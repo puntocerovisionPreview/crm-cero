@@ -1,0 +1,10 @@
+{
+  "name": "CRM Personal .Cero",
+  "description": "Herramienta ágil y simplificada de gestión diaria para operador único: Agenda a 7 días, Proyectos activos e Ingresos mensuales con sincronización persistente en Firebase Firestore.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

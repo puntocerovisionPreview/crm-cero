@@ -1,0 +1,171 @@
+{
+  "entities": {
+    "Task": {
+      "title": "Task",
+      "description": "Agenda task item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "subtasks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "title": { "type": "string" },
+              "completed": { "type": "boolean" }
+            },
+            "required": ["id", "title", "completed"]
+          }
+        }
+      },
+      "required": ["id", "title", "date", "completed"]
+    },
+    "Meeting": {
+      "title": "Meeting",
+      "description": "Agenda meeting item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "notes": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "date", "completed"]
+    },
+    "Project": {
+      "title": "Project",
+      "description": "CRM project tracking item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientName": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "archived": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "clientName", "status", "notes", "archived"]
+    },
+    "Income": {
+      "title": "Income",
+      "description": "Monthly income record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "month": { "type": "string" },
+        "date": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" }
+      },
+      "required": ["id", "title", "month", "date", "amount", "currency", "status"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Direct and operational expense record for projects and studio",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "month": { "type": "string" },
+        "date": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "status": { "type": "string" },
+        "projectId": { "type": "string" },
+        "projectName": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "month", "date", "amount", "currency", "status"]
+    },
+    "WeeklyGoal": {
+      "title": "WeeklyGoal",
+      "description": "Weekly focus and operational goals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "weekStart": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "category": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "title", "weekStart", "completed"]
+    },
+    "StudioFixedExpense": {
+      "title": "StudioFixedExpense",
+      "description": "Fixed expenses, subscriptions and renewals for studio tools, IAs, hosting and domains",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "provider": { "type": "string" },
+        "category": { "type": "string" },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "billingCycle": { "type": "string" },
+        "nextDueDate": { "type": "string" },
+        "lastPaidDate": { "type": "string" },
+        "autoRenew": { "type": "boolean" },
+        "projectId": { "type": "string" },
+        "clientName": { "type": "string" },
+        "notes": { "type": "string" },
+        "active": { "type": "boolean" },
+        "paymentMethod": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "category", "amount", "currency", "billingCycle", "nextDueDate", "active"]
+    }
+  },
+  "firestore": {
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Collection of tasks for personal CRM"
+    },
+    "/meetings/{meetingId}": {
+      "schema": "Meeting",
+      "description": "Collection of meetings for personal CRM"
+    },
+    "/projects/{projectId}": {
+      "schema": "Project",
+      "description": "Collection of active and archived projects"
+    },
+    "/incomes/{incomeId}": {
+      "schema": "Income",
+      "description": "Collection of monthly financial records"
+    },
+    "/expenses/{expenseId}": {
+      "schema": "Expense",
+      "description": "Collection of direct and operational expense records"
+    },
+    "/studioFixedExpenses/{fixedExpenseId}": {
+      "schema": "StudioFixedExpense",
+      "description": "Collection of fixed expenses, renewals, hosting, domains and AI subscriptions"
+    },
+    "/weeklyGoals/{goalId}": {
+      "schema": "WeeklyGoal",
+      "description": "Collection of weekly goals and targets"
+    },
+    "/settings/{settingId}": {
+      "schema": "object",
+      "description": "Application settings such as theme and preferences"
+    }
+  }
+}

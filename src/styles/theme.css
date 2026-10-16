@@ -1,0 +1,218 @@
+/* ==========================================================================
+   GOOGLE MATERIAL DESIGN 3 (MATERIAL YOU) & CRM THEME TOKENS
+   Inspired by Google Gemini, Google Workspace, and Pixel UI
+   ========================================================================== */
+
+:root {
+  /* --- 01. Typography Fonts --- */
+  --font-family-display: 'Google Sans', 'Plus Jakarta Sans', 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-family-body: 'Roboto', 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-family-mono: 'Roboto Mono', 'JetBrains Mono', monospace;
+  --default-font: var(--font-family-display);
+
+  /* --- 02. Material 3 Typography Scale --- */
+  --md-sys-typescale-display-large: 400 57px/64px var(--font-family-display);
+  --md-sys-typescale-display-medium: 400 45px/52px var(--font-family-display);
+  --md-sys-typescale-display-small: 400 36px/44px var(--font-family-display);
+
+  --md-sys-typescale-headline-large: 600 32px/40px var(--font-family-display);
+  --md-sys-typescale-headline-medium: 600 28px/36px var(--font-family-display);
+  --md-sys-typescale-headline-small: 600 24px/32px var(--font-family-display);
+
+  --md-sys-typescale-title-large: 600 22px/28px var(--font-family-display);
+  --md-sys-typescale-title-medium: 600 16px/24px var(--font-family-display);
+  --md-sys-typescale-title-small: 600 14px/20px var(--font-family-display);
+
+  --md-sys-typescale-body-large: 400 16px/24px var(--font-family-body);
+  --md-sys-typescale-body-medium: 400 14px/20px var(--font-family-body);
+  --md-sys-typescale-body-small: 400 12px/16px var(--font-family-body);
+
+  --md-sys-typescale-label-large: 600 14px/20px var(--font-family-display);
+  --md-sys-typescale-label-medium: 600 12px/16px var(--font-family-display);
+  --md-sys-typescale-label-small: 600 11px/16px var(--font-family-display);
+
+  /* --- 03. Material 3 Google Colors & Surfaces (Dark - Default Gemini/Pixel) --- */
+  --md-sys-color-surface: #131314;
+  --md-sys-color-surface-dim: #111112;
+  --md-sys-color-surface-bright: #37393B;
+  --md-sys-color-surface-container-lowest: #0F0F10;
+  --md-sys-color-surface-container-low: #1E1F20;
+  --md-sys-color-surface-container: #282A2C;
+  --md-sys-color-surface-container-high: #2D2F31;
+  --md-sys-color-surface-container-highest: #37393B;
+
+  --md-sys-color-on-surface: #E3E3E3;
+  --md-sys-color-on-surface-variant: #C4C7C5;
+  --md-sys-color-outline: #444746;
+  --md-sys-color-outline-variant: #2D2F31;
+
+  /* Material 3 Google Brand Accents (Gemini / Workspace) */
+  --md-sys-color-primary: #A8C7FA;         /* Google Gemini Light Blue */
+  --md-sys-color-primary-container: #004A77;
+  --md-sys-color-on-primary: #04315A;
+  --md-sys-color-on-primary-container: #D3E3FD;
+
+  --md-sys-color-secondary: #C2E7FF;
+  --md-sys-color-secondary-container: #004D68;
+  --md-sys-color-on-secondary: #003549;
+
+  --md-sys-color-tertiary: #D0BCFF;        /* Google Purple/Violet */
+  --md-sys-color-tertiary-container: #4F378B;
+  --md-sys-color-on-tertiary: #381E72;
+
+  --md-sys-color-error: #F2B8B5;           /* Google Soft Coral Red */
+  --md-sys-color-error-container: #8C1D18;
+  --md-sys-color-on-error: #601410;
+
+  --md-sys-color-success: #C4EED0;         /* Google Mint/Green */
+  --md-sys-color-success-container: #0F5223;
+  --md-sys-color-on-success: #072710;
+
+  --md-sys-color-warning: #FFDF99;         /* Google Warm Amber */
+  --md-sys-color-warning-container: #664600;
+  --md-sys-color-on-warning: #3D2800;
+
+  /* --- 04. M3 Shapes & Border Radius --- */
+  --md-shape-none: 0px;
+  --md-shape-extra-small: 4px;
+  --md-shape-small: 8px;
+  --md-shape-medium: 12px;
+  --md-shape-large: 16px;
+  --md-shape-extra-large: 24px;
+  --md-shape-super-large: 28px;
+  --md-shape-full: 9999px;
+
+  /* --- 05. Legacy compatibility tokens --- */
+  --primary-color: var(--md-sys-color-surface);
+  --secondary-color: var(--md-sys-color-surface-container-low);
+  --accent-color: #A8C7FA;
+  --accent-secondary-color: #C4EED0;
+  --divider-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Light Mode Overrides */
+.light {
+  --md-sys-color-surface: #FFFFFF;
+  --md-sys-color-surface-dim: #DED8E1;
+  --md-sys-color-surface-bright: #FEF7FF;
+  --md-sys-color-surface-container-lowest: #FFFFFF;
+  --md-sys-color-surface-container-low: #F8F9FA;
+  --md-sys-color-surface-container: #F0F4F9;
+  --md-sys-color-surface-container-high: #ECE6F0;
+  --md-sys-color-surface-container-highest: #E6E0E9;
+
+  --md-sys-color-on-surface: #1C1B1F;
+  --md-sys-color-on-surface-variant: #49454F;
+  --md-sys-color-outline: #79747E;
+  --md-sys-color-outline-variant: #CAC4D0;
+
+  --md-sys-color-primary: #0B57D0;
+  --md-sys-color-primary-container: #D3E3FD;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-on-primary-container: #041E49;
+
+  --md-sys-color-success: #1E8E3E;
+  --md-sys-color-success-container: #C4EED0;
+  --md-sys-color-warning: #B06000;
+  --md-sys-color-warning-container: #FFDF99;
+  --md-sys-color-error: #B3261E;
+  --md-sys-color-error-container: #F9DEDC;
+}
+
+/* Material Symbols configuration */
+.material-symbols-rounded {
+  font-family: 'Material Symbols Rounded', sans-serif;
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Base Body Styles */
+body {
+  font-family: var(--font-family-display);
+  background-color: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+}
+
+/* Material 3 Surface utility classes */
+.m3-surface {
+  background-color: var(--md-sys-color-surface);
+}
+.m3-surface-low {
+  background-color: var(--md-sys-color-surface-container-low);
+}
+.m3-surface-container {
+  background-color: var(--md-sys-color-surface-container);
+}
+.m3-surface-high {
+  background-color: var(--md-sys-color-surface-container-high);
+}
+.m3-surface-highest {
+  background-color: var(--md-sys-color-surface-container-highest);
+}
+
+/* Material 3 Rounded Button / Pill */
+.m3-button-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: var(--md-shape-full);
+  background-color: #A8C7FA;
+  color: #04315A;
+  font-family: var(--font-family-display);
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  border: none;
+  cursor: pointer;
+}
+
+.m3-button-primary:hover {
+  background-color: #D3E3FD;
+  transform: translateY(-1px);
+}
+
+.m3-button-tonal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: var(--md-shape-full);
+  background-color: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  font-family: var(--font-family-display);
+  font-weight: 500;
+  font-size: 14px;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  cursor: pointer;
+}
+
+.m3-button-tonal:hover {
+  background-color: var(--md-sys-color-surface-container-highest);
+}
+
+/* Material 3 Card */
+.m3-card {
+  background-color: var(--md-sys-color-surface-container-low);
+  border-radius: var(--md-shape-extra-large);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  padding: 20px;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.m3-card:hover {
+  border-color: rgba(168, 199, 250, 0.4);
+}
