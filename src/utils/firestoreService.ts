@@ -1103,6 +1103,9 @@ export const ALL_CRM_COLLECTIONS = [
   'personal_savings_goals',
   'personal_study_items',
   'personal_finance_settings',
+  'daily_routine',
+  'daily_routine_log',
+  'student_portals',
 ] as const;
 
 export type CrmCollectionName = (typeof ALL_CRM_COLLECTIONS)[number];
