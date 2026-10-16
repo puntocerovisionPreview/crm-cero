@@ -36,6 +36,7 @@ import {
   PersonalFinanceSettings,
   StudioPaymentSettings,
   StudioFixedExpense,
+  Client,
 } from '../types';
 import { LinkRelation } from '../lib/links';
 import { todayLocal, monthOf, toSafeDateString, normalizeTimestamp } from './dates';
@@ -295,6 +296,7 @@ export async function updateTaskInFirestore(taskId: string, updates: Partial<Age
   // Si se reprograma, el recordatorio tiene que volver a sonar
   if (('date' in updates || 'time' in updates || 'reminderMinutesBefore' in updates) && !('reminderNotified' in updates)) {
     payload.reminderNotified = false;
+    payload.telegramReminded = false;
   }
   if ('projectId' in updates && (updates.projectId === undefined || updates.projectId === null || updates.projectId === '')) {
     payload.projectId = deleteField();
@@ -356,6 +358,7 @@ export async function updateMeetingInFirestore(meetingId: string, updates: Parti
   // Si se reprograma, el recordatorio tiene que volver a sonar
   if (('date' in updates || 'time' in updates || 'reminderMinutesBefore' in updates) && !('reminderNotified' in updates)) {
     payload.reminderNotified = false;
+    payload.telegramReminded = false;
   }
   if ('projectId' in updates && (updates.projectId === undefined || updates.projectId === null || updates.projectId === '')) {
     payload.projectId = deleteField();
@@ -1106,6 +1109,7 @@ export const ALL_CRM_COLLECTIONS = [
   'daily_routine',
   'daily_routine_log',
   'student_portals',
+  'clients',
 ] as const;
 
 export type CrmCollectionName = (typeof ALL_CRM_COLLECTIONS)[number];
@@ -1785,3 +1789,32 @@ export async function seedPersonalFinanceDefaultsIfEmpty(
 }
 
 
+
+// ---------------- CLIENTES ----------------
+export function subscribeClients(onChanged: (clients: Client[]) => void, onError?: (err: Error) => void) {
+  return onSnapshot(
+    collection(db, 'clients'),
+    (snapshot) => {
+      const items: Client[] = [];
+      snapshot.forEach((d) => items.push({ ...(d.data() as Client), id: d.id }));
+      items.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      onChanged(items);
+    },
+    (err) => {
+      console.warn('Firestore subscribeClients error:', err);
+      if (onError) onError(err);
+    }
+  );
+}
+
+export async function saveClientToFirestore(client: Client): Promise<void> {
+  await setDoc(doc(db, 'clients', client.id), deepSanitize({ ...client, updatedAt: serverTimestamp() }), { merge: true });
+}
+
+// Crea clientes y vincula proyectos en tandas (planClientLinks decide qué hacer)
+export async function applyClientLinks(newClients: Client[], links: { projectId: string; clientId: string }[]): Promise<void> {
+  const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
+  newClients.forEach((c) => ops.push((batch) => batch.set(doc(db, 'clients', c.id), deepSanitize(c), { merge: true })));
+  links.forEach((l) => ops.push((batch) => batch.set(doc(db, 'projects', l.projectId), { clientId: l.clientId }, { merge: true })));
+  await commitInChunks(ops);
+}

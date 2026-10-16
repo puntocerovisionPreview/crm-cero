@@ -1,8 +1,13 @@
+// Todas las fechas del servidor ("hoy", horarios de avisos) en hora argentina,
+// igual que en la app. Cloud Run corre en UTC y después de las 21 hs ya sería "mañana".
+process.env.TZ = process.env.TZ || 'America/Argentina/Cordoba';
+
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
 import firebaseConfig from './firebase-applet-config.json';
+import { registerAutomationRoutes } from './server/automation';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -40,10 +45,15 @@ async function isAuthorizedRequest(req: express.Request): Promise<boolean> {
   }
 }
 
-app.use('/api/ai', async (req, res, next) => {
+const requireOwner: express.RequestHandler = async (req, res, next) => {
   if (await isAuthorizedRequest(req)) return next();
-  res.status(401).json({ success: false, error: 'Iniciá sesión para usar la IA', code: 'UNAUTHORIZED' });
-});
+  res.status(401).json({ success: false, error: 'Iniciá sesión para continuar', code: 'UNAUTHORIZED' });
+};
+
+app.use('/api/ai', requireOwner);
+
+// Motor de automatización: Telegram, recordatorios, plan semanal y Google Calendar
+registerAutomationRoutes(app, requireOwner);
 
 // ---------------- COTIZACIÓN DEL DÓLAR ----------------
 // Proxy con caché de 30 min a dolarapi.com (precio de compra). Público: no expone datos tuyos.

@@ -1,0 +1,104 @@
+import { describe, expect, it } from 'vitest';
+import { getCollectedEntries, sumByCurrency, monthMatcher } from '../src/utils/ledger';
+import { reconcileCommitments, calculateProjectBilling } from '../src/utils/paymentPlans';
+import { calculateMonthlyCashProjection } from '../src/utils/monthlyCashProjection';
+import { findDataIssues } from '../src/utils/dataReview';
+
+const project = (over: any = {}) =>
+  ({
+    id: 'p1',
+    clientName: 'Multiservicios',
+    status: 'En curso',
+    notes: '',
+    archived: false,
+    createdAt: '2026-08-01',
+    updatedAt: '2026-08-01',
+    estimatedPrice: 650,
+    estimatedCurrency: 'USD',
+    projectType: 'web',
+    ...over,
+  }) as any;
+
+describe('libro único de cobros', () => {
+  it('no cuenta dos veces un pago que ya tiene su ingreso', () => {
+    const incomes = [{ id: 'inc1', status: 'cobrado', amount: 325, currency: 'USD', date: '2026-10-03', month: '2026-10', paymentId: 'pay1', projectId: 'p1' }] as any;
+    const projects = [project({ payments: [{ id: 'pay1', amount: 325, currency: 'USD', date: '2026-10-03', incomeRecordId: 'inc1' }] })];
+    const total = sumByCurrency(getCollectedEntries(incomes, projects, monthMatcher('2026-10')));
+    expect(total).toEqual({ ARS: 0, USD: 325 });
+  });
+
+  it('suma pagos viejos sin ingreso y también los de proyectos archivados', () => {
+    const projects = [project({ archived: true, payments: [{ id: 'pay9', amount: 100, currency: 'ARS', date: '2026-09-10' }] })];
+    const total = sumByCurrency(getCollectedEntries([], projects, monthMatcher('2026-09')));
+    expect(total.ARS).toBe(100);
+  });
+});
+
+describe('compromisos de pago', () => {
+  const cmt = (createdIso: string, due: string, amount: number) =>
+    ({ id: `cmt_${Date.parse(createdIso)}_x`, title: 'Saldo', dueDate: due, amount, status: 'pendiente' }) as any;
+
+  it('si el proyecto está saldado, todos quedan cobrados', () => {
+    const out = reconcileCommitments([cmt('2026-09-30T12:00:00', '2026-10-03', 162)], [], 0);
+    expect(out[0].status).toBe('cobrado');
+  });
+
+  it('un pago anterior al compromiso no lo salda; uno posterior sí', () => {
+    const payments = [
+      { id: 'a', amount: 500, date: '2026-09-20' },
+      { id: 'b', amount: 60, date: '2026-10-02' },
+    ] as any;
+    const out = reconcileCommitments([cmt('2026-10-01T12:00:00', '2026-10-05', 100)], payments, 40);
+    expect(out[0].status).toBe('parcial');
+    expect(out[0].amountPaid).toBe(60);
+  });
+
+  it('el caso Multiservicios: saldo cubierto, sin deuda', () => {
+    const p = project({
+      payments: [
+        { id: 'p1', amount: 163, currency: 'USD', date: '2026-09-30' },
+        { id: 'p2', amount: 325, currency: 'USD', date: '2026-10-03' },
+        { id: 'p3', amount: 162, currency: 'USD', date: '2026-10-13' },
+      ],
+      paymentCommitments: [cmt('2026-09-30T12:00:00', '2026-10-03', 162)],
+    });
+    const b = calculateProjectBilling(p, []);
+    expect(b.saldoPendiente).toBe(0);
+    expect(b.isOverdue).toBe(false);
+    expect(b.commitments.every((c) => c.status === 'cobrado')).toBe(true);
+  });
+});
+
+describe('proyección mensual', () => {
+  const fixed = [
+    { id: 'f1', name: 'Monotributo', amount: 70000, currency: 'ARS', billingCycle: 'mensual', nextDueDate: '2026-10-20', active: true },
+    { id: 'f2', name: 'Dominio', amount: 15, currency: 'USD', billingCycle: 'anual', nextDueDate: '2027-03-01', active: true },
+  ] as any;
+
+  it('descuenta los gastos fijos del mes que no están registrados', () => {
+    const r = calculateMonthlyCashProjection({ monthKey: '2026-10', incomes: [], projects: [], expenses: [], fixedExpenses: fixed, usdRate: 1500 });
+    expect(r.gastosFijosARS).toBe(70000);
+    expect(r.gastosFijosUSD).toBe(0); // el dominio anual no vence este mes
+    expect(r.netoARS).toBe(-70000);
+  });
+
+  it('no cuenta dos veces un gasto fijo ya registrado como gasto', () => {
+    const expenses = [{ id: 'e1', title: 'Renovación: Monotributo (mensual)', amount: 70000, currency: 'ARS', date: '2026-10-20', month: '2026-10', status: 'pagado', fixedExpenseId: 'f1' }] as any;
+    const r = calculateMonthlyCashProjection({ monthKey: '2026-10', incomes: [], projects: [], expenses, fixedExpenses: fixed, usdRate: 1500 });
+    expect(r.gastosARS).toBe(70000);
+    expect(r.gastosFijosARS).toBe(0);
+  });
+});
+
+describe('revisión de datos', () => {
+  it('detecta cobro de más y pagos repetidos', () => {
+    const p = project({
+      payments: [
+        { id: 'x1', amount: 650, currency: 'USD', date: '2026-10-13' },
+        { id: 'x2', amount: 650, currency: 'USD', date: '2026-10-14' },
+      ],
+    });
+    const kinds = findDataIssues([p], []).map((i) => i.kind).sort();
+    expect(kinds).toEqual(['cobrado_de_mas', 'pago_duplicado']);
+  });
+});

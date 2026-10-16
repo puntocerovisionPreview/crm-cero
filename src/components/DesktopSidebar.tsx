@@ -542,7 +542,7 @@ export const DesktopSidebar: React.FC<Props> = ({
             type="button"
             onClick={onLockSession}
             className="p-1.5 rounded text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer"
-            title="Bloquear sesión con PIN"
+            title="Cerrar sesión"
           >
             <Lock className="w-3.5 h-3.5 stroke-[1.5]" />
           </button>

@@ -391,7 +391,7 @@ export const Header: React.FC<Props> = ({
                           className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-rose-400 hover:bg-rose-500/10 transition text-left"
                         >
                           <Lock className="w-4 h-4" />
-                          <span>Bloquear Sesión</span>
+                          <span>Cerrar sesión</span>
                         </button>
                       )}
                     </div>

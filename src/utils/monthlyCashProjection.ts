@@ -2,6 +2,7 @@ import { Project, IncomeRecord, ExpenseRecord, RecurringIncomePlan } from '../ty
 import { getCollectedEntries, sumByCurrency } from './ledger';
 import { StudioFixedExpense } from '../types';
 import { DEFAULT_USD_RATE } from './currency';
+import { getReconciledCommitments } from './paymentPlans';
 
 export interface CashProjectionItem {
   id: string;
@@ -314,8 +315,9 @@ export function calculateMonthlyCashProjection({
     }
 
     // B. Compromisos flexibles directos (si no están en billingAgreement)
-    if (proj.paymentCommitments && proj.paymentCommitments.length > 0) {
-      proj.paymentCommitments.forEach(c => {
+    const reconciledCommitments = getReconciledCommitments(proj, incomes);
+    if (reconciledCommitments.length > 0) {
+      reconciledCommitments.forEach(c => {
         if (matchesMonth(c.dueDate)) {
           const expected = Number(c.amount || 0);
           const paid = Number(c.amountPaid || (c.paid ? expected : 0));

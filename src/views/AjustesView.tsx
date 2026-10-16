@@ -42,6 +42,8 @@ import { getHorizonCapacity, setHorizonCapacity } from '../utils/horizon';
 import { getLeadProbabilities, setLeadProbabilities } from '../utils/monthlyCashProjection';
 import { getMissionsConfig, saveMissionsConfig, MissionsConfig } from '../utils/missions';
 import { DEFAULT_USD_RATE, USD_RATE_SOURCE_LABELS, UsdRateSource } from '../utils/currency';
+import { AutomationSettings } from '../components/AutomationSettings';
+import { Zap } from 'lucide-react';
 
 interface Props {
   subSection?: string;
@@ -227,6 +229,12 @@ export const AjustesView: React.FC<Props> = ({
 
   const SECTIONS = [
     {
+      id: 'automatizaciones',
+      title: 'Automatizaciones',
+      description: 'Resumen diario y avisos por Telegram, plan semanal y Google Calendar',
+      icon: Zap,
+    },
+    {
       id: 'cobro',
       title: 'Datos de cobro del estudio',
       description: 'CBU, CVU, Alias, Banco y datos de facturación para WhatsApp',
@@ -259,7 +267,7 @@ export const AjustesView: React.FC<Props> = ({
     {
       id: 'seguridad',
       title: 'Privacidad y Seguridad',
-      description: 'Modo privacidad ($ ••••••), PIN de bloqueo y acceso',
+      description: 'Modo privacidad ($ ••••••), sesión con Google y acceso',
       icon: Shield,
     },
     {
@@ -328,7 +336,7 @@ export const AjustesView: React.FC<Props> = ({
           className="min-h-[44px] sm:min-h-[32px] px-3 py-1.5 rounded-[var(--radius-control)] border border-rose-500/30 text-rose-500 hover:bg-rose-500/10 text-xs font-semibold flex items-center gap-1.5 transition active:scale-95 cursor-pointer"
         >
           <Lock className="w-3.5 h-3.5" />
-          <span>Bloquear app</span>
+          <span>Cerrar sesión</span>
         </button>
       </div>
 
@@ -433,6 +441,8 @@ export const AjustesView: React.FC<Props> = ({
         )}
 
         {/* Sub-section 1: Datos de cobro */}
+        {activeSection === 'automatizaciones' && <AutomationSettings />}
+
         {activeSection === 'cobro' && (
           <form onSubmit={handleSaveStudioSettings} className="space-y-4">
             <div className="card-swiss p-4 sm:p-5 space-y-4">

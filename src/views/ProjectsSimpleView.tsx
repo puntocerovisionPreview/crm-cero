@@ -90,8 +90,13 @@ import {
   generatePafWhatsAppMessage
 } from '../utils/pafTemplates';
 import { DEFAULT_USD_RATE } from '../utils/currency';
+import { ClientDirectory } from '../components/ClientDirectory';
+import { Users as UsersIcon } from 'lucide-react';
+import { Client } from '../types';
 
 interface Props {
+  clients?: Client[];
+  onUpdateClient?: (client: Client) => void;
   projects: Project[];
   tasks?: AgendaTask[];
   meetings?: AgendaMeeting[];
@@ -132,6 +137,8 @@ interface Props {
 }
 
 export const ProjectsSimpleView: React.FC<Props> = ({
+  clients = [],
+  onUpdateClient,
   projects,
   tasks = [],
   meetings = [],
@@ -170,6 +177,8 @@ export const ProjectsSimpleView: React.FC<Props> = ({
   personalAccounts = [],
   usdRate = DEFAULT_USD_RATE,
 }) => {
+  // Pestaña de la página: Proyectos (tarjetas) o Clientes (agrupados por cliente)
+  const [directoryTab, setDirectoryTab] = useState<'proyectos' | 'clientes'>('proyectos');
   const [serviceMode, setServiceMode] = useState<'web' | 'paf' | 'all' | 'extra'>(initialServiceMode);
   const [includeWebInTarget, setIncludeWebInTargetState] = useState<boolean>(() => getHorizonIncludeWebInTarget());
   const targetGoalARS = getHorizonTargetGoalARS();
@@ -655,47 +664,79 @@ export const ProjectsSimpleView: React.FC<Props> = ({
     }
   };
 
-  return (
-    <div className="space-y-6 pb-24">
-      {/* Pestañas de Vista de Clientes: Lista | Horizonte */}
+  const tabBar = (
       <div className="flex items-center justify-between gap-3 p-1.5 rounded-2xl bg-zinc-950/90 border border-zinc-800 shadow-sm backdrop-blur-md">
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-zinc-800 text-white shadow-xs cursor-default"
-          >
-            <FolderKanban className="w-3.5 h-3.5 text-zinc-300" />
-            <span>Lista de Clientes</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.light();
-              if (onNavigate) onNavigate('/horizonte');
-            }}
-            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition cursor-pointer group"
-            title="Ir a Horizonte: Línea de tiempo de proyectos, ocupación y capacidad mensual"
-          >
-            <Compass className="w-3.5 h-3.5 text-sky-400 group-hover:rotate-45 transition-transform" />
-            <span>Horizonte (Largo Plazo)</span>
-            <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
-              Gantt
-            </span>
-          </button>
-        </div>
-
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setDirectoryTab('proyectos')}
+          aria-pressed={directoryTab === 'proyectos'}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${directoryTab === 'proyectos' ? 'bg-zinc-800 text-white shadow-xs' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+        >
+          <FolderKanban className="w-3.5 h-3.5 text-zinc-300" />
+          <span>Proyectos</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setDirectoryTab('clientes')}
+          aria-pressed={directoryTab === 'clientes'}
+          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${directoryTab === 'clientes' ? 'bg-zinc-800 text-white shadow-xs' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'}`}
+        >
+          <UsersIcon className="w-3.5 h-3.5 text-zinc-300" />
+          <span>Clientes</span>
+        </button>
         <button
           type="button"
           onClick={() => {
             hapticFeedback.light();
             if (onNavigate) onNavigate('/horizonte');
           }}
-          className="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-sky-500/10 transition cursor-pointer shrink-0"
+          className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white hover:bg-zinc-900 transition cursor-pointer group"
+          title="Ir a Horizonte: Línea de tiempo de proyectos, ocupación y capacidad mensual"
         >
-          <span>Abrir Horizonte</span>
-          <ArrowUpRight className="w-3.5 h-3.5" />
+          <Compass className="w-3.5 h-3.5 text-sky-400 group-hover:rotate-45 transition-transform" />
+          <span>Horizonte (Largo Plazo)</span>
+          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+            Gantt
+          </span>
         </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => {
+          hapticFeedback.light();
+          if (onNavigate) onNavigate('/horizonte');
+        }}
+        className="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-sky-500/10 transition cursor-pointer shrink-0"
+      >
+        <span>Abrir Horizonte</span>
+        <ArrowUpRight className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+
+  // Pestaña Clientes: un cliente agrupa todos sus proyectos, cobros y contacto
+  if (directoryTab === 'clientes') {
+    return (
+      <div className="space-y-6 pb-24">
+        {tabBar}
+        <ClientDirectory
+          clients={clients}
+          projects={projects}
+          incomes={incomes}
+          meetings={meetings}
+          privacyMode={privacyMode}
+          onUpdateClient={onUpdateClient || (() => {})}
+          onOpenProject={onNavigateToProject}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 pb-24">
+      {tabBar}
 
       {/* 1. Top Header Card & Segment Switcher */}
       <div className="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/25 space-y-4">

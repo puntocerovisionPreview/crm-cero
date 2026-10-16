@@ -52,7 +52,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
     { key: 'G', label: 'Nuevo Gasto', category: 'Finanzas' },
     { key: 'F', label: 'Iniciar / Pausar Pomodoro', category: 'Enfoque' },
     { key: 'H', label: 'Ocultar / Mostrar cifras (Modo Privacidad)', category: 'Privacidad' },
-    { key: 'L', label: 'Bloquear sesión con PIN', category: 'Seguridad' },
+    { key: 'L', label: 'Cerrar sesión', category: 'Seguridad' },
     { key: 'Esc', label: 'Cerrar selector o panel activo', category: 'General' },
   ];
 

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { AgendaTask, AgendaMeeting, WeeklyGoal, WeeklyMission, IncomeRecord, Project, Payment, StudioPaymentSettings, PersonalAccount } from '../types';
 import { FRENTE_CONFIG, calculateMissionProgress } from '../utils/missions';
 import { 
@@ -65,6 +65,8 @@ import { formatWhatsAppUrl, formatTelUrl, extractPhoneFromText } from '../utils/
 import { generateCalendarICS } from '../utils/calendarIcs';
 import { resolveTaskProject } from '../utils/taskProject';
 import { ModalPortal } from '../components/ModalPortal';
+import { TaskSortControl } from '../components/TaskSortControl';
+import { TaskSortMode, getStoredTaskSortMode, sortTasks, storeTaskSortMode } from '../utils/taskSort';
 
 interface Props {
   tasks: AgendaTask[];
@@ -124,7 +126,7 @@ function reorderTasksList(
 }
 
 export const AgendaView: React.FC<Props> = ({
-  tasks,
+  tasks: rawTasks,
   meetings,
   projects = [],
   incomes = [],
@@ -142,7 +144,7 @@ export const AgendaView: React.FC<Props> = ({
   onUpdateProject,
   onAddIncome,
   onUpdateTask,
-  onReorderTasks,
+  onReorderTasks: onReorderTasksProp,
   onUpdateMeeting,
   onOpenQuickAdd,
   onToggleSubtask,
@@ -176,6 +178,22 @@ export const AgendaView: React.FC<Props> = ({
     setShowRegisterPaymentModal(false);
     setSelectedProjectForPayment(null);
   };
+  // Orden de tareas elegido (se recuerda en este dispositivo). Se aplica una sola vez
+  // acá, así todas las vistas (día, semana, listas, Kanban, encabezado de Hoy) lo respetan.
+  const [taskSortMode, setTaskSortModeState] = useState<TaskSortMode>(() => getStoredTaskSortMode());
+  const setTaskSortMode = (mode: TaskSortMode) => {
+    setTaskSortModeState(mode);
+    storeTaskSortMode(mode);
+  };
+  const tasks = useMemo(() => sortTasks(rawTasks, taskSortMode), [rawTasks, taskSortMode]);
+  // Arrastrar para reordenar implica orden propio: pasa a "Manual" para que se vea el cambio
+  const onReorderTasks = onReorderTasksProp
+    ? (date: string, reordered: AgendaTask[]) => {
+        if (taskSortMode !== 'manual') setTaskSortMode('manual');
+        onReorderTasksProp(date, reordered);
+      }
+    : undefined;
+
   const [startDateStr, setStartDateStr] = useState<string>(getTodayString());
   const [activeMobileDayIndex, setActiveMobileDayIndex] = useState<number>(0);
   const [showInfoModal, setShowInfoModal] = useState(false);
@@ -380,37 +398,6 @@ export const AgendaView: React.FC<Props> = ({
             <span>7 Días</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.light();
-              setMobileTab('kanban');
-            }}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer ${
-              mobileTab === 'kanban'
-                ? 'bg-[var(--accent)] text-white shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <Columns className="w-3.5 h-3.5" />
-            <span>Kanban</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.light();
-              setMobileTab('eisenhower');
-            }}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer ${
-              mobileTab === 'eisenhower'
-                ? 'bg-[var(--accent)] text-white shadow-sm'
-                : 'text-zinc-400 hover:text-zinc-200'
-            }`}
-          >
-            <LayoutGrid className="w-3.5 h-3.5" />
-            <span>Eisenhower</span>
-          </button>
 
           <button
             type="button"
@@ -433,6 +420,27 @@ export const AgendaView: React.FC<Props> = ({
             )}
           </button>
 
+          {/* Vistas secundarias: menos botones, mismo acceso */}
+          <label className="sr-only" htmlFor="mobile-more-views">Más vistas</label>
+          <select
+            id="mobile-more-views"
+            value={mobileTab === 'kanban' || mobileTab === 'eisenhower' ? mobileTab : ''}
+            onChange={(e) => {
+              if (!e.target.value) return;
+              hapticFeedback.light();
+              setMobileTab(e.target.value as 'kanban' | 'eisenhower');
+            }}
+            className={`py-2 px-2 rounded-xl text-xs font-bold shrink-0 cursor-pointer border-0 focus:outline-none ${
+              mobileTab === 'kanban' || mobileTab === 'eisenhower'
+                ? 'bg-[var(--accent)] text-[var(--on-accent)]'
+                : 'bg-transparent text-zinc-400'
+            }`}
+          >
+            <option value="">Más…</option>
+            <option value="kanban">Kanban</option>
+            <option value="eisenhower">Eisenhower</option>
+          </select>
+
           <button
             type="button"
             onClick={() => {
@@ -440,11 +448,11 @@ export const AgendaView: React.FC<Props> = ({
               if (onNavigateToCalendar) onNavigateToCalendar();
               else onNavigate?.('/calendario');
             }}
-            className="py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer bg-amber-500/15 text-amber-300 border border-amber-500/30"
-            title="Abrir Calendario 360°"
+            className="py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer text-zinc-400 hover:text-zinc-200"
+            title="Abrir el calendario del mes"
           >
-            <CalendarDays className="w-3.5 h-3.5 text-amber-400" />
-            <span>Mes 360°</span>
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>Mes</span>
           </button>
         </div>
 
@@ -509,6 +517,10 @@ export const AgendaView: React.FC<Props> = ({
       {/* MOBILE CONTENT ROUTING (Segmented & Clutter-Free)         */}
       {/* ======================================================== */}
       <div className="lg:hidden space-y-4">
+        {mobileTab !== 'objetivos' && (
+          <TaskSortControl value={taskSortMode} onChange={setTaskSortMode} className="justify-end" />
+        )}
+
         {/* MOBILE MODE 1: MI DÍA (Focused, High-Spacing, Clean) */}
         {mobileTab === 'dia' && (
           <div className="space-y-3.5">
@@ -821,10 +833,6 @@ export const AgendaView: React.FC<Props> = ({
                 {[
                   { id: 'dia', label: 'Día' },
                   { id: 'semana', label: 'Semana' },
-                  { id: 'enfoque', label: '3 Días' },
-                  { id: 'lista', label: 'Listas' },
-                  { id: 'kanban', label: 'Kanban' },
-                  { id: 'eisenhower', label: 'Eisenhower' },
                 ].map(tab => {
                   const isActive = desktopViewMode === tab.id;
                   return (
@@ -854,19 +862,40 @@ export const AgendaView: React.FC<Props> = ({
                     if (onNavigateToCalendar) onNavigateToCalendar();
                     else onNavigate?.('/calendario');
                   }}
-                  className="pb-1.5 text-xs sm:text-sm text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0 border-b border-transparent hover:border-amber-400"
-                  title="Abrir Calendario 360° (Vista Mensual Completa y Entregas)"
+                  className="pb-1.5 text-xs sm:text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium flex items-center gap-1.5 transition cursor-pointer shrink-0"
+                  title="Abrir el calendario del mes con entregas"
                 >
-                  <CalendarDays className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Calendario 360°</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 font-mono">
-                    Mes
-                  </span>
+                  <span>Mes</span>
                 </button>
+
+                {/* Vistas secundarias en un menú: menos ruido, mismo acceso */}
+                <label className="sr-only" htmlFor="desktop-more-views">Más vistas</label>
+                <select
+                  id="desktop-more-views"
+                  value={['enfoque', 'lista', 'kanban', 'eisenhower'].includes(desktopViewMode) ? desktopViewMode : ''}
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    hapticFeedback.selection();
+                    setDesktopViewMode(e.target.value as any);
+                  }}
+                  className={`pb-1.5 text-xs sm:text-sm bg-transparent border-0 cursor-pointer focus:outline-none shrink-0 ${
+                    ['enfoque', 'lista', 'kanban', 'eisenhower'].includes(desktopViewMode)
+                      ? 'text-[var(--text-primary)] font-bold'
+                      : 'text-[var(--text-secondary)] font-medium'
+                  }`}
+                >
+                  <option value="">Más vistas</option>
+                  <option value="enfoque">3 días</option>
+                  <option value="lista">Listas</option>
+                  <option value="kanban">Kanban</option>
+                  <option value="eisenhower">Eisenhower (urgente / importante)</option>
+                </select>
               </div>
 
               {/* Center / Right: Filter Badges + Quick Add + Week Progress */}
               <div className="flex items-center gap-3 flex-wrap justify-between md:justify-end">
+                <TaskSortControl value={taskSortMode} onChange={setTaskSortMode} />
+
                 {/* Filter Pills */}
                 <div className="flex items-center bg-[var(--bg-app)] p-0.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)]">
                   {(['todos', 'pendientes', 'reuniones', 'tareas'] as const).map(f => (

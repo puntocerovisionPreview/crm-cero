@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
-import { ViewTab, AgendaTask, AgendaMeeting, Project, IncomeRecord, ExpenseRecord, SyncStatus, SubTask, SubtareaFoco, WeeklyGoal, WeeklyMission, TimeLog, SecondBrainNote, PersonalAccount, PersonalCategory, PersonalTransaction, PersonalRecurring, PersonalBudget, SavingsGoal, StudyItem, PersonalFinanceSettings, Payment, StudioPaymentSettings, TrashItem, StudioFixedExpense } from './types';
+import { ViewTab, AgendaTask, AgendaMeeting, Project, IncomeRecord, ExpenseRecord, SyncStatus, SubTask, SubtareaFoco, WeeklyGoal, WeeklyMission, TimeLog, SecondBrainNote, PersonalAccount, PersonalCategory, PersonalTransaction, PersonalRecurring, PersonalBudget, SavingsGoal, StudyItem, PersonalFinanceSettings, Payment, StudioPaymentSettings, TrashItem, StudioFixedExpense, Client } from './types';
 import { 
   getStoredTasks, 
   saveStoredTasks, 
@@ -126,6 +126,9 @@ import {
   deleteStudioFixedExpenseFromFirestore,
   seedPersonalFinanceDefaultsIfEmpty,
   resetAllFirestoreData,
+  subscribeClients,
+  saveClientToFirestore,
+  applyClientLinks,
   exportCompleteCrmBackup,
   importCompleteCrmBackup,
   seedLocalDataToFirestoreIfEmpty,
@@ -195,6 +198,7 @@ import { PersonalFinanceStudyView } from './views/personal-finance/PersonalFinan
 import { PersonalFinanceRecurringView } from './views/personal-finance/PersonalFinanceRecurringView';
 import { PersonalFinanceSettingsView } from './views/personal-finance/PersonalFinanceSettingsView';
 import { useUsdRates, resolveUsdRate } from './utils/currency';
+import { planClientLinks } from './utils/clients';
 
 // Lazy load Knowledge Graph module to preserve fast app bundle boot per spec
 const KnowledgeGraphView = React.lazy(() => import('./views/KnowledgeGraphView'));
@@ -305,6 +309,9 @@ export default function App() {
   const [tasks, setTasks] = useState<AgendaTask[]>(() => getStoredTasks());
   const [meetings, setMeetings] = useState<AgendaMeeting[]>(() => getStoredMeetings());
   const [projects, setProjects] = useState<Project[]>(() => getStoredProjects());
+  // Clientes (agrupan proyectos). Se vinculan solos cuando proyectos y clientes llegan de la nube.
+  const [clients, setClients] = useState<Client[]>([]);
+  const [cloudLoaded, setCloudLoaded] = useState({ projects: false, clients: false });
   const [incomes, setIncomes] = useState<IncomeRecord[]>(() => getStoredIncomes());
   const [expenses, setExpenses] = useState<ExpenseRecord[]>(() => getStoredExpenses());
   const [weeklyGoals, setWeeklyGoals] = useState<WeeklyMission[]>(() => {
@@ -1084,6 +1091,7 @@ export default function App() {
     const unsubProjects = subscribeProjects(
       (items) => {
         setProjects(items);
+        setCloudLoaded(prev => (prev.projects ? prev : { ...prev, projects: true }));
         saveStoredProjects(items);
         setSyncStatus('synced');
       },
@@ -1195,6 +1203,11 @@ export default function App() {
       () => {}
     );
 
+    const unsubClients = subscribeClients(items => {
+      setClients(items);
+      setCloudLoaded(prev => (prev.clients ? prev : { ...prev, clients: true }));
+    });
+
     const unsubStudioFixed = subscribeStudioFixedExpenses(
       (items) => {
         setStudioFixedExpenses(items);
@@ -1225,6 +1238,7 @@ export default function App() {
       unsubStudyItems();
       unsubPersonalSettings();
       unsubStudioFixed();
+      unsubClients();
     };
   }, [authToken]);
 
@@ -1237,6 +1251,26 @@ export default function App() {
   );
   // Las vistas de finanzas leen settings.usdExchangeRate: se les pasa ya la cotización vigente
   const effectivePersonalSettings = { ...personalFinanceSettings, usdExchangeRate: effectiveUsdRate };
+
+  // Vincular proyectos con su cliente (por nombre). Solo con datos de la nube, para no
+  // crear clientes repetidos desde una copia local vieja. Es aditivo.
+  const clientLinkInFlight = useRef(false);
+  useEffect(() => {
+    if (!authToken || !cloudLoaded.projects || !cloudLoaded.clients || clientLinkInFlight.current) return;
+    const plan = planClientLinks(projects, clients, getTodayString());
+    if (plan.projectLinks.length === 0) return;
+    clientLinkInFlight.current = true;
+    applyClientLinks(plan.newClients, plan.projectLinks)
+      .catch(err => console.warn('Error vinculando clientes:', err))
+      .finally(() => {
+        clientLinkInFlight.current = false;
+      });
+  }, [authToken, cloudLoaded, projects, clients]);
+
+  const handleUpdateClient = (client: Client) => {
+    setClients(prev => prev.map(c => (c.id === client.id ? client : c)));
+    saveClientToFirestore(client).catch(err => console.warn('Error guardando cliente:', err));
+  };
 
   // Portal del alumno: mantiene publicada la "foto" de cada alumno PAF con link activo
   const publishedPortalKeysRef = useRef<Map<string, string>>(new Map());
@@ -3072,6 +3106,8 @@ export default function App() {
     if (path === '/clientes/paf') {
       return (
         <ProjectsSimpleView
+          clients={clients}
+          onUpdateClient={handleUpdateClient}
           serviceMode="paf"
           projects={projects}
           tasks={tasks}
@@ -3124,6 +3160,8 @@ export default function App() {
     if (path === '/clientes/web') {
       return (
         <ProjectsSimpleView
+          clients={clients}
+          onUpdateClient={handleUpdateClient}
           serviceMode="web"
           projects={projects}
           tasks={tasks}
@@ -3177,6 +3215,8 @@ export default function App() {
     if (path === '/clientes') {
       return (
         <ProjectsSimpleView
+          clients={clients}
+          onUpdateClient={handleUpdateClient}
           serviceMode="all"
           projects={projects}
           tasks={tasks}

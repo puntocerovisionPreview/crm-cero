@@ -741,6 +741,85 @@ export function calculateCommitmentStatus(commitment: {
 }
 
 /**
+ * Cruza los compromisos de pago con los pagos reales, para que no queden
+ * "pendientes" compromisos que ya se cobraron.
+ *
+ * Caso típico: un pago parcial crea un compromiso "Saldo pendiente"; después el
+ * cliente paga el resto, pero el compromiso seguía figurando como deuda atrasada.
+ *
+ * Reglas:
+ * - Si el proyecto ya está saldado (saldo 0), todos los compromisos están cobrados.
+ * - Si no, cada pago cubre compromisos en orden de vencimiento, pero solo los que
+ *   ya existían cuando se hizo el pago (un pago viejo no salda un saldo creado después).
+ */
+function commitmentCreatedDate(c: FlexiblePaymentCommitment): string {
+  const m = /(?:cmt|commit)_(\d{12,})/.exec(c.id || '');
+  if (m) {
+    const d = new Date(Number(m[1]));
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+  }
+  return ''; // desconocida: cualquier pago puede cubrirlo
+}
+
+export function reconcileCommitments(
+  commitments: FlexiblePaymentCommitment[],
+  payments: Payment[],
+  saldoPendiente: number | null
+): FlexiblePaymentCommitment[] {
+  if (!commitments || commitments.length === 0) return [];
+
+  if (saldoPendiente !== null && saldoPendiente <= 0) {
+    return commitments.map(c => ({
+      ...c,
+      amountPaid: Number(c.amount) || 0,
+      status: 'cobrado' as const,
+    }));
+  }
+
+  const pool = [...payments]
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))
+    .map(p => ({ date: p.date || '', left: Number(p.amount) || 0 }));
+
+  const ordered = [...commitments].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+  const resolved = new Map<string, FlexiblePaymentCommitment>();
+
+  ordered.forEach(c => {
+    const amount = Number(c.amount) || 0;
+    if (c.paid || c.status === 'cobrado') {
+      resolved.set(c.id, { ...c, status: 'cobrado' });
+      return;
+    }
+    const created = commitmentCreatedDate(c);
+    let covered = 0;
+    for (const p of pool) {
+      if (covered >= amount) break;
+      if (p.left <= 0 || (created && p.date < created)) continue;
+      const take = Math.min(p.left, amount - covered);
+      p.left -= take;
+      covered += take;
+    }
+    const amountPaid = Math.max(Number(c.amountPaid) || 0, covered);
+    const next = { ...c, amountPaid };
+    resolved.set(c.id, { ...next, status: calculateCommitmentStatus(next) });
+  });
+
+  return commitments.map(c => resolved.get(c.id) || c);
+}
+
+/** Compromisos del proyecto con su estado real (usar siempre esto en vez de project.paymentCommitments). */
+export function getReconciledCommitments(project: Project, incomes: IncomeRecord[] = []): FlexiblePaymentCommitment[] {
+  const commitments = project.paymentCommitments || [];
+  if (commitments.length === 0) return [];
+  const payments = getProjectPayments(project, incomes);
+  const montoAcordado = Number(project.montoAcordado ?? project.estimatedPrice ?? 0);
+  const totalPaid = payments.reduce((s, p) => s + (Number(p.amount) || 0), 0);
+  const saldo = montoAcordado > 0 ? Math.max(0, montoAcordado - totalPaid) : null;
+  return reconcileCommitments(commitments, payments, saldo);
+}
+
+/**
  * Financial summary for a project: Monto acordado, Cobrado real, Saldo pendiente
  */
 export function calculateProjectFinancials(
@@ -781,11 +860,12 @@ export function calculateProjectFinancials(
     commitments = migrateInstallmentsToCommitments(project.installments, project);
   }
 
-  // Auto-refresh statuses
-  const refreshedCommitments = commitments.map(c => ({
-    ...c,
-    status: calculateCommitmentStatus(c),
-  }));
+  // Estado real: cruzado con los pagos del proyecto
+  const refreshedCommitments = reconcileCommitments(
+    commitments,
+    getProjectPayments(project, incomes),
+    montoAcordado > 0 ? saldoPendiente : null
+  );
 
   return {
     montoAcordado,
@@ -914,10 +994,11 @@ export function calculateProjectBilling(
 
   // Commitments (optional)
   const today = getTodayString();
-  const commitments = (project.paymentCommitments || []).map(c => ({
-    ...c,
-    status: calculateCommitmentStatus(c),
-  }));
+  const commitments = reconcileCommitments(
+    project.paymentCommitments || [],
+    payments,
+    montoAcordado > 0 ? saldoPendiente : null
+  );
 
   const pendingCommitments = commitments.filter(c => c.status !== 'cobrado');
   const overdueCommitment = pendingCommitments.find(c => c.dueDate && c.dueDate < today);

@@ -15,6 +15,7 @@ import {
   MissionsConfig
 } from '../types';
 import { getWeekMonday, addDays, getTodayString } from './storage';
+import { getReconciledCommitments } from './paymentPlans';
 
 export type { MissionsConfig };
 
@@ -482,7 +483,7 @@ export function generateAutoCobroMissions(
 
     // B. Compromisos de pago directo
     if (proj.paymentCommitments) {
-      proj.paymentCommitments.forEach(comm => {
+      getReconciledCommitments(proj).forEach(comm => {
         if (comm.dueDate && comm.dueDate >= weekStart && comm.dueDate <= weekSunday && !comm.paid && comm.status !== 'cobrado') {
           const expected = Number(comm.amount || 0);
           const alreadyExists = existingMissions.some(m => 

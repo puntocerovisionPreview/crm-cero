@@ -36,6 +36,7 @@ export interface AgendaTask {
   projectName?: string;
   reminderMinutesBefore?: number; // minutos de antelación para aviso (ej. 0 = exacto, 15, 30, 60, etc.)
   reminderNotified?: boolean; // si ya se disparó la notificación
+  telegramReminded?: boolean; // si el servidor ya avisó por Telegram
   category?: DailyAllocationBucketId | 'general'; // Categoría / Bloque de jornada (video, edicion, foco, etc.)
   orderIndex?: number; // Posición personalizada dentro del día
   priority?: TaskPriority; // Prioridad opcional (alta, media, baja)
@@ -58,6 +59,9 @@ export interface AgendaMeeting {
   missionId?: string; // Misión opcional vinculada directamente
   reminderMinutesBefore?: number;
   reminderNotified?: boolean;
+  telegramReminded?: boolean;
+  googleEventId?: string; // Evento vinculado en Google Calendar
+  googleSyncHash?: string; // Última versión sincronizada (evita ida y vuelta)
   durationHours?: number; // Duración de la sesión en horas (ej: 1 o 1.5) para sumar automáticamente a las horas de consultoría PAF
 }
 
@@ -290,8 +294,23 @@ export interface BillingAgreement {
   installments: BillingInstallment[];
 }
 
+// Cliente: la persona o estudio. Puede tener varios proyectos (web, PAF, abonos...)
+export interface Client {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  instagramUrl?: string;
+  websiteUrl?: string;
+  rubro?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
 export interface Project {
   id: string;
+  clientId?: string; // Cliente al que pertenece (se vincula solo por nombre)
   clientName: string; // Nombre del estudio / cliente (ej: "Estudio Cane Arquitectura")
   ownerName?: string; // Titular / Arq. responsable (ej: "Arq. Juan Cane")
   status: string; // Estado simple
