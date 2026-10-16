@@ -995,7 +995,21 @@ export interface Prospect {
   lostReason?: string;
   convertedProjectId?: string;
   updatedAt?: string;
+  // Desde la reserva (base del scraper)
+  poolId?: string;
+  score?: number;
+  segment?: string; // arquitectura | paisajismo | interiorismo | construccion
+  country?: string; // ISO
+  website?: string;
+  // Guion de conversación (cuando respondió)
+  convStep?: ConvStep;
+  difusion?: DifusionKey; // cómo difunde su trabajo hoy (su respuesta a la pregunta)
 }
+
+// Pasos del guion: pregunta → (su respuesta) → empatía → (acuerdo) → speech + link de auditoría
+export type ConvStep = 'pregunta' | 'esperando_respuesta' | 'empatia' | 'esperando_acuerdo' | 'speech';
+
+export type DifusionKey = 'portales' | 'referidos' | 'anuncios' | 'redes' | 'contenido_ig' | 'agencia' | 'otro';
 
 export type ProspectEventType =
   | 'first_contact'
@@ -1024,10 +1038,17 @@ export interface ProspectingSettings {
   dailyCap: number; // acciones máximas en la cola del día
   firstContactsPerDay: number; // reparto de la tanda semanal
   closeHour: number; // desde qué hora pide el cierre del día
+  weeklyBatchSize: number; // contactos que pasan de la reserva a la semana (0 = no automático)
+  poolCountries: string[]; // vacío = todos
+  poolSegments: string[]; // vacío = todos
+  lastBatchWeek?: string; // lunes de la última tanda automática
   templates: {
     first: string;
     followUp: string[]; // seguimiento 1, 2, 3
-    audit: string;
+    question: string; // "¿Cómo haces para difundir tu trabajo...?"
+    empathy: Record<DifusionKey, string>; // respuesta según cómo difunde
+    speech: string; // caballo de Troya + link de auditoría
+    audit: string; // (compatibilidad: igual a speech)
     video: string;
   };
 }

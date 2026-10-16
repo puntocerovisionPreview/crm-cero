@@ -158,7 +158,7 @@ export function registerProspectAuditRoute(app: express.Express) {
 
       res.json({ ok: true });
     } catch (err) {
-      console.error('[auditoria] Error guardando auditoría:', err);
+      console.error('[auditoria] Error guardando auditoría:', (err as Error)?.message || err);
       res.status(500).json({ ok: false });
     }
   });

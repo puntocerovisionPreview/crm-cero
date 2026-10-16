@@ -36,13 +36,18 @@ import {
 } from '../prospecting/core';
 import { deleteProspect, recordProspectAction, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
 import { useProspecting } from '../prospecting/useProspecting';
+import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
+import { takeFromPool } from '../prospecting/poolStore';
+import { ReservaPanel } from '../components/ReservaPanel';
+import { CONV_STEP_LABELS, DIFUSION_LABELS } from '../prospecting/core';
+import { DifusionKey } from '../types';
 import { buildWebSnippet } from '../prospecting/webSnippet';
 import { formatWhatsAppUrl } from '../utils/contact';
 import { hapticFeedback } from '../utils/haptics';
 import { playTaskDone } from '../utils/sound';
 import { parseLocalDate } from '../utils/dates';
 
-type Tab = 'hoy' | 'prospectos' | 'cargar' | 'metricas' | 'mensajes';
+type Tab = 'hoy' | 'prospectos' | 'reserva' | 'cargar' | 'metricas' | 'mensajes';
 
 interface Props {
   projects: Project[];
@@ -53,7 +58,8 @@ interface Props {
 const TABS: { id: Tab; label: string }[] = [
   { id: 'hoy', label: 'Hoy' },
   { id: 'prospectos', label: 'Prospectos' },
-  { id: 'cargar', label: 'Cargar tanda' },
+  { id: 'reserva', label: 'Reserva' },
+  { id: 'cargar', label: 'Cargar a mano' },
   { id: 'metricas', label: 'Métricas' },
   { id: 'mensajes', label: 'Mensajes' },
 ];
@@ -71,9 +77,23 @@ function shortDate(d?: string): string {
 }
 
 export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initialTab = 'hoy' }) => {
-  const { prospects, events, settings, today, hour, loadError } = useProspecting();
+  const { prospects, events, settings, settingsLoaded, today, hour, loadError } = useProspecting();
   const [tab, setTab] = useState<Tab>(initialTab);
   const list = prospects || [];
+  const pool = usePool();
+  const [poolNotice, setPoolNotice] = useState<string | null>(null);
+  useWeeklyAutoBatch(settings, settingsLoaded, today, (n) => {
+    setPoolNotice(`Empezó la semana: pasaron ${n} contactos nuevos de la reserva, repartidos en los días hábiles.`);
+    pool.refresh();
+  });
+
+  // "Sumar más hoy": toma de la reserva y los deja para hoy (la reserva se va restando)
+  const addMoreToday = async (n: number) => {
+    hapticFeedback.medium();
+    const added = await takeFromPool(n, settings, today, { perDay: n }).catch(() => 0);
+    setPoolNotice(added ? `Sumaste ${added} ${added === 1 ? 'contacto' : 'contactos'} más para hoy.` : 'No quedan contactos en la reserva con tus filtros.');
+    pool.refresh();
+  };
 
   const queue = useMemo(() => buildDailyQueue(list, today, settings), [list, today, settings]);
   const toClose = useMemo(() => pendingDayClose(list, today), [list, today]);
@@ -127,15 +147,19 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
         <p className="text-sm text-red-400">No se pudieron cargar los prospectos. Revisá tu conexión y que hayas entrado con tu cuenta de Google.</p>
       )}
 
+      {poolNotice && <p className="text-sm text-[var(--text-primary)] p-3 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)]">{poolNotice}</p>}
+
       {prospects !== null && tab === 'hoy' && (
         <TodayPanel
+          poolAvailable={pool.availableCount}
+          onAddMore={addMoreToday}
           queue={queue.items}
           overflow={queue.overflow}
           toClose={toClose}
           showClose={hour >= settings.closeHour || toClose.length > 0}
           settings={settings}
           onAct={act}
-          onGoLoad={() => setTab('cargar')}
+          onGoLoad={() => setTab(pool.availableCount > 0 ? 'reserva' : 'cargar')}
           isEvening={hour >= settings.closeHour}
         />
       )}
@@ -145,7 +169,19 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
       {prospects !== null && tab === 'cargar' && (
         <ImportPanel prospects={list} projects={projects} today={today} settings={settings} onDone={() => setTab('hoy')} />
       )}
-      {prospects !== null && tab === 'metricas' && <MetricsPanel events={events} today={today} />}
+      {prospects !== null && tab === 'reserva' && (
+        <ReservaPanel
+          available={pool.available}
+          takenCount={pool.takenCount}
+          loading={pool.docs === null && !pool.error}
+          prospects={list}
+          projects={projects}
+          settings={settings}
+          today={today}
+          onChanged={pool.refresh}
+        />
+      )}
+      {prospects !== null && tab === 'metricas' && <MetricsPanel events={events} today={today} prospects={list} />}
       {prospects !== null && tab === 'mensajes' && <SettingsPanel settings={settings} />}
     </div>
   );
@@ -163,7 +199,9 @@ export const TodayPanel: React.FC<{
   onAct: (p: Prospect, a: ProspectAction, note?: string) => void;
   onGoLoad?: () => void;
   compact?: boolean;
-}> = ({ queue, overflow, toClose, showClose, isEvening, settings, onAct, onGoLoad, compact }) => (
+  poolAvailable?: number;
+  onAddMore?: (n: number) => void;
+}> = ({ queue, overflow, toClose, showClose, isEvening, settings, onAct, onGoLoad, compact, poolAvailable = 0, onAddMore }) => (
   <div className="space-y-4">
     {showClose && toClose.length > 0 && (
       <section className={`${card} p-4 space-y-3 ${isEvening ? 'border-[var(--accent)]/50' : ''}`}>
@@ -222,6 +260,24 @@ export const TodayPanel: React.FC<{
         {overflow} {overflow === 1 ? 'acción más queda' : 'acciones más quedan'} para mañana (tope diario: {settings.dailyCap}).
       </p>
     )}
+
+    {onAddMore && poolAvailable > 0 && !queue.some((i) => i.kind === 'primer') && (
+      <section className={`${card} p-4 flex flex-col sm:flex-row sm:items-center gap-3`}>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">Ya no te quedan primeros mensajes para hoy. ¿Sumar más?</p>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Quedan {poolAvailable.toLocaleString('es-AR')} contactos en la reserva. Se toman los mejores y se descuentan de la base.
+          </p>
+        </div>
+        <div className="flex gap-1.5 shrink-0">
+          {[2, 5, 10].map((n) => (
+            <button key={n} type="button" className={`${n === 2 ? btnPrimary : btnGhost} py-1.5 text-xs`} onClick={() => onAddMore(Math.min(n, poolAvailable))}>
+              +{n}
+            </button>
+          ))}
+        </div>
+      </section>
+    )}
   </div>
 );
 
@@ -232,7 +288,9 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
   compact,
 }) => {
   const p = item.prospect;
-  const [open, setOpen] = useState(!compact && item.kind !== 'video');
+  const [open, setOpen] = useState(
+    !compact && item.kind !== 'video' && !(item.kind === 'responder' && ['esperando_respuesta', 'esperando_acuerdo'].includes(item.prospect.convStep || ''))
+  );
   const [copied, setCopied] = useState(false);
   const message = renderTemplate(templateFor(item, settings), p);
   const ig = normalizeInstagram(p.instagram);
@@ -244,9 +302,13 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
     });
   };
 
+  const step = p.convStep || 'pregunta';
+  const waiting = item.kind === 'responder' && (step === 'esperando_respuesta' || step === 'esperando_acuerdo');
   const label =
     item.kind === 'seguimiento'
       ? `${QUEUE_LABELS.seguimiento} ${Math.min((p.followUps || 0) + 1, settings.maxFollowUps)} de ${settings.maxFollowUps}`
+      : item.kind === 'responder'
+      ? `Conversación: ${CONV_STEP_LABELS[step]}`
       : QUEUE_LABELS[item.kind];
 
   return (
@@ -280,8 +342,26 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
         </button>
       </div>
 
+      {item.kind === 'responder' && <ScriptSteps step={step} difusion={p.difusion} />}
+
       {open && (
-        <p className="text-sm whitespace-pre-wrap text-[var(--text-secondary)] p-2.5 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)]">{message}</p>
+        <div className="space-y-1">
+          {waiting && <p className="text-[11px] text-[var(--text-tertiary)]">Ya enviado:</p>}
+          <p className="text-sm whitespace-pre-wrap text-[var(--text-secondary)] p-2.5 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)]">{message}</p>
+        </div>
+      )}
+
+      {item.kind === 'responder' && step === 'esperando_respuesta' && (
+        <div className="space-y-1.5">
+          <p className="text-xs font-semibold text-[var(--text-primary)]">¿Qué te respondió?</p>
+          <div className="flex flex-wrap gap-1.5">
+            {(Object.keys(DIFUSION_LABELS) as DifusionKey[]).map((k) => (
+              <button key={k} type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, `conv_answer:${k}` as ProspectAction)}>
+                {DIFUSION_LABELS[k]}
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       <div className="flex flex-wrap gap-1.5">
@@ -331,12 +411,31 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
           ))}
         {item.kind === 'responder' && (
           <>
-            <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'audit_sent')}>
-              Le pasé la auditoría
-            </button>
-            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'chatting')}>
-              Seguimos hablando
-            </button>
+            {step === 'pregunta' && (
+              <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'conv_question_sent')}>
+                <Check className="w-3.5 h-3.5" /> Pregunta enviada
+              </button>
+            )}
+            {step === 'empatia' && (
+              <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'conv_empathy_sent')}>
+                <Check className="w-3.5 h-3.5" /> Mensaje enviado
+              </button>
+            )}
+            {step === 'esperando_acuerdo' && (
+              <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'conv_agreed')}>
+                Coincidió: pasar al speech
+              </button>
+            )}
+            {step === 'speech' && (
+              <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'audit_sent')}>
+                <Check className="w-3.5 h-3.5" /> Le pasé la auditoría
+              </button>
+            )}
+            {waiting && (
+              <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'snooze')} title="Ocultarlo hasta mañana">
+                Sigue mañana
+              </button>
+            )}
             <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'call')}>
               Agendamos llamada
             </button>
@@ -675,7 +774,13 @@ const ImportPanel: React.FC<{ prospects: Prospect[]; projects: Project[]; today:
 
 // ======================= MÉTRICAS =======================
 
-const MetricsPanel: React.FC<{ events: import('../types').ProspectEvent[]; today: string }> = ({ events, today }) => {
+const MetricsPanel: React.FC<{ events: import('../types').ProspectEvent[]; today: string; prospects: Prospect[] }> = ({ events, today, prospects }) => {
+  const difusion = useMemo(() => {
+    const m: Partial<Record<DifusionKey, number>> = {};
+    prospects.forEach((p) => p.difusion && (m[p.difusion] = (m[p.difusion] || 0) + 1));
+    return (Object.entries(m) as [DifusionKey, number][]).sort((a, b) => b[1] - a[1]);
+  }, [prospects]);
+  const difusionTotal = difusion.reduce((s, [, n]) => s + n, 0);
   const [monthKey, setMonthKey] = useState(today.slice(0, 7));
   const weeks = useMemo(() => computeMonthMetrics(events, monthKey), [events, monthKey]);
   const total = (k: 'conversacionesOut' | 'seguimientos' | 'respuestas' | 'autoAuditorias') => weeks.reduce((s, w) => s + w[k], 0);
@@ -740,6 +845,23 @@ const MetricsPanel: React.FC<{ events: import('../types').ProspectEvent[]; today
           </tbody>
         </table>
       </div>
+
+      {difusion.length > 0 && (
+        <div className={`${card} p-4 space-y-2`}>
+          <p className="text-sm font-semibold text-[var(--text-primary)]">Cómo difunden su trabajo (lo que te respondieron)</p>
+          <ul className="space-y-1.5">
+            {difusion.map(([k, n]) => (
+              <li key={k} className="flex items-center gap-3 text-sm">
+                <span className="w-44 shrink-0 text-[var(--text-secondary)]">{DIFUSION_LABELS[k]}</span>
+                <span className="flex-1 h-2 rounded-full bg-[var(--bg-surface-muted)] overflow-hidden">
+                  <span className="block h-full bg-[var(--accent)]" style={{ width: `${Math.round((n / difusionTotal) * 100)}%` }} />
+                </span>
+                <span className="w-8 text-right tabular-nums text-[var(--text-primary)]">{n}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="grid sm:grid-cols-2 gap-3">
         <div className={`${card} p-4`}>
@@ -809,7 +931,7 @@ const SettingsPanel: React.FC<{ settings: ProspectingSettings }> = ({ settings }
         <div>
           <h2 className="text-base font-semibold text-[var(--text-primary)]">Mensajes</h2>
           <p className="text-xs text-[var(--text-secondary)]">
-            Se completan solos: <code>{'{nombre}'}</code> (primer nombre), <code>{'{estudio}'}</code> y <code>{'{link}'}</code> (su link personal de auditoría).
+            Se completan solos: <code>{'{saludo}'}</code> (su @ de Instagram o el nombre del estudio), <code>{'{nombre}'}</code> (primer nombre), <code>{'{estudio}'}</code> y <code>{'{link}'}</code> (su link personal de auditoría).
           </p>
         </div>
         {tpl('Primer mensaje', draft.templates.first, (v) => setDraft({ ...draft, templates: { ...draft.templates, first: v } }))}
@@ -820,7 +942,14 @@ const SettingsPanel: React.FC<{ settings: ProspectingSettings }> = ({ settings }
             setDraft({ ...draft, templates: { ...draft.templates, followUp } });
           })
         )}
-        {tpl('Pasar la auditoría (cuando responde)', draft.templates.audit, (v) => setDraft({ ...draft, templates: { ...draft.templates, audit: v } }))}
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] pt-2">Guion cuando responde</h3>
+        {tpl('1. La pregunta', draft.templates.question, (v) => setDraft({ ...draft, templates: { ...draft.templates, question: v } }))}
+        {(Object.keys(DIFUSION_LABELS) as DifusionKey[]).map((k) =>
+          tpl(`2. Empatía si responde: ${DIFUSION_LABELS[k]}`, draft.templates.empathy[k], (v) =>
+            setDraft({ ...draft, templates: { ...draft.templates, empathy: { ...draft.templates.empathy, [k]: v } } })
+          )
+        )}
+        {tpl('3. Speech (caballo de Troya) + link de auditoría', draft.templates.speech, (v) => setDraft({ ...draft, templates: { ...draft.templates, speech: v, audit: v } }))}
         {tpl('Video de la auditoría', draft.templates.video, (v) => setDraft({ ...draft, templates: { ...draft.templates, video: v } }))}
       </section>
 
@@ -851,5 +980,36 @@ const SettingsPanel: React.FC<{ settings: ProspectingSettings }> = ({ settings }
         </button>
       </section>
     </div>
+  );
+};
+
+// Pasos del guion de conversación, para ver en qué punto está con cada persona
+const SCRIPT_STEPS: { id: import('../types').ConvStep; label: string }[] = [
+  { id: 'pregunta', label: 'Pregunta' },
+  { id: 'esperando_respuesta', label: 'Su respuesta' },
+  { id: 'empatia', label: 'Empatía' },
+  { id: 'esperando_acuerdo', label: 'Coincide' },
+  { id: 'speech', label: 'Speech + link' },
+];
+
+const ScriptSteps: React.FC<{ step: import('../types').ConvStep; difusion?: DifusionKey }> = ({ step, difusion }) => {
+  const idx = SCRIPT_STEPS.findIndex((s) => s.id === step);
+  return (
+    <ol className="flex items-center gap-1 overflow-x-auto no-scrollbar" aria-label="Pasos del guion">
+      {SCRIPT_STEPS.map((s, i) => (
+        <li key={s.id} className="flex items-center gap-1 shrink-0">
+          <span
+            className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+              i < idx ? 'bg-emerald-500/15 text-emerald-400' : i === idx ? 'bg-[var(--accent)] text-[var(--on-accent)]' : 'bg-[var(--bg-surface-muted)] text-[var(--text-tertiary)]'
+            }`}
+            aria-current={i === idx ? 'step' : undefined}
+          >
+            {s.label}
+            {s.id === 'esperando_respuesta' && difusion && i < idx ? `: ${DIFUSION_LABELS[difusion]}` : ''}
+          </span>
+          {i < SCRIPT_STEPS.length - 1 && <span className="text-[var(--text-tertiary)] text-[11px]">›</span>}
+        </li>
+      ))}
+    </ol>
   );
 };

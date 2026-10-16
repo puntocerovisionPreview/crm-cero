@@ -2,7 +2,7 @@ import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch } from 'fire
 import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
 import { Prospect, ProspectEvent, ProspectingSettings } from '../types';
-import { DEFAULT_PROSPECTING_SETTINGS, ProspectAction, applyAction } from './core';
+import { ProspectAction, applyAction, mergeProspectingSettings } from './core';
 
 // Firestore de la prospección: prospects, prospect_events y settings/prospecting
 
@@ -30,11 +30,7 @@ export function subscribeProspectingSettings(onChanged: (s: ProspectingSettings)
     doc(db, 'settings', 'prospecting'),
     (snap) => {
       const data = (snap.exists() ? snap.data() : {}) as Partial<ProspectingSettings>;
-      onChanged({
-        ...DEFAULT_PROSPECTING_SETTINGS,
-        ...data,
-        templates: { ...DEFAULT_PROSPECTING_SETTINGS.templates, ...(data.templates || {}) },
-      });
+      onChanged(mergeProspectingSettings(data));
     },
     (err) => console.warn('subscribeProspectingSettings error:', err)
   );

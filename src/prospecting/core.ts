@@ -1,4 +1,4 @@
-import { Prospect, ProspectAudit, ProspectEvent, ProspectEventType, ProspectingSettings, ProspectStage, Project } from '../types';
+import { ConvStep, DifusionKey, Prospect, ProspectAudit, ProspectEvent, ProspectEventType, ProspectingSettings, ProspectStage, Project } from '../types';
 import { addDays, parseLocalDate } from '../utils/dates';
 import { normalizeClientName } from '../utils/clients';
 
@@ -11,26 +11,83 @@ import { normalizeClientName } from '../utils/clients';
 
 export const AUDIT_URL = 'https://somospuntocero.online/auditoria';
 
+const DEFAULT_SPEECH =
+  'Justamente por eso armé un diagnóstico gratuito para estudios: en 5 minutos te muestra en qué nivel está tu presencia, cómo te llegan los clientes y dónde se están perdiendo oportunidades. Cuando lo completas, te mando un video personalizado con 2 o 3 acciones concretas para {estudio}. Te lo dejo acá: {link}';
+
 export const DEFAULT_PROSPECTING_SETTINGS: ProspectingSettings = {
   followUpDays: 2,
   maxFollowUps: 3,
   dailyCap: 8,
   firstContactsPerDay: 2,
   closeHour: 18,
+  weeklyBatchSize: 10,
+  poolCountries: [],
+  poolSegments: [],
   templates: {
     first:
-      'Hola {nombre}, ¿cómo estás? Vi el trabajo de {estudio} y me gustó mucho. Ayudo a estudios a conseguir clientes de forma constante desde su presencia digital. ¿Te puedo hacer una pregunta rápida sobre cómo les llegan los clientes hoy?',
+      'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\nViendo el enfoque y la trayectoria que tienes en tu estudio, ¿me permites realizarte una consulta?',
     followUp: [
-      'Hola {nombre}, te escribo de nuevo por si se te pasó el mensaje. ¿Te puedo hacer una pregunta rápida?',
-      '{nombre}, ¿cómo va? Muchos estudios dependen solo de referidos y eso hace que los meses sean impredecibles. ¿Les pasa algo parecido en {estudio}?',
-      'Último mensaje, {nombre}: si en algún momento querés ordenar cómo les llegan los clientes, escribime y lo vemos. ¡Éxitos con {estudio}!',
+      'Hola {saludo}, ¿pudiste ver mi mensaje? Me gustaría hacerte una consulta rápida sobre tu estudio.',
+      '{saludo}, te escribo de nuevo por si se perdió el mensaje. Es una consulta corta, ¿me permites?',
+      'Último mensaje, {saludo}: si en algún momento te interesa que conversemos sobre cómo llegar a más clientes, escríbeme. ¡Muchos éxitos con {estudio}!',
     ],
-    audit:
-      'Genial, {nombre}. Te paso un diagnóstico de 5 minutos para ver en qué nivel está {estudio}: {link}\nCuando lo completes, en 24 a 48 hs te mando un video personalizado con 2 o 3 acciones concretas.',
+    question: '¿Cómo haces para difundir tu trabajo y llegar a más personas?',
+    empathy: {
+      portales:
+        'Te entiendo totalmente, la mayoría de estudios depende solamente de los portales y ambos sabemos que a veces dependemos de la suerte, ¿verdad?',
+      referidos:
+        'Te entiendo, es lo más común: el boca en boca trae buenos clientes, pero no se puede controlar cuándo llegan. Hay meses llenos y meses vacíos, ¿verdad?',
+      anuncios:
+        'Qué bien que ya inviertas en anuncios. Lo que veo seguido es que se paga por clics pero llegan consultas que no encajan con el tipo de proyecto que buscas, ¿te pasa algo así?',
+      redes:
+        'Genial que uses las redes. Lo difícil es que publicar no siempre se convierte en consultas de clientes reales, y a veces se siente como hablarle a la nada, ¿verdad?',
+      contenido_ig:
+        'Te entiendo, subir contenido de vez en cuando es lo que hace la mayoría, porque el día a día del estudio no deja tiempo. El tema es que así es difícil que lleguen consultas constantes, ¿verdad?',
+      agencia:
+        'Qué bueno que ya trabajes con alguien. Muchos estudios me cuentan que la agencia les da publicaciones lindas, pero no saben cuántos clientes les trae realmente, ¿te pasa algo parecido?',
+      otro:
+        'Te entiendo. La mayoría de los estudios con los que hablo sienten que les falta un sistema que les traiga clientes de forma constante, ¿te pasa algo parecido?',
+    },
+    speech: DEFAULT_SPEECH,
+    audit: DEFAULT_SPEECH,
     video:
-      'Hola {nombre}, como te prometí, acá va el video con el análisis de {estudio}: [pegá acá el link del video]\n¿Lo charlamos en una llamada de 20 minutos esta semana?',
+      'Hola {saludo}, como te prometí, aquí va el video con el análisis de {estudio}: [pega aquí el link del video]\n¿Lo conversamos en una llamada de 20 minutos esta semana?',
   },
 };
+
+export const DIFUSION_LABELS: Record<DifusionKey, string> = {
+  portales: 'Portales',
+  referidos: 'Referidos / boca en boca',
+  anuncios: 'Anuncios',
+  redes: 'Redes sociales',
+  contenido_ig: 'Algo de contenido en IG',
+  agencia: 'Agencia / community',
+  otro: 'Otra cosa',
+};
+
+export const CONV_STEP_LABELS: Record<ConvStep, string> = {
+  pregunta: 'Hacerle la pregunta',
+  esperando_respuesta: 'Esperando cómo difunde su trabajo',
+  empatia: 'Empatizar con su respuesta',
+  esperando_acuerdo: 'Esperando que coincida',
+  speech: 'Speech y link de auditoría',
+};
+
+/** Completa la configuración guardada con los valores por defecto (incluidos los textos nuevos). */
+export function mergeProspectingSettings(saved: Partial<ProspectingSettings> | undefined): ProspectingSettings {
+  const t = (saved?.templates || {}) as Partial<ProspectingSettings['templates']>;
+  const d = DEFAULT_PROSPECTING_SETTINGS;
+  return {
+    ...d,
+    ...(saved || {}),
+    templates: {
+      ...d.templates,
+      ...t,
+      followUp: t.followUp && t.followUp.length ? t.followUp : d.templates.followUp,
+      empathy: { ...d.templates.empathy, ...(t.empathy || {}) },
+    },
+  };
+}
 
 export const STAGE_LABELS: Record<ProspectStage, string> = {
   nuevo: 'Nuevo',
@@ -238,8 +295,15 @@ export function newProspectFromRow(row: ParsedRow, plannedFirstContact: string, 
 // ---------------- ACCIONES ----------------
 
 // 'chatting' = sigue la conversación (respondió pero todavía no le pasaste la auditoría).
-// No es un seguimiento a alguien que no contesta, así que no suma en las métricas.
-export type ProspectAction = ProspectEventType | 'chatting';
+// Los pasos del guion ('conv_*') y 'snooze' tampoco suman en las métricas.
+export type ProspectAction =
+  | ProspectEventType
+  | 'chatting'
+  | 'conv_question_sent'
+  | `conv_answer:${DifusionKey}`
+  | 'conv_empathy_sent'
+  | 'conv_agreed'
+  | 'snooze';
 
 export function applyAction(
   p: Prospect,
@@ -258,13 +322,13 @@ export function applyAction(
       updates = { followUps: (p.followUps || 0) + 1, lastContactAt: today, nextActionDate: next };
       break;
     case 'reply':
-      updates = { stage: 'respondio', followUps: 0, nextActionDate: today, lastOutcomeAt: today };
+      updates = { stage: 'respondio', followUps: 0, nextActionDate: today, lastOutcomeAt: today, convStep: 'pregunta' };
       break;
     case 'no_reply':
       updates = { lastOutcomeAt: today };
       break;
     case 'audit_sent':
-      updates = { stage: 'auditoria_enviada', followUps: 0, lastContactAt: today, nextActionDate: next };
+      updates = { stage: 'auditoria_enviada', followUps: 0, lastContactAt: today, nextActionDate: next, convStep: undefined };
       break;
     case 'audit_completed':
       updates = { stage: 'auditoria_completada', nextActionDate: today, videoDueDate: addDays(today, 2) };
@@ -284,8 +348,21 @@ export function applyAction(
     case 'chatting':
       updates = { stage: 'contactado', followUps: 0, lastContactAt: today, lastOutcomeAt: today, nextActionDate: next };
       return { updates, event: null };
+    case 'conv_question_sent':
+      return { updates: { convStep: 'esperando_respuesta', lastContactAt: today, lastOutcomeAt: today }, event: null };
+    case 'conv_empathy_sent':
+      return { updates: { convStep: 'esperando_acuerdo', lastContactAt: today, lastOutcomeAt: today }, event: null };
+    case 'conv_agreed':
+      return { updates: { convStep: 'speech', nextActionDate: today }, event: null };
+    case 'snooze':
+      return { updates: { nextActionDate: addDays(today, 1) }, event: null };
+    default:
+      if (action.startsWith('conv_answer:')) {
+        const difusion = action.slice('conv_answer:'.length) as DifusionKey;
+        return { updates: { difusion, convStep: 'empatia', nextActionDate: today }, event: null };
+      }
   }
-  return { updates, event: { prospectId: p.id, type: action, date: today, note } };
+  return { updates, event: { prospectId: p.id, type: action as ProspectEventType, date: today, note } };
 }
 
 // ---------------- COLA DEL DÍA ----------------
@@ -339,7 +416,7 @@ export function buildDailyQueue(
     if (p.stage === 'auditoria_completada') {
       kind = 'video';
       due = p.videoDueDate || today;
-    } else if (p.stage === 'respondio') kind = 'responder';
+    } else if (p.stage === 'respondio' && (p.nextActionDate || today) <= today) kind = 'responder';
     else if (WAITING.includes(p.stage) && (p.nextActionDate || today) <= today) kind = 'seguimiento';
     else if (p.stage === 'nuevo' && (p.plannedFirstContact || p.createdAt) <= today) {
       kind = 'primer';
@@ -384,8 +461,16 @@ export function auditLinkFor(p: Prospect): string {
   return `${AUDIT_URL}?p=${encodeURIComponent(p.id)}`;
 }
 
+/** Cómo saludarlo: su @ de Instagram si lo tenemos; si no, el nombre del estudio o de la persona. */
+export function greetingFor(p: Prospect): string {
+  const ig = normalizeInstagram(p.instagram);
+  if (ig) return `@${ig}`;
+  return (p.studio || p.name || '').trim();
+}
+
 export function renderTemplate(template: string, p: Prospect): string {
   return template
+    .replace(/\{saludo\}/g, greetingFor(p))
     .replace(/\{nombre\}/g, firstName(p.name))
     .replace(/\{estudio\}/g, p.studio || 'tu estudio')
     .replace(/\{link\}/g, auditLinkFor(p));
@@ -395,7 +480,12 @@ export function templateFor(item: QueueItem, settings: ProspectingSettings): str
   const t = settings.templates;
   if (item.kind === 'primer') return t.first;
   if (item.kind === 'video') return t.video;
-  if (item.kind === 'responder') return t.audit;
+  if (item.kind === 'responder') {
+    const step = item.prospect.convStep || 'pregunta';
+    if (step === 'pregunta' || step === 'esperando_respuesta') return t.question;
+    if (step === 'empatia' || step === 'esperando_acuerdo') return t.empathy[item.prospect.difusion || 'otro'] || t.empathy.otro;
+    return t.speech || t.audit;
+  }
   const idx = Math.min(item.prospect.followUps || 0, t.followUp.length - 1);
   return t.followUp[idx] || t.followUp[0];
 }

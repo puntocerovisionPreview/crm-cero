@@ -11,7 +11,7 @@ import {
   buildProspectingClose,
   getDueReminders,
 } from '../src/automation/messages';
-import { DEFAULT_PROSPECTING_SETTINGS } from '../src/prospecting/core';
+import { mergeProspectingSettings } from '../src/prospecting/core';
 import { addDays, todayLocal } from '../src/utils/dates';
 import { runCalendarSync, isCalendarConfigured } from './calendarSync';
 
@@ -44,6 +44,13 @@ export function credentialMode(): 'clave' | 'cloud-run' | null {
   return null;
 }
 
+// La librería de servidor rechaza campos vacíos (undefined) y tiraba error al guardar
+// auditorías con respuestas opcionales sin completar. Así se omiten, como en la app.
+function prepareDb(db: Firestore): Firestore {
+  db.settings({ ignoreUndefinedProperties: true });
+  return db;
+}
+
 export function getAdminDb(): Firestore | null {
   if (adminDb) return adminDb;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -52,13 +59,13 @@ export function getAdminDb(): Firestore | null {
       const text = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
       const creds = JSON.parse(text);
       const app = getApps()[0] || initializeApp({ credential: cert(creds), projectId: creds.project_id });
-      adminDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+      adminDb = prepareDb(getFirestore(app, firebaseConfig.firestoreDatabaseId));
       return adminDb;
     }
     if (isOnCloudRun()) {
       // Sin clave: credenciales automáticas del servicio de Cloud Run
       const app = getApps()[0] || initializeApp({ projectId: firebaseConfig.projectId });
-      adminDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+      adminDb = prepareDb(getFirestore(app, firebaseConfig.firestoreDatabaseId));
       return adminDb;
     }
     return null;
@@ -138,11 +145,7 @@ export async function loadAutomationData(db: Firestore): Promise<AutomationData>
     fixedExpenses: plainDates(fixedExpenses),
     routine: plainDates(routine).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)),
     prospects: plainDates(prospects).map((p: any) => ({ followUps: 0, ...p })),
-    prospectingSettings: {
-      ...DEFAULT_PROSPECTING_SETTINGS,
-      ...savedSettings,
-      templates: { ...DEFAULT_PROSPECTING_SETTINGS.templates, ...(savedSettings.templates || {}) },
-    },
+    prospectingSettings: mergeProspectingSettings(savedSettings),
   };
 }
 
