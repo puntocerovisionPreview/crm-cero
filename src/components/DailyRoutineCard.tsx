@@ -19,6 +19,7 @@ import {
 } from '../utils/dailyRoutine';
 
 const SUGGESTIONS = [
+  'Bloque de prospección (30 min)',
   'Revisar cobros y vencimientos de hoy',
   'Responder WhatsApp de clientes',
   'Planificar las 3 tareas clave del día',

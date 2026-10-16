@@ -8,9 +8,13 @@ import fs from 'fs';
 import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
 import firebaseConfig from './firebase-applet-config.json';
 import { registerAutomationRoutes } from './server/automation';
+import { registerProspectAuditRoute } from './server/prospectAudit';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+// Auto auditorías desde tu web: va antes del lector JSON general (llega como texto)
+registerProspectAuditRoute(app);
 
 // Configuración de límite para audios pesados en Base64
 app.use(express.json({ limit: '25mb' }));

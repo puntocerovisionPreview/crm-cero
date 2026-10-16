@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 
 export type RouteName =
   | 'hoy'
+  | 'prospeccion'
   | 'agenda'
   | 'agenda-task'
   | 'calendario'
@@ -140,6 +141,10 @@ export function parseRoute(rawPathname: string, searchStr: string = ''): RouteMa
   if (path.startsWith('/proyectos/') || path.startsWith('/proyecto/') || path.startsWith('/fichas/') || path.startsWith('/ficha/')) {
     const id = path.replace(/^(\/proyectos\/|\/proyecto\/|\/fichas\/|\/ficha\/)/, '');
     return { name: 'cliente-detalle', path: `/clientes/${id}`, params: { id }, query };
+  }
+
+  if (path === '/prospeccion' || path === '/prospectos') {
+    return { name: 'prospeccion', path: '/prospeccion', params: {}, query };
   }
 
   if (path === '/clientes' || path === '/proyectos' || path === '/projects' || path === '/fichas' || path === '/ficha') {

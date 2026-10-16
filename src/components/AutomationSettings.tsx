@@ -13,11 +13,12 @@ interface Status {
   calendarId: string | null;
 }
 
-type Job = 'daily-brief' | 'reminders' | 'weekly' | 'calendar-sync';
+type Job = 'daily-brief' | 'reminders' | 'weekly' | 'calendar-sync' | 'prospecting-close';
 
 const JOBS: { id: Job; title: string; when: string; path: string }[] = [
   { id: 'daily-brief', title: 'Resumen del día', when: 'Todos los días a las 8:00', path: 'daily-brief' },
   { id: 'weekly', title: 'Plan de la semana', when: 'Domingos a las 19:00', path: 'weekly' },
+  { id: 'prospecting-close', title: 'Cierre del día de prospección', when: 'De lunes a viernes a las 19:00', path: 'prospecting-close' },
   { id: 'reminders', title: 'Avisos de reuniones y tareas', when: 'Cada 10 minutos (junto con el calendario)', path: 'frequent' },
   { id: 'calendar-sync', title: 'Sincronizar Google Calendar', when: 'Cada 10 minutos (junto con los avisos)', path: 'frequent' },
 ];
@@ -145,7 +146,7 @@ export const AutomationSettings: React.FC = () => {
 
       {status && (
         <ol className="space-y-4">
-          <Step done={status.serviceAccount} title="1. Clave de servicio de Firebase">
+          <Step done={status.serviceAccount} title="1. Clave de servicio de Firebase (necesaria para las auditorías de tu web)">
             {status.serviceAccount ? (
               <p>Conectada ({status.serviceAccountEmail}).</p>
             ) : (
@@ -156,7 +157,8 @@ export const AutomationSettings: React.FC = () => {
             )}
           </Step>
 
-          <Step done={status.telegramToken && status.telegramChat} title="2. Bot de Telegram">
+          <Step done={status.telegramToken && status.telegramChat} title="2. Bot de Telegram (opcional)">
+            {!status.telegramToken && <p>Si no lo usás, no pasa nada: los recordatorios y el cierre del día siguen apareciendo en la app.</p>}
             {!status.telegramToken && (
               <p>
                 En Telegram hablale a <b>@BotFather</b>, mandá <code>/newbot</code> y seguí los pasos. Copiá el token que te da y
@@ -180,7 +182,7 @@ export const AutomationSettings: React.FC = () => {
             {status.telegramChat && <p>Conectado con {status.telegramChatName || 'tu chat'}.</p>}
           </Step>
 
-          <Step done={status.cronSecret} title="3. Reloj automático">
+          <Step done={status.cronSecret} title="3. Reloj automático (solo si usás Telegram o Google Calendar)">
             {!status.cronSecret ? (
               <p>
                 Inventá una clave larga (mínimo 16 caracteres, sin espacios) y guardala en los Secrets como{' '}
@@ -189,13 +191,14 @@ export const AutomationSettings: React.FC = () => {
             ) : (
               <>
                 <p>
-                  Creá una cuenta gratis en <b>cron-job.org</b> (o usá Google Cloud Scheduler) y agregá estas 3 tareas,
+                  Creá una cuenta gratis en <b>cron-job.org</b> (o usá Google Cloud Scheduler) y agregá estas 4 tareas,
                   reemplazando <code>TU_CLAVE</code> por tu CRON_SECRET:
                 </p>
                 <ul className="space-y-1.5">
                   {[
                     ['diario', 'Todos los días 8:00', `${origin}/api/cron/daily-brief?key=TU_CLAVE`],
                     ['semanal', 'Domingos 19:00', `${origin}/api/cron/weekly?key=TU_CLAVE`],
+                    ['cierre', 'Lun a vie 19:00', `${origin}/api/cron/prospecting-close?key=TU_CLAVE`],
                     ['frecuente', 'Cada 10 minutos', `${origin}/api/cron/frequent?key=TU_CLAVE`],
                   ].map(([id, when, url]) => (
                     <li key={id} className="flex items-center gap-2 p-2 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)]">

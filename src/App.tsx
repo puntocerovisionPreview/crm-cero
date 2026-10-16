@@ -199,6 +199,7 @@ import { PersonalFinanceRecurringView } from './views/personal-finance/PersonalF
 import { PersonalFinanceSettingsView } from './views/personal-finance/PersonalFinanceSettingsView';
 import { useUsdRates, resolveUsdRate } from './utils/currency';
 import { planClientLinks } from './utils/clients';
+import { ProspectingView } from './views/ProspectingView';
 
 // Lazy load Knowledge Graph module to preserve fast app bundle boot per spec
 const KnowledgeGraphView = React.lazy(() => import('./views/KnowledgeGraphView'));
@@ -2626,6 +2627,15 @@ export default function App() {
       };
     }
 
+    if (path === '/prospeccion') {
+      return {
+        title: 'Prospección',
+        subtitle: 'Contactos en frío, seguimientos y auditorías',
+        breadcrumbs: [{ label: 'Prospección' }],
+        showBackButton: false,
+      };
+    }
+
     if (path === '/clientes') {
       return {
         title: 'Clientes & Estudios',
@@ -3210,6 +3220,10 @@ export default function App() {
           usdRate={effectiveUsdRate}
         />
       );
+    }
+
+    if (path === '/prospeccion') {
+      return <ProspectingView projects={projects} onAddProject={handleAddProject} />;
     }
 
     if (path === '/clientes') {

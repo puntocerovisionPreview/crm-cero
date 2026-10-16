@@ -942,3 +942,92 @@ export interface MonthlyClosingRecord {
 
 
 
+
+// ================== PROSPECCIÓN EN FRÍO ==================
+export type ProspectStage =
+  | 'nuevo' // cargado, todavía sin primer mensaje
+  | 'contactado' // conversación iniciada, esperando respuesta (con seguimientos)
+  | 'respondio' // contestó: hay que responderle
+  | 'auditoria_enviada' // se le pasó el link de la auto auditoría
+  | 'auditoria_completada' // completó el quiz: toca mandar el video (24-48 hs)
+  | 'video_enviado'
+  | 'llamada' // llamada agendada o hecha
+  | 'cliente'
+  | 'descartado';
+
+export interface ProspectAudit {
+  completedAt: string; // ISO
+  total: number; // 0-30
+  presencia: number; // 0-10
+  adquisicion: number; // 0-10
+  funnel: number; // 0-10
+  nivel: string; // Inicial | Intermedio | Avanzado
+  dedicacion?: string;
+  tamanioEquipo?: string;
+  dolorCaptacion?: string;
+  origenClientes?: string;
+  inversionPrevia?: string;
+  proyectosActivos?: string;
+  ciudad?: string;
+  observaciones?: string;
+  respuestas?: Record<string, string>; // q1..q15 -> texto elegido
+}
+
+export interface Prospect {
+  id: string;
+  name: string; // persona
+  studio?: string; // estudio / empresa
+  instagram?: string;
+  whatsapp?: string;
+  email?: string;
+  city?: string;
+  source?: string; // de dónde salió (Instagram, Google Maps, referido...)
+  notes?: string;
+  stage: ProspectStage;
+  createdAt: string; // YYYY-MM-DD
+  plannedFirstContact?: string; // día asignado para el primer mensaje
+  nextActionDate?: string; // cuándo vuelve a aparecer en la cola
+  followUps: number; // seguimientos enviados desde el último contacto sin respuesta
+  lastContactAt?: string; // YYYY-MM-DD del último mensaje enviado
+  lastOutcomeAt?: string; // YYYY-MM-DD del último cierre del día registrado
+  videoDueDate?: string; // vencimiento del video tras la auditoría
+  audit?: ProspectAudit;
+  lostReason?: string;
+  convertedProjectId?: string;
+  updatedAt?: string;
+}
+
+export type ProspectEventType =
+  | 'first_contact'
+  | 'follow_up'
+  | 'reply'
+  | 'no_reply'
+  | 'audit_sent'
+  | 'audit_completed'
+  | 'video_sent'
+  | 'call'
+  | 'won'
+  | 'lost';
+
+export interface ProspectEvent {
+  id: string;
+  prospectId: string;
+  type: ProspectEventType;
+  date: string; // YYYY-MM-DD
+  note?: string;
+  createdAt: string; // ISO
+}
+
+export interface ProspectingSettings {
+  followUpDays: number; // días entre seguimientos
+  maxFollowUps: number; // después de esto propone descartar
+  dailyCap: number; // acciones máximas en la cola del día
+  firstContactsPerDay: number; // reparto de la tanda semanal
+  closeHour: number; // desde qué hora pide el cierre del día
+  templates: {
+    first: string;
+    followUp: string[]; // seguimiento 1, 2, 3
+    audit: string;
+    video: string;
+  };
+}

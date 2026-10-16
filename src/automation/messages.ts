@@ -3,6 +3,8 @@ import { calculateProjectBilling, resolveProjectAgreement } from '../utils/payme
 import { addDays, parseLocalDate } from '../utils/dates';
 import { RoutineItem, appliesOn } from '../utils/dailyRoutineCore';
 import { sortTasks } from '../utils/taskSort';
+import { Prospect, ProspectingSettings } from '../types';
+import { buildDailyQueue, pendingDayClose, DEFAULT_PROSPECTING_SETTINGS } from '../prospecting/core';
 
 /**
  * Textos que manda el motor de automatización (Telegram). Lógica pura:
@@ -17,6 +19,8 @@ export interface AutomationData {
   incomes: IncomeRecord[];
   fixedExpenses: StudioFixedExpense[];
   routine: RoutineItem[];
+  prospects?: Prospect[];
+  prospectingSettings?: ProspectingSettings;
 }
 
 const DAY_NAMES = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -142,6 +146,9 @@ export function buildDailyBrief(data: AutomationData, today: string, greeting = 
     );
   }
 
+  const prospecting = prospectingSummary(data, today);
+  if (prospecting) lines.push('', prospecting);
+
   if (lines.length === 1) lines.push('', 'No hay nada agendado. Buen día para avanzar en lo importante.');
   return lines.join('\n');
 }
@@ -230,4 +237,39 @@ export function buildWeeklyPlan(data: AutomationData, weekStart: string, today: 
   }
 
   return lines.join('\n');
+}
+
+// ---------------- PROSPECCIÓN ----------------
+
+/** Bloque de prospección para el resumen de la mañana (vacío si no hay nada). */
+export function prospectingSummary(data: AutomationData, today: string): string {
+  if (!data.prospects || data.prospects.length === 0) return '';
+  const settings = data.prospectingSettings || DEFAULT_PROSPECTING_SETTINGS;
+  const { items } = buildDailyQueue(data.prospects, today, settings);
+  if (items.length === 0) return '';
+  const count = (k: string) => items.filter((i) => i.kind === k).length;
+  const parts: string[] = [];
+  const videos = items.filter((i) => i.kind === 'video');
+  if (videos.length) parts.push(`${videos.length} ${videos.length === 1 ? 'video de auditoría' : 'videos de auditoría'} para mandar`);
+  if (count('responder')) parts.push(`${count('responder')} ${count('responder') === 1 ? 'respuesta' : 'respuestas'} para contestar`);
+  if (count('seguimiento')) parts.push(`${count('seguimiento')} ${count('seguimiento') === 1 ? 'seguimiento' : 'seguimientos'}`);
+  if (count('primer')) parts.push(`${count('primer')} ${count('primer') === 1 ? 'primer mensaje' : 'primeros mensajes'}`);
+  const lines = [`<b>Prospección</b>`, `${parts.join(', ')}.`];
+  videos
+    .filter((v) => v.overdueDays > 0 || v.prospect.videoDueDate === today)
+    .forEach((v) => lines.push(`• Video para ${escapeHtml(v.prospect.studio || v.prospect.name)}: vence ${v.overdueDays > 0 ? 'ya pasó' : 'hoy'}`));
+  return lines.join('\n');
+}
+
+/** Mensaje de la tarde: a quiénes les escribiste hoy y falta anotar qué pasó. */
+export function buildProspectingClose(data: AutomationData, today: string): string | null {
+  const pending = pendingDayClose(data.prospects || [], today);
+  if (pending.length === 0) return null;
+  return [
+    `<b>Cierre del día de prospección</b>`,
+    `Hoy les escribiste a ${pending.length} ${pending.length === 1 ? 'persona' : 'personas'}. ¿Qué pasó con cada una?`,
+    ...pending.slice(0, 15).map((p) => `• ${escapeHtml(p.name)}${p.studio && p.studio !== p.name ? ` (${escapeHtml(p.studio)})` : ''}`),
+    '',
+    'Anotalo en la app (Hoy o Prospección): un toque por persona.',
+  ].join('\n');
 }

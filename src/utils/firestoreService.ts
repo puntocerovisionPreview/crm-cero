@@ -1110,6 +1110,8 @@ export const ALL_CRM_COLLECTIONS = [
   'daily_routine_log',
   'student_portals',
   'clients',
+  'prospects',
+  'prospect_events',
 ] as const;
 
 export type CrmCollectionName = (typeof ALL_CRM_COLLECTIONS)[number];

@@ -8,8 +8,10 @@ import {
   buildDailyBrief,
   buildReminderMessage,
   buildWeeklyPlan,
+  buildProspectingClose,
   getDueReminders,
 } from '../src/automation/messages';
+import { DEFAULT_PROSPECTING_SETTINGS } from '../src/prospecting/core';
 import { addDays, todayLocal } from '../src/utils/dates';
 import { runCalendarSync, isCalendarConfigured } from './calendarSync';
 
@@ -73,14 +75,17 @@ function plainDates<T extends Record<string, any>>(items: T[]): T[] {
 }
 
 export async function loadAutomationData(db: Firestore): Promise<AutomationData> {
-  const [tasks, meetings, projects, incomes, fixedExpenses, routine] = await Promise.all([
+  const [tasks, meetings, projects, incomes, fixedExpenses, routine, prospects, prospectingDoc] = await Promise.all([
     readCollection<any>(db, 'tasks'),
     readCollection<any>(db, 'meetings'),
     readCollection<any>(db, 'projects'),
     readCollection<any>(db, 'incomes'),
     readCollection<any>(db, 'studioFixedExpenses'),
     readCollection<any>(db, 'daily_routine'),
+    readCollection<any>(db, 'prospects'),
+    db.collection('settings').doc('prospecting').get(),
   ]);
+  const savedSettings = (prospectingDoc.exists ? prospectingDoc.data() : {}) as any;
   return {
     tasks: plainDates(tasks),
     meetings: plainDates(meetings),
@@ -88,6 +93,12 @@ export async function loadAutomationData(db: Firestore): Promise<AutomationData>
     incomes: plainDates(incomes),
     fixedExpenses: plainDates(fixedExpenses),
     routine: plainDates(routine).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)),
+    prospects: plainDates(prospects).map((p: any) => ({ followUps: 0, ...p })),
+    prospectingSettings: {
+      ...DEFAULT_PROSPECTING_SETTINGS,
+      ...savedSettings,
+      templates: { ...DEFAULT_PROSPECTING_SETTINGS.templates, ...(savedSettings.templates || {}) },
+    },
   };
 }
 
@@ -154,6 +165,14 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
     return { job, sent: 1 };
   }
 
+  if (job === 'prospecting-close') {
+    const text = buildProspectingClose(data, today);
+    if (options.dryRun) return { job, detail: text || 'Hoy no hay nadie para cerrar.' };
+    if (!text) return { job, sent: 0 };
+    await sendTelegram(text, chatId!);
+    return { job, sent: 1 };
+  }
+
   if (job === 'reminders') {
     const due = getDueReminders(data, today, nowMinutesLocal());
     if (options.dryRun) return { job, detail: due };
@@ -177,7 +196,7 @@ function cronSecretOk(req: express.Request): boolean {
   return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
-const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync'];
+const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prospecting-close'];
 
 export function registerAutomationRoutes(app: express.Express, requireOwner: express.RequestHandler) {
   // Reloj externo: GET o POST /api/cron/<tarea>?key=CRON_SECRET

@@ -46,6 +46,7 @@ import {
 } from '../utils/storage';
 import { TodayFocusBanner } from '../components/TodayFocusBanner';
 import { DailyRoutineCard } from '../components/DailyRoutineCard';
+import { ProspectingTodayCard } from '../components/ProspectingTodayCard';
 import { WeeklyGoalsWidget } from '../components/WeeklyGoalsWidget';
 import { ItemDetailModal } from '../components/ItemDetailModal';
 import { MorningBriefingCard } from '../components/MorningBriefingCard';
@@ -526,6 +527,7 @@ export const AgendaView: React.FC<Props> = ({
           <div className="space-y-3.5">
             {/* Lo primero en el celular: la rutina diaria y qué hay que hacer hoy */}
             <DailyRoutineCard />
+                <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
             <TodayFocusBanner
               todayStr={today}
               todayTasks={tasks.filter(t => t.date === today)}
@@ -1033,6 +1035,7 @@ export const AgendaView: React.FC<Props> = ({
             {desktopViewMode === 'dia' && (
               <div className="space-y-4">
                 <DailyRoutineCard />
+                <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
                 <TodayFocusBanner
                   todayStr={today}
                   todayTasks={tasks.filter(t => t.date === today)}
@@ -1667,6 +1670,7 @@ export const AgendaView: React.FC<Props> = ({
               {/* Columna Derecha: Enfoque y Prioridades de Hoy + Accesos */}
               <div className="space-y-4 min-w-0">
                 <DailyRoutineCard />
+                <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
                 <TodayFocusBanner
                   todayStr={today}
                   todayTasks={tasks.filter(t => t.date === today)}

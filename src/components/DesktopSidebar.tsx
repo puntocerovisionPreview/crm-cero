@@ -25,6 +25,7 @@ import { Project, SyncStatus, AgendaTask, AgendaMeeting, IncomeRecord, ExpenseRe
 import { hapticFeedback } from '../utils/haptics';
 import { BrandLogo } from './BrandLogo';
 import { getUiPreferences } from '../utils/uiPreferences';
+import { Send } from 'lucide-react';
 
 interface Props {
   currentPath: string;
@@ -103,6 +104,7 @@ export const DesktopSidebar: React.FC<Props> = ({
   const isGastosFijos = currentPath === '/gastos-fijos' || currentPath === '/vencimientos' || currentPath === '/suscripciones' || currentPath === '/dominios';
   const isCerebro = currentPath.startsWith('/cerebro') || currentPath.startsWith('/notas') || currentPath.startsWith('/grafo') || currentPath.startsWith('/segundo-cerebro');
   const isAjustes = currentPath.startsWith('/ajustes') || currentPath === '/ayuda';
+  const isProspeccion = currentPath.startsWith('/prospeccion');
 
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -362,6 +364,26 @@ export const DesktopSidebar: React.FC<Props> = ({
             </div>
           </button>
         )}
+
+        {/* Prospección en frío */}
+        <button
+          type="button"
+          onClick={() => {
+            hapticFeedback.selection();
+            onNavigate('/prospeccion');
+          }}
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
+            isProspeccion
+              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
+              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
+          }`}
+          title="Prospección: contactos en frío, seguimientos y auditorías"
+        >
+          <div className="flex items-center gap-2.5 truncate">
+            <Send className="w-4 h-4 shrink-0 stroke-[1.75]" />
+            {!isCollapsed && <span className="truncate">Prospección</span>}
+          </div>
+        </button>
 
         {/* Sector 3: Dinero */}
         <button
