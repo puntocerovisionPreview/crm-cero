@@ -64,7 +64,7 @@ export function registerProspectAuditRoute(app: express.Express) {
 
     const db = getAdminDb();
     if (!db) {
-      console.warn('[auditoria] Llegó una auditoría pero falta FIREBASE_SERVICE_ACCOUNT; solo quedó en el mail.');
+      console.warn('[auditoria] Llegó una auditoría pero el servidor no tiene acceso a la base; solo quedó en el mail.');
       return res.status(503).json({ ok: false });
     }
 

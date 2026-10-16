@@ -1,4 +1,4 @@
-import { JWT } from 'google-auth-library';
+import { GoogleAuth, JWT } from 'google-auth-library';
 import type { Firestore } from 'firebase-admin/firestore';
 import { addDays, formatLocalISO, todayLocal } from '../src/utils/dates';
 
@@ -21,7 +21,7 @@ const TZ = 'America/Argentina/Cordoba';
 const API = 'https://www.googleapis.com/calendar/v3';
 
 export function isCalendarConfigured(): boolean {
-  return Boolean(process.env.GOOGLE_CALENDAR_ID && process.env.FIREBASE_SERVICE_ACCOUNT);
+  return Boolean(process.env.GOOGLE_CALENDAR_ID && (process.env.FIREBASE_SERVICE_ACCOUNT || process.env.K_SERVICE));
 }
 
 function getCredentials(): { client_email: string; private_key: string } {
@@ -30,13 +30,22 @@ function getCredentials(): { client_email: string; private_key: string } {
   return JSON.parse(text);
 }
 
+const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 let jwt: JWT | null = null;
+let adc: GoogleAuth | null = null;
 async function authHeaders(): Promise<Record<string, string>> {
-  if (!jwt) {
-    const c = getCredentials();
-    jwt = new JWT({ email: c.client_email, key: c.private_key, scopes: ['https://www.googleapis.com/auth/calendar.events'] });
+  let token: string | null | undefined;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    if (!jwt) {
+      const c = getCredentials();
+      jwt = new JWT({ email: c.client_email, key: c.private_key, scopes: SCOPES });
+    }
+    token = (await jwt.getAccessToken()).token;
+  } else {
+    // En Cloud Run: identidad propia del servidor
+    if (!adc) adc = new GoogleAuth({ scopes: SCOPES });
+    token = await adc.getAccessToken();
   }
-  const { token } = await jwt.getAccessToken();
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 }
 

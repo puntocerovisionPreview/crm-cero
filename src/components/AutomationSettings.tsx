@@ -4,6 +4,8 @@ import { getAuthHeaders } from '../utils/authAccess';
 
 interface Status {
   serviceAccount: boolean;
+  credentialMode?: 'clave' | 'cloud-run' | null;
+  dbAccessError?: string | null;
   serviceAccountEmail: string | null;
   telegramToken: boolean;
   telegramChat: boolean;
@@ -146,14 +148,23 @@ export const AutomationSettings: React.FC = () => {
 
       {status && (
         <ol className="space-y-4">
-          <Step done={status.serviceAccount} title="1. Clave de servicio de Firebase (necesaria para las auditorías de tu web)">
+          <Step done={status.serviceAccount} title="1. Acceso del servidor a tu base (para las auditorías de tu web)">
             {status.serviceAccount ? (
-              <p>Conectada ({status.serviceAccountEmail}).</p>
-            ) : (
               <p>
-                En la consola de Firebase: Configuración del proyecto → Cuentas de servicio → Generar nueva clave privada. Pegá
-                todo el contenido del archivo en los Secrets de AI Studio como <code>FIREBASE_SERVICE_ACCOUNT</code>.
+                Listo{status.credentialMode === 'cloud-run' ? ', con la identidad propia del servidor (sin clave)' : ''}
+                {status.serviceAccountEmail ? ` — ${status.serviceAccountEmail}` : ''}.
               </p>
+            ) : status.credentialMode === 'cloud-run' ? (
+              <>
+                <p>El servidor está publicado pero Google no le da permiso sobre la base todavía.</p>
+                {status.dbAccessError && <p className="text-red-400">Detalle: {status.dbAccessError}</p>}
+                <p>
+                  Alternativa: en la consola de Firebase, Configuración del proyecto → Cuentas de servicio → Generar nueva clave
+                  privada, y pegá el contenido en los Secrets de AI Studio como <code>FIREBASE_SERVICE_ACCOUNT</code>.
+                </p>
+              </>
+            ) : (
+              <p>Se activa solo cuando la app está publicada (no funciona en la vista previa local).</p>
             )}
           </Step>
 

@@ -22,7 +22,9 @@ import { runCalendarSync, isCalendarConfigured } from './calendarSync';
  * Google Cloud Scheduler) llama a /api/cron/<tarea> con la clave CRON_SECRET.
  *
  * Variables de entorno (Secrets en AI Studio):
- * - FIREBASE_SERVICE_ACCOUNT: JSON de la cuenta de servicio (o el mismo JSON en base64)
+ * - FIREBASE_SERVICE_ACCOUNT (opcional en Cloud Run): JSON de una cuenta de servicio. Si no está
+ *   y la app corre publicada en Cloud Run (mismo proyecto que Firestore), se usa la identidad
+ *   propia del servidor: no hace falta generar ni pegar ninguna clave.
  * - TELEGRAM_BOT_TOKEN: token del bot creado con @BotFather
  * - CRON_SECRET: clave larga inventada por vos; el reloj la manda en cada llamada
  * - TELEGRAM_CHAT_ID (opcional): si no, se usa el chat conectado desde Ajustes
@@ -31,30 +33,72 @@ import { runCalendarSync, isCalendarConfigured } from './calendarSync';
 
 let adminDb: Firestore | null = null;
 
+// En Cloud Run existe K_SERVICE: el servidor tiene identidad de Google propia
+export function isOnCloudRun(): boolean {
+  return Boolean(process.env.K_SERVICE);
+}
+
+export function credentialMode(): 'clave' | 'cloud-run' | null {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) return 'clave';
+  if (isOnCloudRun()) return 'cloud-run';
+  return null;
+}
+
 export function getAdminDb(): Firestore | null {
   if (adminDb) return adminDb;
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!raw) return null;
   try {
-    const text = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
-    const creds = JSON.parse(text);
-    const app = getApps()[0] || initializeApp({ credential: cert(creds), projectId: creds.project_id });
-    adminDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-    return adminDb;
+    if (raw) {
+      const text = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+      const creds = JSON.parse(text);
+      const app = getApps()[0] || initializeApp({ credential: cert(creds), projectId: creds.project_id });
+      adminDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+      return adminDb;
+    }
+    if (isOnCloudRun()) {
+      // Sin clave: credenciales automáticas del servicio de Cloud Run
+      const app = getApps()[0] || initializeApp({ projectId: firebaseConfig.projectId });
+      adminDb = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+      return adminDb;
+    }
+    return null;
   } catch (err) {
-    console.error('[automation] FIREBASE_SERVICE_ACCOUNT inválido:', (err as Error).message);
+    console.error('[automation] No se pudo conectar a Firestore como administrador:', (err as Error).message);
     return null;
   }
 }
 
-export function getServiceAccountEmail(): string | null {
+let cachedEmail: string | null | undefined;
+
+/** Correo de la identidad del servidor (para compartir el Google Calendar con ella). */
+export async function getServiceAccountEmail(): Promise<string | null> {
+  if (cachedEmail !== undefined) return cachedEmail;
   try {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!raw) return null;
-    const text = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
-    return JSON.parse(text).client_email || null;
+    if (raw) {
+      const text = raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8');
+      cachedEmail = JSON.parse(text).client_email || null;
+    } else if (isOnCloudRun()) {
+      const r = await fetch('http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email', {
+        headers: { 'Metadata-Flavor': 'Google' },
+      });
+      cachedEmail = r.ok ? (await r.text()).trim() : null;
+    } else cachedEmail = null;
   } catch {
-    return null;
+    cachedEmail = null;
+  }
+  return cachedEmail ?? null;
+}
+
+/** Prueba real de lectura: confirma que el servidor tiene permiso sobre la base. */
+export async function checkDbAccess(): Promise<string> {
+  const db = getAdminDb();
+  if (!db) return 'sin credenciales';
+  try {
+    await db.collection('settings').doc('automation').get();
+    return 'ok';
+  } catch (err) {
+    return (err as Error).message.slice(0, 200);
   }
 }
 
@@ -139,7 +183,7 @@ type JobResult = { job: string; sent?: number; detail?: any; skipped?: string };
 
 async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<JobResult> {
   const db = getAdminDb();
-  if (!db) return { job, skipped: 'Falta FIREBASE_SERVICE_ACCOUNT' };
+  if (!db) return { job, skipped: 'El servidor no tiene acceso a la base de datos' };
   const today = todayLocal();
 
   if (job === 'calendar-sync') {
@@ -230,9 +274,12 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
         telegramChatName = (s.exists && (s.data() as any)?.telegramChatName) || null;
       }
     } catch {}
+    const dbAccess = await checkDbAccess();
     res.json({
-      serviceAccount: Boolean(db),
-      serviceAccountEmail: getServiceAccountEmail(),
+      serviceAccount: dbAccess === 'ok',
+      credentialMode: credentialMode(),
+      dbAccessError: dbAccess === 'ok' ? null : dbAccess,
+      serviceAccountEmail: await getServiceAccountEmail(),
       telegramToken: Boolean(process.env.TELEGRAM_BOT_TOKEN),
       telegramChat: Boolean(telegramChat),
       telegramChatName,
@@ -247,7 +294,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
     const token = process.env.TELEGRAM_BOT_TOKEN;
     const db = getAdminDb();
     if (!token) return res.status(400).json({ error: 'Falta TELEGRAM_BOT_TOKEN en los Secrets' });
-    if (!db) return res.status(400).json({ error: 'Falta FIREBASE_SERVICE_ACCOUNT en los Secrets' });
+    if (!db) return res.status(400).json({ error: 'El servidor no tiene acceso a la base de datos' });
     try {
       const r = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=50`);
       const data: any = await r.json();

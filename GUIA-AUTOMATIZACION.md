@@ -8,9 +8,13 @@ Dentro de la app, en **Ajustes → Automatizaciones**, vas a ver qué paso falta
 
 ---
 
-## 1. Clave de servicio de Firebase (obligatoria)
+## 1. Acceso del servidor a tu base (normalmente no hay que hacer nada)
 
-Le permite al servidor leer tus datos cuando vos no estás en la app.
+El servidor necesita leer y escribir tus datos cuando vos no estás en la app (por ejemplo, para guardar las auditorías de tu web).
+
+**Si la app está publicada desde AI Studio, ya lo tiene:** corre en Google Cloud dentro del mismo proyecto que tu base y usa su propia identidad, sin claves. Lo confirmás en **Ajustes → Automatizaciones**: el paso 1 tiene que aparecer en verde.
+
+Solo si ahí aparece un error de permisos, generá una clave como alternativa:
 
 1. Entrá a https://console.firebase.google.com y abrí el proyecto **fabled-fold-lt8c4**.
 2. Tocá el engranaje → **Configuración del proyecto** → pestaña **Cuentas de servicio**.
