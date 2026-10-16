@@ -36,6 +36,7 @@ import {
   Building2,
   Wallet
 } from 'lucide-react';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   project: Project;
@@ -58,7 +59,7 @@ export const CuotaDetailView: React.FC<Props> = ({
   personalAccounts = [],
   studioSettings,
   privacyMode = false,
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   onBack,
   onOpenRegisterPayment,
   onUpdateCuota,

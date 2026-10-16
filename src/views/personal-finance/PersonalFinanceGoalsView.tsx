@@ -24,6 +24,7 @@ import {
   calculateMonthlyFinanceSummary 
 } from '../../utils/personalFinance';
 import { hapticFeedback } from '../../utils/haptics';
+import { DEFAULT_USD_RATE } from '../../utils/currency';
 
 interface Props {
   goals: SavingsGoal[];
@@ -59,7 +60,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
   const [deadline, setDeadline] = useState('');
   const [color, setColor] = useState('#3b82f6');
 
-  const usdRate = settings.usdExchangeRate || 1250;
+  const usdRate = settings.usdExchangeRate || DEFAULT_USD_RATE;
   const currentSummary = calculateMonthlyFinanceSummary(transactions, undefined, usdRate);
   const averageMonthlySavingsARS = Math.max(1, currentSummary.normalizedSavingsARS);
 

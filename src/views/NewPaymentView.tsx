@@ -13,6 +13,7 @@ import {
   CheckCircle2, 
   AlertCircle 
 } from 'lucide-react';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   project: Project;
@@ -40,7 +41,7 @@ export const NewPaymentView: React.FC<Props> = ({
   project,
   incomes = [],
   personalAccounts = [],
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   privacyMode = false,
   prefillCuotaId,
   prefillAmount,

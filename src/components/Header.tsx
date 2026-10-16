@@ -421,7 +421,7 @@ export const Header: React.FC<Props> = ({
             </div>
 
             <p className="text-xs text-zinc-400 leading-relaxed">
-              Tus datos están protegidos por tu código 0720 y sincronizados continuamente en la nube. Puedes descargar copias adicionales aquí:
+              Tus datos están protegidos por tu cuenta de Google y sincronizados en la nube. Puedes descargar copias adicionales aquí:
             </p>
 
             <div className="space-y-2 pt-1">

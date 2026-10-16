@@ -27,6 +27,7 @@ import {
   PieChart,
   Circle
 } from 'lucide-react';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   projects: Project[];
@@ -42,7 +43,7 @@ export const StudioMonthlyRevenueOverview: React.FC<Props> = ({
   projects,
   incomes,
   privacyMode = false,
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   studioSettings,
   onNavigateToProject,
   onRegisterPaymentForProject,

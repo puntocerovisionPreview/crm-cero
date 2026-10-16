@@ -413,6 +413,7 @@ export interface ExpenseRecord {
   projectId?: string; // Opcional: vinculado a un proyecto o general
   projectName?: string;
   notes?: string;
+  fixedExpenseId?: string; // Si viene de pagar un gasto fijo (evita contarlo dos veces en el neto)
 }
 
 // 4.1 Gastos Fijos del Estudio, Suscripciones & Vencimientos (Hosting, Dominios, IAs, Software)
@@ -757,6 +758,7 @@ export interface StudyItem {
 export interface PersonalFinanceSettings {
   id?: string;
   usdExchangeRate: number; // Cotización manual editable para conversiones
+  usdRateSource?: 'blue' | 'mep' | 'oficial' | 'manual'; // De dónde sale la cotización (por defecto: blue automático)
   customPin?: string; // PIN opcional para este módulo
   pinEnabled?: boolean;
   scriptableToken?: string; // Token de lectura para el widget de Scriptable en iPhone

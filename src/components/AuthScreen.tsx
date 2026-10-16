@@ -1,174 +1,91 @@
 import React, { useState } from 'react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../firebase';
+import { AlertCircle, Loader2, LogOut } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
-import { Lock, Mail, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import { ALLOWED_EMAILS, signInWithGoogle, signOutUser } from '../utils/authAccess';
 
 interface Props {
-  onSuccess: () => void;
+  // Si hay sesión con una cuenta que no está autorizada, se muestra ese correo
+  deniedEmail?: string | null;
 }
 
-export const AuthScreen: React.FC<Props> = ({ onSuccess }) => {
-  const [email, setEmail] = useState('puntocerovision@gmail.com');
-  const [password, setPassword] = useState('');
-  const [isRegistering, setIsRegistering] = useState(false);
+// Entrada al CRM con Google. Solo las cuentas de ALLOWED_EMAILS pueden ver los datos
+// (las reglas de Firestore lo exigen también del lado del servidor).
+export const AuthScreen: React.FC<Props> = ({ deniedEmail }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resetSent, setResetSent] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !password) {
-      setError('Por favor completá tu correo y contraseña.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, email, password);
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-      onSuccess();
-    } catch (err: any) {
-      console.error('Firebase Auth error:', err);
-      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-        setError('Contraseña o correo incorrectos.');
-      } else if (err.code === 'auth/user-not-found') {
-        setError('No existe una cuenta con este correo. Podés crearla debajo.');
-      } else if (err.code === 'auth/email-already-in-use') {
-        setError('Este correo ya está registrado. Intentá iniciar sesión.');
-      } else if (err.code === 'auth/weak-password') {
-        setError('La contraseña debe tener al menos 6 caracteres.');
-      } else {
-        setError(err.message || 'Error al autenticar.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResetPassword = async () => {
-    if (!email) {
-      setError('Ingresá tu correo para recuperar la contraseña.');
-      return;
-    }
+  const handleGoogle = async () => {
     setLoading(true);
     setError(null);
     try {
-      await sendPasswordResetEmail(auth, email);
-      setResetSent(true);
+      await signInWithGoogle();
     } catch (err: any) {
-      setError(err.message || 'Error al enviar correo de recuperación.');
+      if (err?.code === 'auth/popup-closed-by-user' || err?.code === 'auth/cancelled-popup-request') {
+        // El usuario cerró la ventana: no es un error
+      } else if (err?.code === 'auth/unauthorized-domain') {
+        setError('Este dominio no está autorizado en Firebase. Abrí la app desde su dirección publicada.');
+      } else if (err?.code === 'auth/network-request-failed') {
+        setError('Sin conexión. Revisá internet y probá de nuevo.');
+      } else {
+        setError('No se pudo iniciar sesión con Google. Probá de nuevo.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0B0F17] text-[#E8ECF4] flex flex-col justify-center items-center px-4 py-8 select-none">
-      <div className="w-full max-w-sm bg-[#121826] border border-[#263047] rounded-2xl p-7 shadow-2xl space-y-6">
-        <div className="flex flex-col items-center text-center space-y-2">
-          <BrandLogo size="lg" className="mb-2" />
-          <h1 className="text-xl font-bold tracking-tight text-[#E8ECF4]">
-            {isRegistering ? 'Crear acceso operador' : 'Acceso .Cero CRM'}
-          </h1>
-          <p className="text-xs text-[#8B95A9]">
-            Autenticación segura vinculada a tu cuenta de Firestore
-          </p>
+    <div className="fixed inset-0 z-50 bg-[var(--bg-app)] text-[var(--text-primary)] flex flex-col justify-center items-center px-4 py-8">
+      <div className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-card)] p-7 space-y-6">
+        <div className="flex flex-col items-center text-center space-y-3">
+          <BrandLogo size="lg" />
+          <h1 className="text-2xl font-bold">Entrá a .Cero CRM</h1>
+          <p className="text-sm text-[var(--text-secondary)]">Usá tu cuenta de Google autorizada.</p>
         </div>
 
+        {deniedEmail && (
+          <div className="p-3 rounded-[var(--radius-control)] bg-red-500/10 border border-red-500/30 text-sm text-red-400 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                {deniedEmail} no tiene acceso. Entrá con {ALLOWED_EMAILS.join(' o ')}.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => signOutUser()}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)] hover:underline"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Cerrar esa sesión
+            </button>
+          </div>
+        )}
+
         {error && (
-          <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
+          <div className="flex items-center gap-2 p-3 rounded-[var(--radius-control)] bg-red-500/10 border border-red-500/30 text-sm text-red-400">
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {resetSent && (
-          <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-400 text-center">
-            Se envió un correo a {email} para restablecer la contraseña.
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-[#8B95A9] mb-1.5">
-              Correo electrónico
-            </label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-[#8B95A9] absolute left-3 top-3" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="operador@puntocero.com"
-                className="w-full bg-[#1A2233] border border-[#263047] rounded-xl pl-9 pr-3 py-2.5 text-sm text-[#E8ECF4] placeholder-[#8B95A9]/50 focus:outline-none focus:border-[#4C8DFF]"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-[#8B95A9] mb-1.5">
-              Contraseña
-            </label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-[#8B95A9] absolute left-3 top-3" />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-[#1A2233] border border-[#263047] rounded-xl pl-9 pr-3 py-2.5 text-sm text-[#E8ECF4] placeholder-[#8B95A9]/50 focus:outline-none focus:border-[#4C8DFF]"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-3 bg-[#4C8DFF] hover:bg-[#3B7BF0] text-white font-medium rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#4C8DFF]/20 transition-all disabled:opacity-50"
-          >
-            {loading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <span>{isRegistering ? 'Registrar operador' : 'Iniciar sesión'}</span>
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </button>
-        </form>
-
-        <div className="pt-2 flex flex-col items-center gap-2 text-xs text-[#8B95A9]">
-          <button
-            type="button"
-            onClick={() => {
-              setIsRegistering(!isRegistering);
-              setError(null);
-            }}
-            className="hover:text-[#E8ECF4] transition-colors"
-          >
-            {isRegistering
-              ? '¿Ya tenés cuenta? Iniciar sesión'
-              : '¿Primera vez? Crear contraseña para este correo'}
-          </button>
-
-          {!isRegistering && (
-            <button
-              type="button"
-              onClick={handleResetPassword}
-              className="text-[#8B95A9]/70 hover:text-[#8B95A9] underline text-[11px]"
-            >
-              ¿Olvidaste tu contraseña?
-            </button>
+        <button
+          type="button"
+          onClick={handleGoogle}
+          disabled={loading}
+          className="w-full py-3 rounded-[var(--radius-control)] bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-[var(--on-accent)] font-semibold text-sm flex items-center justify-center gap-2 transition disabled:opacity-60"
+        >
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              <svg className="w-4 h-4" viewBox="0 0 24 24" aria-hidden>
+                <path fill="currentColor" d="M21.35 11.1H12v2.98h5.35c-.23 1.4-1.66 4.1-5.35 4.1-3.22 0-5.85-2.67-5.85-5.96S8.78 6.26 12 6.26c1.83 0 3.06.78 3.76 1.45l2.56-2.47C16.68 3.7 14.55 2.75 12 2.75 6.92 2.75 2.8 6.9 2.8 12s4.12 9.25 9.2 9.25c5.31 0 8.83-3.73 8.83-8.99 0-.6-.07-1.06-.15-1.16Z" />
+              </svg>
+              <span>Entrar con Google</span>
+            </>
           )}
-        </div>
+        </button>
       </div>
     </div>
   );

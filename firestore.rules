@@ -1,8 +1,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Solo las cuentas de Google autorizadas leen y escriben los datos del CRM.
+    // Tiene que coincidir con ALLOWED_EMAILS en src/utils/authAccess.ts y server.ts.
+    function isOwner() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['puntocerovision@gmail.com', 'liendojuan070@gmail.com'];
+    }
+
+    // Portal del alumno: cualquiera con el link (token largo y aleatorio) puede leer
+    // SU documento, pero nadie puede listar la colección ni escribir.
+    match /student_portals/{token} {
+      allow get: if true;
+    }
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if isOwner();
     }
   }
 }

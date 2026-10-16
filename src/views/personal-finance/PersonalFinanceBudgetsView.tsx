@@ -26,6 +26,7 @@ import {
   getPreviousMonthStr
 } from '../../utils/personalFinance';
 import { hapticFeedback } from '../../utils/haptics';
+import { DEFAULT_USD_RATE } from '../../utils/currency';
 
 interface Props {
   budgets: PersonalBudget[];
@@ -59,7 +60,7 @@ export const PersonalFinanceBudgetsView: React.FC<Props> = ({
   const [limit, setLimit] = useState<number>(50000);
   const [currency, setCurrency] = useState<'ARS' | 'USD'>('ARS');
 
-  const usdRate = settings.usdExchangeRate || 1250;
+  const usdRate = settings.usdExchangeRate || DEFAULT_USD_RATE;
   const expenseCategories = categories.filter(c => c.type === 'gasto');
   const budgetStatuses = calculateBudgetsStatus(budgets, categories, transactions, selectedMonth, usdRate);
 

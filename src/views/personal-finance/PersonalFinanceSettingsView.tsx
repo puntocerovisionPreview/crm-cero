@@ -35,6 +35,7 @@ import {
   getCurrentMonthStr 
 } from '../../utils/personalFinance';
 import { hapticFeedback } from '../../utils/haptics';
+import { DEFAULT_USD_RATE } from '../../utils/currency';
 
 interface Props {
   settings: PersonalFinanceSettings;
@@ -55,7 +56,7 @@ export const PersonalFinanceSettingsView: React.FC<Props> = ({
   onSaveSettings,
   onNavigate,
 }) => {
-  const [usdRateStr, setUsdRateStr] = useState<string>(String(settings.usdExchangeRate || 1250));
+  const [usdRateStr, setUsdRateStr] = useState<string>(String(settings.usdExchangeRate || DEFAULT_USD_RATE));
   const [pinEnabled, setPinEnabled] = useState<boolean>(settings.pinEnabled || false);
   const [customPin, setCustomPin] = useState<string>(settings.customPin || '');
   const [hideAmountsInWidget, setHideAmountsInWidget] = useState<boolean>(settings.hideAmountsInWidget || false);
@@ -98,10 +99,13 @@ export const PersonalFinanceSettingsView: React.FC<Props> = ({
     setIsSaving(true);
     hapticFeedback.medium();
 
-    const rate = parseFloat(usdRateStr) || 1250;
+    const rate = parseFloat(usdRateStr) || DEFAULT_USD_RATE;
+    // Si cambiaste el número a mano, pasa a cotización manual; si no, se mantiene la automática
+    const rateChanged = Math.round(rate) !== Math.round(settings.usdExchangeRate || 0);
     const updated: PersonalFinanceSettings = {
       ...settings,
       usdExchangeRate: rate,
+      ...(rateChanged ? { usdRateSource: 'manual' as const } : {}),
       pinEnabled,
       customPin: pinEnabled ? customPin.trim() : undefined,
       scriptableToken: token,
@@ -254,9 +258,11 @@ widget.presentMedium();
               <DollarSign className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-sm font-bold text-zinc-100">Cotización USD ↔ ARS Manual</h2>
+              <h2 className="text-sm font-bold text-zinc-100">Cotización USD ↔ ARS</h2>
               <p className="text-xs text-zinc-400">
-                Valor de referencia para conversiones y totales unificados (sin depender de APIs externas)
+                {settings.usdRateSource === 'manual'
+                  ? 'Usás un valor manual. Para volver a la cotización automática, cambialo en Ajustes.'
+                  : 'Se actualiza sola con el dólar del día. Si cargás otro número, pasa a ser manual.'}
               </p>
             </div>
           </div>
@@ -278,7 +284,7 @@ widget.presentMedium();
             type="button"
             onClick={() => handleSaveSettings()}
             disabled={isSaving}
-            className="px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[#d04f0b] text-black text-xs font-bold transition shadow-sm"
+            className="px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-[var(--on-accent)] text-xs font-bold transition shadow-sm"
           >
             {isSaving ? 'Guardando...' : 'Actualizar'}
           </button>

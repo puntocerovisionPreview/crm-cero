@@ -6,6 +6,7 @@ import {
   getIncludeLeadsSetting,
   setIncludeLeadsSetting 
 } from './monthlyCashProjection';
+import { DEFAULT_USD_RATE } from './currency';
 
 export type HorizonFrente = 'PAF' | 'Webs' | 'Otros';
 export type HorizonEstado = 'por entrar' | 'no comenzó' | 'activo' | 'finalizado';
@@ -278,7 +279,7 @@ export function deriveHorizonProject(project: Project, usdRate: number = 1250): 
   const monto = isNaN(rawMonto) || rawMonto < 0 ? 0 : rawMonto;
   const currency: 'USD' | 'ARS' = (project.billingAgreement?.currency || project.estimatedCurrency || 'ARS') as 'USD' | 'ARS';
 
-  const validRate = usdRate > 0 ? usdRate : 1250;
+  const validRate = usdRate > 0 ? usdRate : DEFAULT_USD_RATE;
   const montoEnARS = currency === 'USD' ? monto * validRate : monto;
   const montoEnUSD = currency === 'USD' ? monto : (validRate > 0 ? monto / validRate : 0);
 

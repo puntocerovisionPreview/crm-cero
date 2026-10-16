@@ -2,12 +2,72 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
+import firebaseConfig from './firebase-applet-config.json';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Configuración de límite para audios pesados en Base64
 app.use(express.json({ limit: '25mb' }));
+
+// ---------------- AUTH PARA RUTAS DE IA ----------------
+// Sin esto, cualquiera que conociera la URL podía usar tu cuota de Gemini.
+// Se valida el token de Firebase del usuario con la API pública de Identity Toolkit
+// (sin dependencias nuevas) y se exige una de las cuentas autorizadas.
+const ALLOWED_EMAILS = ['puntocerovision@gmail.com', 'liendojuan070@gmail.com'];
+const verifiedTokens = new Map<string, number>(); // token -> vencimiento (ms)
+
+async function isAuthorizedRequest(req: express.Request): Promise<boolean> {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!token) return false;
+  const cachedUntil = verifiedTokens.get(token);
+  if (cachedUntil && cachedUntil > Date.now()) return true;
+  try {
+    const r = await fetch(
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseConfig.apiKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken: token }) }
+    );
+    if (!r.ok) return false;
+    const data: any = await r.json();
+    const user = data?.users?.[0];
+    const ok = Boolean(user?.emailVerified && ALLOWED_EMAILS.includes(String(user.email || '').toLowerCase()));
+    if (ok) verifiedTokens.set(token, Date.now() + 5 * 60 * 1000);
+    if (verifiedTokens.size > 200) verifiedTokens.clear();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+app.use('/api/ai', async (req, res, next) => {
+  if (await isAuthorizedRequest(req)) return next();
+  res.status(401).json({ success: false, error: 'Iniciá sesión para usar la IA', code: 'UNAUTHORIZED' });
+});
+
+// ---------------- COTIZACIÓN DEL DÓLAR ----------------
+// Proxy con caché de 30 min a dolarapi.com (precio de compra). Público: no expone datos tuyos.
+let dolarCache: { at: number; data: any } | null = null;
+app.get('/api/dolar', async (req, res) => {
+  if (dolarCache && Date.now() - dolarCache.at < 30 * 60 * 1000) return res.json(dolarCache.data);
+  try {
+    const r = await fetch('https://dolarapi.com/v1/dolares');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const list: any[] = await r.json();
+    const pick = (casa: string) => Number(list.find((d) => d.casa === casa)?.compra) || undefined;
+    const data = {
+      blue: pick('blue'),
+      mep: pick('bolsa'),
+      oficial: pick('oficial'),
+      updatedAt: list.find((d) => d.casa === 'blue')?.fechaActualizacion,
+    };
+    dolarCache = { at: Date.now(), data };
+    res.json(data);
+  } catch (err: any) {
+    if (dolarCache) return res.json(dolarCache.data);
+    res.status(502).json({ error: 'No se pudo obtener la cotización', details: err?.message });
+  }
+});
 
 // Health check endpoint for Cloud Run container readiness probe
 app.get(['/_health', '/healthz', '/api/health'], (req, res) => {

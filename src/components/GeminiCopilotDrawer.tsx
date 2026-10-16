@@ -43,6 +43,7 @@ import { getTodayString, getMonthKey, getWeekMonday } from '../utils/storage';
 import { currentWeekdayLocal } from '../utils/dates';
 import { hapticFeedback } from '../utils/haptics';
 import { playItemCreated, playTaskDone } from '../utils/sound';
+import { getAuthHeaders } from '../utils/authAccess';
 
 interface Props {
   isOpen: boolean;
@@ -763,7 +764,7 @@ export const GeminiCopilotDrawer: React.FC<Props> = ({
 
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           messages: newHistory.map(m => ({
             role: m.role,

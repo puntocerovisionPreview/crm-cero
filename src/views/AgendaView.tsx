@@ -884,10 +884,11 @@ export const AgendaView: React.FC<Props> = ({
                 </div>
 
                 {/* Week Progress */}
-                <div className="hidden xl:flex items-center gap-2.5 text-right font-mono">
+                <div className="hidden xl:flex items-center gap-2.5 text-right" title="Tareas y reuniones de la semana completadas">
                   <div>
+                    <span className="text-[11px] text-[var(--text-secondary)] mr-1">Semana:</span>
                     <span className="text-[11px] font-bold text-[var(--text-primary)] tabular-nums">
-                      {completedWeekItems}/{totalWeekItems}
+                      {completedWeekItems} de {totalWeekItems}
                     </span>
                     <span className="text-[10px] text-[var(--text-secondary)] ml-1 tabular-nums">
                       ({weekCompletionRate}%)

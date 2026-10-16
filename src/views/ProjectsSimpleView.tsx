@@ -89,6 +89,7 @@ import {
   checkPafPacing,
   generatePafWhatsAppMessage
 } from '../utils/pafTemplates';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   projects: Project[];
@@ -167,7 +168,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
   onSavePayment,
   onDeletePayment,
   personalAccounts = [],
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
 }) => {
   const [serviceMode, setServiceMode] = useState<'web' | 'paf' | 'all' | 'extra'>(initialServiceMode);
   const [includeWebInTarget, setIncludeWebInTargetState] = useState<boolean>(() => getHorizonIncludeWebInTarget());

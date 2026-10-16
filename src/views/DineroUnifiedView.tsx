@@ -41,6 +41,7 @@ import {
   ChevronDown,
   ChevronUp
 } from 'lucide-react';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   initialMode?: 'estudio' | 'personal';
@@ -112,7 +113,7 @@ export const DineroUnifiedView: React.FC<Props> = ({
   personalSettings,
   studioFixedExpenses = [],
   privacyMode = false,
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   onAddIncome,
   onUpdateIncome,
   onDeleteIncome,

@@ -44,6 +44,7 @@ import {
 import { RegisterRecurringIncomeModal } from '../components/RegisterRecurringIncomeModal';
 import { AssignProjectDatesModal } from '../components/AssignProjectDatesModal';
 import { todayLocal } from '../utils/dates';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   projects: Project[];
@@ -63,7 +64,7 @@ export const HorizonView: React.FC<Props> = ({
   projects,
   incomes = [],
   expenses = [],
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   privacyMode = false,
   onNavigate,
   onBack,

@@ -41,6 +41,7 @@ import { loadStoredTrash, purgeTrashRecord, emptyTrashRecords, loadFromStorage, 
 import { getHorizonCapacity, setHorizonCapacity } from '../utils/horizon';
 import { getLeadProbabilities, setLeadProbabilities } from '../utils/monthlyCashProjection';
 import { getMissionsConfig, saveMissionsConfig, MissionsConfig } from '../utils/missions';
+import { DEFAULT_USD_RATE, USD_RATE_SOURCE_LABELS, UsdRateSource } from '../utils/currency';
 
 interface Props {
   subSection?: string;
@@ -101,7 +102,8 @@ export const AjustesView: React.FC<Props> = ({
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Section 2: Personal Finance Form State
-  const [usdRate, setUsdRate] = useState<string>(String(personalSettings?.usdExchangeRate || 1250));
+  const [usdRate, setUsdRate] = useState<string>(String(personalSettings?.usdExchangeRate || DEFAULT_USD_RATE));
+  const [usdRateSource, setUsdRateSource] = useState<UsdRateSource>(personalSettings?.usdRateSource || 'blue');
   const [horizonCapacity, setHorizonCapacityState] = useState<number>(() => getHorizonCapacity());
   const [leadProbMap, setLeadProbMap] = useState<Record<string, number>>(() => getLeadProbabilities());
   const [missionsCfg, setMissionsCfg] = useState<MissionsConfig>(() => getMissionsConfig());
@@ -146,8 +148,11 @@ export const AjustesView: React.FC<Props> = ({
   const handleSavePersonalSettings = (e: React.FormEvent) => {
     e.preventDefault();
     const rate = parseFloat(usdRate);
-    if (!isNaN(rate) && rate > 0 && onUpdatePersonalSettings) {
-      onUpdatePersonalSettings({ usdExchangeRate: rate });
+    if (onUpdatePersonalSettings) {
+      onUpdatePersonalSettings({
+        usdRateSource,
+        ...(usdRateSource === 'manual' && !isNaN(rate) && rate > 0 ? { usdExchangeRate: rate } : {}),
+      });
     }
     setHorizonCapacity(horizonCapacity);
     hapticFeedback.success();
@@ -846,6 +851,27 @@ export const AjustesView: React.FC<Props> = ({
             </p>
 
             <div className="space-y-2 pt-2">
+              <label className="text-xs font-semibold text-[var(--text-primary)]" htmlFor="usd-rate-source">
+                De dónde sale la cotización
+              </label>
+              <select
+                id="usd-rate-source"
+                value={usdRateSource}
+                onChange={(e) => setUsdRateSource(e.target.value as UsdRateSource)}
+                className="w-full max-w-xs px-3 py-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-sm text-[var(--text-primary)] focus:outline-none"
+              >
+                {(Object.keys(USD_RATE_SOURCE_LABELS) as UsdRateSource[]).map(src => (
+                  <option key={src} value={src}>{USD_RATE_SOURCE_LABELS[src]}</option>
+                ))}
+              </select>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                {usdRateSource === 'manual'
+                  ? 'Se usa siempre el valor que cargues abajo.'
+                  : `Se actualiza sola cada hora (precio de compra). Hoy: $ ${Number(personalSettings?.usdExchangeRate || 0).toLocaleString('es-AR')}.`}
+              </p>
+            </div>
+
+            <div className={`space-y-2 pt-2 ${usdRateSource === 'manual' ? '' : 'hidden'}`}>
               <label className="text-xs font-semibold text-[var(--text-primary)]">
                 Tipo de cambio Dólar (ARS por USD)
               </label>
@@ -1085,10 +1111,10 @@ export const AjustesView: React.FC<Props> = ({
 
               <div className="p-3 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface-muted)] space-y-2">
                 <span className="text-xs font-semibold text-[var(--text-primary)] block">
-                  PIN de Desbloqueo
+                  Sesión
                 </span>
                 <p className="text-[11px] text-[var(--text-secondary)]">
-                  El PIN por defecto para tu CRM es <strong className="font-mono text-[var(--text-primary)]">0720</strong>.
+                  Entrás con tu cuenta de Google. Solo las cuentas autorizadas pueden ver tus datos.
                 </p>
                 <button
                   type="button"
@@ -1096,7 +1122,7 @@ export const AjustesView: React.FC<Props> = ({
                   className="min-h-[44px] px-4 py-2 rounded-[var(--radius-control)] btn-solid-primary text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <Lock className="w-3.5 h-3.5" />
-                  <span>Probar bloqueo de pantalla</span>
+                  <span>Cerrar sesión</span>
                 </button>
               </div>
             </div>

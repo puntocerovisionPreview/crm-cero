@@ -18,6 +18,7 @@ import {
   Award,
   AlertCircle
 } from 'lucide-react';
+import { getAuthHeaders } from '../utils/authAccess';
 
 interface Props {
   isOpen: boolean;
@@ -105,7 +106,7 @@ export const WeeklyCloseModal: React.FC<Props> = ({
 
       const res = await fetch('/api/ai/suggest-weekly-goals', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({ summary: summaryPayload }),
       });
 

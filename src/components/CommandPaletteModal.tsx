@@ -435,8 +435,8 @@ export const CommandPaletteModal: React.FC<Props> = ({
 
     items.push({
       id: 'action-lock',
-      title: 'Bloquear Sesión',
-      subtitle: 'Cerrar acceso seguro con contraseña 0720',
+      title: 'Cerrar sesión',
+      subtitle: 'Salir de tu cuenta de Google en este dispositivo',
       category: 'Navegación',
       icon: <Lock className="w-4 h-4 text-red-400" />,
       action: () => {

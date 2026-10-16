@@ -25,6 +25,7 @@ import {
   AlertCircle 
 } from 'lucide-react';
 import { todayLocal } from '../utils/dates';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   isOpen: boolean;
@@ -79,7 +80,7 @@ export const MercadoPagoReconcileModal: React.FC<Props> = ({
   payment,
   projects,
   personalAccounts,
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   onReconcileAsProjectPayment,
   onReconcileAsStudioIncome,
   onReconcileAsPersonalTransaction,

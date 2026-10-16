@@ -89,6 +89,7 @@ import { ClientPaymentHabitsCard } from '../components/ClientPaymentHabitsCard';
 import { CuotaDetailView } from './CuotaDetailView';
 import { AgreementEditorView } from './AgreementEditorView';
 import { resolveProjectAgreement } from '../utils/paymentPlans';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   project: Project;
@@ -155,7 +156,7 @@ export const ClientDetailView: React.FC<Props> = ({
   onNavigate,
   personalAccounts = [],
   studioSettings,
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   privacyMode = false,
   onSavePayment,
   onDeletePayment,

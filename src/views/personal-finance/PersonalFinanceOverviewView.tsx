@@ -42,6 +42,7 @@ import {
   formatMonthName
 } from '../../utils/personalFinance';
 import { hapticFeedback } from '../../utils/haptics';
+import { DEFAULT_USD_RATE } from '../../utils/currency';
 
 interface Props {
   accounts: PersonalAccount[];
@@ -70,7 +71,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
 }) => {
   const [showCombinedARS, setShowCombinedARS] = useState(false);
   const currentMonth = getCurrentMonthStr();
-  const usdRate = settings.usdExchangeRate || 1250;
+  const usdRate = settings.usdExchangeRate || DEFAULT_USD_RATE;
 
   const balances = calculateTotalBalances(accounts, transactions, usdRate);
   const monthSummary = calculateMonthlyFinanceSummary(transactions, currentMonth, usdRate);

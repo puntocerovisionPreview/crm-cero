@@ -1,4 +1,7 @@
 import { Project, IncomeRecord, ExpenseRecord, RecurringIncomePlan } from '../types';
+import { getCollectedEntries, sumByCurrency } from './ledger';
+import { StudioFixedExpense } from '../types';
+import { DEFAULT_USD_RATE } from './currency';
 
 export interface CashProjectionItem {
   id: string;
@@ -36,6 +39,9 @@ export interface MonthlyCashProjection {
   // 5. Gastos operativos del mes (para cálculo de Neto)
   gastosARS: number;
   gastosUSD: number;
+  // Parte de los gastos que son costos fijos del mes aún no registrados como gasto
+  gastosFijosARS: number;
+  gastosFijosUSD: number;
   netoARS: number;
   netoUSD: number;
 
@@ -67,6 +73,7 @@ export interface MonthlyProjectionOptions {
   incomes: IncomeRecord[];
   projects: Project[];
   expenses?: ExpenseRecord[];
+  fixedExpenses?: StudioFixedExpense[];
   usdRate?: number;
   leadProbabilities?: Record<string, number>;
   standaloneRetainers?: RecurringIncomePlan[];
@@ -220,7 +227,8 @@ export function calculateMonthlyCashProjection({
   incomes,
   projects,
   expenses = [],
-  usdRate = 1250,
+  fixedExpenses = [],
+  usdRate = DEFAULT_USD_RATE,
   leadProbabilities,
   standaloneRetainers = [],
 }: MonthlyProjectionOptions): MonthlyCashProjection {
@@ -238,7 +246,7 @@ export function calculateMonthlyCashProjection({
   }
 
   const effectiveProbabilities = leadProbabilities || getLeadProbabilities();
-  const validRate = usdRate > 0 ? usdRate : 1250;
+  const validRate = usdRate > 0 ? usdRate : DEFAULT_USD_RATE;
 
   const matchesMonth = (dateOrMonth?: string | null): boolean => {
     if (!dateOrMonth) return false;
@@ -252,48 +260,13 @@ export function calculateMonthlyCashProjection({
   // -------------------------------------------------------------
   // 1. COBRADO: Incomes con status 'cobrado' + payments reales de proyectos
   // -------------------------------------------------------------
-  const itemsCobrados: CashProjectionItem[] = [];
-  const countedPaymentIds = new Set<string>();
-
-  // A. Incomes cobrados
-  incomes.forEach(inc => {
-    if (inc.status === 'cobrado' && matchesMonth(inc.date || inc.month)) {
-      itemsCobrados.push({
-        id: inc.id,
-        title: inc.title || inc.concept || 'Cobro registrado',
-        clientName: inc.projectName,
-        amount: Number(inc.amount) || 0,
-        currency: inc.currency || 'ARS',
-        date: inc.date,
-        status: 'cobrado',
-        projectId: inc.projectId,
-      });
-
-      if (inc.paymentId) countedPaymentIds.add(inc.paymentId);
-    }
-  });
-
-  // B. Payments en proyectos no contemplados en incomes (salvaguarda anti-pérdida)
-  projects.forEach(p => {
-    (p.payments || []).forEach(pay => {
-      if (matchesMonth(pay.date) && !countedPaymentIds.has(pay.id) && (!pay.incomeRecordId || !incomes.some(i => i.id === pay.incomeRecordId))) {
-        countedPaymentIds.add(pay.id);
-        itemsCobrados.push({
-          id: pay.id,
-          title: pay.note || `Pago de ${p.clientName}`,
-          clientName: p.clientName,
-          amount: Number(pay.amount) || 0,
-          currency: pay.currency || 'ARS',
-          date: pay.date,
-          status: 'cobrado',
-          projectId: p.id,
-        });
-      }
-    });
-  });
-
-  const cobradoARS = itemsCobrados.filter(i => i.currency === 'ARS').reduce((sum, i) => sum + i.amount, 0);
-  const cobradoUSD = itemsCobrados.filter(i => i.currency === 'USD').reduce((sum, i) => sum + i.amount, 0);
+  const itemsCobrados: CashProjectionItem[] = getCollectedEntries(incomes, projects, matchesMonth).map(e => ({
+    ...e,
+    status: 'cobrado' as const,
+  }));
+  const cobradoTotals = sumByCurrency(itemsCobrados);
+  const cobradoARS = cobradoTotals.ARS;
+  const cobradoUSD = cobradoTotals.USD;
 
   // -------------------------------------------------------------
   // 2. POR COBRAR: Cuotas reales pendientes con dueDate en el mes + Incomes pendientes
@@ -478,8 +451,30 @@ export function calculateMonthlyCashProjection({
   // 5. GASTOS Y NETO
   // -------------------------------------------------------------
   const monthExpenses = expenses.filter(e => e.status === 'pagado' && matchesMonth(e.date || e.month));
-  const gastosARS = monthExpenses.filter(e => e.currency === 'ARS').reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const gastosUSD = monthExpenses.filter(e => e.currency === 'USD').reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  // Costos fijos del mes (Monotributo, suscripciones, hosting...). Antes no se descontaban
+  // si se pagaban cambiando la fecha a mano, y el neto quedaba inflado. Se suman solo si
+  // no hay ya un gasto registrado para ese costo fijo en el mes.
+  let gastosFijosARS = 0;
+  let gastosFijosUSD = 0;
+  if (!isAllYear) {
+    fixedExpenses.forEach(fx => {
+      if (!fx.active) return;
+      const appliesThisMonth =
+        fx.billingCycle === 'mensual' ||
+        matchesMonth(fx.nextDueDate) ||
+        matchesMonth(fx.lastPaidDate);
+      if (!appliesThisMonth) return;
+      const alreadyRecorded = monthExpenses.some(
+        e => e.fixedExpenseId === fx.id || (e.title || '').startsWith(`Renovación: ${fx.name}`)
+      );
+      if (alreadyRecorded) return;
+      if (fx.currency === 'USD') gastosFijosUSD += Number(fx.amount) || 0;
+      else gastosFijosARS += Number(fx.amount) || 0;
+    });
+  }
+
+  const gastosARS = monthExpenses.filter(e => e.currency === 'ARS').reduce((sum, e) => sum + Number(e.amount || 0), 0) + gastosFijosARS;
+  const gastosUSD = monthExpenses.filter(e => e.currency === 'USD').reduce((sum, e) => sum + Number(e.amount || 0), 0) + gastosFijosUSD;
   const netoARS = cobradoARS - gastosARS;
   const netoUSD = cobradoUSD - gastosUSD;
 
@@ -542,6 +537,8 @@ export function calculateMonthlyCashProjection({
     totalMesCombinadoARS,
     gastosARS,
     gastosUSD,
+    gastosFijosARS,
+    gastosFijosUSD,
     netoARS,
     netoUSD,
     leadsPonderadoARS,

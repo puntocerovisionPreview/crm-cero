@@ -74,6 +74,7 @@ import { playItemCreated, playItemDeleted, playTaskDone } from '../utils/sound';
 import { ActiveClientsCashflowProjection } from '../components/ActiveClientsCashflowProjection';
 import { CategoryBudgetManager } from '../components/CategoryBudgetManager';
 import { StudioMonthlyRevenueOverview } from '../components/StudioMonthlyRevenueOverview';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   incomes: IncomeRecord[];
@@ -116,7 +117,7 @@ export const IncomeView: React.FC<Props> = ({
   onSavePayment,
   onDeletePayment,
   personalAccounts = [],
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   studioFixedExpenses = [],
   onAddFixedExpense = () => {},
   onUpdateFixedExpense = () => {},
@@ -333,9 +334,10 @@ export const IncomeView: React.FC<Props> = ({
       incomes,
       projects,
       expenses,
+      fixedExpenses: studioFixedExpenses,
       usdRate,
     });
-  }, [targetMonthKey, selectedYear, incomes, projects, expenses, usdRate]);
+  }, [targetMonthKey, selectedYear, incomes, projects, expenses, studioFixedExpenses, usdRate]);
 
   const monthlyTotals = useMemo(() => {
     return {

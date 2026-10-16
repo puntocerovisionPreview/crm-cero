@@ -1,4 +1,5 @@
 import { todayLocal, currentWeekdayLocal, addDays, parseLocalDate } from './dates';
+import { getAuthHeaders } from './authAccess';
 
 // Speech helper with iOS PWA WebKit detection, AudioRecorder, and AI transcription
 // On iOS Web-App-Capable mode (standalone added to Home Screen), WebKit disables SpeechRecognition.
@@ -102,6 +103,7 @@ export async function transcribeAudioWithAI(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        ...(await getAuthHeaders()),
       },
       body: JSON.stringify({
         audioBase64: base64,

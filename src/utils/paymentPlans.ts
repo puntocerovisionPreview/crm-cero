@@ -15,6 +15,7 @@ import {
   CuotaStatus
 } from '../types';
 import { getTodayString, getMonthKey, MONTH_NAMES } from './storage';
+import { getCollectedEntries, monthMatcher, sumByCurrency } from './ledger';
 
 export type InstallmentFrequency = 'monthly' | 'monthly_same_day' | 'biweekly' | 'custom';
 
@@ -1886,20 +1887,14 @@ export function calculateMonthIncomeSummary(
       const paid = Number(cuota.actualPaidAmount) || 0;
       const pending = Math.max(0, amt - paid);
 
-      // Accumulate metrics
+      // Lo cobrado sale del libro único (ver más abajo); las cuotas solo aportan lo pendiente
       if (cuota.currency === 'USD') {
-        if (isPaidInMonth || (cuota.status === 'pagado_a_tiempo' || cuota.status === 'pagado_tarde')) {
-          cobradoUSD += paid;
-        }
         if (cuota.status === 'vencido') {
           vencidoUSD += pending;
         } else if (cuota.status === 'pendiente' || cuota.status === 'vence_hoy' || cuota.status === 'parcial') {
           porCobrarUSD += pending;
         }
       } else {
-        if (isPaidInMonth || (cuota.status === 'pagado_a_tiempo' || cuota.status === 'pagado_tarde')) {
-          cobradoARS += paid;
-        }
         if (cuota.status === 'vencido') {
           vencidoARS += pending;
         } else if (cuota.status === 'pendiente' || cuota.status === 'vence_hoy' || cuota.status === 'parcial') {
@@ -1947,17 +1942,17 @@ export function calculateMonthIncomeSummary(
     });
   });
 
-  // Also include direct Incomes recorded in this month that don't belong to any project
+  // Cobrado: libro único (ingresos cobrados + pagos sin ingreso), igual que las tarjetas de arriba
+  const collectedThisMonth = sumByCurrency(getCollectedEntries(incomes, projects, monthMatcher(selectedMonthKey)));
+  cobradoARS = collectedThisMonth.ARS;
+  cobradoUSD = collectedThisMonth.USD;
+
+  // Ingresos sueltos (sin proyecto) todavía pendientes
   incomes.forEach(inc => {
-    if (inc.month === selectedMonthKey && !inc.projectId) {
+    if (inc.month === selectedMonthKey && !inc.projectId && inc.status !== 'cobrado') {
       const amt = Number(inc.amount) || 0;
-      if (inc.status === 'cobrado') {
-        if (inc.currency === 'USD') cobradoUSD += amt;
-        else cobradoARS += amt;
-      } else {
-        if (inc.currency === 'USD') porCobrarUSD += amt;
-        else porCobrarARS += amt;
-      }
+      if (inc.currency === 'USD') porCobrarUSD += amt;
+      else porCobrarARS += amt;
     }
   });
 
@@ -2015,21 +2010,17 @@ export function calculateMonthIncomeSummary(
           if (c.currency === 'USD') mProyectadoUSD += amt;
           else mProyectadoARS += amt;
         }
-
-        if (cPMKey === mKey || (cMKey === mKey && (c.status === 'pagado_a_tiempo' || c.status === 'pagado_tarde'))) {
-          if (c.currency === 'USD') mCobradoUSD += paid;
-          else mCobradoARS += paid;
-        }
       });
     });
 
+    // Antes se sumaban cuotas pagadas Y sus ingresos: los cobros de proyectos se contaban dos veces
+    const mCollected = sumByCurrency(getCollectedEntries(incomes, projects, monthMatcher(mKey)));
+    mCobradoARS = mCollected.ARS;
+    mCobradoUSD = mCollected.USD;
+
     incomes.forEach(inc => {
-      if (inc.month === mKey) {
+      if (inc.month === mKey && !inc.projectId) {
         const amt = Number(inc.amount) || 0;
-        if (inc.status === 'cobrado') {
-          if (inc.currency === 'USD') mCobradoUSD += amt;
-          else mCobradoARS += amt;
-        }
         if (inc.currency === 'USD') mProyectadoUSD += amt;
         else mProyectadoARS += amt;
       }

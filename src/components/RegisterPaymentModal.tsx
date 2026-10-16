@@ -19,6 +19,7 @@ import {
   AlertCircle,
   Sparkles
 } from 'lucide-react';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   isOpen: boolean;
@@ -44,7 +45,7 @@ export const RegisterPaymentModal: React.FC<Props> = ({
   project,
   incomes = [],
   personalAccounts = [],
-  usdRate = 1200,
+  usdRate = DEFAULT_USD_RATE,
   initialPayment,
   onSavePayment,
   onDeletePayment,

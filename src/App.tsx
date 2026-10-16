@@ -141,7 +141,10 @@ import { AppTopBar } from './components/AppTopBar';
 import { MobileNav } from './components/MobileNav';
 import { QuickAddModal, QuickAddType } from './components/QuickAddModal';
 import { PWAInstallButton } from './components/PWAInstallButton';
-import { LockScreen } from './components/LockScreen';
+import { AuthScreen } from './components/AuthScreen';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from './firebase';
+import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -191,6 +194,7 @@ import { PersonalFinanceGoalsView } from './views/personal-finance/PersonalFinan
 import { PersonalFinanceStudyView } from './views/personal-finance/PersonalFinanceStudyView';
 import { PersonalFinanceRecurringView } from './views/personal-finance/PersonalFinanceRecurringView';
 import { PersonalFinanceSettingsView } from './views/personal-finance/PersonalFinanceSettingsView';
+import { useUsdRates, resolveUsdRate } from './utils/currency';
 
 // Lazy load Knowledge Graph module to preserve fast app bundle boot per spec
 const KnowledgeGraphView = React.lazy(() => import('./views/KnowledgeGraphView'));
@@ -199,8 +203,24 @@ export default function App() {
   // Path-based SPA Router (syncs with window.location & browser history)
   const { currentRoute, navigate, goBack } = useRouter();
 
-  // Authentication State (passcode 0720)
-  const [authToken, setAuthToken] = useState<string | null>(() => getStoredAuthToken());
+  // Sesión real de Firebase (Google). authToken = uid de una cuenta autorizada.
+  // Antes era un PIN guardado en el navegador que no protegía los datos.
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [deniedEmail, setDeniedEmail] = useState<string | null>(null);
+  useEffect(() => {
+    removeStoredAuthToken();
+    return onAuthStateChanged(auth, (user) => {
+      if (user && isAllowedUser(user)) {
+        setAuthToken(user.uid);
+        setDeniedEmail(null);
+      } else {
+        setAuthToken(null);
+        setDeniedEmail(user?.email || null);
+      }
+      setAuthReady(true);
+    });
+  }, []);
 
   // Cloud Sync Status
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('synced');
@@ -670,7 +690,9 @@ export default function App() {
     showToast(`Pago de ${rec.title} confirmado`);
   };
 
-  const handleSavePersonalFinanceSettings = async (newSettings: PersonalFinanceSettings) => {
+  // Combina con lo guardado: Ajustes manda cambios parciales y antes se perdía el resto
+  const handleSavePersonalFinanceSettings = async (changes: Partial<PersonalFinanceSettings>) => {
+    const newSettings: PersonalFinanceSettings = { ...personalFinanceSettings, ...changes };
     setPersonalFinanceSettings(newSettings);
     saveStoredPersonalSettings(newSettings);
     try {
@@ -1206,6 +1228,16 @@ export default function App() {
     };
   }, [authToken]);
 
+  // Cotización del dólar: automática (blue/MEP/oficial) o manual, según Mis finanzas > Ajustes
+  const usdRates = useUsdRates();
+  const effectiveUsdRate = resolveUsdRate(
+    personalFinanceSettings.usdRateSource,
+    usdRates,
+    personalFinanceSettings.usdExchangeRate
+  );
+  // Las vistas de finanzas leen settings.usdExchangeRate: se les pasa ya la cotización vigente
+  const effectivePersonalSettings = { ...personalFinanceSettings, usdExchangeRate: effectiveUsdRate };
+
   // Portal del alumno: mantiene publicada la "foto" de cada alumno PAF con link activo
   const publishedPortalKeysRef = useRef<Map<string, string>>(new Map());
   useEffect(() => {
@@ -1338,17 +1370,9 @@ export default function App() {
     return () => clearInterval(intervalId);
   }, []);
 
-  // Handle successful passcode authentication
-  const handleUnlock = (token: string = 'auth_token_0720') => {
-    saveStoredAuthToken(token);
-    setAuthToken(token);
-    showToast('Acceso concedido · Conectado a Firestore');
-  };
-
-  // Handle lock session
+  // Cerrar sesión (Google)
   const handleLockSession = () => {
-    removeStoredAuthToken();
-    setAuthToken(null);
+    signOutUser().catch(err => console.warn('Error al cerrar sesión:', err));
   };
 
   // Explicit Reset Database to 0 in Cloud
@@ -2429,9 +2453,12 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  // If user is not authenticated with passcode 0720, show full-screen LockScreen
+  // Sin sesión de Google autorizada no se muestra ni se lee nada
+  if (!authReady) {
+    return <div className="fixed inset-0 bg-[var(--bg-app)]" />;
+  }
   if (!authToken) {
-    return <LockScreen onUnlock={handleUnlock} />;
+    return <AuthScreen deniedEmail={deniedEmail} />;
   }
 
   // Route Meta Configuration for Breadcrumbs & TopBar
@@ -2911,7 +2938,7 @@ export default function App() {
           project={project}
           incomes={incomes}
           personalAccounts={personalAccounts}
-          usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+          usdRate={effectiveUsdRate}
           privacyMode={privacyMode}
           prefillCuotaId={prefillCuotaId}
           prefillAmount={prefillAmount}
@@ -3033,7 +3060,7 @@ export default function App() {
           personalTransactions={personalTransactions}
           personalAccounts={personalAccounts}
           studioSettings={studioPaymentSettings}
-          usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+          usdRate={effectiveUsdRate}
           onSavePayment={handleSaveProjectPayment}
           onDeletePayment={handleDeleteProjectPayment}
           onOpenStudioPaymentSettings={() => setShowStudioPaymentSettingsModal(true)}
@@ -3089,7 +3116,7 @@ export default function App() {
           onSavePayment={handleSaveProjectPayment}
           onDeletePayment={handleDeleteProjectPayment}
           personalAccounts={personalAccounts}
-          usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+          usdRate={effectiveUsdRate}
         />
       );
     }
@@ -3142,7 +3169,7 @@ export default function App() {
           onSavePayment={handleSaveProjectPayment}
           onDeletePayment={handleDeleteProjectPayment}
           personalAccounts={personalAccounts}
-          usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+          usdRate={effectiveUsdRate}
         />
       );
     }
@@ -3195,7 +3222,7 @@ export default function App() {
           onSavePayment={handleSaveProjectPayment}
           onDeletePayment={handleDeleteProjectPayment}
           personalAccounts={personalAccounts}
-          usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+          usdRate={effectiveUsdRate}
         />
       );
     }
@@ -3207,7 +3234,7 @@ export default function App() {
           projects={projects}
           incomes={incomes}
           expenses={expenses}
-          usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+          usdRate={effectiveUsdRate}
           privacyMode={privacyMode}
           onNavigate={navigate}
           onBack={() => navigate('/clientes')}
@@ -3274,7 +3301,7 @@ export default function App() {
           onSavePayment={handleSaveProjectPayment}
           onDeletePayment={handleDeleteProjectPayment}
           personalAccounts={personalAccounts}
-          usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+          usdRate={effectiveUsdRate}
         />
       );
     }
@@ -3286,7 +3313,7 @@ export default function App() {
           <StudioFixedExpensesSection
             expenses={studioFixedExpenses}
             projects={projects}
-            usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+            usdRate={effectiveUsdRate}
             privacyMode={privacyMode}
             onAddFixedExpense={handleAddStudioFixedExpense}
             onUpdateFixedExpense={handleUpdateStudioFixedExpense}
@@ -3367,7 +3394,7 @@ export default function App() {
               accounts={personalAccounts}
               categories={personalCategories}
               projects={projects}
-              settings={personalFinanceSettings}
+              settings={effectivePersonalSettings}
               onSaveTransaction={handleSavePersonalTransaction}
               onNavigate={(p) => navigate(p)}
             />
@@ -3406,7 +3433,7 @@ export default function App() {
               budgets={personalBudgets}
               categories={personalCategories}
               transactions={personalTransactions}
-              settings={personalFinanceSettings}
+              settings={effectivePersonalSettings}
               privacyMode={privacyMode}
               onSaveBudget={handleSavePersonalBudget}
               onUpdateBudget={handleUpdatePersonalBudget}
@@ -3420,7 +3447,7 @@ export default function App() {
             <PersonalFinanceGoalsView
               goals={savingsGoals}
               transactions={personalTransactions}
-              settings={personalFinanceSettings}
+              settings={effectivePersonalSettings}
               privacyMode={privacyMode}
               onSaveGoal={handleSaveSavingsGoal}
               onUpdateGoal={handleUpdateSavingsGoal}
@@ -3436,7 +3463,7 @@ export default function App() {
               projects={projects}
               timeLogs={timeLogs}
               privacyMode={privacyMode}
-              usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+              usdRate={effectiveUsdRate}
               onSaveStudyItem={handleSaveStudyItem}
               onUpdateStudyItem={handleUpdateStudyItem}
               onDeleteStudyItem={handleDeleteStudyItem}
@@ -3451,7 +3478,7 @@ export default function App() {
               accounts={personalAccounts}
               categories={personalCategories}
               privacyMode={privacyMode}
-              usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+              usdRate={effectiveUsdRate}
               onSaveRecurring={handleSavePersonalRecurring}
               onUpdateRecurring={handleUpdatePersonalRecurring}
               onDeleteRecurring={handleDeletePersonalRecurring}
@@ -3463,7 +3490,7 @@ export default function App() {
         if (path === '/mis-finanzas/ajustes') {
           return (
             <PersonalFinanceSettingsView
-              settings={personalFinanceSettings}
+              settings={effectivePersonalSettings}
               accounts={personalAccounts}
               categories={personalCategories}
               transactions={personalTransactions}
@@ -3481,7 +3508,7 @@ export default function App() {
             transactions={personalTransactions}
             recurrings={personalRecurrings}
             budgets={personalBudgets}
-            settings={personalFinanceSettings}
+            settings={effectivePersonalSettings}
             incomes={incomes}
             privacyMode={privacyMode}
             onNavigate={(p) => navigate(p)}
@@ -3501,7 +3528,7 @@ export default function App() {
           budgets={personalBudgets}
           goals={savingsGoals}
           studyItems={studyItems}
-          settings={personalFinanceSettings}
+          settings={effectivePersonalSettings}
           projects={projects}
           incomes={incomes}
           timeLogs={timeLogs}
@@ -3532,9 +3559,9 @@ export default function App() {
           personalBudgets={personalBudgets}
           personalSavingsGoals={savingsGoals}
           personalStudyItems={studyItems}
-          personalSettings={personalFinanceSettings}
+          personalSettings={effectivePersonalSettings}
           privacyMode={privacyMode}
-          usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+          usdRate={effectiveUsdRate}
           onAddIncome={handleAddIncome}
           onUpdateIncome={handleUpdateIncome}
           onDeleteIncome={handleDeleteIncome}
@@ -3615,7 +3642,7 @@ export default function App() {
             saveStoredStudioPaymentSettings(s);
             showToast('Datos de cobro del estudio actualizados');
           }}
-          personalSettings={personalFinanceSettings}
+          personalSettings={effectivePersonalSettings}
           onUpdatePersonalSettings={handleSavePersonalFinanceSettings}
           privacyMode={privacyMode}
           onTogglePrivacy={handleTogglePrivacy}
@@ -3721,7 +3748,7 @@ export default function App() {
         onNavigate={navigate}
         studioSettings={studioPaymentSettings}
         personalAccounts={personalAccounts}
-        usdRate={personalFinanceSettings.usdExchangeRate || 1250}
+        usdRate={effectiveUsdRate}
         onSavePayment={handleSaveProjectPayment}
         onDeletePayment={handleDeleteProjectPayment}
       />

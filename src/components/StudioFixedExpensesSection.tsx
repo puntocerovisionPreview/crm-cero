@@ -40,6 +40,7 @@ import {
   TrendingUp,
   Receipt
 } from 'lucide-react';
+import { DEFAULT_USD_RATE } from '../utils/currency';
 
 interface Props {
   expenses: StudioFixedExpense[];
@@ -55,7 +56,7 @@ interface Props {
 export const StudioFixedExpensesSection: React.FC<Props> = ({
   expenses = [],
   projects = [],
-  usdRate = 1250,
+  usdRate = DEFAULT_USD_RATE,
   privacyMode = false,
   onAddFixedExpense,
   onUpdateFixedExpense,
@@ -434,6 +435,7 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
         status: 'pagado',
         projectId: renewingItem.projectId,
         projectName: renewingItem.clientName,
+        fixedExpenseId: renewingItem.id,
         notes: `Registrado automáticamente desde Gastos Fijos & Vencimientos. Próximo vencimiento: ${nextDate}`,
       });
     }
