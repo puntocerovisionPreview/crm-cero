@@ -376,7 +376,7 @@ export const NewClientWizardView: React.FC<Props> = ({
               key={stepNum}
               className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-bold transition ${
                 currentStep === stepNum
-                  ? 'bg-[#E8590C] text-white shadow-md shadow-[#E8590C]/25'
+                  ? 'bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/25'
                   : currentStep > stepNum
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                   : 'bg-zinc-900 text-zinc-500 border border-zinc-800'
@@ -395,7 +395,7 @@ export const NewClientWizardView: React.FC<Props> = ({
         {currentStep === 1 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[#E8590C] font-bold">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--accent)] font-bold">
                 Paso 1 de 4
               </span>
               <h2 className="text-lg sm:text-xl font-extrabold text-zinc-100 mt-1">
@@ -419,11 +419,11 @@ export const NewClientWizardView: React.FC<Props> = ({
                 }}
                 className={`p-5 rounded-2xl border text-left transition cursor-pointer relative ${
                   serviceType === 'paf'
-                    ? 'bg-gradient-to-b from-[#E8590C]/15 to-zinc-900/90 border-[#E8590C] shadow-lg shadow-[#E8590C]/10'
+                    ? 'bg-gradient-to-b from-[var(--accent)]/15 to-zinc-900/90 border-[var(--accent)] shadow-lg shadow-[var(--accent)]/10'
                     : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700'
                 }`}
               >
-                <div className="w-10 h-10 rounded-xl bg-[#E8590C]/20 border border-[#E8590C]/40 flex items-center justify-center text-[#E8590C] mb-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent)]/20 border border-[var(--accent)]/40 flex items-center justify-center text-[var(--accent)] mb-3">
                   <Award className="w-5 h-5" />
                 </div>
                 <h3 className="text-sm font-black text-zinc-100 mb-1">
@@ -432,7 +432,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                 <p className="text-xs text-zinc-400 leading-relaxed mb-3">
                   Aceleración comercial para estudios de arquitectura. Mentoría 1:1, 5 etapas y plan de cuotas mensuales.
                 </p>
-                <span className="inline-block px-2 py-0.5 rounded-full bg-[#E8590C]/20 text-[#E8590C] text-[10px] font-bold">
+                <span className="inline-block px-2 py-0.5 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-bold">
                   26hs de Consultoría • 12 Semanas
                 </span>
               </button>
@@ -504,7 +504,7 @@ export const NewClientWizardView: React.FC<Props> = ({
         {currentStep === 2 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[#E8590C] font-bold">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--accent)] font-bold">
                 Paso 2 de 4
               </span>
               <h2 className="text-lg sm:text-xl font-extrabold text-zinc-100 mt-1">
@@ -528,7 +528,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                     placeholder="Ej: Estudio Cane Arquitectura o Empresa XYZ"
                     value={clientName}
                     onChange={e => setClientName(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
                     autoFocus
                   />
                 </div>
@@ -543,7 +543,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                   placeholder="Ej: Arquitectura, Desarrollo Software, Diseño, Marketing, Salud, Consultoría"
                   value={rubro}
                   onChange={e => setRubro(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
                 />
                 <div className="flex items-center gap-1.5 mt-2 flex-wrap">
                   {['Arquitectura', 'Desarrollo Software', 'Diseño UI/UX', 'Marketing & Ads', 'Consultoría', 'Salud / Médico', 'Comercio'].map(r => (
@@ -575,7 +575,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                     placeholder="Ej: Arq. Juan Cane"
                     value={ownerName}
                     onChange={e => setOwnerName(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
                   />
                 </div>
               </div>
@@ -591,7 +591,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                     placeholder="Ej: +54 9 11 3844 5599"
                     value={clientPhone}
                     onChange={e => setClientPhone(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
                   />
                 </div>
               </div>
@@ -608,7 +608,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                       placeholder="Ej: @estudiocane"
                       value={instagramUrl}
                       onChange={e => setInstagramUrl(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
                     />
                   </div>
                 </div>
@@ -624,7 +624,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                       placeholder="Ej: estudiocane.com"
                       value={websiteUrl}
                       onChange={e => setWebsiteUrl(e.target.value)}
-                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-3 py-2.5 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
                     />
                   </div>
                 </div>
@@ -637,7 +637,7 @@ export const NewClientWizardView: React.FC<Props> = ({
         {currentStep === 3 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[#E8590C] font-bold">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--accent)] font-bold">
                 Paso 3 de 4
               </span>
               <h2 className="text-lg sm:text-xl font-extrabold text-zinc-100 mt-1">
@@ -660,7 +660,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                     onClick={() => handleSelectPafPreset('pro', 3)}
                     className={`p-2 rounded-xl border text-center text-xs transition cursor-pointer ${
                       pafPlanType === 'paf_pro' && installmentsCount === 3
-                        ? 'bg-[#E8590C]/20 border-[#E8590C] text-[#E8590C] font-bold'
+                        ? 'bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)] font-bold'
                         : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-white'
                     }`}
                   >
@@ -676,7 +676,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                     onClick={() => handleSelectPafPreset('pro', 1)}
                     className={`p-2 rounded-xl border text-center text-xs transition cursor-pointer ${
                       pafPlanType === 'paf_pro' && installmentsCount === 1
-                        ? 'bg-[#E8590C]/20 border-[#E8590C] text-[#E8590C] font-bold'
+                        ? 'bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)] font-bold'
                         : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-white'
                     }`}
                   >
@@ -719,7 +719,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                     min="0"
                     value={price || ''}
                     onChange={e => setPrice(Number(e.target.value))}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-zinc-100 font-mono font-bold focus:outline-none focus:border-[#E8590C]"
+                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 text-xs text-zinc-100 font-mono font-bold focus:outline-none focus:border-[var(--accent)]"
                     placeholder="Monto total del proyecto"
                   />
                 </div>
@@ -732,7 +732,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                 <select
                   value={currency}
                   onChange={e => setCurrency(e.target.value as 'ARS' | 'USD')}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-100 font-bold focus:outline-none focus:border-[#E8590C] cursor-pointer"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-xs text-zinc-100 font-bold focus:outline-none focus:border-[var(--accent)] cursor-pointer"
                 >
                   <option value="USD">USD ($ Dólares)</option>
                   <option value="ARS">ARS ($ Pesos Argentinos)</option>
@@ -756,7 +756,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                   }}
                   className={`p-3.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
                     billingOption === 'indefinido'
-                      ? 'bg-zinc-800/90 border-[#E8590C] ring-1 ring-[#E8590C]'
+                      ? 'bg-zinc-800/90 border-[var(--accent)] ring-1 ring-[var(--accent)]'
                       : 'bg-zinc-900/60 border-zinc-800 hover:border-zinc-700'
                   }`}
                 >
@@ -1080,7 +1080,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                     className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5 text-blue-400" />
-                    <span>+ Agregar cuota</span>
+                    <span>Agregar cuota</span>
                   </button>
 
                   <div className="text-xs font-mono text-zinc-400">
@@ -1160,7 +1160,7 @@ export const NewClientWizardView: React.FC<Props> = ({
         {currentStep === 4 && (
           <div className="space-y-6 animate-in fade-in duration-150">
             <div>
-              <span className="text-[10px] font-mono uppercase tracking-widest text-[#E8590C] font-bold">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--accent)] font-bold">
                 Paso 4 de 4
               </span>
               <h2 className="text-lg sm:text-xl font-extrabold text-zinc-100 mt-1">
@@ -1180,7 +1180,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                   type="date"
                   value={startDate}
                   onChange={e => setStartDate(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
 
@@ -1192,7 +1192,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                   type="date"
                   value={deliveryDate}
                   onChange={e => setDeliveryDate(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
             </div>
@@ -1215,7 +1215,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                 )}
                 <div className="flex justify-between">
                   <span className="text-zinc-500">Servicio:</span>
-                  <span className="text-[#E8590C] font-bold">
+                  <span className="text-[var(--accent)] font-bold">
                     {serviceType === 'paf' ? (pafPlanType === 'paf_pro' ? 'PAF Pro (12 sem / 26h)' : 'PAF Base') : 'Desarrollo Web'}
                   </span>
                 </div>
@@ -1273,7 +1273,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                 hapticFeedback.light();
                 setCurrentStep((prev) => (prev + 1) as any);
               }}
-              className="px-5 py-2 rounded-xl bg-[#E8590C] hover:bg-[#cf4d07] disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#E8590C]/20 cursor-pointer"
+              className="px-5 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[var(--accent)]/20 cursor-pointer"
             >
               <span>Siguiente</span>
               <ArrowRight className="w-3.5 h-3.5" />

@@ -181,7 +181,7 @@ export const DesktopSidebar: React.FC<Props> = ({
               className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg btn-solid-primary text-xs font-semibold transition active:scale-95 cursor-pointer shadow-xs"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2]" />
-              <span>+ Añadir rápido</span>
+              <span>Añadir rápido</span>
             </button>
           </>
         )}
@@ -196,9 +196,9 @@ export const DesktopSidebar: React.FC<Props> = ({
             hapticFeedback.selection();
             onNavigate('/hoy');
           }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
             isHoy
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold'
+              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
           }`}
           title="Hoy (Agenda, Foco y Metas)"
@@ -222,14 +222,14 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/semana');
             }}
-            className={`w-full flex items-center justify-center p-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+            className={`w-full flex items-center justify-center p-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
               isSemana
-                ? 'bg-[#E8590C]/20 text-[#E8590C] font-semibold border border-[#E8590C]/30'
-                : 'text-[var(--text-secondary)] hover:text-[#E8590C] hover:bg-[var(--bg-surface-muted)]'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Misiones de la Semana (/semana)"
           >
-            <Target className="w-4 h-4 shrink-0 text-[#E8590C] stroke-[1.75]" />
+            <Target className="w-4 h-4 shrink-0 text-[var(--accent)] stroke-[1.75]" />
           </button>
         ) : (
           <button
@@ -238,20 +238,17 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/semana');
             }}
-            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer group ${
+            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer group ${
               isSemana
-                ? 'bg-[#E8590C]/15 text-[#E8590C] font-semibold border border-[#E8590C]/30'
-                : 'text-[var(--text-secondary)] hover:text-[#E8590C] hover:bg-[var(--bg-surface-muted)]'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Misiones de la Semana: Carriles, avance, capacidad y ritmo (/semana)"
           >
             <div className="flex items-center gap-2 truncate">
-              <Target className="w-3.5 h-3.5 shrink-0 text-[#E8590C] group-hover:scale-110 transition-transform" />
+              <Target className="w-3.5 h-3.5 shrink-0 text-[var(--accent)] group-hover:scale-110 transition-transform" />
               <span className="truncate">Semana</span>
             </div>
-            <span className="text-[9.5px] font-mono text-[#E8590C] px-1 rounded bg-[#E8590C]/10">
-              Misiones
-            </span>
           </button>
         )}
 
@@ -263,9 +260,9 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/calendario');
             }}
-            className={`w-full flex items-center justify-center p-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+            className={`w-full flex items-center justify-center p-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
               isCalendario
-                ? 'bg-amber-500/20 text-amber-500 dark:text-amber-300 font-semibold border border-amber-500/30'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
                 : 'text-[var(--text-secondary)] hover:text-amber-500 dark:hover:text-amber-300 hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Calendario 360° (Vista Mensual y Entregas) (C)"
@@ -279,9 +276,9 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/calendario');
             }}
-            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer group ${
+            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer group ${
               isCalendario
-                ? 'bg-amber-500/15 text-amber-600 dark:text-amber-300 font-semibold border border-amber-500/30'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
                 : 'text-[var(--text-secondary)] hover:text-amber-600 dark:hover:text-amber-300 hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Calendario 360°: Vista global del mes, entregas, reuniones y cobros (C)"
@@ -291,9 +288,6 @@ export const DesktopSidebar: React.FC<Props> = ({
               <span className="truncate">Calendario</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[9.5px] font-mono text-amber-600 dark:text-amber-400/90 px-1 rounded bg-amber-500/10">
-                360°
-              </span>
               <kbd className="hidden group-hover:inline-block px-1 py-0.2 rounded bg-[var(--bg-surface-muted)] text-[9px] font-mono text-[var(--text-tertiary)]">
                 C
               </kbd>
@@ -308,9 +302,9 @@ export const DesktopSidebar: React.FC<Props> = ({
             hapticFeedback.selection();
             onNavigate('/clientes');
           }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
             isClientes
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold'
+              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
           }`}
           title="Clientes (PAF, Web, Pipeline)"
@@ -334,9 +328,9 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/horizonte');
             }}
-            className={`w-full flex items-center justify-center p-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+            className={`w-full flex items-center justify-center p-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
               isHorizonte
-                ? 'bg-sky-500/20 text-sky-600 dark:text-sky-300 font-semibold border border-sky-500/30'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
                 : 'text-[var(--text-secondary)] hover:text-sky-600 dark:hover:text-sky-300 hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Horizonte: Planificación de largo plazo y cronograma Gantt (H)"
@@ -350,9 +344,9 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/horizonte');
             }}
-            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer group ${
+            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer group ${
               isHorizonte
-                ? 'bg-sky-500/15 text-sky-600 dark:text-sky-300 font-semibold border border-sky-500/30'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
                 : 'text-[var(--text-secondary)] hover:text-sky-600 dark:hover:text-sky-300 hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Horizonte: Planificación de largo plazo, Gantt y balance de frentes (H)"
@@ -362,9 +356,6 @@ export const DesktopSidebar: React.FC<Props> = ({
               <span className="truncate">Horizonte</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[9.5px] font-mono text-sky-600 dark:text-sky-400/90 px-1 rounded bg-sky-500/10">
-                Gantt
-              </span>
               <kbd className="hidden group-hover:inline-block px-1 py-0.2 rounded bg-[var(--bg-surface-muted)] text-[9px] font-mono text-[var(--text-tertiary)]">
                 H
               </kbd>
@@ -379,9 +370,9 @@ export const DesktopSidebar: React.FC<Props> = ({
             hapticFeedback.selection();
             onNavigate('/dinero');
           }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
             isDinero
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold'
+              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
           }`}
           title="Dinero (Estudio & Personal)"
@@ -405,9 +396,9 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/gastos-fijos');
             }}
-            className={`w-full flex items-center justify-center p-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+            className={`w-full flex items-center justify-center p-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
               isGastosFijos
-                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 font-semibold border border-emerald-500/30'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
                 : 'text-[var(--text-secondary)] hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Gastos Fijos: Dominios, Hosting, IAs y Vencimientos"
@@ -421,9 +412,9 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/gastos-fijos');
             }}
-            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer group ${
+            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer group ${
               isGastosFijos
-                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 font-semibold border border-emerald-500/30'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
                 : 'text-[var(--text-secondary)] hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Control de gastos fijos: Hosting, Dominios de clientes e IAs mensuales"
@@ -433,9 +424,6 @@ export const DesktopSidebar: React.FC<Props> = ({
               <span className="truncate">Gastos Fijos</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[9.5px] font-mono text-emerald-600 dark:text-emerald-400/90 px-1 rounded bg-emerald-500/10">
-                IAs & Web
-              </span>
             </div>
           </button>
         )}
@@ -448,9 +436,9 @@ export const DesktopSidebar: React.FC<Props> = ({
               hapticFeedback.selection();
               onNavigate('/cerebro');
             }}
-            className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+            className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
               isCerebro
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold'
+                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
             }`}
             title="Segundo Cerebro (Notas & Grafo)"
@@ -474,9 +462,9 @@ export const DesktopSidebar: React.FC<Props> = ({
             hapticFeedback.selection();
             onNavigate('/ajustes');
           }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition cursor-pointer ${
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
             isAjustes
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold'
+              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
           }`}
           title="Ajustes y configuración"
@@ -497,7 +485,7 @@ export const DesktopSidebar: React.FC<Props> = ({
             hapticFeedback.selection();
             onNavigate('/foco');
           }}
-          className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-xs font-medium transition cursor-pointer text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20"
+          className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20"
           title="Modo Foco (F)"
         >
           <div className="flex items-center gap-2.5 truncate">
@@ -540,7 +528,7 @@ export const DesktopSidebar: React.FC<Props> = ({
           <button
             type="button"
             onClick={onOpenGeminiChat}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-[#E8590C] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer"
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-[var(--accent)] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer"
             title="Copiloto IA"
           >
             <Sparkles className="w-3.5 h-3.5 shrink-0" />

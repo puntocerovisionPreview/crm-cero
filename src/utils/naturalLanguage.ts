@@ -7,6 +7,7 @@
 
 import { QuickAddType } from '../components/QuickAddModal';
 import { getTodayString, addDays } from './storage';
+import { formatLocalISO } from './dates';
 
 export interface ParsedNaturalLanguage {
   originalText: string;
@@ -124,17 +125,17 @@ export function parseNaturalLanguageInput(rawText: string, defaultDate?: string)
   if (/\bpasado\s+mañana\b/i.test(text)) {
     const d = new Date();
     d.setDate(today.getDate() + 2);
-    date = d.toISOString().split('T')[0];
+    date = formatLocalISO(d);
     score += 2;
     text = text.replace(/\b(?:para\s+|de\s+)?pasado\s+mañana\b/gi, '').trim();
   } else if (/\bmañana\b/i.test(text)) {
     const d = new Date();
     d.setDate(today.getDate() + 1);
-    date = d.toISOString().split('T')[0];
+    date = formatLocalISO(d);
     score += 2;
     text = text.replace(/\b(?:para\s+|de\s+|el\s+)?mañana\b/gi, '').trim();
   } else if (/\bhoy\b/i.test(text)) {
-    date = today.toISOString().split('T')[0];
+    date = formatLocalISO(today);
     score += 1;
     text = text.replace(/\b(?:para\s+|de\s+)?hoy\b/gi, '').trim();
   } else {
@@ -155,7 +156,7 @@ export function parseNaturalLanguageInput(rawText: string, defaultDate?: string)
         if (diff <= 0) diff += 7; // next upcoming day
         const target = new Date();
         target.setDate(today.getDate() + diff);
-        date = target.toISOString().split('T')[0];
+        date = formatLocalISO(target);
         score += 2;
         text = text.replace(regex, '').trim();
         break;

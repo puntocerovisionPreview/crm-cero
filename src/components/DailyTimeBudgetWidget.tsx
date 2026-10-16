@@ -1067,7 +1067,7 @@ export const DailyTimeBudgetWidget: React.FC<Props> = ({
                     key={key}
                     className={`group p-3 rounded-xl border transition-all ${
                       isSessionThis
-                        ? 'bg-zinc-900 border-[#E8590C]/60 shadow-md'
+                        ? 'bg-zinc-900 border-[var(--accent)]/60 shadow-md'
                         : isDone 
                         ? 'bg-zinc-950/60 border-zinc-800/60 opacity-60' 
                         : b.allocatedMinutes > 0
@@ -1128,7 +1128,7 @@ export const DailyTimeBudgetWidget: React.FC<Props> = ({
                           onClick={() => handleStartSession(key, b.allocatedMinutes > 0 ? b.allocatedMinutes : 45)}
                           className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 cursor-pointer active:scale-95 ${
                             isSessionThis
-                              ? 'bg-[#E8590C] text-white shadow-sm'
+                              ? 'bg-[var(--accent)] text-white shadow-sm'
                               : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700/80'
                           }`}
                         >

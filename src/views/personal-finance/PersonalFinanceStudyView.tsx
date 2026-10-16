@@ -558,7 +558,7 @@ export const PersonalFinanceStudyView: React.FC<Props> = ({
                         {item.projectName && (
                           <>
                             <span>•</span>
-                            <span className="flex items-center gap-1 text-[#E8590C]">
+                            <span className="flex items-center gap-1 text-[var(--accent)]">
                               <FolderKanban className="w-3 h-3" />
                               {item.projectName}
                             </span>

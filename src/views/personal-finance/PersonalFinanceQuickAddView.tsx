@@ -399,7 +399,7 @@ export const PersonalFinanceQuickAddView: React.FC<Props> = ({
                   }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition active:scale-95 flex items-center gap-1.5 border cursor-pointer ${
                     selectedAccountId === acc.id
-                      ? 'bg-zinc-800 text-zinc-100 border-[#E8590C] ring-1 ring-[#E8590C]/50'
+                      ? 'bg-zinc-800 text-zinc-100 border-[var(--accent)] ring-1 ring-[var(--accent)]/50'
                       : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:border-zinc-700'
                   }`}
                 >
@@ -481,7 +481,7 @@ export const PersonalFinanceQuickAddView: React.FC<Props> = ({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Ej: Almuerzo, Uber, Factura luz, Nafta..."
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl pl-3.5 pr-11 py-2.5 text-xs text-zinc-200 focus:outline-hidden transition"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl pl-3.5 pr-11 py-2.5 text-xs text-zinc-200 focus:outline-hidden transition"
             />
             <button
               type="button"
@@ -506,7 +506,7 @@ export const PersonalFinanceQuickAddView: React.FC<Props> = ({
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-hidden"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-2.5 py-1.5 text-xs text-zinc-200 focus:outline-hidden"
             />
           </div>
 
@@ -515,7 +515,7 @@ export const PersonalFinanceQuickAddView: React.FC<Props> = ({
             <select
               value={selectedProjectId}
               onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-2 py-1.5 text-xs text-zinc-200 focus:outline-hidden truncate"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-2 py-1.5 text-xs text-zinc-200 focus:outline-hidden truncate"
             >
               <option value="">(Sin vincular)</option>
               {projects.filter(p => !p.archived).map(p => (
@@ -558,7 +558,7 @@ export const PersonalFinanceQuickAddView: React.FC<Props> = ({
             type="button"
             disabled={isSaving || !amountStr}
             onClick={() => handleSave(false)}
-            className="py-3 px-3 rounded-2xl bg-[#E8590C] hover:bg-[#d94f08] text-black text-xs font-black transition active:scale-95 disabled:opacity-40 shadow-lg shadow-[#E8590C]/25 cursor-pointer flex items-center justify-center gap-1.5"
+            className="py-3 px-3 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-black text-xs font-black transition active:scale-95 disabled:opacity-40 shadow-lg shadow-[var(--accent)]/25 cursor-pointer flex items-center justify-center gap-1.5"
           >
             <Check className="w-4 h-4 stroke-[3]" />
             <span>Guardar</span>

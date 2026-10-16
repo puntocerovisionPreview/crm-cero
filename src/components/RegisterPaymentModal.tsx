@@ -85,10 +85,9 @@ export const RegisterPaymentModal: React.FC<Props> = ({
       setDolarRef(initialPayment.dolarRef ? String(initialPayment.dolarRef) : '');
       setShowAdvanced(Boolean(initialPayment.destinationAccountId || initialPayment.invoiced || initialPayment.dolarRef));
     } else {
-      // New payment: suggest remaining balance or default
-      const defaultAmount = billing.saldoPendiente > 0 
-        ? String(billing.saldoPendiente) 
-        : (billing.montoAcordado > 0 ? String(billing.montoAcordado) : '');
+      // New payment: suggest remaining balance. Si ya está saldado queda vacío,
+      // antes se precargaba el precio total y era fácil cobrar dos veces.
+      const defaultAmount = billing.saldoPendiente > 0 ? String(billing.saldoPendiente) : '';
       setAmount(defaultAmount);
       setCurrency(billing.currency);
       setDate(today);
@@ -107,13 +106,14 @@ export const RegisterPaymentModal: React.FC<Props> = ({
   const numAmount = Number(amount) || 0;
   const saldoRestante = Math.max(0, billing.saldoPendiente - numAmount);
   const isPartial = numAmount > 0 && numAmount < billing.saldoPendiente;
+  // Al editar, el saldo ya descuenta este mismo pago
+  const maxWithoutOverpay = billing.saldoPendiente + (initialPayment ? Number(initialPayment.amount) || 0 : 0);
+  const overpayAmount = billing.montoAcordado > 0 && currency === billing.currency ? numAmount - maxWithoutOverpay : 0;
 
   const handleFillFullBalance = () => {
     hapticFeedback.light();
     if (billing.saldoPendiente > 0) {
       setAmount(String(billing.saldoPendiente));
-    } else if (billing.montoAcordado > 0) {
-      setAmount(String(billing.montoAcordado));
     }
   };
 
@@ -290,6 +290,15 @@ export const RegisterPaymentModal: React.FC<Props> = ({
               className="w-full px-3 py-2 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-strong)]"
             />
           </div>
+
+          {overpayAmount > 0 && (
+            <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 flex items-center gap-1.5 font-semibold text-[11px]">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>
+                Ojo: este pago supera lo acordado por {formatCurrencyAmount(overpayAmount, currency, true)}. Revisá que no esté cargado dos veces.
+              </span>
+            </div>
+          )}
 
           {/* Aviso inteligente de pago parcial */}
           {isPartial && (

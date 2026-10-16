@@ -1,5 +1,6 @@
 import { PafMilestone } from '../types';
 import { PAF_PRO_CATALOG, PAF_BASE_CATALOG } from './pricingCatalog';
+import { parseLocalDate } from './dates';
 
 export const PAF_PRO_MILESTONES: Omit<PafMilestone, 'id' | 'completed'>[] = [
   // MES 1: INFRAESTRUCTURA & PRESENCIA DIGITAL
@@ -303,7 +304,7 @@ export function checkPafPacing(
   if (!startDate) {
     return { isFast: false, percentHours: Math.round((hoursUsed / (totalHours || 26)) * 100), elapsedWeeks: 0 };
   }
-  const start = new Date(startDate);
+  const start = parseLocalDate(startDate);
   const now = new Date();
   const diffDays = Math.max(0, Math.floor((now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
   const elapsedWeeks = Math.max(1, Math.min(12, Math.ceil(diffDays / 7)));

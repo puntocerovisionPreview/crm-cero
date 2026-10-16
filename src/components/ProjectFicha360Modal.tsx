@@ -599,7 +599,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
         <div className="p-4 sm:p-5 border-b border-zinc-800 bg-zinc-950/60 flex items-start justify-between gap-3 shrink-0">
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#E8590C]/10 text-[#E8590C] border border-[#E8590C]/20 uppercase tracking-wider">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 uppercase tracking-wider">
                 <FolderKanban className="w-3 h-3" />
                 Ficha 360° de Proyecto
               </span>
@@ -608,7 +608,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
               <select
                 value={project.status}
                 onChange={e => onUpdateProject(project.id, { status: e.target.value })}
-                className="text-xs font-semibold px-2 py-0.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+                className="text-xs font-semibold px-2 py-0.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
               >
                 {DEFAULT_PROJECT_STATUSES.map(st => (
                   <option key={st} value={st}>
@@ -633,7 +633,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
               <select
                 value={project.leadScore || ''}
                 onChange={e => onUpdateProject(project.id, { leadScore: (e.target.value as any) || undefined })}
-                className="text-xs font-semibold px-2 py-0.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 focus:outline-none focus:border-[#E8590C]"
+                className="text-xs font-semibold px-2 py-0.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 focus:outline-none focus:border-[var(--accent)]"
                 title="Lead Scoring para arquitectos (A = Terreno + Plazo + Presupuesto)"
               >
                 <option value="">Scoring Lead...</option>
@@ -699,13 +699,13 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                       value={priceDraft}
                       onChange={e => setPriceDraft(e.target.value === '' ? '' : Number(e.target.value))}
                       placeholder="Monto presupuestado"
-                      className="w-36 bg-zinc-950 text-xs text-zinc-100 px-2.5 py-1.5 rounded-lg border border-zinc-800 focus:outline-none focus:border-[#E8590C]"
+                      className="w-36 bg-zinc-950 text-xs text-zinc-100 px-2.5 py-1.5 rounded-lg border border-zinc-800 focus:outline-none focus:border-[var(--accent)]"
                       autoFocus
                     />
                     <button
                       type="button"
                       onClick={handleSavePrice}
-                      className="p-1.5 rounded-lg bg-[#E8590C] text-white hover:bg-[#cf4d07] transition"
+                      className="p-1.5 rounded-lg bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)] transition"
                       title="Guardar precio"
                     >
                       <Check className="w-4 h-4" />
@@ -795,7 +795,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                       setCurrencyDraft(project.estimatedCurrency || 'USD');
                       setIsEditingPrice(true);
                     }}
-                    className="p-1 text-zinc-400 hover:text-[#E8590C] rounded transition"
+                    className="p-1 text-zinc-400 hover:text-[var(--accent)] rounded transition"
                     title="Editar valor de precio y aplicar lógica de planes"
                   >
                     <Edit3 className="w-3 h-3" />
@@ -821,20 +821,20 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                     }
                     onUpdateProject(project.id, updates);
                   }}
-                  className="bg-transparent text-xs text-zinc-100 font-mono focus:outline-none focus:text-[#E8590C]"
+                  className="bg-transparent text-xs text-zinc-100 font-mono focus:outline-none focus:text-[var(--accent)]"
                   title="Fecha en que arrancaría el proyecto o te confirmó el cliente (para contar meses transcurridos)"
                 />
               </div>
 
               {/* Delivery Date / Plazo for Roadmap #4 & PAF 3-Month Cycle */}
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-zinc-950 border border-zinc-800/80">
-                <Calendar className="w-3.5 h-3.5 text-[#E8590C]" />
+                <Calendar className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span className="text-[11px] text-zinc-400 font-semibold">{isPaf ? 'Fin (3m):' : 'Entrega / Plazo:'}</span>
                 <input
                   type="date"
                   value={project.deliveryDate || ''}
                   onChange={e => onUpdateProject(project.id, { deliveryDate: e.target.value || undefined })}
-                  className="bg-transparent text-xs text-zinc-100 font-mono focus:outline-none focus:text-[#E8590C]"
+                  className="bg-transparent text-xs text-zinc-100 font-mono focus:outline-none focus:text-[var(--accent)]"
                   title={isPaf ? "Fecha límite (calculada a 3 meses de aceleración PAF)" : "Fecha límite para el Roadmap de Entregas"}
                 />
                 {isPaf && (
@@ -1026,7 +1026,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   onClick={() => setActiveSubTab('paf')}
                   className={`px-3 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 text-xs shrink-0 md:shrink whitespace-nowrap cursor-pointer ${
                     activeSubTab === 'paf'
-                      ? 'bg-[#E8590C] !text-white shadow-xs font-extrabold'
+                      ? 'bg-[var(--accent)] !text-white shadow-xs font-extrabold'
                       : 'text-amber-400 hover:text-amber-300 hover:bg-zinc-800/60 bg-zinc-900/50'
                   }`}
                   title="Programa PAF y Metas de Aceleración"
@@ -1042,7 +1042,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   onClick={() => setActiveSubTab('tareas')}
                   className={`px-3 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 text-xs shrink-0 md:shrink whitespace-nowrap cursor-pointer ${
                     activeSubTab === 'tareas'
-                      ? 'bg-[#E8590C] !text-white shadow-xs font-extrabold'
+                      ? 'bg-[var(--accent)] !text-white shadow-xs font-extrabold'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 bg-zinc-900/50'
                   }`}
                   title="Tareas del Cliente"
@@ -1056,7 +1056,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   onClick={() => setActiveSubTab('reuniones')}
                   className={`px-3 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 text-xs shrink-0 md:shrink whitespace-nowrap cursor-pointer ${
                     activeSubTab === 'reuniones'
-                      ? 'bg-[#E8590C] !text-white shadow-xs font-extrabold'
+                      ? 'bg-[var(--accent)] !text-white shadow-xs font-extrabold'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 bg-zinc-900/50'
                   }`}
                   title="Sesiones 1:1 de Consultoría"
@@ -1070,7 +1070,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   onClick={() => setActiveSubTab('finanzas')}
                   className={`px-3 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 text-xs shrink-0 md:shrink whitespace-nowrap cursor-pointer ${
                     activeSubTab === 'finanzas'
-                      ? 'bg-[#E8590C] !text-white shadow-xs font-extrabold'
+                      ? 'bg-[var(--accent)] !text-white shadow-xs font-extrabold'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 bg-zinc-900/50'
                   }`}
                   title="Cronograma de Cuotas y Pagos"
@@ -1084,7 +1084,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   onClick={() => setActiveSubTab('notas')}
                   className={`px-3 py-2 rounded-xl font-bold transition flex items-center justify-center gap-1.5 text-xs shrink-0 md:shrink whitespace-nowrap cursor-pointer ${
                     activeSubTab === 'notas'
-                      ? 'bg-[#E8590C] !text-white shadow-xs font-extrabold'
+                      ? 'bg-[var(--accent)] !text-white shadow-xs font-extrabold'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60 bg-zinc-900/50'
                   }`}
                   title="Bitácora del Cliente Arquitecto"
@@ -1485,12 +1485,12 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
               <div className="bg-zinc-950 border border-zinc-800/90 rounded-2xl p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-bold uppercase text-zinc-300 flex items-center gap-1.5">
-                    <CheckSquare className="w-4 h-4 text-[#E8590C]" />
+                    <CheckSquare className="w-4 h-4 text-[var(--accent)]" />
                     Pendientes clave ({projectTasks.filter(t => !t.completed).length} pendientes)
                   </h4>
                   <button
                     onClick={() => setActiveSubTab('tareas')}
-                    className="text-xs text-[#E8590C] hover:underline font-semibold"
+                    className="text-xs text-[var(--accent)] hover:underline font-semibold"
                   >
                     Ver todas
                   </button>
@@ -1506,10 +1506,10 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <button
                             onClick={() => onToggleTask(task.id)}
-                            className="text-zinc-500 hover:text-[#E8590C] transition"
+                            className="text-zinc-500 hover:text-[var(--accent)] transition"
                           >
                             {task.completed ? (
-                              <CheckCircle2 className="w-4 h-4 text-[#E8590C]" />
+                              <CheckCircle2 className="w-4 h-4 text-[var(--accent)]" />
                             ) : (
                               <Circle className="w-4 h-4 text-zinc-500" />
                             )}
@@ -1591,7 +1591,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                 </span>
                 <button
                   onClick={() => setShowNewTaskInput(prev => !prev)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#E8590C] text-white text-xs font-bold transition hover:bg-[#cf4d07]"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[var(--accent)] text-white text-xs font-bold transition hover:bg-[var(--accent-strong)]"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Nueva Tarea</span>
@@ -1600,7 +1600,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
 
               {/* Inline Add Task Form */}
               {showNewTaskInput && (
-                <form onSubmit={handleCreateTask} className="p-3 bg-zinc-950 border border-[#E8590C]/40 rounded-2xl space-y-3 animate-in fade-in">
+                <form onSubmit={handleCreateTask} className="p-3 bg-zinc-950 border border-[var(--accent)]/40 rounded-2xl space-y-3 animate-in fade-in">
                   <div className="text-xs font-bold text-zinc-200">
                     Agregar tarea vinculada a {project.clientName}
                   </div>
@@ -1611,7 +1611,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                     placeholder="Título de la tarea..."
                     value={newTaskTitle}
                     onChange={e => setNewTaskTitle(e.target.value)}
-                    className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[#E8590C]"
+                    className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[var(--accent)]"
                   />
                   <div className="flex items-center justify-between gap-2">
                     <input
@@ -1631,7 +1631,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                       </button>
                       <button
                         type="submit"
-                        className="px-3 py-1.5 rounded-xl bg-[#E8590C] text-white text-xs font-bold"
+                        className="px-3 py-1.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold"
                       >
                         Guardar
                       </button>
@@ -1657,10 +1657,10 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                           <div className="flex items-start gap-2.5 flex-1 min-w-0">
                             <button
                               onClick={() => onToggleTask(task.id)}
-                              className="mt-0.5 text-zinc-500 hover:text-[#E8590C] transition"
+                              className="mt-0.5 text-zinc-500 hover:text-[var(--accent)] transition"
                             >
                               {task.completed ? (
-                                <CheckCircle2 className="w-4 h-4 text-[#E8590C]" />
+                                <CheckCircle2 className="w-4 h-4 text-[var(--accent)]" />
                               ) : (
                                 <Circle className="w-4 h-4 text-zinc-500" />
                               )}
@@ -1687,7 +1687,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                                   : 'bg-transparent border-dashed border-zinc-800 text-zinc-500 hover:text-zinc-300'
                               }`}
                             >
-                              <ListTodo className="w-3 h-3 text-[#E8590C]" />
+                              <ListTodo className="w-3 h-3 text-[var(--accent)]" />
                               <span>{completedSub}/{subtasks.length} Subtareas</span>
                               {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                             </button>
@@ -1762,13 +1762,13 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                                     handleAddInlineSubtask(task.id);
                                   }
                                 }}
-                                className="flex-1 text-[11px] text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 focus:outline-none focus:border-[#E8590C]"
+                                className="flex-1 text-[11px] text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 focus:outline-none focus:border-[var(--accent)]"
                               />
                               <button
                                 type="button"
                                 onClick={() => handleAddInlineSubtask(task.id)}
                                 disabled={!inlineSubtaskText.trim()}
-                                className="px-2 py-1 rounded-lg bg-zinc-800 text-zinc-200 text-[11px] font-bold hover:bg-[#E8590C] hover:text-white disabled:opacity-40 transition"
+                                className="px-2 py-1 rounded-lg bg-zinc-800 text-zinc-200 text-[11px] font-bold hover:bg-[var(--accent)] hover:text-white disabled:opacity-40 transition"
                               >
                                 <Plus className="w-3 h-3" />
                               </button>
@@ -1942,7 +1942,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                     className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-500/30 transition"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ Cobro Manual</span>
+                    <span>Cobro Manual</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1952,7 +1952,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                     className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold hover:bg-rose-500/30 transition"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>+ Gasto Directo</span>
+                    <span>Gasto Directo</span>
                   </button>
                 </div>
               </div>
@@ -2233,7 +2233,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
 
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase text-zinc-400 flex items-center gap-1.5">
-                  <Edit3 className="w-3.5 h-3.5 text-[#E8590C]" />
+                  <Edit3 className="w-3.5 h-3.5 text-[var(--accent)]" />
                   {isPaf ? 'Notas & Bitácora del Cliente Arquitecto' : 'Notas & Especificaciones del Sitio'}
                 </span>
                 {notesSaved && (
@@ -2251,14 +2251,14 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                 placeholder={isPaf
                   ? "Escribe aquí acuerdos, especificaciones, bitácora de obra o anotaciones importantes de este cliente..."
                   : "Escribe aquí requerimientos del sitio web, credenciales de hosting/dominio, feedback de diseño o notas del cliente..."}
-                className="w-full text-xs sm:text-sm text-zinc-200 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-[#E8590C] transition leading-relaxed resize-none"
+                className="w-full text-xs sm:text-sm text-zinc-200 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-[var(--accent)] transition leading-relaxed resize-none"
               />
 
               <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={handleSaveNotes}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#E8590C] text-white text-xs font-bold hover:bg-[#cf4d07] transition shadow-md shadow-[#E8590C]/20 cursor-pointer"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent-strong)] transition shadow-md shadow-[var(--accent)]/20 cursor-pointer"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>Guardar Notas</span>
@@ -2540,7 +2540,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <h5 className="text-xs font-bold text-zinc-200 flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4 text-[#E8590C]" />
+                    <CheckSquare className="w-4 h-4 text-[var(--accent)]" />
                     <span>Hitos de las 12 Semanas / 3 Meses</span>
                   </h5>
 

@@ -4,6 +4,33 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
+   .CERO · "PLANO NOCTURNO"
+   Base pizarra azulada (papel de plano de noche) en vez de negro neutro.
+   Dos acentos con rol fijo:
+     - Cian plano  (--accent)  → acciones, navegación, foco
+     - Luz de obra (amber)     → plata, cobros y PAF
+   Tipografía única: Archivo; los títulos usan su eje de ancho expandido,
+   como la rotulación de un plano.
+   Reescribir la escala zinc recolorea de una vez las ~5000 clases zinc-*.
+   ========================================================================== */
+@theme {
+  --font-sans: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --color-zinc-50: #F2F5F8;
+  --color-zinc-100: #E6EBF0;
+  --color-zinc-200: #CDD5DE;
+  --color-zinc-300: #B0BBC8;
+  --color-zinc-400: #97A3B3;
+  --color-zinc-500: #7A8798;
+  --color-zinc-600: #586476;
+  --color-zinc-700: #3B4657;
+  --color-zinc-800: #293443;
+  --color-zinc-900: #1A222D;
+  --color-zinc-950: #121821;
+}
+
+/* ==========================================================================
    PUNTO CERO CRM - SWISS MINIMALIST MONOCHROME DESIGN TOKENS
    Light Mode (Hero Reference) & Dark Mode (Faithful Inversion)
    ========================================================================== */
@@ -37,9 +64,14 @@
   --semantic-indigo: #4338CA;
   --semantic-indigo-subtle: rgba(67, 56, 202, 0.12);
 
-  /* Geometry & Radii */
-  --radius-card: 12px;
-  --radius-control: 8px;
+  /* Acento de acción (cian plano) */
+  --accent: #0E7FAD;
+  --accent-strong: #0B6A91;
+  --on-accent: #FFFFFF;
+
+  /* Geometry & Radii: jerarquía, no un radio único */
+  --radius-card: 16px;
+  --radius-control: 10px;
   --radius-pill: 9999px;
   --border-width: 1px;
 
@@ -61,7 +93,10 @@
 
 .light {
   /* Explicit Light Mode Support */
-  --bg-app: #F8F9FA;
+  --accent: #0E7FAD;
+  --accent-strong: #0B6A91;
+  --on-accent: #FFFFFF;
+  --bg-app: #F3F6F8;
   --bg-surface: #FFFFFF;
   --bg-surface-elevated: #F4F4F5;
   --bg-surface-muted: #E4E4E7;
@@ -87,23 +122,26 @@
 }
 
 .dark {
-  /* Surface & Canvas (Dark - Faithful Inversion) */
-  --bg-app: #09090B;
-  --bg-surface: #121215;
-  --bg-surface-elevated: #18181B;
-  --bg-surface-muted: #27272A;
-  --border-subtle: #27272A;
-  --border-divider: #1E1E22;
+  /* Surface & Canvas: pizarra azulada, cada nivel de elevación un paso más claro */
+  --bg-app: #121821;
+  --bg-surface: #18202A;
+  --bg-surface-elevated: #1F2834;
+  --bg-surface-muted: #293443;
+  --border-subtle: #2A3544;
+  --border-divider: #222B37;
 
   /* Typography (Dark) */
-  --text-primary: #FAFAFA;
-  --text-secondary: #A1A1AA;
-  --text-tertiary: #71717A;
+  --text-primary: #EEF2F6;
+  --text-secondary: #A5B1C0;
+  --text-tertiary: #7A8798;
 
-  /* Solid Accent / Actions */
-  --solid-contrast-bg: #FAFAFA;
-  --solid-contrast-text: #09090B;
-  --solid-contrast-hover: #E4E4E7;
+  /* Acción principal: cian plano con texto oscuro (contraste AA) */
+  --accent: #5BC2E7;
+  --accent-strong: #8AD4EF;
+  --on-accent: #06222E;
+  --solid-contrast-bg: #5BC2E7;
+  --solid-contrast-text: #06222E;
+  --solid-contrast-hover: #8AD4EF;
 
   /* Semantic Colors in Dark */
   --semantic-green: #22C55E;
@@ -441,7 +479,8 @@ html:not(.dark) .bg-black\/80,
 html, body {
   background-color: var(--bg-app);
   color: var(--text-primary);
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Archivo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-variation-settings: 'wdth' 100;
   -webkit-overflow-scrolling: touch;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
@@ -453,9 +492,12 @@ html, body {
   transition: background-color 150ms ease, color 150ms ease;
 }
 
+/* Títulos con ancho expandido: la rotulación de plano es la voz de la marca */
 h1, h2, h3, .font-heading {
-  font-family: 'Inter Tight', 'Inter', system-ui, sans-serif;
-  letter-spacing: -0.025em;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-stretch: 112%;
+  font-variation-settings: 'wdth' 112;
+  letter-spacing: -0.015em;
 }
 
 #root {
@@ -511,10 +553,9 @@ h1, h2, h3, .font-heading {
 
 /* Micro-labels in Swiss style (10-11px, uppercase, wide tracking) */
 .label-swiss {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.005em;
   color: var(--text-secondary);
 }
 
@@ -757,5 +798,50 @@ h1, h2, h3, .font-heading {
 @media screen and (max-width: 768px) {
   input, select, textarea {
     font-size: 16px !important;
+  }
+}
+
+
+/* ==========================================================================
+   LEGIBILIDAD Y ACCESIBILIDAD (capa global, sin tocar cada componente)
+   ========================================================================== */
+
+/* Tamaños mínimos: había más de 1.300 textos de 8 a 11 px, ilegibles en el celular */
+.text-\[8px\], .text-\[8\.5px\], .text-\[9px\], .text-\[9\.5px\] { font-size: 10.5px; }
+.text-\[10px\] { font-size: 11px; }
+.text-\[10\.5px\] { font-size: 11.5px; }
+.text-\[11px\] { font-size: 12px; }
+
+/* Etiquetas en mayúsculas espaciadas → frase normal, más fácil de leer */
+.uppercase[class*="tracking-"] {
+  text-transform: none;
+  letter-spacing: 0.005em;
+}
+
+/* Los números se alinean en columnas sin usar tipografía monoespaciada */
+.font-mono, .tabular-nums {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* Acento: el naranja suelto se reemplazó por el cian de acción; el texto
+   sobre el acento usa su color de contraste en cada tema */
+.bg-\[var\(--accent\)\].text-white,
+.bg-\[var\(--accent\)\] .text-white,
+.hover\:bg-\[var\(--accent\)\]:hover {
+  color: var(--on-accent);
+}
+
+/* Foco visible con teclado */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
   }
 }

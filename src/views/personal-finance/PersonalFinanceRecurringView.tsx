@@ -200,7 +200,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Ej: Internet Fibertel, Figma Pro, Alquiler..."
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-[#E8590C] transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-[var(--accent)] transition"
             />
           </div>
 
@@ -245,7 +245,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
                 value={amountStr}
                 onChange={(e) => setAmountStr(e.target.value)}
                 placeholder="0"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 font-mono text-sm focus:outline-none focus:border-[#E8590C] transition"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 font-mono text-sm focus:outline-none focus:border-[var(--accent)] transition"
               />
             </div>
             <div>
@@ -257,7 +257,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
                   type="button"
                   onClick={() => setCurrency('ARS')}
                   className={`py-1.5 rounded-lg text-xs font-bold transition ${
-                    currency === 'ARS' ? 'bg-[#E8590C] text-black' : 'text-zinc-400'
+                    currency === 'ARS' ? 'bg-[var(--accent)] text-black' : 'text-zinc-400'
                   }`}
                 >
                   ARS
@@ -284,7 +284,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
               <select
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[#E8590C] transition"
+                className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[var(--accent)] transition"
               >
                 {accounts.map(acc => (
                   <option key={acc.id} value={acc.id}>
@@ -301,7 +301,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[#E8590C] transition"
+                className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[var(--accent)] transition"
               >
                 {categories.map(cat => (
                   <option key={cat.id} value={cat.id}>
@@ -321,7 +321,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
               <select
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value as PersonalRecurringFrequency)}
-                className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[#E8590C] transition"
+                className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[var(--accent)] transition"
               >
                 {Object.entries(FREQUENCY_LABELS).map(([k, label]) => (
                   <option key={k} value={k}>{label}</option>
@@ -338,7 +338,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
                 required
                 value={nextDate}
                 onChange={(e) => setNextDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[#E8590C] transition font-mono"
+                className="w-full px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[var(--accent)] transition font-mono"
               />
             </div>
           </div>
@@ -350,7 +350,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
               id="activeRec"
               checked={active}
               onChange={(e) => setActive(e.target.checked)}
-              className="w-4 h-4 rounded text-[#E8590C] bg-zinc-900 border-zinc-700"
+              className="w-4 h-4 rounded text-[var(--accent)] bg-zinc-900 border-zinc-700"
             />
             <label htmlFor="activeRec" className="text-xs font-semibold text-zinc-200 cursor-pointer">
               Suscripción activa (generar avisos y confirmaciones de vencimiento)
@@ -367,7 +367,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Ej: Número de cliente, débito automático..."
-              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[#E8590C] transition"
+              className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[var(--accent)] transition"
             />
           </div>
 
@@ -381,7 +381,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-[#E8590C] hover:bg-[#d04f0b] text-black text-xs font-bold transition shadow-lg shadow-[#E8590C]/20"
+              className="px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[#d04f0b] text-black text-xs font-bold transition shadow-lg shadow-[var(--accent)]/20"
             >
               {editingId ? 'Guardar Cambios' : 'Crear Recurrente'}
             </button>
@@ -410,7 +410,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
         <button
           type="button"
           onClick={openNewForm}
-          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#E8590C] hover:bg-[#d04f0b] text-black text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-[#E8590C]/20 active:scale-95 transition"
+          className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[#d04f0b] text-black text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-[var(--accent)]/20 active:scale-95 transition"
         >
           <Plus className="w-4 h-4 stroke-[2.5]" />
           <span>Nuevo Recurrente</span>
@@ -491,7 +491,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
           <button
             type="button"
             onClick={openNewForm}
-            className="px-4 py-2 rounded-xl bg-[#E8590C] text-black text-xs font-bold inline-flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-[var(--accent)] text-black text-xs font-bold inline-flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             <span>Cargar Primer Recurrente</span>

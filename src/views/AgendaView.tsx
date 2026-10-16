@@ -355,7 +355,7 @@ export const AgendaView: React.FC<Props> = ({
             }}
             className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer ${
               mobileTab === 'dia'
-                ? 'bg-[#E8590C] text-white shadow-sm'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
@@ -371,7 +371,7 @@ export const AgendaView: React.FC<Props> = ({
             }}
             className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer ${
               mobileTab === 'semana'
-                ? 'bg-[#E8590C] text-white shadow-sm'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
@@ -387,7 +387,7 @@ export const AgendaView: React.FC<Props> = ({
             }}
             className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer ${
               mobileTab === 'kanban'
-                ? 'bg-[#E8590C] text-white shadow-sm'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
@@ -403,7 +403,7 @@ export const AgendaView: React.FC<Props> = ({
             }}
             className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer ${
               mobileTab === 'eisenhower'
-                ? 'bg-[#E8590C] text-white shadow-sm'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
@@ -419,7 +419,7 @@ export const AgendaView: React.FC<Props> = ({
             }}
             className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shrink-0 cursor-pointer ${
               mobileTab === 'objetivos'
-                ? 'bg-[#E8590C] text-white shadow-sm'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
                 : 'text-zinc-400 hover:text-zinc-200'
             }`}
           >
@@ -448,7 +448,7 @@ export const AgendaView: React.FC<Props> = ({
         </div>
 
         {/* Quick Add Action Bar on Mobile */}
-        <div className="flex items-center justify-between gap-2 p-2.5 bg-zinc-900/90 border border-zinc-800 rounded-2xl">
+        <div className={`flex items-center justify-between gap-2 p-2.5 bg-zinc-900/90 border border-zinc-800 rounded-2xl ${mobileTab === 'dia' ? 'hidden' : ''}`}>
           <div className="min-w-0">
             <span className="text-xs font-bold text-zinc-200 block truncate">
               {mobileTab === 'dia'
@@ -487,7 +487,7 @@ export const AgendaView: React.FC<Props> = ({
               className="px-2.5 py-1.5 rounded-xl bg-[#34C38F]/15 border border-[#34C38F]/30 text-[#34C38F] text-xs font-bold transition active:scale-95 flex items-center gap-1 cursor-pointer"
             >
               <Calendar className="w-3 h-3 text-[#34C38F]" />
-              <span>+ Reunión</span>
+              <span>Reunión</span>
             </button>
 
             <button
@@ -495,10 +495,10 @@ export const AgendaView: React.FC<Props> = ({
                 hapticFeedback.medium();
                 onOpenQuickAdd('tarea', mobileTab === 'dia' ? today : activeMobileDateStr);
               }}
-              className="px-3 py-1.5 rounded-xl bg-[#4C8DFF] hover:bg-[#3B7BF0] text-white text-xs font-bold transition active:scale-95 shadow-sm shadow-[#4C8DFF]/20 flex items-center gap-1 cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white text-xs font-bold transition active:scale-95 shadow-sm shadow-[var(--accent)]/20 flex items-center gap-1 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ Tarea</span>
+              <span>Tarea</span>
             </button>
           </div>
         </div>
@@ -511,6 +511,17 @@ export const AgendaView: React.FC<Props> = ({
         {/* MOBILE MODE 1: MI DÍA (Focused, High-Spacing, Clean) */}
         {mobileTab === 'dia' && (
           <div className="space-y-3.5">
+            {/* Lo primero en el celular: qué hay que hacer hoy */}
+            <TodayFocusBanner
+              todayStr={today}
+              todayTasks={tasks.filter(t => t.date === today)}
+              todayMeetings={meetings.filter(m => m.date === today)}
+              onToggleTask={onToggleTask}
+              onToggleMeeting={handleToggleMeetingWithCheckout}
+              onOpenQuickAdd={onOpenQuickAdd}
+              onOpenFocus={() => onNavigate && onNavigate('/foco')}
+            />
+
             {/* Widget de Cobranzas & Saldos Activos */}
             <AgendaBillingWidget
               projects={projects}
@@ -524,11 +535,11 @@ export const AgendaView: React.FC<Props> = ({
               }}
             />
 
-            {/* Distribución de Jornada (Time Budget Flexible) */}
+            {/* Distribución de Jornada (Time Budget Flexible): plegada en el celular */}
             <DailyTimeBudgetWidget
               dateStr={today}
               isToday={true}
-              defaultCollapsed={false}
+              defaultCollapsed={true}
             />
 
             {/* Compact Daily Briefing Banner */}
@@ -542,7 +553,7 @@ export const AgendaView: React.FC<Props> = ({
                 <div className="p-3 bg-zinc-900/90 border border-zinc-800 rounded-2xl shadow-sm space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-[#E8590C]/15 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C]">
+                      <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]">
                         <Sparkles className="w-3.5 h-3.5" />
                       </div>
                       <div>
@@ -661,12 +672,12 @@ export const AgendaView: React.FC<Props> = ({
                     }}
                     className={`flex flex-col items-center justify-center min-w-[76px] py-2 px-2.5 rounded-xl border text-center transition shadow-sm active:scale-95 ${
                       isSelected
-                        ? 'bg-[#E8590C] border-[#E8590C] text-white font-bold shadow-md shadow-[#E8590C]/30'
+                        ? 'bg-[var(--accent)] border-[var(--accent)] text-white font-bold shadow-md shadow-[var(--accent)]/30'
                         : 'bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                     }`}
                   >
                     <span className={`text-[10px] uppercase font-bold tracking-wider ${
-                      isSelected ? 'text-white/90' : isToday ? 'text-[#E8590C]' : 'text-zinc-400'
+                      isSelected ? 'text-white/90' : isToday ? 'text-[var(--accent)]' : 'text-zinc-400'
                     }`}>
                       {isToday ? 'HOY' : formatDayName(dateStr).slice(0, 3)}
                     </span>
@@ -897,7 +908,7 @@ export const AgendaView: React.FC<Props> = ({
                   className="btn-swiss-primary flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold shrink-0"
                 >
                   <Plus className="w-3.5 h-3.5 stroke-[2]" />
-                  <span>+ Nueva Tarea</span>
+                  <span>Nueva Tarea</span>
                 </button>
               </div>
             </div>
@@ -907,7 +918,7 @@ export const AgendaView: React.FC<Props> = ({
               <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-3 shadow-xs">
                 <div className="flex items-center justify-between gap-2 mb-2 text-xs">
                   <div className="flex items-center gap-2">
-                    <Target className="w-3.5 h-3.5 text-[#E8590C]" />
+                    <Target className="w-3.5 h-3.5 text-[var(--accent)]" />
                     <span className="font-bold text-[var(--text-primary)]">
                       Misiones de la Semana
                     </span>
@@ -921,7 +932,7 @@ export const AgendaView: React.FC<Props> = ({
                       <button
                         type="button"
                         onClick={() => setFilterMissionId(null)}
-                        className="text-[11px] text-[#E8590C] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                        className="text-[11px] text-[var(--accent)] font-semibold hover:underline flex items-center gap-1 cursor-pointer"
                       >
                         <X className="w-3 h-3" />
                         <span>Ver todas las tareas</span>
@@ -932,7 +943,7 @@ export const AgendaView: React.FC<Props> = ({
                       <button
                         type="button"
                         onClick={() => onNavigate('/semana')}
-                        className="text-[11px] text-[var(--text-secondary)] hover:text-[#E8590C] transition cursor-pointer flex items-center gap-1"
+                        className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--accent)] transition cursor-pointer flex items-center gap-1"
                       >
                         <span>Ir a /semana</span>
                         <ArrowRight className="w-3 h-3" />
@@ -957,7 +968,7 @@ export const AgendaView: React.FC<Props> = ({
                         }}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs transition cursor-pointer shrink-0 ${
                           isFiltered
-                            ? 'bg-[#E8590C]/15 border-[#E8590C] ring-2 ring-[#E8590C]/30 text-white font-bold'
+                            ? 'bg-[var(--accent)]/15 border-[var(--accent)] ring-2 ring-[var(--accent)]/30 text-white font-bold'
                             : 'bg-[var(--bg-app)] border-[var(--border-subtle)] hover:border-[var(--text-tertiary)] text-[var(--text-primary)]'
                         }`}
                         title={`Clic para filtrar tareas de: ${m.title}`}
@@ -1064,7 +1075,7 @@ export const AgendaView: React.FC<Props> = ({
                 {/* Desktop scroll navigation bar with Day Quick Pickers */}
                 <div className="flex items-center justify-between px-3.5 py-2.5 bg-zinc-900/90 border border-zinc-800/80 rounded-2xl text-xs text-zinc-300 shadow-sm flex-wrap gap-2.5">
                   <div className="flex items-center gap-2">
-                    <LayoutGrid className="w-4 h-4 text-[#E8590C]" />
+                    <LayoutGrid className="w-4 h-4 text-[var(--accent)]" />
                     <span className="font-bold text-zinc-200">Semana Completa (7 Días)</span>
                     <span className="text-[11px] text-zinc-400 hidden lg:inline">
                       · Columnas anchas y legibles
@@ -1092,7 +1103,7 @@ export const AgendaView: React.FC<Props> = ({
                           }}
                           className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border ${
                             isToday
-                              ? 'bg-[#E8590C] text-white border-[#E8590C] shadow-xs'
+                              ? 'bg-[var(--accent)] text-white border-[var(--accent)] shadow-xs'
                               : 'bg-zinc-950/70 hover:bg-zinc-800/80 text-zinc-300 border-zinc-800/80'
                           }`}
                           title={`Ir a ${formatDayName(dateStr)} ${dayNum}`}
@@ -1261,14 +1272,14 @@ export const AgendaView: React.FC<Props> = ({
                   key={dateStr}
                   className={`p-4 rounded-2xl border ${
                     isToday 
-                      ? 'bg-zinc-900 border-[#E8590C]/50 shadow-lg shadow-[#E8590C]/5' 
+                      ? 'bg-zinc-900 border-[var(--accent)]/50 shadow-lg shadow-[var(--accent)]/5' 
                       : 'bg-zinc-900/80 border-zinc-800'
                   } space-y-3 transition`}
                 >
                   <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2.5">
                     <div className="flex items-center gap-2.5">
                       <span className={`text-sm font-bold uppercase tracking-wider ${
-                        isToday ? 'text-[#E8590C]' : 'text-zinc-200'
+                        isToday ? 'text-[var(--accent)]' : 'text-zinc-200'
                       }`}>
                         {isToday ? 'Hoy' : formatDayName(dateStr)}
                       </span>
@@ -1276,7 +1287,7 @@ export const AgendaView: React.FC<Props> = ({
                         {formatShortDay(dateStr)}
                       </span>
                       {isToday && (
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8590C]/15 text-[#E8590C] border border-[#E8590C]/30">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30">
                           Fecha actual
                         </span>
                       )}
@@ -1285,7 +1296,7 @@ export const AgendaView: React.FC<Props> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => onOpenQuickAdd('tarea', dateStr)}
-                        className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-[#E8590C] hover:text-white text-zinc-300 text-xs font-semibold transition flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-[var(--accent)] hover:text-white text-zinc-300 text-xs font-semibold transition flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" />
                         <span>Tarea</span>
@@ -1423,10 +1434,10 @@ export const AgendaView: React.FC<Props> = ({
                           >
                             {/* Visual Drop line */}
                             {isDragOver && listDropPosition === 'before' && (
-                              <div className="absolute -top-1 left-2 right-2 h-1 bg-[#E8590C] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
+                              <div className="absolute -top-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
                             )}
                             {isDragOver && listDropPosition === 'after' && (
-                              <div className="absolute -bottom-1 left-2 right-2 h-1 bg-[#E8590C] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
+                              <div className="absolute -bottom-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
                             )}
 
                             <div 
@@ -1452,7 +1463,7 @@ export const AgendaView: React.FC<Props> = ({
                               }}
                               className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-grab active:cursor-grabbing transition ${
                                 isDragging
-                                  ? 'opacity-40 scale-[0.98] border-dashed border-[#E8590C]/60 bg-[#E8590C]/5'
+                                  ? 'opacity-40 scale-[0.98] border-dashed border-[var(--accent)]/60 bg-[var(--accent)]/5'
                                   : t.completed 
                                   ? 'bg-zinc-950/40 border-zinc-800/40 opacity-60' 
                                   : `${catCfg.cardBg} ${catCfg.cardBorder} ${catCfg.cardBorderHover}`
@@ -1461,7 +1472,7 @@ export const AgendaView: React.FC<Props> = ({
                               <div className="flex items-start gap-2 min-w-0">
                                 {/* Grip handle for dragging */}
                                 <div
-                                  className="no-swipe touch-none select-none p-1 -ml-1 text-zinc-600 hover:text-zinc-300 active:text-[#E8590C] cursor-grab active:cursor-grabbing rounded hover:bg-zinc-800/80 transition flex items-center justify-center shrink-0"
+                                  className="no-swipe touch-none select-none p-1 -ml-1 text-zinc-600 hover:text-zinc-300 active:text-[var(--accent)] cursor-grab active:cursor-grabbing rounded hover:bg-zinc-800/80 transition flex items-center justify-center shrink-0"
                                   title="Arrastrar para reordenar"
                                   onTouchStart={(e) => {
                                     e.stopPropagation();
@@ -1509,7 +1520,7 @@ export const AgendaView: React.FC<Props> = ({
                                     }
                                     onToggleTask(t.id);
                                   }}
-                                  className="mt-0.5 text-[#E8590C] shrink-0"
+                                  className="mt-0.5 text-[var(--accent)] shrink-0"
                                 >
                                   {t.completed ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Circle className="w-4 h-4" />}
                                 </button>
@@ -1537,7 +1548,7 @@ export const AgendaView: React.FC<Props> = ({
                                     {t.title}
                                   </div>
                                   <div className="flex items-center gap-2 text-[11px] text-zinc-400 mt-1">
-                                    {t.time && <span className="text-[#E8590C]">{t.time} hs</span>}
+                                    {t.time && <span className="text-[var(--accent)]">{t.time} hs</span>}
                                     {t.projectName && <span>· {t.projectName}</span>}
                                   </div>
                                 </div>
@@ -1641,7 +1652,7 @@ export const AgendaView: React.FC<Props> = ({
                 {/* Banner de acceso a la semana completa */}
                 <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-between shadow-xs">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-[#E8590C]/15 text-[#E8590C] flex items-center justify-center font-bold">
+                    <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] flex items-center justify-center font-bold">
                       <Calendar className="w-4 h-4" />
                     </div>
                     <div>
@@ -1654,7 +1665,7 @@ export const AgendaView: React.FC<Props> = ({
                       hapticFeedback.light();
                       setAgendaTab('calendario');
                     }}
-                    className="px-3.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-[#E8590C] text-zinc-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    className="px-3.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-[var(--accent)] text-zinc-200 hover:text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
                   >
                     <span>Ver Semana</span>
                     <ChevronRight className="w-3.5 h-3.5" />
@@ -2013,25 +2024,25 @@ const DayColumn: React.FC<DayColumnProps> = ({
       onDrop={handleDrop}
       className={`flex flex-col bg-zinc-900/90 rounded-2xl border transition-all duration-200 ${
         isDragOver
-          ? 'border-[#E8590C] bg-[#E8590C]/10 ring-2 ring-[#E8590C]/50 scale-[1.01]'
+          ? 'border-[var(--accent)] bg-[var(--accent)]/10 ring-2 ring-[var(--accent)]/50 scale-[1.01]'
           : isToday 
-          ? 'border-[#E8590C]/60 shadow-lg shadow-[#E8590C]/5 ring-1 ring-[#E8590C]/30' 
+          ? 'border-[var(--accent)]/60 shadow-lg shadow-[var(--accent)]/5 ring-1 ring-[var(--accent)]/30' 
           : 'border-zinc-800'
       } overflow-hidden min-h-[420px]`}
     >
       {/* Day Header - Clean & Responsive */}
       <div className={`p-3 border-b ${
-        isToday ? 'bg-[#E8590C]/10 border-[#E8590C]/30' : 'bg-zinc-950/60 border-zinc-800/80'
+        isToday ? 'bg-[var(--accent)]/10 border-[var(--accent)]/30' : 'bg-zinc-950/60 border-zinc-800/80'
       } flex items-center justify-between gap-2`}>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className={`text-xs font-bold uppercase tracking-wider ${
-              isToday ? 'text-[#E8590C]' : 'text-zinc-200'
+              isToday ? 'text-[var(--accent)]' : 'text-zinc-200'
             }`}>
               {isToday ? 'Hoy' : dayName}
             </span>
             {isToday && (
-              <span className="w-1.5 h-1.5 rounded-full bg-[#E8590C] animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
             )}
             {pendingCount > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-zinc-800 text-zinc-300">
@@ -2068,10 +2079,10 @@ const DayColumn: React.FC<DayColumnProps> = ({
           </button>
           <button
             onClick={() => onOpenQuickAdd('tarea', dateStr)}
-            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-[#E8590C] hover:text-white text-zinc-200 border border-zinc-700/60 transition active:scale-90"
+            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-[var(--accent)] hover:text-white text-zinc-200 border border-zinc-700/60 transition active:scale-90"
             title={`Agregar tarea para el ${shortDate}`}
           >
-            <Plus className="w-3.5 h-3.5 text-[#E8590C]" />
+            <Plus className="w-3.5 h-3.5 text-[var(--accent)]" />
           </button>
         </div>
       </div>
@@ -2513,12 +2524,12 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
     >
       {/* Drop indicator bar at top */}
       {isDragOver && dropPosition === 'before' && (
-        <div className="absolute -top-1 left-2 right-2 h-1 bg-[#E8590C] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
+        <div className="absolute -top-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
       )}
 
       {/* Drop indicator bar at bottom */}
       {isDragOver && dropPosition === 'after' && (
-        <div className="absolute -bottom-1 left-2 right-2 h-1 bg-[#E8590C] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
+        <div className="absolute -bottom-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
       )}
 
       {/* Background layer revealed during swipe */}
@@ -2527,7 +2538,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
           isSwipingRight
             ? 'bg-emerald-950/70 text-emerald-400 border border-emerald-600/40'
             : isSwipingLeft
-            ? 'bg-[#E8590C]/20 text-[#E8590C] border border-[#E8590C]/40'
+            ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/40'
             : 'bg-transparent'
         }`}
       >
@@ -2540,7 +2551,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
         {/* Right icon: Tomorrow (Swipe left) */}
         <div className={`flex items-center gap-1 text-xs font-bold ml-auto ${isSwipingLeft ? 'opacity-100' : 'opacity-0'}`}>
           <span>Mañana</span>
-          <ArrowRight className="w-4 h-4 text-[#E8590C]" />
+          <ArrowRight className="w-4 h-4 text-[var(--accent)]" />
         </div>
       </div>
 
@@ -2570,7 +2581,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
         }}
         className={`relative z-10 group p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing ${
           isDragging
-            ? 'opacity-40 scale-[0.98] border-dashed border-[#E8590C]/60 bg-[#E8590C]/5'
+            ? 'opacity-40 scale-[0.98] border-dashed border-[var(--accent)]/60 bg-[var(--accent)]/5'
             : task.completed
             ? 'bg-zinc-950/70 border-zinc-800/50 opacity-60'
             : `${catCfg.cardBg} ${catCfg.cardBorder} ${catCfg.cardBorderHover}`
@@ -2580,7 +2591,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
           <div className="flex items-start gap-1.5 flex-1 min-w-0">
             {/* Grip handle for reordering (Desktop drag + mobile touch) */}
             <div
-              className="no-swipe touch-none select-none p-0.5 mt-0.5 text-zinc-600 hover:text-zinc-300 active:text-[#E8590C] cursor-grab active:cursor-grabbing rounded hover:bg-zinc-800/80 transition flex items-center justify-center shrink-0"
+              className="no-swipe touch-none select-none p-0.5 mt-0.5 text-zinc-600 hover:text-zinc-300 active:text-[var(--accent)] cursor-grab active:cursor-grabbing rounded hover:bg-zinc-800/80 transition flex items-center justify-center shrink-0"
               title="Arrastrar para reordenar"
               onTouchStart={(e) => {
                 e.stopPropagation();
@@ -2608,11 +2619,11 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                 }
                 onToggleTask(task.id);
               }}
-              className="mt-0.5 text-zinc-500 hover:text-[#E8590C] transition shrink-0 t-press cursor-pointer"
+              className="mt-0.5 text-zinc-500 hover:text-[var(--accent)] transition shrink-0 t-press cursor-pointer"
               title={task.completed ? 'Marcar como pendiente' : 'Marcar como hecha'}
             >
               {task.completed ? (
-                <CheckCircle2 className="w-4 h-4 text-[#E8590C] t-success-pop" />
+                <CheckCircle2 className="w-4 h-4 text-[var(--accent)] t-success-pop" />
               ) : (
                 <Circle className="w-4 h-4 text-zinc-500 hover:text-zinc-300" />
               )}
@@ -2652,8 +2663,8 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                   </div>
 
                   {task.reminderMinutesBefore !== undefined && (
-                    <div className="inline-flex items-center gap-1 text-[9px] font-bold text-[#E8590C] bg-[#E8590C]/10 border border-[#E8590C]/20 px-1.5 py-0.2 rounded-md" title="Recordatorio programado">
-                      <Bell className="w-2.5 h-2.5 text-[#E8590C]" />
+                    <div className="inline-flex items-center gap-1 text-[9px] font-bold text-[var(--accent)] bg-[var(--accent)]/10 border border-[var(--accent)]/20 px-1.5 py-0.2 rounded-md" title="Recordatorio programado">
+                      <Bell className="w-2.5 h-2.5 text-[var(--accent)]" />
                       <span>
                         {task.reminderMinutesBefore === 0
                           ? 'Aviso puntual'
@@ -2669,7 +2680,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                 if (!displayProjectName) return null;
                 return (
                   <div className="mt-1">
-                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[#E8590C] bg-[#E8590C]/10 border border-[#E8590C]/20 px-1.5 py-0.5 rounded-md max-w-[200px] truncate">
+                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[var(--accent)] bg-[var(--accent)]/10 border border-[var(--accent)]/20 px-1.5 py-0.5 rounded-md max-w-[200px] truncate">
                       <FolderKanban className="w-2.5 h-2.5 shrink-0" />
                       <span className="truncate">{displayProjectName}</span>
                     </span>
@@ -2716,7 +2727,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                       }`}
                       title={isExpanded ? 'Ocultar subtareas' : 'Ver subtareas'}
                     >
-                      <ListTodo className="w-3 h-3 text-[#E8590C]" />
+                      <ListTodo className="w-3 h-3 text-[var(--accent)]" />
                       <span>{completedSubtasks}/{totalSubtasks}</span>
                       {isExpanded ? (
                         <ChevronUp className="w-3 h-3 text-zinc-500" />
@@ -2729,7 +2740,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                     <div className="w-14 bg-zinc-800/80 h-1.5 rounded-full overflow-hidden shrink-0">
                       <div
                         className={`h-full transition-all duration-300 ${
-                          allSubtasksDone ? 'bg-emerald-500' : 'bg-[#E8590C]'
+                          allSubtasksDone ? 'bg-emerald-500' : 'bg-[var(--accent)]'
                         }`}
                         style={{ width: `${(completedSubtasks / totalSubtasks) * 100}%` }}
                       />
@@ -2743,7 +2754,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                         setShowAddForm(true);
                         setIsExpanded(true);
                       }}
-                      className="text-[10px] text-zinc-500 hover:text-[#E8590C] transition flex items-center gap-0.5 opacity-70 group-hover:opacity-100"
+                      className="text-[10px] text-zinc-500 hover:text-[var(--accent)] transition flex items-center gap-0.5 opacity-70 group-hover:opacity-100"
                       title="Agregar subtarea"
                     >
                       <Plus className="w-2.5 h-2.5" />
@@ -2837,7 +2848,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                 >
                   <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition shrink-0 ${
                     sub.completed
-                      ? 'bg-[#E8590C] border-[#E8590C] text-white t-success-pop'
+                      ? 'bg-[var(--accent)] border-[var(--accent)] text-white t-success-pop'
                       : 'border-zinc-700 bg-zinc-900 hover:border-zinc-500'
                   }`}>
                     {sub.completed && <Check className="w-2.5 h-2.5 stroke-[3]" />}
@@ -2875,12 +2886,12 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                   placeholder="Nueva subtarea..."
                   value={newSubtaskTitle}
                   onChange={e => setNewSubtaskTitle(e.target.value)}
-                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-[#E8590C]"
+                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]"
                 />
                 <button
                   type="submit"
                   disabled={!newSubtaskTitle.trim()}
-                  className="px-2 py-1 rounded-lg bg-[#E8590C] hover:bg-[#d04e0a] text-white text-[10px] font-bold transition disabled:opacity-40"
+                  className="px-2 py-1 rounded-lg bg-[var(--accent)] hover:bg-[#d04e0a] text-white text-[10px] font-bold transition disabled:opacity-40"
                 >
                   <Plus className="w-3 h-3" />
                 </button>
@@ -2900,7 +2911,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddForm(true)}
-                className="text-[11px] text-zinc-400 hover:text-[#E8590C] flex items-center gap-1 pt-1 transition font-medium"
+                className="text-[11px] text-zinc-400 hover:text-[var(--accent)] flex items-center gap-1 pt-1 transition font-medium"
               >
                 <Plus className="w-3 h-3" />
                 <span>Agregar subtarea</span>

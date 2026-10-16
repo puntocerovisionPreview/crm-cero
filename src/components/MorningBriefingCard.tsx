@@ -86,7 +86,7 @@ export const MorningBriefingCard: React.FC<Props> = ({
       {/* Header Banner */}
       <div className="px-4 py-3 bg-zinc-950/60 border-b border-zinc-800/80 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-[#E8590C]/15 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C]">
+          <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
@@ -143,7 +143,7 @@ export const MorningBriefingCard: React.FC<Props> = ({
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
                   todayPendingTasks.length === 0 && todayTasks.length > 0
                     ? 'bg-emerald-500/15 text-emerald-400'
-                    : 'bg-[#E8590C]/15 text-[#E8590C]'
+                    : 'bg-[var(--accent)]/15 text-[var(--accent)]'
                 }`}>
                   {todayPendingTasks.length === 0 && todayTasks.length > 0 ? (
                     <CheckCircle2 className="w-4 h-4" />

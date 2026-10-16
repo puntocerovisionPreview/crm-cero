@@ -61,6 +61,7 @@ import { ProjectFicha360Modal } from '../components/ProjectFicha360Modal';
 import { DeliveriesRoadmap } from '../components/DeliveriesRoadmap';
 import { PafDashboard } from '../components/PafDashboard';
 import { InCallDrawer } from '../components/InCallDrawer';
+import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
 import { ProjectTimelineBadge } from '../components/ProjectTimelineBadge';
 import { ProjectHealthBadge } from '../components/ProjectHealthBadge';
 import { taskBelongsToProject } from '../utils/taskProject';
@@ -699,7 +700,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
       <div className="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/25 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-[#E8590C] uppercase tracking-wider mb-0.5">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--accent)] uppercase tracking-wider mb-0.5">
               {serviceMode === 'paf' ? (
                 <>
                   <Building2 className="w-3.5 h-3.5 text-amber-400" />
@@ -767,7 +768,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
               title="Registrar ingreso extra recurrente, asesoría externa o servicio especial"
             >
               <Handshake className="w-3.5 h-3.5 text-violet-400" />
-              <span>+ Ingreso Extra</span>
+              <span>Agregar ingreso extra</span>
             </button>
 
             <button
@@ -793,7 +794,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
               }}
               className={`flex items-center gap-2 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl text-white text-xs font-bold transition shadow-lg active:scale-95 cursor-pointer ${
                 serviceMode === 'paf' 
-                  ? 'bg-[#E8590C] hover:bg-[#cf4d07] shadow-[#E8590C]/20' 
+                  ? 'bg-[var(--accent)] hover:bg-[var(--accent-strong)] shadow-[var(--accent)]/20' 
                   : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20'
               }`}
               title={serviceMode === 'paf' ? 'Registrar nuevo estudio en el programa PAF' : 'Registrar un proyecto web activo en curso'}
@@ -939,7 +940,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
               title="Registrar un ingreso extra recurrente"
             >
               <Handshake className="w-3.5 h-3.5 text-violet-400" />
-              <span>+ Ingreso Extra</span>
+              <span>Agregar ingreso extra</span>
             </button>
             <button
               type="button"
@@ -1087,15 +1088,15 @@ export const ProjectsSimpleView: React.FC<Props> = ({
             <div 
               onClick={() => setTab('activos')}
               className={`cursor-pointer bg-zinc-900/90 border rounded-2xl p-4 transition shadow-sm hover:border-zinc-700 flex flex-col justify-between ${
-                tab === 'activos' ? 'border-[#E8590C]/60 bg-[#E8590C]/10 shadow-md' : 'border-zinc-800/80'
+                tab === 'activos' ? 'border-[var(--accent)]/60 bg-[var(--accent)]/10 shadow-md' : 'border-zinc-800/80'
               }`}
             >
               <div className="flex items-center justify-between text-xs font-bold text-zinc-400 uppercase">
-                <span className="flex items-center gap-1.5 text-[#E8590C]">
+                <span className="flex items-center gap-1.5 text-[var(--accent)]">
                   <Building2 className="w-3.5 h-3.5" />
                   <span>Estudios Activos</span>
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#E8590C]/15 text-[#E8590C] font-semibold">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)] font-semibold">
                   En Programa
                 </span>
               </div>
@@ -1109,7 +1110,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
               </div>
               <div className="text-[11px] text-zinc-400 border-t border-zinc-800/60 pt-2 flex items-center justify-between">
                 <span>Tablero PAF:</span>
-                <span className="text-[#E8590C] font-semibold hover:underline">Ver etapas →</span>
+                <span className="text-[var(--accent)] font-semibold hover:underline">Ver etapas →</span>
               </div>
             </div>
 
@@ -1317,7 +1318,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
             >
               <div className="flex items-center justify-between text-xs font-bold text-zinc-400 uppercase">
                 <span className="flex items-center gap-1.5 text-zinc-300">
-                  <CheckSquare className="w-3.5 h-3.5 text-[#E8590C]" />
+                  <CheckSquare className="w-3.5 h-3.5 text-[var(--accent)]" />
                   <span>Tareas & Citas</span>
                 </span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 font-semibold">
@@ -1360,7 +1361,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                   }}
                   className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition text-center shrink-0 md:shrink whitespace-nowrap cursor-pointer ${
                     tab === 'paf'
-                      ? 'bg-[#E8590C] text-white shadow-sm font-extrabold'
+                      ? 'bg-[var(--accent)] text-white shadow-sm font-extrabold'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                   }`}
                   title="Tablero & Etapas del Método PAF"
@@ -1498,7 +1499,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                   }}
                   className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition text-center shrink-0 md:shrink whitespace-nowrap cursor-pointer ${
                     tab === 'roadmap'
-                      ? 'bg-[#E8590C] text-white shadow-sm font-extrabold'
+                      ? 'bg-[var(--accent)] text-white shadow-sm font-extrabold'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                   }`}
                   title="Cronograma de Entregas Web"
@@ -1539,7 +1540,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Buscar cliente, nota, teléfono..."
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-8 pr-7 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[#E8590C] transition"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-8 pr-7 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[var(--accent)] transition"
               />
               {searchQuery && (
                 <button
@@ -1556,7 +1557,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className="bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-[#E8590C] cursor-pointer shrink-0"
+              className="bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-[var(--accent)] cursor-pointer shrink-0"
             >
               <option value="todos">Todos los estados</option>
               {DEFAULT_PROJECT_STATUSES.map(st => (
@@ -1575,7 +1576,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                 onClick={() => setDesktopLayout('grid')}
                 className={`p-1.5 rounded-lg transition ${
                   desktopLayout === 'grid'
-                    ? 'bg-[#E8590C] text-white shadow-xs'
+                    ? 'bg-[var(--accent)] text-white shadow-xs'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
                 }`}
                 title="Vista en Tarjetas 360°"
@@ -1587,7 +1588,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                 onClick={() => setDesktopLayout('table')}
                 className={`p-1.5 rounded-lg transition ${
                   desktopLayout === 'table'
-                    ? 'bg-[#E8590C] text-white shadow-xs'
+                    ? 'bg-[var(--accent)] text-white shadow-xs'
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800'
                 }`}
                 title="Vista en Tabla Ejecutiva"
@@ -1868,7 +1869,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                                     setSelected360ProjectId(project.id);
                                   }
                                 }}
-                                className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-[#E8590C] hover:text-white text-zinc-200 text-xs font-bold transition flex items-center gap-1 shadow-xs"
+                                className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-[var(--accent)] hover:text-white text-zinc-200 text-xs font-bold transition flex items-center gap-1 shadow-xs"
                                 title="Abrir Ficha 360°"
                               >
                                 <PieChart className="w-3 h-3" />
@@ -2076,7 +2077,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                             {/* Indicador compacto de tareas PAF (Paso 7) */}
                             {pendingTasks > 0 ? (
                               <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                                <CheckSquare className="w-2.5 h-2.5 text-[#E8590C]" />
+                                <CheckSquare className="w-2.5 h-2.5 text-[var(--accent)]" />
                                 <span>{pendingTasks} pend.</span>
                                 {pafOverdueTasks > 0 && (
                                   <span className="text-rose-400 font-bold ml-0.5 animate-pulse">
@@ -2140,7 +2141,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                         {/* Visual Progress Bar */}
                         <div className="w-full bg-zinc-800/80 rounded-full h-2 overflow-hidden border border-zinc-800">
                           <div
-                            className="h-full bg-gradient-to-r from-amber-500 to-[#E8590C] rounded-full transition-all duration-300"
+                            className="h-full bg-gradient-to-r from-amber-500 to-[var(--accent)] rounded-full transition-all duration-300"
                             style={{ width: `${hoursPct}%` }}
                           />
                         </div>
@@ -2171,7 +2172,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                       <div className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
-                            <Target className="w-3 h-3 text-[#E8590C]" />
+                            <Target className="w-3 h-3 text-[var(--accent)]" />
                             <span>Etapa Pedagógica</span>
                           </span>
                           <select
@@ -2237,7 +2238,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                             className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-[11px] font-bold border border-emerald-500/30 flex items-center gap-1 transition active:scale-95 cursor-pointer"
                           >
                             <Plus className="w-3 h-3" />
-                            <span>+ Registrar pago</span>
+                            <span>Registrar pago</span>
                           </button>
                           {onNavigateToProject && (
                             <button
@@ -2302,6 +2303,8 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                         </button>
                       </div>
 
+                      <StudentPortalLinkButton project={project} phone={phone || undefined} onUpdateProject={onUpdateProject} />
+
                       {/* WhatsApp with Smart PAF Template */}
                       {phone && (
                         <a
@@ -2346,7 +2349,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                           {isExtraIncomeProject(project) ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/40">
                               <Handshake className="w-2.5 h-2.5 text-violet-400" />
-                              <span>Ingreso Extra</span>
+                              <span>Agregar ingreso extra</span>
                             </span>
                           ) : isLead ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
@@ -2484,12 +2487,12 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                               value={inlinePriceDraft}
                               onChange={e => setInlinePriceDraft(e.target.value === '' ? '' : Number(e.target.value))}
                               placeholder="Monto"
-                              className="w-24 bg-zinc-900 text-xs text-zinc-100 px-2 py-0.5 rounded border border-zinc-700 focus:outline-none focus:border-[#E8590C]"
+                              className="w-24 bg-zinc-900 text-xs text-zinc-100 px-2 py-0.5 rounded border border-zinc-700 focus:outline-none focus:border-[var(--accent)]"
                               autoFocus
                             />
                             <button
                               onClick={() => handleSaveInlinePrice(project.id)}
-                              className="p-1 rounded bg-[#E8590C] text-white hover:bg-[#cf4d07] transition"
+                              className="p-1 rounded bg-[var(--accent)] text-white hover:bg-[var(--accent-strong)] transition"
                               title="Guardar"
                             >
                               <Check className="w-3 h-3" />
@@ -2517,7 +2520,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                                 setInlineCurrencyDraft(project.estimatedCurrency || 'USD');
                                 setEditingPriceProjectId(project.id);
                               }}
-                              className="p-1 text-zinc-400 hover:text-[#E8590C] rounded transition"
+                              className="p-1 text-zinc-400 hover:text-[var(--accent)] rounded transition"
                               title="Editar valor de precio"
                             >
                               <Edit3 className="w-3 h-3" />
@@ -2562,7 +2565,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                           className="px-2.5 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-[11px] font-bold border border-emerald-500/30 flex items-center gap-1 transition active:scale-95 cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
-                          <span>+ Registrar pago</span>
+                          <span>Registrar pago</span>
                         </button>
                         {onNavigateToProject && (
                           <button
@@ -2614,7 +2617,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                       />
                       <div className="flex items-center justify-between text-zinc-400 text-[10px] px-0.5">
                         <span className="flex items-center gap-1">
-                          <CheckSquare className="w-3 h-3 text-[#E8590C]" />
+                          <CheckSquare className="w-3 h-3 text-[var(--accent)]" />
                           {pendingTasks > 0 ? (
                             <span><strong className="text-amber-400">{pendingTasks} pend.</strong> ({projTasks.length - pendingTasks}/{projTasks.length})</span>
                           ) : projTasks.length > 0 ? (
@@ -2660,7 +2663,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between text-[11px] text-zinc-400 font-medium">
                         <span className="flex items-center gap-1">
-                          <Edit3 className="w-3 h-3 text-[#E8590C]" />
+                          <Edit3 className="w-3 h-3 text-[var(--accent)]" />
                           <span>Notas & Seguimiento:</span>
                         </span>
                         {savedNotesIndicator[project.id] && (
@@ -2675,7 +2678,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                         defaultValue={project.notes}
                         onBlur={e => handleNotesChange(project.id, e.target.value)}
                         placeholder="Anotar acuerdos, entregables pendientes o dudas del cliente..."
-                        className="w-full text-xs text-zinc-200 bg-zinc-950/80 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[#E8590C]/60 transition leading-relaxed resize-none placeholder:text-zinc-600"
+                        className="w-full text-xs text-zinc-200 bg-zinc-950/80 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[var(--accent)]/60 transition leading-relaxed resize-none placeholder:text-zinc-600"
                       />
                     </div>
                   </div>
@@ -2691,9 +2694,9 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                           setSelected360ProjectId(project.id);
                         }
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-zinc-800/80 hover:bg-[#E8590C] hover:text-white border border-zinc-700/60 text-xs font-bold text-zinc-200 transition shadow-sm active:scale-[0.99] group"
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-zinc-800/80 hover:bg-[var(--accent)] hover:text-white border border-zinc-700/60 text-xs font-bold text-zinc-200 transition shadow-sm active:scale-[0.99] group"
                     >
-                      <PieChart className="w-3.5 h-3.5 text-[#E8590C] group-hover:text-white transition" />
+                      <PieChart className="w-3.5 h-3.5 text-[var(--accent)] group-hover:text-white transition" />
                       <span>Abrir Ficha 360° Completa</span>
                     </button>
 
@@ -2764,7 +2767,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
           </p>
           <button
             onClick={() => handleOpenAddModal(tab === 'posibles')}
-            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#cf4d07] text-white text-xs font-bold transition shadow-md shadow-[#E8590C]/20"
+            className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white text-xs font-bold transition shadow-md shadow-[var(--accent)]/20"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{tab === 'posibles' ? 'Crear Posible Proyecto' : 'Crear Proyecto'}</span>
@@ -2779,7 +2782,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md sm:max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden my-auto animate-in zoom-in-95 duration-150">
               <div className="flex items-center justify-between border-b border-zinc-800 px-4 py-3 sm:px-5 sm:py-3.5 shrink-0 bg-zinc-900">
               <h3 className="text-sm sm:text-base font-bold text-zinc-100 flex items-center gap-2">
-                <FolderKanban className="w-4 h-4 text-[#E8590C]" />
+                <FolderKanban className="w-4 h-4 text-[var(--accent)]" />
                 <span>
                   {serviceMode === 'paf'
                     ? (newIsLead ? 'Nuevo Lead / Entrevista PAF' : 'Registrar Cliente Arquitecto (PAF)')
@@ -2814,7 +2817,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                     }}
                     className={`py-1.5 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                       !newIsLead
-                        ? serviceMode === 'paf' ? 'bg-[#E8590C] text-white shadow-sm' : 'bg-blue-600 text-white shadow-sm'
+                        ? serviceMode === 'paf' ? 'bg-[var(--accent)] text-white shadow-sm' : 'bg-blue-600 text-white shadow-sm'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
                     }`}
                   >
@@ -2852,7 +2855,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                   placeholder={serviceMode === 'paf' ? 'ej. Arq. Martín Cane / Cane Arquitectura' : 'ej. Estudio Cane Web Corporativa'}
                   value={newClientName}
                   onChange={e => setNewClientName(e.target.value)}
-                  className="w-full text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-3 focus:outline-none focus:border-[#E8590C]"
+                  className="w-full text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-3 focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
 
@@ -3016,7 +3019,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                       onClick={() => setNewEstimatedCurrency('USD')}
                       className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
                         newEstimatedCurrency === 'USD'
-                          ? 'bg-[#E8590C] text-white'
+                          ? 'bg-[var(--accent)] text-white'
                           : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
@@ -3027,7 +3030,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                       onClick={() => setNewEstimatedCurrency('ARS')}
                       className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
                         newEstimatedCurrency === 'ARS'
-                          ? 'bg-[#E8590C] text-white'
+                          ? 'bg-[var(--accent)] text-white'
                           : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
@@ -3047,7 +3050,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                     placeholder="ej. 1500 (monto cotizado)"
                     value={newEstimatedPrice}
                     onChange={e => setNewEstimatedPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                    className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-[#E8590C]"
+                    className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2.5 focus:outline-none focus:border-[var(--accent)]"
                   />
                 </div>
               </div>
@@ -3056,7 +3059,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
               <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800/90 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5 uppercase">
-                    <Calendar className="w-3.5 h-3.5 text-[#E8590C]" />
+                    <Calendar className="w-3.5 h-3.5 text-[var(--accent)]" />
                     <span>Cronograma de Arranque & Duración</span>
                   </label>
                   {(newProjectType === 'paf_pro' || newProjectType === 'paf_base') && (
@@ -3081,7 +3084,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                           setNewDeliveryDate(addMonths(val, 3));
                         }
                       }}
-                      className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-2 focus:outline-none focus:border-[#E8590C]"
+                      className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-2 focus:outline-none focus:border-[var(--accent)]"
                     />
                     <p className="text-[10px] text-zinc-500 mt-1 leading-tight">
                       ej. Si confirmó en Octubre o arranca el mes próximo, empieza a contar meses desde ahí.
@@ -3099,7 +3102,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                         type="date"
                         value={newDeliveryDate}
                         onChange={e => setNewDeliveryDate(e.target.value)}
-                        className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-2 focus:outline-none focus:border-[#E8590C]"
+                        className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-2 focus:outline-none focus:border-[var(--accent)]"
                       />
                       {(newProjectType === 'paf_pro' || newProjectType === 'paf_base') && (
                         <button
@@ -3132,7 +3135,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                   <select
                     value={newStatus}
                     onChange={e => setNewStatus(e.target.value)}
-                    className="w-full text-xs text-zinc-200 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 focus:outline-none focus:border-[#E8590C]"
+                    className="w-full text-xs text-zinc-200 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 focus:outline-none focus:border-[var(--accent)]"
                   >
                     {DEFAULT_PROJECT_STATUSES.map(st => (
                       <option key={st} value={st} className="bg-zinc-900">
@@ -3151,7 +3154,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                     placeholder="ej. +54 9 11 2345-6789"
                     value={newPhone}
                     onChange={e => setNewPhone(e.target.value)}
-                    className="w-full text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 focus:outline-none focus:border-[#E8590C]"
+                    className="w-full text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-2 focus:outline-none focus:border-[var(--accent)]"
                   />
                 </div>
               </div>
@@ -3166,7 +3169,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                   placeholder={serviceMode === 'paf' ? "ej. Objetivo principal del arquitecto, enlace a portfolio..." : "ej. Falta que envíen el logo en SVG y fotos de alta calidad..."}
                   value={newNotes}
                   onChange={e => setNewNotes(e.target.value)}
-                  className="w-full text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[#E8590C] resize-none"
+                  className="w-full text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[var(--accent)] resize-none"
                 />
               </div>
 
@@ -3180,7 +3183,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[#E8590C] hover:bg-[#cf4d07] text-white transition shadow-md shadow-[#E8590C]/20 active:scale-95 flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white transition shadow-md shadow-[var(--accent)]/20 active:scale-95 flex items-center gap-1.5"
                 >
                   <span>Guardar {newIsLead ? 'Lead' : (serviceMode === 'paf' ? 'Cliente Arquitecto' : 'Proyecto')}</span>
                 </button>
@@ -3198,7 +3201,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-[#E8590C]" />
+                <Info className="w-4 h-4 text-[var(--accent)]" />
                 <h3 className="text-sm font-bold text-zinc-100">
                   Control & Pipeline de Proyectos
                 </h3>

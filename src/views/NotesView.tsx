@@ -425,7 +425,7 @@ export const NotesView: React.FC<Props> = ({
             className="btn-solid-primary py-2 px-3 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>+ Nueva Nota</span>
+            <span>Nueva Nota</span>
           </button>
 
           <button
@@ -773,7 +773,7 @@ export const NotesView: React.FC<Props> = ({
                 className="btn-solid-primary py-2 px-4 text-xs font-semibold rounded-xl inline-flex items-center gap-1.5 cursor-pointer mt-2"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Crear Primera Nota</span>
+                <span>Crear Primera Nota</span>
               </button>
             </div>
           )}

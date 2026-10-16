@@ -223,7 +223,7 @@ export const NewPafClientModal: React.FC<Props> = ({
         {/* Modal Top Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#2D2F31] bg-[#131314]/90 sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#E8590C]/20 border border-[#E8590C]/30 text-[#E8590C] flex items-center justify-center shadow-inner">
+            <div className="w-10 h-10 rounded-2xl bg-[var(--accent)]/20 border border-[var(--accent)]/30 text-[var(--accent)] flex items-center justify-center shadow-inner">
               <Building2 className="w-5 h-5" />
             </div>
             <div>
@@ -249,7 +249,7 @@ export const NewPafClientModal: React.FC<Props> = ({
           {/* Section 1: Studio & Contact Info */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-3.5 h-3.5 text-[#E8590C]" />
+              <Building2 className="w-3.5 h-3.5 text-[var(--accent)]" />
               <span>1. Identidad del Estudio & Contacto</span>
             </h4>
 
@@ -266,7 +266,7 @@ export const NewPafClientModal: React.FC<Props> = ({
                     placeholder="Ej. Estudio Cane Arquitectura"
                     value={clientName}
                     onChange={e => setClientName(e.target.value)}
-                    className="w-full bg-[#131314] border border-[#37393B] focus:border-[#E8590C] rounded-2xl pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none transition"
+                    className="w-full bg-[#131314] border border-[#37393B] focus:border-[var(--accent)] rounded-2xl pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none transition"
                   />
                 </div>
               </div>
@@ -282,7 +282,7 @@ export const NewPafClientModal: React.FC<Props> = ({
                     placeholder="Ej. Arq. Juan Cane"
                     value={ownerName}
                     onChange={e => setOwnerName(e.target.value)}
-                    className="w-full bg-[#131314] border border-[#37393B] focus:border-[#E8590C] rounded-2xl pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none transition"
+                    className="w-full bg-[#131314] border border-[#37393B] focus:border-[var(--accent)] rounded-2xl pl-9 pr-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none transition"
                   />
                 </div>
               </div>
@@ -350,16 +350,16 @@ export const NewPafClientModal: React.FC<Props> = ({
                 onClick={() => handleSelectPreset('paf_pro', '1_pago')}
                 className={`p-4 rounded-3xl border cursor-pointer transition relative flex flex-col justify-between ${
                   projectType === 'paf_pro'
-                    ? 'bg-[#282A2C] border-[#E8590C] shadow-md shadow-[#E8590C]/10'
+                    ? 'bg-[#282A2C] border-[var(--accent)] shadow-md shadow-[var(--accent)]/10'
                     : 'bg-[#131314] border-[#37393B] hover:border-zinc-500 opacity-80'
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-extrabold text-[#E8590C]">
+                    <span className="text-xs font-extrabold text-[var(--accent)]">
                       PAF Pro (12 Semanas)
                     </span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#E8590C]/20 text-[#E8590C] border border-[#E8590C]/30">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/30">
                       26 hs 1:1
                     </span>
                   </div>
@@ -568,7 +568,7 @@ export const NewPafClientModal: React.FC<Props> = ({
                   setStartDate(e.target.value);
                   setDeliveryDate(addMonths(e.target.value, 3));
                 }}
-                className="w-full bg-[#131314] border border-[#37393B] focus:border-[#E8590C] rounded-2xl px-3 py-2 text-xs text-white focus:outline-none"
+                className="w-full bg-[#131314] border border-[#37393B] focus:border-[var(--accent)] rounded-2xl px-3 py-2 text-xs text-white focus:outline-none"
               />
             </div>
 
@@ -580,7 +580,7 @@ export const NewPafClientModal: React.FC<Props> = ({
                 type="date"
                 value={deliveryDate}
                 onChange={e => setDeliveryDate(e.target.value)}
-                className="w-full bg-[#131314] border border-[#37393B] focus:border-[#E8590C] rounded-2xl px-3 py-2 text-xs text-white focus:outline-none"
+                className="w-full bg-[#131314] border border-[#37393B] focus:border-[var(--accent)] rounded-2xl px-3 py-2 text-xs text-white focus:outline-none"
               />
             </div>
           </div>
@@ -599,7 +599,7 @@ export const NewPafClientModal: React.FC<Props> = ({
             type="button"
             disabled={isSubmitting}
             onClick={handleSubmit}
-            className="px-6 py-2.5 rounded-full bg-[#E8590C] hover:bg-[#d04e0a] text-white text-xs font-bold shadow-lg shadow-[#E8590C]/20 transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+            className="px-6 py-2.5 rounded-full bg-[var(--accent)] hover:bg-[#d04e0a] text-white text-xs font-bold shadow-lg shadow-[var(--accent)]/20 transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             <Check className="w-4 h-4" />
             <span>{isSubmitting ? 'Creando...' : `Crear Cliente PAF (${projectType === 'paf_pro' ? 'PAF Pro' : 'PAF Base'})`}</span>

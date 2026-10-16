@@ -424,7 +424,7 @@ export const ClientDetailView: React.FC<Props> = ({
             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-md shadow-emerald-600/20 cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>+ Registrar primer pago</span>
+            <span>Registrar primer pago</span>
           </button>
         </div>
       ) : (
@@ -701,7 +701,7 @@ export const ClientDetailView: React.FC<Props> = ({
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-4 shadow-xl">
             {/* 1. Header: Avatar & Client Name */}
             <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[#E8590C]/15 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C] text-lg font-black shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] text-lg font-black shrink-0">
                 {project.clientName.charAt(0).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
@@ -793,7 +793,7 @@ export const ClientDetailView: React.FC<Props> = ({
               {isPaf && (
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-500">Consultoría 1:1 realizada:</span>
-                  <span className="font-mono font-bold text-[#E8590C]">
+                  <span className="font-mono font-bold text-[var(--accent)]">
                     {project.pafConsultingHoursDone || 0} / {project.pafConsultingHoursTotal || 26} hs
                   </span>
                 </div>
@@ -826,7 +826,7 @@ export const ClientDetailView: React.FC<Props> = ({
                 className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold transition shadow-md shadow-emerald-600/20 cursor-pointer"
               >
                 <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>+ Registrar pago</span>
+                <span>Registrar pago</span>
               </button>
 
               <button
@@ -931,7 +931,7 @@ export const ClientDetailView: React.FC<Props> = ({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm sm:text-base font-bold text-zinc-100 flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-[#E8590C]" />
+                      <Sparkles className="w-4 h-4 text-[var(--accent)]" />
                       <span>Resumen Ejecutivo</span>
                     </h3>
                     <p className="text-xs text-zinc-400 mt-0.5">
@@ -954,7 +954,7 @@ export const ClientDetailView: React.FC<Props> = ({
                   <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800 space-y-1">
                     <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Estado</span>
                     <div className="flex items-center gap-2">
-                      <StatusIcon className="w-4 h-4 text-[#E8590C]" />
+                      <StatusIcon className="w-4 h-4 text-[var(--accent)]" />
                       <span className="text-xs font-bold text-zinc-100">{statusConfig.label}</span>
                     </div>
                     <span className="text-[10px] text-zinc-400 block truncate">{statusConfig.description}</span>
@@ -1223,7 +1223,7 @@ export const ClientDetailView: React.FC<Props> = ({
                       className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-emerald-600/20 active:scale-95 cursor-pointer"
                     >
                       <Plus className="w-4 h-4 stroke-[2.5]" />
-                      <span>+ Registrar pago</span>
+                      <span>Registrar pago</span>
                     </button>
 
                     <button
@@ -1332,7 +1332,7 @@ export const ClientDetailView: React.FC<Props> = ({
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-sm sm:text-base font-extrabold text-zinc-100 flex items-center gap-2">
-                          <Award className="w-4 h-4 text-[#E8590C]" />
+                          <Award className="w-4 h-4 text-[var(--accent)]" />
                           <span>Las 5 Etapas del Método PAF</span>
                         </h3>
                         <p className="text-xs text-zinc-400 mt-0.5">
@@ -1371,7 +1371,7 @@ export const ClientDetailView: React.FC<Props> = ({
                             }}
                             className={`p-2.5 rounded-xl border text-left transition cursor-pointer ${
                               isCurrent
-                                ? 'bg-[#E8590C]/15 border-[#E8590C] text-white shadow-xs'
+                                ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-white shadow-xs'
                                 : isDone
                                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
                                 : 'bg-zinc-950/40 border-zinc-800/70 text-zinc-500 hover:text-zinc-300'
@@ -1397,7 +1397,7 @@ export const ClientDetailView: React.FC<Props> = ({
                     className="p-4 flex items-center justify-between cursor-pointer select-none hover:bg-zinc-800/40 transition"
                   >
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-[#E8590C]" />
+                      <CheckCircle2 className="w-4 h-4 text-[var(--accent)]" />
                       <h4 className="text-sm font-bold text-zinc-100">
                         Tareas Vinculadas ({clientTasks.length})
                       </h4>
@@ -1417,7 +1417,7 @@ export const ClientDetailView: React.FC<Props> = ({
                         className="px-2.5 py-1 rounded-lg btn-solid-primary text-xs font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <Plus className="w-3 h-3" />
-                        <span>+ Tarea</span>
+                        <span>Tarea</span>
                       </button>
                       {trabajoTareasOpen ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
                     </div>
@@ -1433,7 +1433,7 @@ export const ClientDetailView: React.FC<Props> = ({
                             placeholder="Nombre de la tarea..."
                             value={newTaskTitle}
                             onChange={e => setNewTaskTitle(e.target.value)}
-                            className="flex-1 bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+                            className="flex-1 bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
                             autoFocus
                           />
                           <button
@@ -1474,7 +1474,7 @@ export const ClientDetailView: React.FC<Props> = ({
                                     playTaskDone();
                                     onToggleTask(t.id);
                                   }}
-                                  className="mt-0.5 text-zinc-400 hover:text-[#E8590C] cursor-pointer"
+                                  className="mt-0.5 text-zinc-400 hover:text-[var(--accent)] cursor-pointer"
                                 >
                                   {t.completed ? (
                                     <CheckCircle2 className="w-4 h-4 text-emerald-400" />
@@ -1542,7 +1542,7 @@ export const ClientDetailView: React.FC<Props> = ({
                         className="px-2.5 py-1 rounded-lg btn-solid-primary text-xs font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <Plus className="w-3 h-3" />
-                        <span>+ Reunión</span>
+                        <span>Reunión</span>
                       </button>
                       {trabajoReunionesOpen ? <ChevronUp className="w-4 h-4 text-zinc-400" /> : <ChevronDown className="w-4 h-4 text-zinc-400" />}
                     </div>
@@ -1613,7 +1613,7 @@ export const ClientDetailView: React.FC<Props> = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-[#E8590C]" />
+                      <FileText className="w-4 h-4 text-[var(--accent)]" />
                       <span>Bitácora, Requerimientos & Notas</span>
                     </h3>
                     <p className="text-xs text-zinc-400">
@@ -1660,7 +1660,7 @@ export const ClientDetailView: React.FC<Props> = ({
                     value={notesText}
                     onChange={e => setNotesText(e.target.value)}
                     placeholder="Escribí notas libres, requerimientos técnicos, links a Figma o Drive..."
-                    className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C] font-mono leading-relaxed resize-y"
+                    className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)] font-mono leading-relaxed resize-y"
                   />
                 ) : (
                   <div className="p-4 rounded-xl bg-zinc-950/70 border border-zinc-800 min-h-[140px] text-xs text-zinc-300 font-mono whitespace-pre-wrap leading-relaxed">
@@ -1697,7 +1697,7 @@ export const ClientDetailView: React.FC<Props> = ({
               <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-4 animate-in fade-in duration-150">
                 <div>
                   <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-[#E8590C]" />
+                    <Clock className="w-4 h-4 text-[var(--accent)]" />
                     <span>Control de Horas & Dedicación ({project.clientName})</span>
                   </h3>
                   <p className="text-xs text-zinc-400 mt-0.5">
@@ -1795,7 +1795,7 @@ export const ClientDetailView: React.FC<Props> = ({
                   onToggleArchive(project.id);
                   setConfirmArchive(false);
                 }}
-                className="px-4 py-1.5 rounded-xl bg-[#E8590C] hover:bg-[#cf4d07] text-white text-xs font-bold"
+                className="px-4 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white text-xs font-bold"
               >
                 {project.archived ? 'Desarchivar' : 'Confirmar archivo'}
               </button>

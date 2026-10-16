@@ -232,7 +232,7 @@ export const DineroUnifiedView: React.FC<Props> = ({
               title="Registrar cobro o ingreso libre de estudio"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2]" />
-              <span>+ Movimiento</span>
+              <span>Movimiento</span>
             </button>
             <button
               type="button"
@@ -244,7 +244,7 @@ export const DineroUnifiedView: React.FC<Props> = ({
               title="Registrar gasto de estudio"
             >
               <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-              <span>+ Gasto</span>
+              <span>Registrar gasto</span>
             </button>
           </div>
         ) : (
@@ -263,7 +263,7 @@ export const DineroUnifiedView: React.FC<Props> = ({
               title="Cargar nuevo movimiento en tus finanzas personales"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2]" />
-              <span>+ Movimiento</span>
+              <span>Movimiento</span>
             </button>
           </div>
         )}
@@ -408,7 +408,7 @@ export const DineroUnifiedView: React.FC<Props> = ({
                   className="w-full p-4 flex items-center justify-between text-left hover:bg-[var(--bg-surface-muted)] transition cursor-pointer select-none"
                 >
                   <div className="flex items-center gap-2">
-                    <PieChart className="w-4 h-4 text-[#E8590C]" />
+                    <PieChart className="w-4 h-4 text-[var(--accent)]" />
                     <span className="text-xs font-semibold text-[var(--text-primary)] font-heading">
                       Presupuestos de Gasto Mensual
                     </span>

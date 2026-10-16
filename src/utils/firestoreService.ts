@@ -292,6 +292,10 @@ export async function saveTaskToFirestore(task: AgendaTask): Promise<void> {
 
 export async function updateTaskInFirestore(taskId: string, updates: Partial<AgendaTask>): Promise<void> {
   const payload: Record<string, any> = { ...updates, updatedAt: serverTimestamp() };
+  // Si se reprograma, el recordatorio tiene que volver a sonar
+  if (('date' in updates || 'time' in updates || 'reminderMinutesBefore' in updates) && !('reminderNotified' in updates)) {
+    payload.reminderNotified = false;
+  }
   if ('projectId' in updates && (updates.projectId === undefined || updates.projectId === null || updates.projectId === '')) {
     payload.projectId = deleteField();
   }
@@ -349,6 +353,10 @@ export async function saveMeetingToFirestore(meeting: AgendaMeeting): Promise<vo
 
 export async function updateMeetingInFirestore(meetingId: string, updates: Partial<AgendaMeeting>): Promise<void> {
   const payload: Record<string, any> = { ...updates, updatedAt: serverTimestamp() };
+  // Si se reprograma, el recordatorio tiene que volver a sonar
+  if (('date' in updates || 'time' in updates || 'reminderMinutesBefore' in updates) && !('reminderNotified' in updates)) {
+    payload.reminderNotified = false;
+  }
   if ('projectId' in updates && (updates.projectId === undefined || updates.projectId === null || updates.projectId === '')) {
     payload.projectId = deleteField();
   }
@@ -482,6 +490,8 @@ export async function payInstallmentTransaction(
         ...installments[targetIdx],
         paid: true,
         paidAt: today,
+        status: 'cobrado',
+        incomeRecordId: incomeId,
         amount,
       };
     } else {
@@ -493,19 +503,43 @@ export async function payInstallmentTransaction(
         dueDate: today,
         paid: true,
         paidAt: today,
+        status: 'cobrado',
+        incomeRecordId: incomeId,
       });
+    }
+
+    const instCurrency = targetIdx !== -1 ? installments[targetIdx].currency : undefined;
+    const currency = instCurrency || project.estimatedCurrency || 'USD';
+
+    // Si el proyecto ya usa el array `payments`, el cobro de la cuota también tiene que
+    // aparecer ahí; si no, la ficha del proyecto lo mostraba como impago aunque el ingreso existía.
+    let payments = project.payments;
+    if (Array.isArray(payments) && !payments.some((p) => p.incomeRecordId === incomeId)) {
+      payments = [
+        {
+          id: `pay_${cleanInstId}`,
+          projectId,
+          amount,
+          currency: currency === 'ARS' ? 'ARS' : 'USD',
+          date: today,
+          method: 'transferencia',
+          note: `Cuota ${instNumber}`,
+          incomeRecordId: incomeId,
+          createdAt: today,
+        },
+        ...payments,
+      ];
     }
 
     // Actualizar proyecto en la transacción (o crearlo si era fallback)
     transaction.set(projectRef, sanitize({
       ...project,
       installments,
+      ...(payments ? { payments } : {}),
       updatedAt: serverTimestamp(),
     }), { merge: true });
 
     // Upsert IncomeRecord determinístico
-    const instCurrency = targetIdx !== -1 ? installments[targetIdx].currency : undefined;
-    const currency = instCurrency || project.estimatedCurrency || 'USD';
     const incomeData: IncomeRecord = {
       id: incomeId,
       title: `${project.clientName || 'Cliente'} - Cuota ${instNumber}`,
@@ -542,13 +576,17 @@ export async function revertInstallmentPaymentTransaction(
       const project = projSnap.data() as Project;
       const installments = (project.installments || []).map((i) => {
         if (i.id === installmentId) {
-          const { paidAt, ...rest } = i;
-          return { ...rest, paid: false };
+          const { paidAt, incomeRecordId, ...rest } = i;
+          return { ...rest, paid: false, status: 'pendiente' as const };
         }
         return i;
       });
+      const payments = Array.isArray(project.payments)
+        ? project.payments.filter((p) => p.incomeRecordId !== incomeId)
+        : undefined;
       transaction.update(projectRef, sanitize({
         installments,
+        ...(payments ? { payments } : {}),
         updatedAt: serverTimestamp(),
       }));
     }
@@ -762,16 +800,14 @@ export async function migrateIncomeAndExpenseMonths(): Promise<void> {
   try {
     const incomesSnap = await getDocs(collection(db, 'incomes'));
     const expensesSnap = await getDocs(collection(db, 'expenses'));
-    const batch = writeBatch(db);
-    let count = 0;
+    const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
 
     incomesSnap.forEach((docSnap) => {
       const data = docSnap.data() as IncomeRecord;
       if (data.date) {
         const correctMonth = monthOf(data.date);
         if (data.month !== correctMonth) {
-          batch.update(docSnap.ref, { month: correctMonth });
-          count++;
+          ops.push((batch) => batch.update(docSnap.ref, { month: correctMonth }));
         }
       }
     });
@@ -781,15 +817,14 @@ export async function migrateIncomeAndExpenseMonths(): Promise<void> {
       if (data.date) {
         const correctMonth = monthOf(data.date);
         if (data.month !== correctMonth) {
-          batch.update(docSnap.ref, { month: correctMonth });
-          count++;
+          ops.push((batch) => batch.update(docSnap.ref, { month: correctMonth }));
         }
       }
     });
 
-    if (count > 0) {
-      await batch.commit();
-      console.log(`Migración de meses completada: ${count} registros corregidos.`);
+    if (ops.length > 0) {
+      await commitInChunks(ops);
+      console.log(`Migración de meses completada: ${ops.length} registros corregidos.`);
     }
   } catch (err) {
     console.warn('Migración de meses omitida o fallida:', err);
@@ -1044,96 +1079,141 @@ export async function getDailyBudgetFromFirestore(dateStr: string): Promise<Dail
 }
 
 // ---------------- BACKUP EXPORT / IMPORT ----------------
+// Todas las colecciones que guarda la app. Si se agrega una colección nueva,
+// sumala acá para que entre en el backup, la restauración y el reseteo.
+export const ALL_CRM_COLLECTIONS = [
+  'tasks',
+  'meetings',
+  'projects',
+  'incomes',
+  'expenses',
+  'weeklyGoals',
+  'timeLogs',
+  'notes',
+  'links',
+  'daily_budgets',
+  'studioFixedExpenses',
+  'studio_payment_settings',
+  'settings',
+  'personal_accounts',
+  'personal_categories',
+  'personal_transactions',
+  'personal_recurrings',
+  'personal_budgets',
+  'personal_savings_goals',
+  'personal_study_items',
+  'personal_finance_settings',
+] as const;
+
+export type CrmCollectionName = (typeof ALL_CRM_COLLECTIONS)[number];
+
 export interface CrmCompleteBackup {
   exportedAt: string;
   version: string;
-  tasks: AgendaTask[];
-  meetings: AgendaMeeting[];
-  projects: Project[];
-  incomes: IncomeRecord[];
-  expenses: ExpenseRecord[];
-  weeklyGoals: WeeklyGoal[];
+  // v3: cada colección se guarda tal cual está en Firestore, como { [id]: datos }
+  collections?: Partial<Record<CrmCollectionName, Record<string, any>>>;
+  // v1/v2 (formato viejo, se sigue aceptando al importar)
+  tasks?: AgendaTask[];
+  meetings?: AgendaMeeting[];
+  projects?: Project[];
+  incomes?: IncomeRecord[];
+  expenses?: ExpenseRecord[];
+  weeklyGoals?: WeeklyGoal[];
   timeLogs?: TimeLog[];
 }
 
-export async function exportCompleteCrmBackup(): Promise<CrmCompleteBackup> {
-  const [tasksSnap, meetingsSnap, projectsSnap, incomesSnap, expensesSnap, goalsSnap, logsSnap] = await Promise.all([
-    getDocs(collection(db, 'tasks')),
-    getDocs(collection(db, 'meetings')),
-    getDocs(collection(db, 'projects')),
-    getDocs(collection(db, 'incomes')),
-    getDocs(collection(db, 'expenses')),
-    getDocs(collection(db, 'weeklyGoals')),
-    getDocs(collection(db, 'timeLogs')),
-  ]);
+// Firestore rechaza lotes de más de 500 operaciones: partimos en tandas.
+const BATCH_LIMIT = 450;
 
+async function commitInChunks(ops: Array<(batch: ReturnType<typeof writeBatch>) => void>): Promise<void> {
+  for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
+    const batch = writeBatch(db);
+    ops.slice(i, i + BATCH_LIMIT).forEach((op) => op(batch));
+    await batch.commit();
+  }
+}
+
+// Convierte Timestamps de Firestore a ISO para que el JSON se pueda volver a importar.
+function toPlainJson(val: any): any {
+  if (val === null || val === undefined) return val;
+  if (Array.isArray(val)) return val.map(toPlainJson);
+  if (typeof val === 'object') {
+    if (typeof val.toDate === 'function') return normalizeTimestamp(val);
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(val)) out[k] = toPlainJson(v);
+    return out;
+  }
+  return val;
+}
+
+export async function exportCompleteCrmBackup(): Promise<CrmCompleteBackup> {
+  const snaps = await Promise.all(ALL_CRM_COLLECTIONS.map((c) => getDocs(collection(db, c))));
+  const collections: CrmCompleteBackup['collections'] = {};
+  ALL_CRM_COLLECTIONS.forEach((name, idx) => {
+    const docs: Record<string, any> = {};
+    snaps[idx].forEach((d) => {
+      docs[d.id] = toPlainJson(d.data());
+    });
+    collections[name] = docs;
+  });
   return {
-    exportedAt: todayLocal(),
-    version: '2.0',
-    tasks: tasksSnap.docs.map((d) => normalizeTask(d.data(), d.id)),
-    meetings: meetingsSnap.docs.map((d) => normalizeMeeting(d.data(), d.id)),
-    projects: projectsSnap.docs.map((d) => normalizeProject(d.data(), d.id)),
-    incomes: incomesSnap.docs.map((d) => normalizeIncome(d.data(), d.id)),
-    expenses: expensesSnap.docs.map((d) => normalizeExpense(d.data(), d.id)),
-    weeklyGoals: goalsSnap.docs.map((d) => normalizeWeeklyGoal(d.data(), d.id)),
-    timeLogs: logsSnap.docs.map((d) => normalizeTimeLog(d.data(), d.id)),
+    exportedAt: new Date().toISOString(),
+    version: '3.0',
+    collections,
   };
 }
 
-export async function importCompleteCrmBackup(backup: CrmCompleteBackup): Promise<void> {
+export async function importCompleteCrmBackup(backup: CrmCompleteBackup): Promise<{ imported: number }> {
   if (!backup || typeof backup !== 'object') {
     throw new Error('Archivo de backup inválido: formato no reconocido');
   }
 
-  const batch = writeBatch(db);
+  const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
 
-  if (Array.isArray(backup.tasks)) {
-    backup.tasks.forEach((t) => {
-      if (t.id) batch.set(doc(db, 'tasks', t.id), deepSanitize(t), { merge: true });
-    });
-  }
-  if (Array.isArray(backup.meetings)) {
-    backup.meetings.forEach((m) => {
-      if (m.id) batch.set(doc(db, 'meetings', m.id), deepSanitize(m), { merge: true });
-    });
-  }
-  if (Array.isArray(backup.projects)) {
-    backup.projects.forEach((p) => {
-      if (p.id) batch.set(doc(db, 'projects', p.id), deepSanitize(p), { merge: true });
-    });
-  }
-  if (Array.isArray(backup.incomes)) {
-    backup.incomes.forEach((i) => {
-      if (i.id) batch.set(doc(db, 'incomes', i.id), deepSanitize(i), { merge: true });
-    });
-  }
-  if (Array.isArray(backup.expenses)) {
-    backup.expenses.forEach((e) => {
-      if (e.id) batch.set(doc(db, 'expenses', e.id), deepSanitize(e), { merge: true });
-    });
-  }
-  if (Array.isArray(backup.weeklyGoals)) {
-    backup.weeklyGoals.forEach((g) => {
-      if (g.id) batch.set(doc(db, 'weeklyGoals', g.id), deepSanitize(g), { merge: true });
-    });
-  }
-  if (Array.isArray(backup.timeLogs)) {
-    backup.timeLogs.forEach((l) => {
-      if (l.id) batch.set(doc(db, 'timeLogs', l.id), deepSanitize(l), { merge: true });
-    });
+  if (backup.collections && typeof backup.collections === 'object') {
+    for (const name of ALL_CRM_COLLECTIONS) {
+      const docs = backup.collections[name];
+      if (!docs || typeof docs !== 'object') continue;
+      for (const [id, data] of Object.entries(docs)) {
+        if (!id || !data || typeof data !== 'object') continue;
+        ops.push((batch) => batch.set(doc(db, name, id), deepSanitize(data), { merge: true }));
+      }
+    }
+  } else {
+    // Formato viejo: arrays por colección
+    const legacy: Array<[CrmCollectionName, any[] | undefined]> = [
+      ['tasks', backup.tasks],
+      ['meetings', backup.meetings],
+      ['projects', backup.projects],
+      ['incomes', backup.incomes],
+      ['expenses', backup.expenses],
+      ['weeklyGoals', backup.weeklyGoals],
+      ['timeLogs', backup.timeLogs],
+    ];
+    for (const [name, items] of legacy) {
+      if (!Array.isArray(items)) continue;
+      for (const item of items) {
+        if (!item?.id) continue;
+        const data = name === 'incomes' || name === 'expenses'
+          ? { ...item, month: monthOf(toSafeDateString(item.date) || todayLocal()) }
+          : item;
+        ops.push((batch) => batch.set(doc(db, name, item.id), deepSanitize(data), { merge: true }));
+      }
+    }
   }
 
-  await batch.commit();
+  if (ops.length === 0) {
+    throw new Error('El archivo no contiene datos para restaurar');
+  }
+  await commitInChunks(ops);
+  return { imported: ops.length };
 }
 
 // ---------------- RESET ALL FIRESTORE DATA ----------------
 export async function resetAllFirestoreData(): Promise<void> {
-  const collections = ['tasks', 'meetings', 'projects', 'incomes', 'expenses', 'weeklyGoals', 'timeLogs'];
-  for (const col of collections) {
+  for (const col of ALL_CRM_COLLECTIONS) {
     const snap = await getDocs(collection(db, col));
-    const batch = writeBatch(db);
-    snap.forEach((d) => batch.delete(d.ref));
-    await batch.commit();
+    await commitInChunks(snap.docs.map((d) => (batch) => batch.delete(d.ref)));
   }
 }
 
@@ -1184,59 +1264,59 @@ export async function syncLocalDataWithFirestore(
     // sembramos los datos locales iniciales en Firestore:
     updateSyncStatus('Sincronizando…');
     let uploadedCount = 0;
-    const batch = writeBatch(db);
+    const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
 
     localTasks.forEach((t) => {
       if (t.id) {
-        batch.set(doc(db, 'tasks', t.id), deepSanitize({ ...t, updatedAt: serverTimestamp() }), { merge: true });
+        ops.push((batch) => batch.set(doc(db, 'tasks', t.id), deepSanitize({ ...t, updatedAt: serverTimestamp() }), { merge: true }));
         uploadedCount++;
       }
     });
 
     localMeetings.forEach((m) => {
       if (m.id) {
-        batch.set(doc(db, 'meetings', m.id), deepSanitize({ ...m, updatedAt: serverTimestamp() }), { merge: true });
+        ops.push((batch) => batch.set(doc(db, 'meetings', m.id), deepSanitize({ ...m, updatedAt: serverTimestamp() }), { merge: true }));
         uploadedCount++;
       }
     });
 
     localProjects.forEach((p) => {
       if (p.id) {
-        batch.set(doc(db, 'projects', p.id), deepSanitize({ ...p, updatedAt: serverTimestamp() }), { merge: true });
+        ops.push((batch) => batch.set(doc(db, 'projects', p.id), deepSanitize({ ...p, updatedAt: serverTimestamp() }), { merge: true }));
         uploadedCount++;
       }
     });
 
     localIncomes.forEach((i) => {
       if (i.id) {
-        batch.set(doc(db, 'incomes', i.id), deepSanitize({ ...i, month: monthOf(i.date) }), { merge: true });
+        ops.push((batch) => batch.set(doc(db, 'incomes', i.id), deepSanitize({ ...i, month: monthOf(i.date) }), { merge: true }));
         uploadedCount++;
       }
     });
 
     localExpenses.forEach((e) => {
       if (e.id) {
-        batch.set(doc(db, 'expenses', e.id), deepSanitize({ ...e, month: monthOf(e.date) }), { merge: true });
+        ops.push((batch) => batch.set(doc(db, 'expenses', e.id), deepSanitize({ ...e, month: monthOf(e.date) }), { merge: true }));
         uploadedCount++;
       }
     });
 
     localGoals.forEach((g) => {
       if (g.id) {
-        batch.set(doc(db, 'weeklyGoals', g.id), deepSanitize({ ...g, updatedAt: serverTimestamp() }), { merge: true });
+        ops.push((batch) => batch.set(doc(db, 'weeklyGoals', g.id), deepSanitize({ ...g, updatedAt: serverTimestamp() }), { merge: true }));
         uploadedCount++;
       }
     });
 
     localTimeLogs.forEach((l) => {
       if (l.id) {
-        batch.set(doc(db, 'timeLogs', l.id), deepSanitize({ ...l, updatedAt: serverTimestamp() }), { merge: true });
+        ops.push((batch) => batch.set(doc(db, 'timeLogs', l.id), deepSanitize({ ...l, updatedAt: serverTimestamp() }), { merge: true }));
         uploadedCount++;
       }
     });
 
     if (uploadedCount > 0) {
-      await batch.commit();
+      await commitInChunks(ops);
       console.log(`[Firestore Seed] Base inicial creada en la nube con ${uploadedCount} registros.`);
     }
 
@@ -1680,12 +1760,18 @@ export async function seedPersonalFinanceDefaultsIfEmpty(
   categories: PersonalCategory[]
 ): Promise<void> {
   try {
+    // Se consulta Firestore (no el estado local): en un dispositivo nuevo el localStorage
+    // está vacío y antes se pisaban las cuentas/categorías reales con los valores por defecto.
     if (accounts.length === 0) {
-      for (const acc of DEFAULT_PERSONAL_ACCOUNTS) {
-        await savePersonalAccountToFirestore(acc as PersonalAccount);
+      const remote = await getDocs(collection(db, 'personal_accounts'));
+      if (remote.empty) {
+        for (const acc of DEFAULT_PERSONAL_ACCOUNTS) {
+          await savePersonalAccountToFirestore(acc as PersonalAccount);
+        }
       }
     }
-    if (categories.length === 0) {
+    const remoteCategories = categories.length === 0 ? await getDocs(collection(db, 'personal_categories')) : null;
+    if (remoteCategories?.empty) {
       for (const cat of DEFAULT_PERSONAL_CATEGORIES) {
         await savePersonalCategoryToFirestore(cat as PersonalCategory);
       }

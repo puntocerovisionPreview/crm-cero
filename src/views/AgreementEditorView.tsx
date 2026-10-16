@@ -427,7 +427,7 @@ export const AgreementEditorView: React.FC<Props> = ({
               className="px-3 py-1.5 rounded-[var(--radius-control)] btn-secondary text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>+ Agregar cuota</span>
+              <span>Agregar cuota</span>
             </button>
           </div>
 

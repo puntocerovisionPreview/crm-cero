@@ -49,7 +49,7 @@ export const PafGuideModal: React.FC<Props> = ({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-900/50">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-[#E8590C]/10 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C] shrink-0">
+            <div className="w-9 h-9 rounded-2xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shrink-0">
               <Award className="w-5 h-5" />
             </div>
             <div>
@@ -88,7 +88,7 @@ export const PafGuideModal: React.FC<Props> = ({
                 }}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition active:scale-95 whitespace-nowrap ${
                   active 
-                    ? 'bg-[#E8590C] text-white shadow-md shadow-[#E8590C]/20' 
+                    ? 'bg-[var(--accent)] text-white shadow-md shadow-[var(--accent)]/20' 
                     : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                 }`}
               >
@@ -105,10 +105,10 @@ export const PafGuideModal: React.FC<Props> = ({
           {activeTab === 'ofertas' && (
             <div className="space-y-6">
               {/* PAF Pro Tier */}
-              <div className="p-4 sm:p-5 rounded-3xl bg-zinc-900/60 border-2 border-[#E8590C]/40 relative space-y-4">
+              <div className="p-4 sm:p-5 rounded-3xl bg-zinc-900/60 border-2 border-[var(--accent)]/40 relative space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div>
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#E8590C] text-white text-[10px] font-extrabold uppercase tracking-wider">
+                    <span className="px-2.5 py-0.5 rounded-full bg-[var(--accent)] text-white text-[10px] font-extrabold uppercase tracking-wider">
                       Acceso Premium Completo
                     </span>
                     <h3 className="text-base sm:text-lg font-black text-zinc-100 mt-1">
@@ -128,31 +128,31 @@ export const PafGuideModal: React.FC<Props> = ({
                 {/* What includes */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-zinc-800">
                   <div className="flex items-center gap-2 text-zinc-300">
-                    <CheckCircle2 className="w-4 h-4 text-[#E8590C] shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />
                     <span>26 horas de consultoría y mentoría 1:1 (2 sesiones/sem)</span>
                   </div>
                   <div className="flex items-center gap-2 text-zinc-300">
-                    <CheckCircle2 className="w-4 h-4 text-[#E8590C] shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />
                     <span>Página Web & Landing Page comercial de alta conversión</span>
                   </div>
                   <div className="flex items-center gap-2 text-zinc-300">
-                    <CheckCircle2 className="w-4 h-4 text-[#E8590C] shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />
                     <span>Gestión y configuración de campañas Meta Ads</span>
                   </div>
                   <div className="flex items-center gap-2 text-zinc-300">
-                    <CheckCircle2 className="w-4 h-4 text-[#E8590C] shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />
                     <span>Producción y lanzamiento de VSL Funnel</span>
                   </div>
                   <div className="flex items-center gap-2 text-zinc-300">
-                    <CheckCircle2 className="w-4 h-4 text-[#E8590C] shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />
                     <span>Optimización Google Business Profile / Maps (SEO Local)</span>
                   </div>
                   <div className="flex items-center gap-2 text-zinc-300">
-                    <CheckCircle2 className="w-4 h-4 text-[#E8590C] shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />
                     <span>Soporte en reuniones y auditoría de llamadas reales</span>
                   </div>
                   <div className="flex items-center gap-2 text-zinc-300">
-                    <CheckCircle2 className="w-4 h-4 text-[#E8590C] shrink-0" />
+                    <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />
                     <span>Librería de Prompts IA .Cero + Manuales de Infraestructura Comercial</span>
                   </div>
                 </div>
@@ -305,7 +305,7 @@ export const PafGuideModal: React.FC<Props> = ({
                       <MessageSquare className="w-4 h-4 shrink-0" />
                       <span>{item.objection}</span>
                     </div>
-                    <div className="text-xs text-zinc-300 leading-relaxed pl-6 border-l-2 border-[#E8590C]/50">
+                    <div className="text-xs text-zinc-300 leading-relaxed pl-6 border-l-2 border-[var(--accent)]/50">
                       {item.rebuttal}
                     </div>
                   </div>

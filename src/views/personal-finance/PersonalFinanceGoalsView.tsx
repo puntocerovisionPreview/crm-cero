@@ -160,7 +160,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ej: Fondo de emergencia, Vacaciones, MacBook Pro..."
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-sm text-zinc-100 focus:outline-hidden"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-sm text-zinc-100 focus:outline-hidden"
             />
           </div>
 
@@ -174,7 +174,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
                 value={targetAmount || ''}
                 onChange={(e) => setTargetAmount(parseFloat(e.target.value) || 0)}
                 placeholder="100000"
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-2.5 text-sm font-mono font-bold text-zinc-100 focus:outline-hidden"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-2.5 text-sm font-mono font-bold text-zinc-100 focus:outline-hidden"
               />
             </div>
 
@@ -186,7 +186,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
                 value={savedAmount || ''}
                 onChange={(e) => setSavedAmount(parseFloat(e.target.value) || 0)}
                 placeholder="0"
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-2.5 text-sm font-mono font-bold text-zinc-100 focus:outline-hidden"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-2.5 text-sm font-mono font-bold text-zinc-100 focus:outline-hidden"
               />
             </div>
           </div>
@@ -218,7 +218,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
                 type="date"
                 value={deadline}
                 onChange={(e) => setDeadline(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-2.5 py-2 text-xs text-zinc-200 focus:outline-hidden"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-2.5 py-2 text-xs text-zinc-200 focus:outline-hidden"
               />
             </div>
           </div>
@@ -236,7 +236,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-[#E8590C] hover:bg-[#d94f08] text-black font-black text-xs transition active:scale-95 shadow-md shadow-[#E8590C]/20"
+              className="px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-black font-black text-xs transition active:scale-95 shadow-md shadow-[var(--accent)]/20"
             >
               Guardar Meta
             </button>
@@ -287,7 +287,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
               value={depositAmount || ''}
               onChange={(e) => setDepositAmount(parseFloat(e.target.value) || 0)}
               placeholder="0"
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-2xl font-mono font-black text-zinc-100 focus:outline-hidden"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-2xl font-mono font-black text-zinc-100 focus:outline-hidden"
             />
           </div>
 
@@ -337,7 +337,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
         <button
           type="button"
           onClick={startCreate}
-          className="px-3 py-1.5 rounded-xl bg-[#E8590C] hover:bg-[#d94f08] text-black font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-[#E8590C]/20 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-black font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-[var(--accent)]/20 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 stroke-[3]" />
           <span>Nueva Meta</span>
@@ -356,7 +356,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
           <button
             type="button"
             onClick={startCreate}
-            className="px-4 py-2 rounded-xl bg-[#E8590C] text-black font-bold text-xs"
+            className="px-4 py-2 rounded-xl bg-[var(--accent)] text-black font-bold text-xs"
           >
             Crear mi primera meta
           </button>

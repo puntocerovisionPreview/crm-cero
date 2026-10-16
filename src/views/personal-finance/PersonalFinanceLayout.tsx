@@ -102,7 +102,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
 
     return (
       <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 max-w-sm mx-auto animate-in fade-in">
-        <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[#E8590C] mb-6 shadow-xl shadow-black/50">
+        <div className="w-16 h-16 rounded-3xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-[var(--accent)] mb-6 shadow-xl shadow-black/50">
           <Lock className="w-8 h-8" />
         </div>
         <h2 className="text-xl font-bold text-zinc-100 mb-1">Finanzas Personales</h2>
@@ -117,7 +117,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
               key={idx}
               className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
                 pinInput.length > idx 
-                  ? pinError ? 'bg-rose-500 scale-110' : 'bg-[#E8590C] scale-110'
+                  ? pinError ? 'bg-rose-500 scale-110' : 'bg-[var(--accent)] scale-110'
                   : 'bg-zinc-800 border border-zinc-700'
               }`}
             />
@@ -229,8 +229,8 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
                   }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl font-bold text-xs transition mb-2 shadow-sm ${
                     active 
-                      ? 'bg-[#E8590C] text-black shadow-[#E8590C]/20' 
-                      : 'bg-[#E8590C]/15 text-[#E8590C] hover:bg-[#E8590C] hover:text-black border border-[#E8590C]/30'
+                      ? 'bg-[var(--accent)] text-black shadow-[var(--accent)]/20' 
+                      : 'bg-[var(--accent)]/15 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black border border-[var(--accent)]/30'
                   }`}
                 >
                   <Icon className="w-4 h-4 stroke-[2.5]" />
@@ -254,10 +254,10 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
                 }`}
               >
                 <div className="flex items-center gap-2.5">
-                  <Icon className={`w-4 h-4 ${active ? 'text-[#E8590C]' : 'text-zinc-400'}`} />
+                  <Icon className={`w-4 h-4 ${active ? 'text-[var(--accent)]' : 'text-zinc-400'}`} />
                   <span>{item.label}</span>
                 </div>
-                {active && <div className="w-1.5 h-1.5 rounded-full bg-[#E8590C]" />}
+                {active && <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />}
               </button>
             );
           })}
@@ -282,7 +282,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
             }}
             className={`flex flex-col items-center justify-center min-w-[56px] py-1 transition ${
               isCurrent('/mis-finanzas') && !currentPath.includes('/movimientos') && !currentPath.includes('/presupuestos') && !currentPath.includes('/nuevo')
-                ? 'text-[#E8590C]'
+                ? 'text-[var(--accent)]'
                 : 'text-zinc-400'
             }`}
           >
@@ -298,7 +298,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
               onNavigate('/mis-finanzas/movimientos');
             }}
             className={`flex flex-col items-center justify-center min-w-[56px] py-1 transition ${
-              isCurrent('/mis-finanzas/movimientos') ? 'text-[#E8590C]' : 'text-zinc-400'
+              isCurrent('/mis-finanzas/movimientos') ? 'text-[var(--accent)]' : 'text-zinc-400'
             }`}
           >
             <ArrowLeftRight className="w-5 h-5" />
@@ -314,10 +314,10 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
             }}
             className="flex flex-col items-center justify-center -mt-5"
           >
-            <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-[#E8590C] to-amber-500 text-black flex items-center justify-center shadow-lg shadow-[#E8590C]/30 border-4 border-zinc-950 active:scale-95 transition">
+            <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-[var(--accent)] to-amber-500 text-black flex items-center justify-center shadow-lg shadow-[var(--accent)]/30 border-4 border-zinc-950 active:scale-95 transition">
               <PlusCircle className="w-7 h-7 stroke-[2.2]" />
             </div>
-            <span className="text-[10px] font-bold text-[#E8590C] mt-0.5">Cargar</span>
+            <span className="text-[10px] font-bold text-[var(--accent)] mt-0.5">Cargar</span>
           </button>
 
           {/* Tab 4: Presupuestos */}
@@ -328,7 +328,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
               onNavigate('/mis-finanzas/presupuestos');
             }}
             className={`flex flex-col items-center justify-center min-w-[56px] py-1 transition ${
-              isCurrent('/mis-finanzas/presupuestos') ? 'text-[#E8590C]' : 'text-zinc-400'
+              isCurrent('/mis-finanzas/presupuestos') ? 'text-[var(--accent)]' : 'text-zinc-400'
             }`}
           >
             <Target className="w-5 h-5" />
@@ -344,7 +344,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
             }}
             className={`flex flex-col items-center justify-center min-w-[56px] py-1 transition ${
               showMobileMoreMenu || currentPath.includes('/cuentas') || currentPath.includes('/metas') || currentPath.includes('/estudio') || currentPath.includes('/recurrentes') || currentPath.includes('/ajustes')
-                ? 'text-[#E8590C]'
+                ? 'text-[var(--accent)]'
                 : 'text-zinc-400'
             }`}
           >

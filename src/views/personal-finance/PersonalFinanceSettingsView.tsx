@@ -271,14 +271,14 @@ widget.presentMedium();
               value={usdRateStr}
               onChange={(e) => setUsdRateStr(e.target.value)}
               placeholder="1250"
-              className="w-full pl-8 pr-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 font-mono text-sm focus:outline-none focus:border-[#E8590C]"
+              className="w-full pl-8 pr-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 font-mono text-sm focus:outline-none focus:border-[var(--accent)]"
             />
           </div>
           <button
             type="button"
             onClick={() => handleSaveSettings()}
             disabled={isSaving}
-            className="px-4 py-2.5 rounded-xl bg-[#E8590C] hover:bg-[#d04f0b] text-black text-xs font-bold transition shadow-sm"
+            className="px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[#d04f0b] text-black text-xs font-bold transition shadow-sm"
           >
             {isSaving ? 'Guardando...' : 'Actualizar'}
           </button>
@@ -309,7 +309,7 @@ widget.presentMedium();
               }}
               className="sr-only peer" 
             />
-            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#E8590C]" />
+            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]" />
           </label>
         </div>
 
@@ -325,7 +325,7 @@ widget.presentMedium();
                 value={customPin}
                 onChange={(e) => setCustomPin(e.target.value.replace(/\D/g, ''))}
                 placeholder="••••"
-                className="w-32 text-center tracking-[0.5em] px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 font-mono text-base focus:outline-none focus:border-[#E8590C]"
+                className="w-32 text-center tracking-[0.5em] px-3.5 py-2.5 rounded-xl bg-zinc-900 border border-zinc-700/80 text-zinc-100 font-mono text-base focus:outline-none focus:border-[var(--accent)]"
               />
               <button
                 type="button"

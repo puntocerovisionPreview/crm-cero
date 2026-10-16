@@ -491,11 +491,11 @@ export const SemanaView: React.FC<Props> = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#E8590C]" />
+              <span className="w-2.5 h-2.5 rounded-full bg-[var(--accent)]" />
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--text-primary)]">
                 Misiones de la Semana
               </h1>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-[#E8590C]/10 text-[#E8590C] font-semibold border border-[#E8590C]/20">
+              <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] font-semibold border border-[var(--accent)]/20">
                 Unidad de Avance
               </span>
             </div>
@@ -521,7 +521,7 @@ export const SemanaView: React.FC<Props> = ({
                 onClick={handleCurrentWeek}
                 className={`px-3 py-1 font-medium rounded-lg transition cursor-pointer ${
                   selectedWeek === currentWeekMonday
-                    ? 'bg-[#E8590C] text-white font-semibold'
+                    ? 'bg-[var(--accent)] text-white font-semibold'
                     : 'text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
                 }`}
               >
@@ -586,7 +586,7 @@ export const SemanaView: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => handleOpenNewMission()}
-              className="px-4 py-1.5 rounded-xl bg-[#E8590C] hover:bg-[#d04f0a] text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
+              className="px-4 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[#d04f0a] text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 cursor-pointer shadow-sm"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Nueva Misión</span>
@@ -614,7 +614,7 @@ export const SemanaView: React.FC<Props> = ({
                 Disponible: <strong className="text-[var(--text-primary)]">{weekCapacityHours}h</strong>
               </span>
               <span>
-                Tiempo Real: <strong className="text-[#E8590C]">{totalRealHours.toFixed(1)}h</strong>
+                Tiempo Real: <strong className="text-[var(--accent)]">{totalRealHours.toFixed(1)}h</strong>
               </span>
             </div>
           </div>
@@ -690,7 +690,7 @@ export const SemanaView: React.FC<Props> = ({
                   <button
                     type="button"
                     onClick={() => handleOpenNewMission()}
-                    className="px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#d04f0a] text-white text-xs font-bold transition cursor-pointer shadow-sm"
+                    className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[#d04f0a] text-white text-xs font-bold transition cursor-pointer shadow-sm"
                   >
                     + Crear Primera Misión
                   </button>
@@ -709,7 +709,7 @@ export const SemanaView: React.FC<Props> = ({
                         <div 
                           key={dia.key} 
                           className={`py-1 rounded-lg transition ${
-                            isToday ? 'bg-[#E8590C]/15 text-[#E8590C] font-bold border border-[#E8590C]/30' : ''
+                            isToday ? 'bg-[var(--accent)]/15 text-[var(--accent)] font-bold border border-[var(--accent)]/30' : ''
                           }`}
                         >
                           <div className="text-[11px]">{dia.short}</div>
@@ -756,7 +756,7 @@ export const SemanaView: React.FC<Props> = ({
                           </div>
 
                           <div className="flex items-center justify-between gap-2">
-                            <h4 className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[#E8590C] transition truncate flex-1">
+                            <h4 className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--accent)] transition truncate flex-1">
                               {mission.title}
                             </h4>
                             <button
@@ -816,7 +816,7 @@ export const SemanaView: React.FC<Props> = ({
                             >
                               {/* Línea vertical de HOY */}
                               {isToday && (
-                                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-[#E8590C] z-10 opacity-70 pointer-events-none" />
+                                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-0.5 bg-[var(--accent)] z-10 opacity-70 pointer-events-none" />
                               )}
 
                               {isPlanned && (
@@ -877,7 +877,7 @@ export const SemanaView: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => handleQuickConvertProjectToMission(proj)}
-                      className="px-2.5 py-1 rounded-lg bg-[var(--bg-surface-muted)] hover:bg-[#E8590C] hover:text-white text-[var(--text-primary)] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-[var(--bg-surface-muted)] hover:bg-[var(--accent)] hover:text-white text-[var(--text-primary)] font-semibold transition active:scale-95 shrink-0 cursor-pointer"
                     >
                       Convertir en misión
                     </button>
@@ -895,7 +895,7 @@ export const SemanaView: React.FC<Props> = ({
           <div className="bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl t-modal-enter">
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)] mb-4">
               <div className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-[#E8590C]" />
+                <Target className="w-5 h-5 text-[var(--accent)]" />
                 <h3 className="text-base font-bold text-[var(--text-primary)]">
                   Nueva Misión de la Semana
                 </h3>
@@ -927,7 +927,7 @@ export const SemanaView: React.FC<Props> = ({
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="ej: Entrega PAF Módulo 1 Estudio Alfa"
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[#E8590C]"
+                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
                   autoFocus
                 />
               </div>
@@ -942,7 +942,7 @@ export const SemanaView: React.FC<Props> = ({
                   value={newResultado}
                   onChange={(e) => setNewResultado(e.target.value)}
                   placeholder="ej: Entregables validados y reunión de feedback cerrada"
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[#E8590C]"
+                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
 
@@ -1034,7 +1034,7 @@ export const SemanaView: React.FC<Props> = ({
                         }}
                         className={`py-1.5 rounded-lg text-xs font-semibold transition ${
                           isSelected 
-                            ? 'bg-[#E8590C] text-white' 
+                            ? 'bg-[var(--accent)] text-white' 
                             : 'bg-[var(--bg-app)] text-[var(--text-secondary)] border border-[var(--border-subtle)] hover:border-[var(--text-tertiary)]'
                         }`}
                       >
@@ -1055,7 +1055,7 @@ export const SemanaView: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => setNewPasos(prev => [...prev, ''])}
-                      className="text-[11px] text-[#E8590C] font-semibold hover:underline"
+                      className="text-[11px] text-[var(--accent)] font-semibold hover:underline"
                     >
                       + Añadir paso
                     </button>
@@ -1107,7 +1107,7 @@ export const SemanaView: React.FC<Props> = ({
                       type="checkbox"
                       checked={acceptOverCapacity}
                       onChange={(e) => setAcceptOverCapacity(e.target.checked)}
-                      className="rounded accent-[#E8590C]"
+                      className="rounded accent-[var(--accent)]"
                     />
                     <span>Acepto explícitamente la sobrecarga horaria</span>
                   </label>
@@ -1125,7 +1125,7 @@ export const SemanaView: React.FC<Props> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#d04f0a] text-white text-xs font-bold transition shadow-sm"
+                  className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[#d04f0a] text-white text-xs font-bold transition shadow-sm"
                 >
                   Confirmar Misión
                 </button>
@@ -1200,7 +1200,7 @@ export const SemanaView: React.FC<Props> = ({
                               onClick={() => setCarryDecisions(prev => ({ ...prev, [m.id]: { action: 'arrastrar' } }))}
                               className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
                                 dec.action === 'arrastrar' 
-                                  ? 'bg-[#E8590C] text-white' 
+                                  ? 'bg-[var(--accent)] text-white' 
                                   : 'bg-[var(--bg-surface-muted)] text-[var(--text-secondary)]'
                               }`}
                             >
@@ -1258,7 +1258,7 @@ export const SemanaView: React.FC<Props> = ({
                   onChange={(e) => setCloseLearnings(e.target.value)}
                   placeholder="ej: Agrupar llamadas los martes permitió foco los miércoles. Faltó estimar mejor el tiempo de revisión con cliente."
                   rows={3}
-                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[#E8590C]"
+                  className="w-full px-3 py-2 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
 
@@ -1274,7 +1274,7 @@ export const SemanaView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleConfirmWeeklyClose}
-                  className="px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#d04f0a] text-white text-xs font-bold transition shadow-sm"
+                  className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[#d04f0a] text-white text-xs font-bold transition shadow-sm"
                 >
                   Confirmar y Guardar Cierre
                 </button>
@@ -1480,7 +1480,7 @@ const MissionDedicatedScreen: React.FC<MissionScreenProps> = ({
                 Tipo: {mission.tipo}
               </span>
               <span className={`text-xs px-2 py-0.5 rounded-md font-bold uppercase ${
-                mission.estado === 'terminada' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#E8590C]/20 text-[#E8590C]'
+                mission.estado === 'terminada' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[var(--accent)]/20 text-[var(--accent)]'
               }`}>
                 {mission.estado}
               </span>
@@ -1493,7 +1493,7 @@ const MissionDedicatedScreen: React.FC<MissionScreenProps> = ({
             {projectLinked && (
               <div 
                 onClick={() => onNavigate(`/clientes/${projectLinked.id}`)}
-                className="mt-1 text-xs text-[#E8590C] hover:underline cursor-pointer flex items-center gap-1 font-semibold"
+                className="mt-1 text-xs text-[var(--accent)] hover:underline cursor-pointer flex items-center gap-1 font-semibold"
               >
                 <Building2 className="w-3.5 h-3.5" />
                 <span>Cliente: {projectLinked.clientName} (Ver ficha 360°)</span>
@@ -1535,7 +1535,7 @@ const MissionDedicatedScreen: React.FC<MissionScreenProps> = ({
         {/* Pasos Grandes (3 a 5 pasos) */}
         <div>
           <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <ListTodo className="w-4 h-4 text-[#E8590C]" />
+            <ListTodo className="w-4 h-4 text-[var(--accent)]" />
             <span>Pasos Grandes ({progress.pasosHechos}/{progress.totalPasos})</span>
           </h3>
 
@@ -1575,7 +1575,7 @@ const MissionDedicatedScreen: React.FC<MissionScreenProps> = ({
             />
             <button
               type="submit"
-              className="px-3 py-2 rounded-xl bg-[var(--bg-surface-muted)] hover:bg-[#E8590C] hover:text-white text-xs font-semibold transition"
+              className="px-3 py-2 rounded-xl bg-[var(--bg-surface-muted)] hover:bg-[var(--accent)] hover:text-white text-xs font-semibold transition"
             >
               Agregar
             </button>
@@ -1585,7 +1585,7 @@ const MissionDedicatedScreen: React.FC<MissionScreenProps> = ({
         {/* Tareas de la Agenda Vinculadas a esta Misión */}
         <div>
           <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[#E8590C]" />
+            <Clock className="w-4 h-4 text-[var(--accent)]" />
             <span>Tareas Diarias Vinculadas ({linkedTasks.length})</span>
           </h3>
 
@@ -1636,7 +1636,7 @@ const MissionDedicatedScreen: React.FC<MissionScreenProps> = ({
             />
             <button
               type="submit"
-              className="px-3 py-2 rounded-xl bg-[#E8590C] text-white text-xs font-semibold transition"
+              className="px-3 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-semibold transition"
             >
               Crear tarea
             </button>
@@ -1654,7 +1654,7 @@ const MissionDedicatedScreen: React.FC<MissionScreenProps> = ({
               {linkedMeetings.map(m => (
                 <div key={m.id} className="p-2 rounded-lg bg-[var(--bg-app)] border border-[var(--border-subtle)] flex items-center justify-between">
                   <span>{m.title} ({m.date})</span>
-                  <span className="font-mono text-[#E8590C]">+{m.durationHours || 1}h</span>
+                  <span className="font-mono text-[var(--accent)]">+{m.durationHours || 1}h</span>
                 </div>
               ))}
             </div>
@@ -1729,7 +1729,7 @@ const WeeklyHistoryView: React.FC<HistoryProps> = ({
             <button
               type="button"
               onClick={() => onSelectWeek(item.weekStart)}
-              className="text-xs text-[#E8590C] hover:underline font-semibold cursor-pointer"
+              className="text-xs text-[var(--accent)] hover:underline font-semibold cursor-pointer"
             >
               Ver misiones de esa semana →
             </button>

@@ -9,7 +9,7 @@ export const fireTaskCelebration = (originX: number = 0.5, originY: number = 0.6
       particleCount: 45,
       spread: 60,
       origin: { x: originX, y: originY },
-      colors: ['#E8590C', '#f59e0b', '#10b981', '#fbbf24', '#ffffff'],
+      colors: ['#5BC2E7', '#f59e0b', '#10b981', '#fbbf24', '#ffffff'],
       ticks: 180,
       gravity: 1.1,
       scalar: 0.9,
@@ -28,7 +28,7 @@ export const fireGrandCelebration = () => {
     const count = 200;
     const defaults = {
       origin: { y: 0.7 },
-      colors: ['#E8590C', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#ffffff'],
+      colors: ['#5BC2E7', '#f59e0b', '#10b981', '#3b82f6', '#ec4899', '#ffffff'],
       disableForReducedMotion: true,
     };
 

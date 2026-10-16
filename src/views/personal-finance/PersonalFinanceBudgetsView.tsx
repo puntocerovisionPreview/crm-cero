@@ -154,7 +154,7 @@ export const PersonalFinanceBudgetsView: React.FC<Props> = ({
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-sm text-zinc-200 focus:outline-hidden"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-sm text-zinc-200 focus:outline-hidden"
             >
               {expenseCategories.map(c => (
                 <option key={c.id} value={c.id}>{c.name}</option>
@@ -172,7 +172,7 @@ export const PersonalFinanceBudgetsView: React.FC<Props> = ({
                 value={limit || ''}
                 onChange={(e) => setLimit(parseFloat(e.target.value) || 0)}
                 placeholder="50000"
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-xl font-mono font-bold text-zinc-100 focus:outline-hidden"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-xl font-mono font-bold text-zinc-100 focus:outline-hidden"
               />
               <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-2xl border border-zinc-800 shrink-0 font-mono text-xs font-bold">
                 <button
@@ -206,7 +206,7 @@ export const PersonalFinanceBudgetsView: React.FC<Props> = ({
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 rounded-xl bg-[#E8590C] hover:bg-[#d94f08] text-black font-black text-xs transition active:scale-95 shadow-md shadow-[#E8590C]/20"
+              className="px-5 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-black font-black text-xs transition active:scale-95 shadow-md shadow-[var(--accent)]/20"
             >
               Guardar Presupuesto
             </button>
@@ -232,7 +232,7 @@ export const PersonalFinanceBudgetsView: React.FC<Props> = ({
         <button
           type="button"
           onClick={startCreate}
-          className="px-3 py-1.5 rounded-xl bg-[#E8590C] hover:bg-[#d94f08] text-black font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-[#E8590C]/20 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-black font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-[var(--accent)]/20 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 stroke-[3]" />
           <span>Fijar Presupuesto</span>
@@ -294,7 +294,7 @@ export const PersonalFinanceBudgetsView: React.FC<Props> = ({
           <button
             type="button"
             onClick={startCreate}
-            className="px-4 py-2 rounded-xl bg-[#E8590C] text-black font-bold text-xs"
+            className="px-4 py-2 rounded-xl bg-[var(--accent)] text-black font-bold text-xs"
           >
             Fijar mi primer presupuesto
           </button>

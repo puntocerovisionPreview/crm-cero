@@ -158,7 +158,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-3xl bg-zinc-950 border border-zinc-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#E8590C]/10 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C] shrink-0">
+          <div className="w-10 h-10 rounded-2xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] shrink-0">
             <CalendarIcon className="w-5 h-5" />
           </div>
           <div>
@@ -181,7 +181,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
                 setViewMode('calendar');
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                viewMode === 'calendar' ? 'bg-[#E8590C] text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
+                viewMode === 'calendar' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
               }`}
               title="Vista de Calendario Mensual (Lun a Dom)"
             >
@@ -194,7 +194,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
                 setViewMode('timeline');
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                viewMode === 'timeline' ? 'bg-[#E8590C] text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
+                viewMode === 'timeline' ? 'bg-[var(--accent)] text-white shadow-xs' : 'text-zinc-400 hover:text-zinc-200'
               }`}
               title="Vista Cronograma Lineal Semana por Semana"
             >
@@ -252,7 +252,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
             }}
             className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
               typeFilter === tab.id
-                ? 'bg-[#E8590C] text-white shadow-sm'
+                ? 'bg-[var(--accent)] text-white shadow-sm'
                 : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800/80'
             }`}
           >
@@ -289,7 +289,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
           {/* Helper hint for mobile / small screens */}
           <div className="md:hidden px-3 py-1.5 bg-zinc-900/60 border-b border-zinc-800/80 text-[10px] text-zinc-400 flex items-center justify-between">
             <span>Desliza horizontalmente para ver la semana completa (Lun a Dom)</span>
-            <span className="text-[#E8590C] font-semibold">7 columnas →</span>
+            <span className="text-[var(--accent)] font-semibold">7 columnas →</span>
           </div>
 
           <div className="overflow-x-auto scrollbar-thin">
@@ -319,7 +319,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
                         !cell.isCurrentMonth 
                           ? 'bg-zinc-950/40 opacity-30' 
                           : isToday 
-                          ? 'bg-[#E8590C]/5' 
+                          ? 'bg-[var(--accent)]/5' 
                           : 'bg-zinc-950 hover:bg-zinc-900/40'
                       }`}
                     >
@@ -328,7 +328,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
                         <span
                           className={`text-xs font-mono font-bold w-6 h-6 flex items-center justify-center rounded-full ${
                             isToday 
-                              ? 'bg-[#E8590C] text-white' 
+                              ? 'bg-[var(--accent)] text-white' 
                               : 'text-zinc-400'
                           }`}
                         >
@@ -336,7 +336,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
                         </span>
 
                         {dayDeliveries.length > 0 && (
-                          <span className="text-[10px] font-extrabold text-[#E8590C] bg-[#E8590C]/10 px-1.5 py-0.5 rounded-md border border-[#E8590C]/20">
+                          <span className="text-[10px] font-extrabold text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded-md border border-[var(--accent)]/20">
                             {dayDeliveries.length} {dayDeliveries.length === 1 ? 'Entrega' : 'Entregas'}
                           </span>
                         )}
@@ -351,9 +351,9 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
                               hapticFeedback.light();
                               onSelectProject(p);
                             }}
-                            className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-[#E8590C] cursor-pointer transition text-left group"
+                            className="p-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-[var(--accent)] cursor-pointer transition text-left group"
                           >
-                            <div className="text-[11px] font-bold text-zinc-100 truncate group-hover:text-[#E8590C]">
+                            <div className="text-[11px] font-bold text-zinc-100 truncate group-hover:text-[var(--accent)]">
                               {p.clientName}
                             </div>
                             <div className="flex items-center justify-between gap-1 mt-0.5">
@@ -384,7 +384,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
           ) : (
             <div className="rounded-3xl bg-zinc-950 border border-zinc-800 p-4 sm:p-5 space-y-3">
               <div className="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                <CalendarIcon className="w-4 h-4 text-[#E8590C]" />
+                <CalendarIcon className="w-4 h-4 text-[var(--accent)]" />
                 <span>Cronograma Lineal Ordenado por Fecha de Entrega</span>
               </div>
               <div className="space-y-2">
@@ -398,7 +398,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
                       <div
                         key={p.id}
                         onClick={() => onSelectProject(p)}
-                        className="p-3.5 rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-[#E8590C] cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                        className="p-3.5 rounded-2xl bg-zinc-900/70 border border-zinc-800 hover:border-[var(--accent)] cursor-pointer transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="px-3 py-1.5 rounded-xl bg-zinc-800 text-zinc-200 font-mono font-bold text-xs text-center shrink-0">
@@ -423,7 +423,7 @@ export const DeliveriesRoadmap: React.FC<Props> = ({
                           }`}>
                             {diffDays < 0 ? `Vencido (${Math.abs(diffDays)}d)` : diffDays === 0 ? '¡Vence Hoy!' : `En ${diffDays} días`}
                           </span>
-                          <span className="text-xs text-[#E8590C] font-semibold hover:underline">Abrir Ficha 360 →</span>
+                          <span className="text-xs text-[var(--accent)] font-semibold hover:underline">Abrir Ficha 360 →</span>
                         </div>
                       </div>
                     );

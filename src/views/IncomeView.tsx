@@ -579,7 +579,7 @@ export const IncomeView: React.FC<Props> = ({
             className="px-3 py-1.5 rounded-xl bg-[var(--bg-surface-muted)] hover:bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-subtle)] text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer active:scale-95 shadow-2xs"
             title="Generar Resumen Ejecutivo Mensual para WhatsApp o Archivo"
           >
-            <FileText className="w-3.5 h-3.5 text-[#E8590C]" />
+            <FileText className="w-3.5 h-3.5 text-[var(--accent)]" />
             <span className="hidden sm:inline">Informe Ejecutivo</span>
             <span className="sm:hidden">Informe</span>
           </button>
@@ -1419,7 +1419,7 @@ export const IncomeView: React.FC<Props> = ({
                               className="btn-swiss-secondary py-1 px-2.5 text-[11px] rounded-lg flex items-center gap-1 cursor-pointer"
                             >
                               <Plus className="w-3 h-3" />
-                              <span>+ Agregar Cuota</span>
+                              <span>Agregar Cuota</span>
                             </button>
                           </div>
 
@@ -1515,7 +1515,7 @@ export const IncomeView: React.FC<Props> = ({
               className="btn-solid-primary py-2 px-4 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer self-start sm:self-auto"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Nuevo Abono Recurrente</span>
+              <span>Nuevo Abono Recurrente</span>
             </button>
           </div>
 
@@ -1753,7 +1753,7 @@ export const IncomeView: React.FC<Props> = ({
           <div className="bg-zinc-900 border border-zinc-800 rounded-3xl max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-2xl flex flex-col max-h-[90vh] t-modal-enter">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-[#E8590C]/15 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C]">
+                <div className="w-9 h-9 rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]">
                   <FileText className="w-4 h-4" />
                 </div>
                 <div>

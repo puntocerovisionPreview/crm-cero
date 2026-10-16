@@ -210,7 +210,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
             className="py-2.5 px-2 rounded-2xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
           >
             <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>+ Gasto</span>
+            <span>Registrar gasto</span>
           </button>
 
           <button
@@ -222,7 +222,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
             className="py-2.5 px-2 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 text-xs font-bold transition flex items-center justify-center gap-1.5 active:scale-95"
           >
             <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>+ Ingreso</span>
+            <span>Registrar ingreso</span>
           </button>
 
           <button
@@ -296,7 +296,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
       <div className="p-4 sm:p-5 rounded-3xl bg-zinc-950 border border-zinc-800 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <TrendingUp className="w-4 h-4 text-[#E8590C]" />
+            <TrendingUp className="w-4 h-4 text-[var(--accent)]" />
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
               Flujo de {formatMonthName(currentMonth)}
             </span>
@@ -459,7 +459,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
       <div className="p-4 sm:p-5 rounded-3xl bg-zinc-950 border border-zinc-800 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-[#E8590C]" />
+            <Calendar className="w-4 h-4 text-[var(--accent)]" />
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
               Histórico de Últimos 6 Meses
             </span>
@@ -517,7 +517,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
               <button
                 type="button"
                 onClick={() => onNavigate('/mis-finanzas/recurrentes')}
-                className="text-xs text-[#E8590C] hover:underline flex items-center gap-0.5"
+                className="text-xs text-[var(--accent)] hover:underline flex items-center gap-0.5"
               >
                 <span>Ver todos</span>
                 <ChevronRight className="w-3.5 h-3.5" />

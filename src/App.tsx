@@ -126,6 +126,8 @@ import {
   deleteStudioFixedExpenseFromFirestore,
   seedPersonalFinanceDefaultsIfEmpty,
   resetAllFirestoreData,
+  exportCompleteCrmBackup,
+  importCompleteCrmBackup,
   seedLocalDataToFirestoreIfEmpty,
   syncLocalDataWithFirestore
 } from './utils/firestoreService';
@@ -140,6 +142,7 @@ import { MobileNav } from './components/MobileNav';
 import { QuickAddModal, QuickAddType } from './components/QuickAddModal';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { LockScreen } from './components/LockScreen';
+import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { PomodoroModal } from './components/PomodoroModal';
@@ -1203,6 +1206,24 @@ export default function App() {
     };
   }, [authToken]);
 
+  // Portal del alumno: mantiene publicada la "foto" de cada alumno PAF con link activo
+  const publishedPortalKeysRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!authToken) return;
+    projects.forEach(project => {
+      const token = project.studentPortalToken;
+      if (!token) return;
+      const snapshot = buildStudentPortalSnapshot(project, token, meetings);
+      const key = portalSnapshotKey(snapshot);
+      if (publishedPortalKeysRef.current.get(token) === key) return;
+      publishedPortalKeysRef.current.set(token, key);
+      publishStudentPortal(snapshot).catch(err => {
+        publishedPortalKeysRef.current.delete(token);
+        console.warn('Error publicando portal del alumno:', err);
+      });
+    });
+  }, [authToken, projects, meetings]);
+
   const handleForceSync = async () => {
     setSyncStatus('syncing');
     try {
@@ -1350,6 +1371,14 @@ export default function App() {
       setIncomes([]);
       setExpenses([]);
       setWeeklyGoals([]);
+      setTimeLogs([]);
+      setNotes([]);
+      setStudioFixedExpenses([]);
+      setPersonalTransactions([]);
+      setPersonalRecurrings([]);
+      setPersonalBudgets([]);
+      setSavingsGoals([]);
+      setStudyItems([]);
       setSyncStatus('synced');
       showToast('Base de datos en la nube limpia y en 0');
     } catch (err) {
@@ -1853,6 +1882,11 @@ export default function App() {
 
   const handleDeleteProject = async (id: string) => {
     const projectToDelete = projects.find(p => p.id === id);
+    if (projectToDelete?.studentPortalToken) {
+      // Si se borra el cliente, su link deja de funcionar
+      publishedPortalKeysRef.current.delete(projectToDelete.studentPortalToken);
+      unpublishStudentPortal(projectToDelete.studentPortalToken).catch(err => console.warn(err));
+    }
     if (projectToDelete) {
       addTrashRecord({
         id: projectToDelete.id,
@@ -1949,6 +1983,10 @@ export default function App() {
         return updated;
       });
       savePersonalTransactionToFirestore(txData).catch(err => console.warn(err));
+    } else if (personalTxId) {
+      // Al editar y quitar la cuenta destino, el movimiento viejo no debe seguir sumando en Mis Finanzas
+      handleDeletePersonalTransaction(personalTxId);
+      personalTxId = undefined;
     }
 
     const paymentWithMeta: Payment = {
@@ -2338,9 +2376,12 @@ export default function App() {
   };
 
   // --- Backup & Data Management ---
-  const handleExportJSON = () => {
+  // Backup completo desde Firestore (todas las colecciones, incluidas notas y finanzas personales)
+  const handleExportJSON = async () => {
     try {
-      const dataStr = exportAllDataJSON();
+      showToast('Generando copia de seguridad…');
+      const backup = await exportCompleteCrmBackup();
+      const dataStr = JSON.stringify(backup, null, 2);
       const blob = new Blob([dataStr], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -2351,6 +2392,7 @@ export default function App() {
       showToast('Copia JSON descargada');
     } catch (err) {
       console.error('Error exporting JSON:', err);
+      showToast('No se pudo generar la copia (¿sin conexión?)');
     }
   };
 
@@ -2376,42 +2418,9 @@ export default function App() {
       try {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content);
-        if (parsed.tasks && Array.isArray(parsed.tasks)) {
-          setTasks(parsed.tasks);
-          saveStoredTasks(parsed.tasks);
-          for (const t of parsed.tasks) {
-            await saveTaskToFirestore(t);
-          }
-        }
-        if (parsed.meetings && Array.isArray(parsed.meetings)) {
-          setMeetings(parsed.meetings);
-          saveStoredMeetings(parsed.meetings);
-          for (const m of parsed.meetings) {
-            await saveMeetingToFirestore(m);
-          }
-        }
-        if (parsed.projects && Array.isArray(parsed.projects)) {
-          setProjects(parsed.projects);
-          saveStoredProjects(parsed.projects);
-          for (const p of parsed.projects) {
-            await saveProjectToFirestore(p);
-          }
-        }
-        if (parsed.incomes && Array.isArray(parsed.incomes)) {
-          setIncomes(parsed.incomes);
-          saveStoredIncomes(parsed.incomes);
-          for (const i of parsed.incomes) {
-            await saveIncomeToFirestore(i);
-          }
-        }
-        if (parsed.expenses && Array.isArray(parsed.expenses)) {
-          setExpenses(parsed.expenses);
-          saveStoredExpenses(parsed.expenses);
-          for (const exp of parsed.expenses) {
-            await saveExpenseToFirestore(exp);
-          }
-        }
-        showToast('Copia de seguridad restaurada');
+        // Los listeners de Firestore actualizan el estado al terminar la escritura
+        const { imported } = await importCompleteCrmBackup(parsed);
+        showToast(`Copia de seguridad restaurada (${imported} registros)`);
       } catch (err) {
         console.error('Error importing JSON:', err);
         showToast('Error al leer el archivo JSON');
@@ -3822,7 +3831,7 @@ export default function App() {
                 toast.onUndo?.();
                 setToast(null);
               }}
-              className="ml-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold text-[#E8590C] hover:text-white hover:bg-zinc-800 transition cursor-pointer underline"
+              className="ml-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold text-[var(--accent)] hover:text-white hover:bg-zinc-800 transition cursor-pointer underline"
             >
               Deshacer
             </button>
@@ -3899,10 +3908,10 @@ export default function App() {
             hapticFeedback.medium();
             setShowGeminiChat(true);
           }}
-          className="fixed bottom-20 md:bottom-6 right-4 sm:right-6 z-40 px-3.5 py-2 rounded-full bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] border border-[var(--border-subtle)] text-xs font-medium shadow-sm flex items-center gap-2 transition cursor-pointer active:scale-95 group touch-manipulation hover:opacity-90"
+          className="hidden md:flex fixed bottom-6 right-6 z-40 px-3.5 py-2 rounded-full bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] border border-[var(--border-subtle)] text-xs font-medium shadow-sm items-center gap-2 transition cursor-pointer active:scale-95 group touch-manipulation hover:opacity-90"
           title="Copiloto Gemini (⌘J o 'g')"
         >
-          <Sparkles className="w-3.5 h-3.5 text-[#4F46E5] dark:text-[#818CF8] group-hover:rotate-12 transition-transform shrink-0" />
+          <Sparkles className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform shrink-0" />
           <span className="hidden sm:inline">Copiloto IA</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--solid-contrast-text)]/15 font-mono">
             ⌘J

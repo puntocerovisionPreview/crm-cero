@@ -164,7 +164,7 @@ export const NewPaymentView: React.FC<Props> = ({
           </div>
           <div className="flex items-center justify-between text-xs pt-1 border-t border-[var(--border-subtle)]">
             <span className="font-semibold text-[var(--text-primary)]">Saldo pendiente actual:</span>
-            <span className="font-mono font-bold text-[#E8590C]">
+            <span className="font-mono font-bold text-[var(--accent)]">
               {privacyMode ? '$ ••••••' : formatCurrencyAmount(billing.saldoPendiente, billing.currency)}
             </span>
           </div>
@@ -182,7 +182,7 @@ export const NewPaymentView: React.FC<Props> = ({
                 <button
                   type="button"
                   onClick={handleFillFullBalance}
-                  className="text-[11px] font-semibold text-[#E8590C] hover:underline cursor-pointer"
+                  className="text-[11px] font-semibold text-[var(--accent)] hover:underline cursor-pointer"
                 >
                   Saldo completo ({privacyMode ? '$ ••••••' : formatCurrencyAmount(billing.saldoPendiente, billing.currency)})
                 </button>
@@ -274,7 +274,7 @@ export const NewPaymentView: React.FC<Props> = ({
           {personalAccounts.length > 0 && (
             <div className="space-y-1 pt-1">
               <label className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5 text-[#E8590C]" />
+                <Wallet className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span>¿En qué cuenta ingresó el dinero? (Mis Finanzas)</span>
               </label>
               <select

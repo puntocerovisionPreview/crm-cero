@@ -331,6 +331,7 @@ export interface Project {
   pafInstallmentDates?: { number: number; dueDate: string; amount: number; paid: boolean; paidAt?: string; note?: string }[]; // Compatibilidad
   installments?: ProjectInstallment[]; // Plan de cuotas exactas
   pafStageChecklist?: Record<string, { id: string; text: string; done: boolean }[]>; // Hitos de salida por etapa
+  studentPortalToken?: string; // Link de solo lectura para el alumno (/alumno/{token})
   statusOverride?: 'not_started' | 'in_progress' | 'waiting_client' | 'overdue_payment' | 'completed'; // Override manual del sistema de estado visual
   // Horizonte (Línea de tiempo & Capacidad de largo plazo)
   horizonStart?: string; // YYYY-MM-DD override para el Horizonte

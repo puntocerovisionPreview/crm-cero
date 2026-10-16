@@ -12,6 +12,7 @@ import {
   Sparkles,
   BookOpen
 } from 'lucide-react';
+import { todayLocal } from '../utils/dates';
 
 const KnowledgeGraphView = React.lazy(() => import('./KnowledgeGraphView'));
 
@@ -119,7 +120,7 @@ export const CerebroUnifiedView: React.FC<Props> = ({
               onAddNote({
                 title: 'Nueva nota',
                 content: '',
-                date: new Date().toISOString().slice(0, 10),
+                date: todayLocal(),
                 tags: ['idea'],
                 pinned: false,
                 linkedEntityTitles: [],
@@ -130,7 +131,7 @@ export const CerebroUnifiedView: React.FC<Props> = ({
             title="Crear nota con [[WikiLinks]]"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2]" />
-            <span>+ Nueva nota</span>
+            <span>Nueva nota</span>
           </button>
         </div>
 

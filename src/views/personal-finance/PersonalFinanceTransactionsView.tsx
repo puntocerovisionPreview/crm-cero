@@ -183,7 +183,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
                 step="any"
                 value={editAmount || ''}
                 onChange={(e) => setEditAmount(parseFloat(e.target.value) || 0)}
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-xl font-mono font-bold text-zinc-100 focus:outline-hidden"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-xl font-mono font-bold text-zinc-100 focus:outline-hidden"
               />
               <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-2xl border border-zinc-800 shrink-0 font-mono text-xs font-bold">
                 <button
@@ -210,7 +210,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
             <select
               value={editAccountId}
               onChange={(e) => setEditAccountId(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden"
             >
               {accounts.map(a => (
                 <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>
@@ -225,7 +225,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
               <select
                 value={editCategoryId}
                 onChange={(e) => setEditCategoryId(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden"
+                className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden"
               >
                 {categories.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
@@ -242,7 +242,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
               value={editNote}
               onChange={(e) => setEditNote(e.target.value)}
               placeholder="Descripción del gasto o ingreso..."
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden"
             />
           </div>
 
@@ -252,7 +252,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
             <select
               value={editProjectId}
               onChange={(e) => setEditProjectId(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden truncate"
+              className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden truncate"
             >
               <option value="">(Sin vincular)</option>
               {projects.map(p => (
@@ -294,7 +294,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
             <button
               type="button"
               onClick={handleSaveEdit}
-              className="px-5 py-2.5 rounded-2xl bg-[#E8590C] hover:bg-[#d94f08] text-black font-black text-xs transition active:scale-95 shadow-md shadow-[#E8590C]/25"
+              className="px-5 py-2.5 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-black font-black text-xs transition active:scale-95 shadow-md shadow-[var(--accent)]/25"
             >
               Guardar Cambios
             </button>
@@ -320,7 +320,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
             hapticFeedback.light();
             onNavigate('/mis-finanzas/nuevo');
           }}
-          className="px-3 py-1.5 rounded-xl bg-[#E8590C] hover:bg-[#d94f08] text-black font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-[#E8590C]/20"
+          className="px-3 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-black font-bold text-xs flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-[var(--accent)]/20"
         >
           <Plus className="w-3.5 h-3.5 stroke-[3]" />
           <span>Cargar</span>
@@ -336,7 +336,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por detalle, categoría, cuenta..."
-            className="w-full bg-zinc-900 border border-zinc-800 focus:border-[#E8590C] rounded-xl pl-9 pr-8 py-2 text-xs text-zinc-200 focus:outline-hidden"
+            className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-xl pl-9 pr-8 py-2 text-xs text-zinc-200 focus:outline-hidden"
           />
           {search && (
             <button
@@ -376,7 +376,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
               onClick={() => setCurrencyFilter(c)}
               className={`px-2.5 py-1 rounded-lg whitespace-nowrap transition font-mono border ${
                 currencyFilter === c
-                  ? 'bg-[#E8590C]/20 text-[#E8590C] border-[#E8590C]/40'
+                  ? 'bg-[var(--accent)]/20 text-[var(--accent)] border-[var(--accent)]/40'
                   : 'bg-zinc-900/60 text-zinc-400 border-zinc-800/80 hover:text-zinc-300'
               }`}
             >
@@ -446,7 +446,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
                             <div className="text-xs font-bold text-zinc-100 truncate flex items-center gap-1.5">
                               <span>{t.note || cat?.name || 'Movimiento'}</span>
                               {t.projectName && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#E8590C]/10 text-[#E8590C] font-semibold truncate max-w-[120px]">
+                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] font-semibold truncate max-w-[120px]">
                                   {t.projectName}
                                 </span>
                               )}

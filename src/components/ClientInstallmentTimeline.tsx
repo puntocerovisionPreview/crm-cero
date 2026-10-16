@@ -170,7 +170,7 @@ export const ClientInstallmentTimeline: React.FC<Props> = ({
             title="Registrar cobro para este cliente"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>+ Registrar pago</span>
+            <span>Registrar pago</span>
           </button>
         </div>
       </div>

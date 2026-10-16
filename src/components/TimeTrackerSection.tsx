@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { hapticFeedback } from '../utils/haptics';
 import { playTaskDone } from '../utils/sound';
+import { todayLocal } from '../utils/dates';
 
 interface Props {
   project: Project;
@@ -80,7 +81,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
       projectName: project.clientName,
       durationMinutes: Math.max(1, minutes),
       description: desc,
-      date: new Date().toISOString().slice(0, 10),
+      date: todayLocal(),
     });
 
     // If consulting session and PAF Pro
@@ -112,7 +113,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
       projectName: project.clientName,
       durationMinutes: totalMinutes,
       description: desc,
-      date: new Date().toISOString().slice(0, 10),
+      date: todayLocal(),
     });
 
     if (isConsultingSession && project.projectType === 'paf_pro' && onUpdateProjectConsultingHours) {
@@ -136,7 +137,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
       projectName: project.clientName,
       durationMinutes: 60,
       description: 'Sesión de Consultoría y Mentoría 1:1 (PAF)',
-      date: new Date().toISOString().slice(0, 10),
+      date: todayLocal(),
     });
 
     if (onUpdateProjectConsultingHours) {
@@ -175,7 +176,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
         <div className="p-3 rounded-2xl bg-zinc-950 border border-zinc-800">
           <div className="flex items-center gap-1.5 text-zinc-500 text-[11px] font-semibold mb-1">
-            <Clock className="w-3.5 h-3.5 text-[#E8590C]" />
+            <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
             <span>Horas Totales Invertidas</span>
           </div>
           <div className="text-xl sm:text-2xl font-black text-zinc-100 font-mono">
@@ -248,7 +249,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className={`p-2.5 rounded-xl border flex items-center justify-center transition ${
             isStopwatchRunning 
-              ? 'bg-[#E8590C]/20 border-[#E8590C] text-[#E8590C] animate-pulse' 
+              ? 'bg-[var(--accent)]/20 border-[var(--accent)] text-[var(--accent)] animate-pulse' 
               : 'bg-zinc-900 border-zinc-800 text-zinc-400'
           }`}>
             <Clock className="w-5 h-5" />
@@ -267,7 +268,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
             placeholder="¿Qué estás trabajando? (ej: Grabación VSL...)"
             value={stopwatchDesc}
             onChange={(e) => setStopwatchDesc(e.target.value)}
-            className="w-full sm:w-64 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#E8590C]"
+            className="w-full sm:w-64 bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[var(--accent)]"
           />
         )}
 
@@ -280,7 +281,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
                   hapticFeedback.light();
                   setIsStopwatchRunning(true);
                 }}
-                className="px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#ff691e] text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-[#E8590C]/20"
+                className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[#ff691e] text-white text-xs font-bold flex items-center gap-1.5 transition active:scale-95 shadow-md shadow-[var(--accent)]/20"
               >
                 <Play className="w-3.5 h-3.5 fill-current" />
                 <span>Iniciar Cronómetro</span>
@@ -335,7 +336,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
                 step="1"
                 value={manualHours}
                 onChange={(e) => setManualHours(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
             <div>
@@ -347,7 +348,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
                 step="5"
                 value={manualMinutes}
                 onChange={(e) => setManualMinutes(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-[#E8590C]"
+                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
             <div className="col-span-2 sm:col-span-1">
@@ -371,7 +372,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
             placeholder="Descripción (ej: Armado de guiones, Revisión de pauta Meta Ads...)"
             value={manualDesc}
             onChange={(e) => setManualDesc(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[#E8590C]"
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[var(--accent)]"
           />
 
           <div className="flex items-center justify-end gap-2">
@@ -384,7 +385,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
             </button>
             <button
               type="submit"
-              className="px-4 py-1.5 rounded-xl bg-[#E8590C] hover:bg-[#ff691e] text-white text-xs font-bold transition"
+              className="px-4 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[#ff691e] text-white text-xs font-bold transition"
             >
               Guardar Horas
             </button>

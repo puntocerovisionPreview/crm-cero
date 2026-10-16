@@ -352,7 +352,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
       {/* Header */}
       <div className="flex items-center justify-between gap-3 pb-3 border-b border-zinc-800/80">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-xl bg-[#E8590C]/15 text-[#E8590C] flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 text-[var(--accent)] flex items-center justify-center shrink-0">
             <CreditCard className="w-4 h-4" />
           </div>
           <div className="min-w-0">
@@ -470,7 +470,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
         <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-2xl space-y-4 animate-in fade-in">
           <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2">
             <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-[#E8590C]" />
+              <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
               <span>Configuración del Plan & Precios</span>
             </span>
             <span className="text-[11px] text-zinc-400">
@@ -488,7 +488,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {/* PAF Pro Presets */}
                 <div className="p-2.5 rounded-xl bg-zinc-900 border border-zinc-800 space-y-1.5">
-                  <div className="text-[11px] font-bold text-[#E8590C] flex items-center justify-between">
+                  <div className="text-[11px] font-bold text-[var(--accent)] flex items-center justify-between">
                     <span>PAF Completo / Pro (12 Sem)</span>
                     <span className="text-[10px] text-zinc-400 font-mono">ARS</span>
                   </div>
@@ -604,7 +604,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
               <label className="text-xs font-semibold text-zinc-300 block mb-1">
                 Monto Total Acordado:
               </label>
-              <div className="flex rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden focus-within:border-[#E8590C]">
+              <div className="flex rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden focus-within:border-[var(--accent)]">
                 <select
                   value={currency}
                   onChange={e => handleToggleCurrency(e.target.value as 'USD' | 'ARS')}
@@ -638,7 +638,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
                     }}
                     className={`flex-1 py-2 rounded-xl text-xs font-bold transition border cursor-pointer ${
                       installmentsCount === num
-                        ? 'bg-[#E8590C] text-white border-[#E8590C]'
+                        ? 'bg-[var(--accent)] text-white border-[var(--accent)]'
                         : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:text-zinc-200'
                     }`}
                   >
@@ -656,7 +656,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
                 type="date"
                 value={startDate}
                 onChange={e => setStartDate(e.target.value)}
-                className="w-full bg-zinc-900 text-zinc-100 text-xs p-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-[#E8590C]"
+                className="w-full bg-zinc-900 text-zinc-100 text-xs p-2 rounded-xl border border-zinc-800 focus:outline-none focus:border-[var(--accent)]"
               />
             </div>
           </div>
@@ -683,7 +683,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
             <button
               type="button"
               onClick={handleApplySchedule}
-              className="px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#cf4d07] text-white text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white text-xs font-bold transition shadow-sm flex items-center gap-1.5 cursor-pointer"
             >
               <Check className="w-4 h-4" />
               <span>Guardar Plan de {installmentsCount} Cuotas</span>
@@ -709,7 +709,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => handleApplySchedule()}
-              className="px-3.5 py-1.5 rounded-xl bg-[#E8590C] hover:bg-[#cf4d07] text-white text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Crear Plan de 2 Cuotas</span>
@@ -779,7 +779,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
                           type="number"
                           value={inst.amount}
                           onChange={e => handleUpdateInstallment(inst.id, { amount: Number(e.target.value) || 0 })}
-                          className="w-24 sm:w-28 bg-zinc-900 text-zinc-100 text-xs sm:text-sm font-mono font-bold px-2 py-1 rounded-lg border border-zinc-700 text-right focus:outline-none focus:border-[#E8590C]"
+                          className="w-24 sm:w-28 bg-zinc-900 text-zinc-100 text-xs sm:text-sm font-mono font-bold px-2 py-1 rounded-lg border border-zinc-700 text-right focus:outline-none focus:border-[var(--accent)]"
                           title="Modificar precio de esta cuota"
                         />
                       )}
@@ -801,7 +801,7 @@ export const PaymentPlanManager: React.FC<Props> = ({
                           type="date"
                           value={inst.dueDate}
                           onChange={e => handleUpdateInstallment(inst.id, { dueDate: e.target.value })}
-                          className="bg-zinc-900 text-zinc-200 text-xs px-2 py-1 rounded-lg border border-zinc-700/80 focus:outline-none focus:border-[#E8590C]"
+                          className="bg-zinc-900 text-zinc-200 text-xs px-2 py-1 rounded-lg border border-zinc-700/80 focus:outline-none focus:border-[var(--accent)]"
                         />
                       )}
                     </div>

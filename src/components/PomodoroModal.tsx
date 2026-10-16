@@ -13,6 +13,7 @@ import {
 import { Project, AgendaTask, TimeLog } from '../types';
 import { hapticFeedback } from '../utils/haptics';
 import { playAllDone, playTaskDone } from '../utils/sound';
+import { todayLocal } from '../utils/dates';
 
 interface Props {
   isOpen: boolean;
@@ -56,7 +57,7 @@ export const PomodoroModal: React.FC<Props> = ({
       const saved = localStorage.getItem('cero_pomodoros_today');
       if (!saved) return 0;
       const parsed = JSON.parse(saved);
-      const todayStr = new Date().toISOString().slice(0, 10);
+      const todayStr = todayLocal();
       return parsed.date === todayStr ? (parsed.count || 0) : 0;
     } catch {
       return 0;
@@ -107,7 +108,7 @@ export const PomodoroModal: React.FC<Props> = ({
       const newCount = completedPomodorosToday + 1;
       setCompletedPomodorosToday(newCount);
       try {
-        const todayStr = new Date().toISOString().slice(0, 10);
+        const todayStr = todayLocal();
         localStorage.setItem('cero_pomodoros_today', JSON.stringify({ date: todayStr, count: newCount }));
       } catch {}
 
@@ -116,7 +117,7 @@ export const PomodoroModal: React.FC<Props> = ({
         const desc = customSessionNotes.trim() || `Sesión de foco Pomodoro (${customMinutes} min)`;
         if (onAddTimeLog) {
           onAddTimeLog({
-            date: new Date().toISOString().slice(0, 10),
+            date: todayLocal(),
             minutes: customMinutes,
             projectId: selectedProjectId || undefined,
             taskId: selectedTaskId || undefined,

@@ -9,6 +9,7 @@ import {
 import { hapticFeedback } from '../utils/haptics';
 import { playItemCreated, playTaskDone } from '../utils/sound';
 import { getTodayString, getMonthKey } from '../utils/storage';
+import { addMonths } from '../utils/dates';
 import { ModalPortal } from './ModalPortal';
 import { 
   Server, 
@@ -391,19 +392,10 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
   // Calculate next cycle date
   const computeNextCycleDate = (currentDueDate: string, cycle: StudioBillingCycle): string => {
     try {
-      const d = new Date(currentDueDate + 'T00:00:00');
-      if (cycle === 'anual') {
-        d.setFullYear(d.getFullYear() + 1);
-      } else if (cycle === 'bianual') {
-        d.setFullYear(d.getFullYear() + 2);
-      } else if (cycle === 'semestral') {
-        d.setMonth(d.getMonth() + 6);
-      } else if (cycle === 'trimestral') {
-        d.setMonth(d.getMonth() + 3);
-      } else {
-        d.setMonth(d.getMonth() + 1);
-      }
-      return d.toISOString().split('T')[0];
+      const months =
+        cycle === 'anual' ? 12 : cycle === 'bianual' ? 24 : cycle === 'semestral' ? 6 : cycle === 'trimestral' ? 3 : 1;
+      // addMonths evita el desborde de fin de mes (31/01 + 1 mes = 28/02, no 03/03)
+      return addMonths(currentDueDate, months);
     } catch {
       return getTodayString();
     }

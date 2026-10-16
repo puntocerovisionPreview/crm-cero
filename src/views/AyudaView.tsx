@@ -67,7 +67,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
       {/* Header Bar */}
       <div className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/80 px-4 py-3 flex items-center justify-between safe-area-top-header">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#E8590C]/15 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C]">
+          <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]">
             <HelpCircle className="w-4 h-4" />
           </div>
           <div>
@@ -100,7 +100,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                   isActive
-                    ? 'bg-[#E8590C] text-white shadow-xs'
+                    ? 'bg-[var(--accent)] text-white shadow-xs'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
@@ -137,7 +137,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
                     }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                       isCur
-                        ? 'bg-zinc-800 text-[#E8590C] border border-[#E8590C]/40'
+                        ? 'bg-zinc-800 text-[var(--accent)] border border-[var(--accent)]/40'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
                     }`}
                   >
@@ -153,13 +153,13 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* PAF Pro */}
-                  <div className="bg-zinc-900/90 border border-[#E8590C]/40 rounded-2xl p-5 space-y-4 shadow-xl relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#E8590C]/10 rounded-bl-full pointer-events-none" />
+                  <div className="bg-zinc-900/90 border border-[var(--accent)]/40 rounded-2xl p-5 space-y-4 shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[var(--accent)]/10 rounded-bl-full pointer-events-none" />
                     <div className="flex items-center justify-between">
-                      <span className="px-2.5 py-0.5 rounded-full bg-[#E8590C]/20 text-[#E8590C] text-[10px] font-mono font-bold">
+                      <span className="px-2.5 py-0.5 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] text-[10px] font-mono font-bold">
                         PROGRAMA ESTRELLA (12 SEMANAS · 26HS)
                       </span>
-                      <Sparkles className="w-4 h-4 text-[#E8590C]" />
+                      <Sparkles className="w-4 h-4 text-[var(--accent)]" />
                     </div>
 
                     <h3 className="text-lg font-black text-zinc-100">
@@ -186,19 +186,19 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
                       </div>
                       <ul className="space-y-1.5 text-xs text-zinc-400">
                         <li className="flex items-start gap-2">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#E8590C] shrink-0 mt-0.5" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent)] shrink-0 mt-0.5" />
                           <span>26 horas de consultoría y mentoría 1:1 en vivo</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#E8590C] shrink-0 mt-0.5" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent)] shrink-0 mt-0.5" />
                           <span>Web comercial de alta conversión para arquitectos</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#E8590C] shrink-0 mt-0.5" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent)] shrink-0 mt-0.5" />
                           <span>Guion y producción de VSL + Setup de Meta Ads</span>
                         </li>
                         <li className="flex items-start gap-2">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#E8590C] shrink-0 mt-0.5" />
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent)] shrink-0 mt-0.5" />
                           <span>Google Business Profile SEO Local + Lead Scoring A/B/C</span>
                         </li>
                       </ul>
@@ -263,7 +263,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
                     <div key={key} className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2.5">
                       <div className="flex items-center gap-2">
                         <span className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${
-                          key === 'A' ? 'bg-[#E8590C]/20 text-[#E8590C]' : key === 'B' ? 'bg-amber-500/20 text-amber-300' : 'bg-zinc-800 text-zinc-400'
+                          key === 'A' ? 'bg-[var(--accent)]/20 text-[var(--accent)]' : key === 'B' ? 'bg-amber-500/20 text-amber-300' : 'bg-zinc-800 text-zinc-400'
                         }`}>
                           {key}
                         </span>
@@ -289,7 +289,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
               <div className="space-y-3">
                 {PAF_SALES_OBJECTIONS.map((obj, i) => (
                   <div key={i} className="p-4 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-2">
-                    <h4 className="text-xs font-black text-[#E8590C] flex items-center gap-2">
+                    <h4 className="text-xs font-black text-[var(--accent)] flex items-center gap-2">
                       <MessageSquare className="w-3.5 h-3.5" />
                       <span>Objeción: {obj.objection}</span>
                     </h4>
@@ -323,7 +323,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
                   placeholder="Buscar atajo..."
                   value={shortcutSearch}
                   onChange={e => setShortcutSearch(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
             </div>
@@ -352,7 +352,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
           <div className="space-y-4 animate-in fade-in duration-150">
             <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800 space-y-3">
               <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-[#E8590C]" />
+                <Clock className="w-4 h-4 text-[var(--accent)]" />
                 <span>Bloques de Tiempo & Técnica Pomodoro para Agencias</span>
               </h3>
               <p className="text-xs text-zinc-400 leading-relaxed">

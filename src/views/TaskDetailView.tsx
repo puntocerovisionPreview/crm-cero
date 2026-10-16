@@ -90,7 +90,7 @@ export const TaskDetailView: React.FC<Props> = ({
         <button
           type="button"
           onClick={onBack}
-          className="px-4 py-2 rounded-xl bg-[#E8590C] text-white text-xs font-bold"
+          className="px-4 py-2 rounded-xl bg-[var(--accent)] text-white text-xs font-bold"
         >
           Volver a la Agenda
         </button>
@@ -235,7 +235,7 @@ export const TaskDetailView: React.FC<Props> = ({
             type="button"
             onClick={() => handleSave()}
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer ${
-              isSaved ? 'bg-emerald-600 text-white' : 'bg-[#E8590C] hover:bg-[#cf4d07] text-white'
+              isSaved ? 'bg-emerald-600 text-white' : 'bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white'
             }`}
           >
             {isSaved ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : <Save className="w-3.5 h-3.5" />}
@@ -260,7 +260,7 @@ export const TaskDetailView: React.FC<Props> = ({
             <button
               type="button"
               onClick={handleToggle}
-              className="mt-1 text-zinc-400 hover:text-[#E8590C] transition cursor-pointer"
+              className="mt-1 text-zinc-400 hover:text-[var(--accent)] transition cursor-pointer"
             >
               {isCompleted ? (
                 <CheckCircle2 className="w-6 h-6 text-emerald-400" />
@@ -274,7 +274,7 @@ export const TaskDetailView: React.FC<Props> = ({
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 placeholder="Título de la tarea o compromiso..."
-                className="w-full bg-transparent text-base sm:text-lg font-bold text-zinc-100 focus:outline-none focus:border-b focus:border-[#E8590C] pb-1"
+                className="w-full bg-transparent text-base sm:text-lg font-bold text-zinc-100 focus:outline-none focus:border-b focus:border-[var(--accent)] pb-1"
               />
               <span className="text-[11px] text-zinc-500 font-mono">
                 {isTask ? 'Tarea de Agenda' : 'Reunión / Encuentro 1:1'} • {isCompleted ? 'Completado ✓' : 'Pendiente'}
@@ -289,7 +289,7 @@ export const TaskDetailView: React.FC<Props> = ({
               type="button"
               onClick={() => handlePostpone(today)}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                date === today ? 'bg-[#E8590C] text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                date === today ? 'bg-[var(--accent)] text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
               }`}
             >
               Hoy
@@ -298,7 +298,7 @@ export const TaskDetailView: React.FC<Props> = ({
               type="button"
               onClick={() => handlePostpone(tomorrow)}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
-                date === tomorrow ? 'bg-[#E8590C] text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                date === tomorrow ? 'bg-[var(--accent)] text-white' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
               }`}
             >
               Mañana
@@ -317,39 +317,39 @@ export const TaskDetailView: React.FC<Props> = ({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 space-y-1.5">
             <label className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
-              <Calendar className="w-3.5 h-3.5 text-[#E8590C]" />
+              <Calendar className="w-3.5 h-3.5 text-[var(--accent)]" />
               <span>Fecha</span>
             </label>
             <input
               type="date"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
             />
           </div>
 
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 space-y-1.5">
             <label className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-[#E8590C]" />
+              <Clock className="w-3.5 h-3.5 text-[var(--accent)]" />
               <span>Horario (opcional)</span>
             </label>
             <input
               type="time"
               value={time}
               onChange={e => setTime(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
             />
           </div>
 
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 space-y-1.5">
             <label className="text-xs font-bold text-zinc-400 flex items-center gap-1.5">
-              <FolderKanban className="w-3.5 h-3.5 text-[#E8590C]" />
+              <FolderKanban className="w-3.5 h-3.5 text-[var(--accent)]" />
               <span>Cliente vinculado</span>
             </label>
             <select
               value={projectName}
               onChange={e => setProjectName(e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
             >
               <option value="">Sin cliente (Personal)</option>
               {projects.filter(p => !p.archived).map(p => (
@@ -363,9 +363,9 @@ export const TaskDetailView: React.FC<Props> = ({
 
         {/* Linked Client Shortcut Card (if selected) */}
         {linkedProject && onNavigateToProject && (
-          <div className="p-3.5 rounded-2xl bg-[#E8590C]/10 border border-[#E8590C]/30 flex items-center justify-between">
+          <div className="p-3.5 rounded-2xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <FolderKanban className="w-4 h-4 text-[#E8590C]" />
+              <FolderKanban className="w-4 h-4 text-[var(--accent)]" />
               <div>
                 <p className="text-xs font-bold text-zinc-100">
                   {linkedProject.clientName}
@@ -380,7 +380,7 @@ export const TaskDetailView: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => onNavigateToProject(linkedProject.id)}
-              className="px-3 py-1.5 rounded-xl bg-[#E8590C] text-white text-xs font-bold hover:bg-[#cf4d07] transition cursor-pointer"
+              className="px-3 py-1.5 rounded-xl bg-[var(--accent)] text-white text-xs font-bold hover:bg-[var(--accent-strong)] transition cursor-pointer"
             >
               Abrir Ficha 360
             </button>
@@ -394,11 +394,11 @@ export const TaskDetailView: React.FC<Props> = ({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-xs font-bold text-zinc-400 block uppercase tracking-wider flex items-center gap-1.5">
-                  <Target className="w-3.5 h-3.5 text-[#E8590C]" />
+                  <Target className="w-3.5 h-3.5 text-[var(--accent)]" />
                   <span>Misión de la Semana</span>
                 </label>
                 {selectedMissionId ? (
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#E8590C]/10 text-[#E8590C] border border-[#E8590C]/20 font-bold">
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20 font-bold">
                     ✓ En Misión
                   </span>
                 ) : (
@@ -414,7 +414,7 @@ export const TaskDetailView: React.FC<Props> = ({
                   setSelectedMissionId(newId);
                   handleSave(newId);
                 }}
-                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
               >
                 <option value="">Suelto (Sin misión asignada)</option>
                 {missions.map(m => (
@@ -498,7 +498,7 @@ export const TaskDetailView: React.FC<Props> = ({
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
-                <ListTodo className="w-4 h-4 text-[#E8590C]" />
+                <ListTodo className="w-4 h-4 text-[var(--accent)]" />
                 <span>Subtareas / Checklist ({completedSubtasks}/{subtasks.length})</span>
               </h3>
             </div>
@@ -509,7 +509,7 @@ export const TaskDetailView: React.FC<Props> = ({
                 placeholder="Agregar paso o entregable específico..."
                 value={newSubtaskTitle}
                 onChange={e => setNewSubtaskTitle(e.target.value)}
-                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+                className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
               />
               <button
                 type="submit"
@@ -570,7 +570,7 @@ export const TaskDetailView: React.FC<Props> = ({
               value={notes}
               onChange={e => setNotes(e.target.value)}
               placeholder="Objetivos de la llamada, acuerdos y próximos pasos acordados..."
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-[#E8590C]"
+              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
             />
 
             {clientPhone && (

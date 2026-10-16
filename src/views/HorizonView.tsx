@@ -43,6 +43,7 @@ import {
 } from 'lucide-react';
 import { RegisterRecurringIncomeModal } from '../components/RegisterRecurringIncomeModal';
 import { AssignProjectDatesModal } from '../components/AssignProjectDatesModal';
+import { todayLocal } from '../utils/dates';
 
 interface Props {
   projects: Project[];
@@ -282,8 +283,8 @@ export const HorizonView: React.FC<Props> = ({
       amount: Number(project.montoAcordado || project.estimatedPrice || 0),
       currency: (project.estimatedCurrency || 'ARS') as 'USD' | 'ARS',
       frequency: 'mensual' as const,
-      startDate: project.startDate || project.createdAt?.slice(0, 10) || new Date().toISOString().slice(0, 10),
-      nextDueDate: project.startDate || new Date().toISOString().slice(0, 10),
+      startDate: project.startDate || project.createdAt?.slice(0, 10) || todayLocal(),
+      nextDueDate: project.startDate || todayLocal(),
       active: true,
       clientName: project.clientName,
       createdAt: new Date().toISOString(),
@@ -563,7 +564,7 @@ export const HorizonView: React.FC<Props> = ({
                 title="Registrar abono mensual fijo o retainer sin crear proyectos cliente ficticios"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>+ Abono Mensual</span>
+                <span>Abono Mensual</span>
               </button>
             </div>
           </div>

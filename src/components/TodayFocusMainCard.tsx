@@ -156,7 +156,7 @@ export const TodayFocusMainCard: React.FC<Props> = ({
                 </button>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--text-tertiary)]">
-                    <Flame className="w-3 h-3 text-[#E8590C]" />
+                    <Flame className="w-3 h-3 text-[var(--accent)]" />
                     <span>Foco Principal</span>
                     {mainTask.priority === 'alta' && (
                       <span className="text-rose-500 font-semibold">· Prioridad Alta</span>

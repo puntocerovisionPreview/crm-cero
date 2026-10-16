@@ -219,7 +219,7 @@ export const AppTopBar: React.FC<Props> = ({
                 hapticFeedback.light();
                 onOpenGeminiChat();
               }}
-              className="min-w-[42px] min-h-[42px] sm:min-w-[32px] sm:min-h-[32px] p-2.5 sm:p-1.5 flex items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-muted)] text-[#E8590C] transition cursor-pointer active:scale-90"
+              className="min-w-[42px] min-h-[42px] sm:min-w-[32px] sm:min-h-[32px] p-2.5 sm:p-1.5 flex items-center justify-center rounded-[var(--radius-control)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-muted)] text-[var(--accent)] transition cursor-pointer active:scale-90"
               title="Copiloto IA"
               aria-label="Copiloto IA"
             >

@@ -24,6 +24,7 @@ import {
   FileText, 
   AlertCircle 
 } from 'lucide-react';
+import { todayLocal } from '../utils/dates';
 
 interface Props {
   isOpen: boolean;
@@ -118,7 +119,7 @@ export const MercadoPagoReconcileModal: React.FC<Props> = ({
         {
           amount: payment.amount,
           currency: payment.currency,
-          date: payment.dateCreated || new Date().toISOString().slice(0, 10),
+          date: payment.dateCreated || todayLocal(),
           method: 'mercadopago',
           note: noteProject,
           destinationAccountId: personalAccountId || undefined,
@@ -132,7 +133,7 @@ export const MercadoPagoReconcileModal: React.FC<Props> = ({
           title: studioTitle,
           amount: payment.amount,
           currency: payment.currency,
-          date: payment.dateCreated || new Date().toISOString().slice(0, 10),
+          date: payment.dateCreated || todayLocal(),
           category: studioCategory,
           notes: `Pago MP #${payment.mpPaymentId} por ${payment.payerName || 'Pagador'}`,
         },
@@ -144,7 +145,7 @@ export const MercadoPagoReconcileModal: React.FC<Props> = ({
           accountId: personalAccountId,
           amount: payment.amount,
           currency: payment.currency,
-          date: payment.dateCreated || new Date().toISOString().slice(0, 10),
+          date: payment.dateCreated || todayLocal(),
           note: personalNote,
         },
         payment.id
@@ -228,11 +229,11 @@ export const MercadoPagoReconcileModal: React.FC<Props> = ({
                 }}
                 className={`p-3 rounded-2xl border text-left transition cursor-pointer t-press flex flex-col justify-between gap-1.5 ${
                   destination === 'cliente'
-                    ? 'bg-[#E8590C]/15 border-[#E8590C] text-white shadow-sm'
+                    ? 'bg-[var(--accent)]/15 border-[var(--accent)] text-white shadow-sm'
                     : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900'
                 }`}
               >
-                <FolderKanban className={`w-4 h-4 ${destination === 'cliente' ? 'text-[#E8590C]' : 'text-zinc-500'}`} />
+                <FolderKanban className={`w-4 h-4 ${destination === 'cliente' ? 'text-[var(--accent)]' : 'text-zinc-500'}`} />
                 <div>
                   <div className="font-bold text-[11px]">Cliente / Proyecto</div>
                   <div className="text-[9.5px] opacity-75 leading-tight">Saldar cuota o acuerdo</div>

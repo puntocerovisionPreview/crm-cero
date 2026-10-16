@@ -104,8 +104,8 @@ export const PafDashboard: React.FC<Props> = ({
       {/* 1. Header & Metric Summary Bar */}
       <div className="bg-zinc-900 border border-zinc-800/80 rounded-2xl p-4 sm:p-5 shadow-lg shadow-black/25 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-xs font-semibold text-[#E8590C] uppercase tracking-wider mb-0.5">
-            <Building2 className="w-4 h-4 text-[#E8590C]" />
+          <div className="flex items-center gap-2 text-xs font-semibold text-[var(--accent)] uppercase tracking-wider mb-0.5">
+            <Building2 className="w-4 h-4 text-[var(--accent)]" />
             <span>Infraestructura & Aceleración de Estudios</span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-zinc-100 tracking-tight">
@@ -120,10 +120,10 @@ export const PafDashboard: React.FC<Props> = ({
         <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={onOpenNewPafModal}
-            className="px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#d04e0a] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[#E8590C]/20 active:scale-95"
+            className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[#d04e0a] text-white text-xs font-bold transition flex items-center gap-1.5 shadow-md shadow-[var(--accent)]/20 active:scale-95"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Nuevo Cliente PAF</span>
+            <span>Nuevo Cliente PAF</span>
           </button>
         </div>
       </div>
@@ -135,7 +135,7 @@ export const PafDashboard: React.FC<Props> = ({
           onClick={() => { setStageFilter('todos'); setTierFilter('todos'); }}
           className={`p-3 rounded-xl border transition cursor-pointer ${
             stageFilter === 'todos' && tierFilter === 'todos'
-              ? 'bg-zinc-800/90 border-[#E8590C] shadow-md shadow-[#E8590C]/10' 
+              ? 'bg-zinc-800/90 border-[var(--accent)] shadow-md shadow-[var(--accent)]/10' 
               : 'bg-zinc-900/80 border-zinc-800 hover:border-zinc-700'
           }`}
         >
@@ -220,7 +220,7 @@ export const PafDashboard: React.FC<Props> = ({
             onClick={() => setStageFilter('todos')}
             className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
               stageFilter === 'todos' 
-                ? 'bg-[#E8590C] text-white shadow-xs' 
+                ? 'bg-[var(--accent)] text-white shadow-xs' 
                 : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
             }`}
           >
@@ -290,10 +290,10 @@ export const PafDashboard: React.FC<Props> = ({
           </p>
           <button
             onClick={onOpenNewPafModal}
-            className="px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#d04e0a] text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-md shadow-[#E8590C]/20"
+            className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[#d04e0a] text-white text-xs font-bold transition inline-flex items-center gap-1.5 shadow-md shadow-[var(--accent)]/20"
           >
             <Plus className="w-4 h-4" />
-            <span>+ Registrar Estudio Método PAF</span>
+            <span>Registrar Estudio Método PAF</span>
           </button>
         </div>
       ) : (
@@ -348,7 +348,7 @@ export const PafDashboard: React.FC<Props> = ({
 
                       <h3 
                         onClick={() => onSelectProject(project)}
-                        className="text-base sm:text-lg font-bold text-zinc-100 hover:text-[#E8590C] transition cursor-pointer truncate"
+                        className="text-base sm:text-lg font-bold text-zinc-100 hover:text-[var(--accent)] transition cursor-pointer truncate"
                         title={project.clientName}
                       >
                         {project.clientName}
@@ -414,7 +414,7 @@ export const PafDashboard: React.FC<Props> = ({
                           onClick={() => handleStageChange(project.id, s)}
                           className={`py-1.5 px-1 rounded-lg text-[10px] font-bold transition text-center truncate active:scale-95 ${
                             isCurrent
-                              ? 'bg-[#E8590C] text-white shadow-xs font-extrabold'
+                              ? 'bg-[var(--accent)] text-white shadow-xs font-extrabold'
                               : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900'
                           }`}
                           title={`Cambiar a: ${s}`}
@@ -470,7 +470,7 @@ export const PafDashboard: React.FC<Props> = ({
                   <div className="space-y-2 pt-2 border-t border-zinc-800/70">
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1.5 text-zinc-300 font-semibold">
-                        <Target className="w-3.5 h-3.5 text-[#E8590C]" />
+                        <Target className="w-3.5 h-3.5 text-[var(--accent)]" />
                         <span>Hitos del Método:</span>
                       </div>
                       <span className="text-[11px] font-bold text-zinc-400">
@@ -480,7 +480,7 @@ export const PafDashboard: React.FC<Props> = ({
 
                     <div className="w-full h-1.5 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
                       <div 
-                        className="h-full bg-gradient-to-r from-[#E8590C] to-emerald-400 rounded-full transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-[var(--accent)] to-emerald-400 rounded-full transition-all duration-300"
                         style={{ width: `${progressPercent}%` }}
                       />
                     </div>

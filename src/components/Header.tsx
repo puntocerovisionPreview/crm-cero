@@ -122,7 +122,7 @@ export const Header: React.FC<Props> = ({
                     onClick={() => onTabChange(tab.id)}
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
                       isActive
-                        ? 'bg-[#E8590C] text-white shadow-sm shadow-[#E8590C]/30'
+                        ? 'bg-[var(--accent)] text-white shadow-sm shadow-[var(--accent)]/30'
                         : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60'
                     }`}
                   >
@@ -143,7 +143,7 @@ export const Header: React.FC<Props> = ({
                 className="flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200 text-xs transition shadow-sm"
                 title="Buscar o comandos (⌘K)"
               >
-                <Search className="w-3.5 h-3.5 text-[#E8590C]" />
+                <Search className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span className="hidden lg:inline text-zinc-400">Buscar...</span>
                 <kbd className="hidden sm:inline-block px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-zinc-950 text-zinc-400 border border-zinc-800">
                   ⌘K
@@ -159,7 +159,7 @@ export const Header: React.FC<Props> = ({
                 className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 hover:border-zinc-700 text-zinc-300 hover:text-white text-xs font-semibold transition shadow-sm active:scale-95 group"
                 title="Temporizador Pomodoro (25m)"
               >
-                <Clock className="w-3.5 h-3.5 text-[#E8590C] group-hover:animate-spin" />
+                <Clock className="w-3.5 h-3.5 text-[var(--accent)] group-hover:animate-spin" />
                 <span className="hidden sm:inline">Pomodoro</span>
                 <span className="text-[10px] text-zinc-500 font-mono">25m</span>
               </button>
@@ -168,7 +168,7 @@ export const Header: React.FC<Props> = ({
             {/* Primary Action "+ Nuevo" CTA Button */}
             <button
               onClick={onOpenQuickAdd}
-              className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-[#E8590C] hover:bg-[#d44d07] text-white text-xs font-bold transition shadow-sm shadow-[#E8590C]/25 active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[#d44d07] text-white text-xs font-bold transition shadow-sm shadow-[var(--accent)]/25 active:scale-95"
               title="Crear nueva tarea, reunión o proyecto (T / R / P)"
             >
               <Plus className="w-4 h-4" />
@@ -204,7 +204,7 @@ export const Header: React.FC<Props> = ({
                 onClick={() => setShowOverflowMenu(prev => !prev)}
                 className={`p-2 rounded-xl border transition shadow-sm active:scale-95 ${
                   showOverflowMenu 
-                    ? 'bg-[#E8590C] text-white border-[#E8590C]' 
+                    ? 'bg-[var(--accent)] text-white border-[var(--accent)]' 
                     : 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                 }`}
                 title="Herramientas y Opciones"
@@ -235,7 +235,7 @@ export const Header: React.FC<Props> = ({
                           className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition text-left"
                         >
                           <div className="flex items-center gap-2.5">
-                            <Clock className="w-4 h-4 text-[#E8590C]" />
+                            <Clock className="w-4 h-4 text-[var(--accent)]" />
                             <span>Temporizador Pomodoro</span>
                           </div>
                           <span className="text-[10px] text-zinc-500 font-mono">25m</span>
@@ -367,7 +367,7 @@ export const Header: React.FC<Props> = ({
                         }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition text-left"
                       >
-                        <Download className="w-4 h-4 text-[#E8590C]" />
+                        <Download className="w-4 h-4 text-[var(--accent)]" />
                         <span>Copia de seguridad & datos</span>
                       </button>
 
@@ -378,7 +378,7 @@ export const Header: React.FC<Props> = ({
                         }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-zinc-200 hover:bg-zinc-800 hover:text-white transition text-left"
                       >
-                        <Smartphone className="w-4 h-4 text-[#E8590C]" />
+                        <Smartphone className="w-4 h-4 text-[var(--accent)]" />
                         <span>Instalar app en iPhone</span>
                       </button>
 
@@ -409,7 +409,7 @@ export const Header: React.FC<Props> = ({
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-sm w-full p-5 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
               <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
-                <Download className="w-4 h-4 text-[#E8590C]" />
+                <Download className="w-4 h-4 text-[var(--accent)]" />
                 <span>Copia de Seguridad & Datos</span>
               </h3>
               <button
@@ -430,10 +430,10 @@ export const Header: React.FC<Props> = ({
                   setShowBackupModal(false);
                   setShowIOSModal(true);
                 }}
-                className="w-full flex items-center justify-between p-3 rounded-xl bg-[#E8590C]/10 hover:bg-[#E8590C]/20 border border-[#E8590C]/30 text-left transition"
+                className="w-full flex items-center justify-between p-3 rounded-xl bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/30 text-left transition"
               >
                 <div className="flex items-center gap-2.5">
-                  <Smartphone className="w-4 h-4 text-[#E8590C]" />
+                  <Smartphone className="w-4 h-4 text-[var(--accent)]" />
                   <div>
                     <div className="text-xs font-bold text-zinc-100">Instalar en tu iPhone</div>
                     <div className="text-[10px] text-zinc-400">Paso a paso para usar como App nativa</div>
@@ -537,7 +537,7 @@ export const Header: React.FC<Props> = ({
           >
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[#E8590C]/20 border border-[#E8590C]/40 flex items-center justify-center text-[#E8590C] font-extrabold text-sm">
+                <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/20 border border-[var(--accent)]/40 flex items-center justify-center text-[var(--accent)] font-extrabold text-sm">
                   .C
                 </div>
                 <div>
@@ -555,7 +555,7 @@ export const Header: React.FC<Props> = ({
 
             <div className="space-y-3 text-xs text-zinc-300 py-1">
               <div className="flex items-start gap-3 p-3 bg-zinc-950/90 rounded-xl border border-zinc-800">
-                <div className="p-1.5 bg-zinc-800 rounded-lg text-[#E8590C] shrink-0 mt-0.5">
+                <div className="p-1.5 bg-zinc-800 rounded-lg text-[var(--accent)] shrink-0 mt-0.5">
                   <Share2 className="w-4 h-4" />
                 </div>
                 <div>
@@ -564,7 +564,7 @@ export const Header: React.FC<Props> = ({
               </div>
 
               <div className="flex items-start gap-3 p-3 bg-zinc-950/90 rounded-xl border border-zinc-800">
-                <div className="p-1.5 bg-zinc-800 rounded-lg text-[#E8590C] shrink-0 mt-0.5">
+                <div className="p-1.5 bg-zinc-800 rounded-lg text-[var(--accent)] shrink-0 mt-0.5">
                   <PlusSquare className="w-4 h-4" />
                 </div>
                 <div>
@@ -581,12 +581,12 @@ export const Header: React.FC<Props> = ({
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-3 bg-zinc-950/90 rounded-xl border border-[#E8590C]/30">
-                <div className="p-1.5 bg-[#E8590C]/15 rounded-lg text-[#E8590C] shrink-0 mt-0.5 font-bold">
+              <div className="flex items-start gap-3 p-3 bg-zinc-950/90 rounded-xl border border-[var(--accent)]/30">
+                <div className="p-1.5 bg-[var(--accent)]/15 rounded-lg text-[var(--accent)] shrink-0 mt-0.5 font-bold">
                   <Bell className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-[#E8590C]">4. Avisos en Pantalla de Bloqueo:</span>
+                  <span className="font-bold text-[var(--accent)]">4. Avisos en Pantalla de Bloqueo:</span>
                   <div className="text-zinc-300 mt-0.5">
                     Al cargar una tarea o reunión, activá <strong className="text-zinc-100">"Sincronizar con Calendario/Recordatorios"</strong> para que suene y aparezca en tu <strong>pantalla bloqueada</strong> sin importar si el teléfono está en reposo.
                   </div>
@@ -608,7 +608,7 @@ export const Header: React.FC<Props> = ({
 
             <button
               onClick={() => setShowIOSModal(false)}
-              className="w-full py-2.5 rounded-xl bg-[#E8590C] hover:bg-[#cf4d07] text-white text-xs font-bold transition shadow-md shadow-[#E8590C]/20"
+              className="w-full py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white text-xs font-bold transition shadow-md shadow-[var(--accent)]/20"
             >
               Entendido
             </button>

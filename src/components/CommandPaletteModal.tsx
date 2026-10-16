@@ -137,7 +137,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
       title: 'Nueva Tarea',
       subtitle: 'Crear tarea en la agenda diaria',
       category: 'Acciones Rápidas',
-      icon: <CheckSquare className="w-4 h-4 text-[#E8590C]" />,
+      icon: <CheckSquare className="w-4 h-4 text-[var(--accent)]" />,
       badge: 'T',
       action: () => {
         onClose();
@@ -190,7 +190,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
         title: 'Reparar vínculos tarea-proyecto',
         subtitle: 'Sincronizar projectId y projectName en lote de forma idempotente',
         category: 'Acciones Rápidas',
-        icon: <Link2 className="w-4 h-4 text-[#E8590C]" />,
+        icon: <Link2 className="w-4 h-4 text-[var(--accent)]" />,
         action: () => {
           onClose();
           onOpenRepairTaskLinks();
@@ -294,7 +294,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
       title: 'Ir a Agenda',
       subtitle: 'Planificador semanal y tareas diarias',
       category: 'Navegación',
-      icon: <Calendar className="w-4 h-4 text-[#E8590C]" />,
+      icon: <Calendar className="w-4 h-4 text-[var(--accent)]" />,
       badge: '1',
       action: () => {
         onClose();
@@ -516,7 +516,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
         title: t.title,
         subtitle: `${t.completed ? 'Completada' : 'Pendiente'} · ${t.date || 'Sin fecha'} ${t.time ? `· ${t.time} hs` : ''} ${t.projectName ? `· ${t.projectName}` : ''}`,
         category: 'Tareas',
-        icon: <CheckSquare className={`w-4 h-4 ${t.completed ? 'text-emerald-400' : 'text-[#E8590C]'}`} />,
+        icon: <CheckSquare className={`w-4 h-4 ${t.completed ? 'text-emerald-400' : 'text-[var(--accent)]'}`} />,
         badge: t.completed ? 'Hecha' : 'Pendiente',
         action: () => {
           onClose();

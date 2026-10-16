@@ -805,7 +805,7 @@ export const AjustesView: React.FC<Props> = ({
               <div className="p-3 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface-muted)]">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[var(--text-primary)]">PAF Pro (12 Semanas)</span>
-                  <span className="text-xs font-mono font-bold text-[#E8590C]">u$s 1.200 - 1.800</span>
+                  <span className="text-xs font-mono font-bold text-[var(--accent)]">u$s 1.200 - 1.800</span>
                 </div>
                 <p className="text-[11px] text-[var(--text-secondary)] mt-1">
                   Diagnóstico + 12 sesiones 1:1 + Tablero de control financiero + Soporte prioritario.
@@ -815,7 +815,7 @@ export const AjustesView: React.FC<Props> = ({
               <div className="p-3 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface-muted)]">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-[var(--text-primary)]">PAF Base (6 Semanas)</span>
-                  <span className="text-xs font-mono font-bold text-[#E8590C]">u$s 750 - 950</span>
+                  <span className="text-xs font-mono font-bold text-[var(--accent)]">u$s 750 - 950</span>
                 </div>
                 <p className="text-[11px] text-[var(--text-secondary)] mt-1">
                   Orden de caja + 6 sesiones 1:1 + Plantilla de flujo de fondos.
@@ -1165,7 +1165,7 @@ export const AjustesView: React.FC<Props> = ({
                   }}
                   className="min-h-[44px] px-3.5 py-2 rounded-[var(--radius-control)] border border-[var(--border-subtle)] hover:bg-[var(--bg-surface-muted)] text-xs font-semibold flex items-center gap-2 cursor-pointer"
                 >
-                  <Link2 className="w-3.5 h-3.5 text-[#E8590C]" />
+                  <Link2 className="w-3.5 h-3.5 text-[var(--accent)]" />
                   <span>Reparar vínculos entre tareas y clientes</span>
                 </button>
               </div>

@@ -17,7 +17,7 @@ export const PWAInstallButton: React.FC = () => {
       <button
         id="pwa-install-btn"
         onClick={install}
-        className="flex items-center gap-1.5 rounded-lg bg-[#E8590C] hover:bg-[#cf4d07] px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition active:scale-95"
+        className="flex items-center gap-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-strong)] px-3 py-1.5 text-xs font-semibold text-white shadow-lg transition active:scale-95"
       >
         <Download className="w-3.5 h-3.5" />
         <span>Instalar App</span>
@@ -34,7 +34,7 @@ export const PWAInstallButton: React.FC = () => {
           onClick={() => setShowIOSGuide(true)}
           className="flex items-center gap-1.5 rounded-lg border border-zinc-700 bg-zinc-900/90 px-3 py-1.5 text-xs font-medium text-zinc-200 hover:bg-zinc-800 transition active:scale-95"
         >
-          <Download className="w-3.5 h-3.5 text-[#E8590C]" />
+          <Download className="w-3.5 h-3.5 text-[var(--accent)]" />
           <span>Instalar en iPhone</span>
         </button>
 
@@ -51,7 +51,7 @@ export const PWAInstallButton: React.FC = () => {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-9 h-9 rounded-xl bg-[#E8590C]/20 border border-[#E8590C]/40 flex items-center justify-center text-[#E8590C] font-bold text-sm">
+                  <div className="w-9 h-9 rounded-xl bg-[var(--accent)]/20 border border-[var(--accent)]/40 flex items-center justify-center text-[var(--accent)] font-bold text-sm">
                     .0
                   </div>
                   <div>
@@ -70,7 +70,7 @@ export const PWAInstallButton: React.FC = () => {
               <div className="space-y-3 text-xs text-zinc-300 py-1">
                 <div className="flex items-start gap-3 p-3 bg-zinc-950/80 rounded-xl border border-zinc-800">
                   <div className="p-1.5 bg-zinc-800 rounded-lg text-zinc-300 shrink-0 mt-0.5">
-                    <Share2 className="w-4 h-4 text-[#E8590C]" />
+                    <Share2 className="w-4 h-4 text-[var(--accent)]" />
                   </div>
                   <div>
                     <span className="font-semibold text-zinc-100">Paso 1:</span> En la barra inferior de Safari, tocá el botón de <strong className="text-zinc-100">Compartir</strong> (ícono de caja con flecha arriba).
@@ -79,7 +79,7 @@ export const PWAInstallButton: React.FC = () => {
 
                 <div className="flex items-start gap-3 p-3 bg-zinc-950/80 rounded-xl border border-zinc-800">
                   <div className="p-1.5 bg-zinc-800 rounded-lg text-zinc-300 shrink-0 mt-0.5">
-                    <PlusSquare className="w-4 h-4 text-[#E8590C]" />
+                    <PlusSquare className="w-4 h-4 text-[var(--accent)]" />
                   </div>
                   <div>
                     <span className="font-semibold text-zinc-100">Paso 2:</span> Deslizá hacia abajo y seleccioná <strong className="text-zinc-100">"Agregar a pantalla de inicio"</strong>.

@@ -73,7 +73,7 @@ export const IosWidgetsModal: React.FC<Props> = ({
       id: 'nueva-tarea',
       title: 'Nueva Tarea Rápida',
       subtitle: 'Abre el modal para crear una tarea de hoy',
-      icon: <CheckSquare className="w-4 h-4 text-[#E8590C]" />,
+      icon: <CheckSquare className="w-4 h-4 text-[var(--accent)]" />,
       url: `${appOrigin}/?action=nueva-tarea`,
       color: 'from-amber-500/20 to-orange-500/20 text-orange-400 border-orange-500/30',
     },
@@ -261,7 +261,7 @@ Script.complete();
         {/* Header con estilo iOS Human Interface */}
         <div className="px-5 py-4 border-b border-zinc-800/80 flex items-center justify-between bg-zinc-900/60 shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[#E8590C] to-amber-600 flex items-center justify-center text-white shadow-md shadow-[#E8590C]/20">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-[var(--accent)] to-amber-600 flex items-center justify-center text-white shadow-md shadow-[var(--accent)]/20">
               <Smartphone className="w-5 h-5 stroke-[2.2]" />
             </div>
             <div>
@@ -269,7 +269,7 @@ Script.complete();
                 <h3 className="font-bold text-base text-zinc-100">
                   Widgets para iPhone & iOS
                 </h3>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#E8590C]/15 border border-[#E8590C]/30 text-[#E8590C] font-semibold">
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] font-semibold">
                   iPhone 11 Pro
                 </span>
               </div>
@@ -298,7 +298,7 @@ Script.complete();
                 : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'
             }`}
           >
-            <Layers className="w-3.5 h-3.5 text-[#E8590C]" />
+            <Layers className="w-3.5 h-3.5 text-[var(--accent)]" />
             <span>Simulador de Widget</span>
           </button>
 
@@ -370,7 +370,7 @@ Script.complete();
                       }}
                       className={`px-2.5 py-1 rounded-lg transition capitalize ${
                         widgetSize === size
-                          ? 'bg-[#E8590C] text-black font-bold shadow-sm'
+                          ? 'bg-[var(--accent)] text-black font-bold shadow-sm'
                           : 'text-zinc-400 hover:text-zinc-200'
                       }`}
                     >
@@ -388,11 +388,11 @@ Script.complete();
 
                 {/* SMALL WIDGET (2x2) */}
                 {widgetSize === 'small' && (
-                  <div className="w-40 h-40 rounded-[26px] bg-zinc-950/90 border border-zinc-800 p-3.5 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[#E8590C]/50 transition-all">
+                  <div className="w-40 h-40 rounded-[26px] bg-zinc-950/90 border border-zinc-800 p-3.5 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-all">
                     <div>
                       <div className="flex items-center justify-between text-[10px]">
-                        <span className="font-extrabold text-[#E8590C] tracking-wider flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#E8590C] animate-pulse" />
+                        <span className="font-extrabold text-[var(--accent)] tracking-wider flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
                           .CERO
                         </span>
                         <span className="text-zinc-500 font-mono text-[9px]">HOY</span>
@@ -411,7 +411,7 @@ Script.complete();
                     <div className="space-y-1">
                       {todayTasks.slice(0, 1).map(t => (
                         <div key={t.id} className="text-[10px] text-zinc-300 truncate font-medium flex items-center gap-1">
-                          <span className={t.completed ? 'text-emerald-400' : 'text-[#E8590C]'}>•</span>
+                          <span className={t.completed ? 'text-emerald-400' : 'text-[var(--accent)]'}>•</span>
                           <span className="truncate">{t.title}</span>
                         </div>
                       ))}
@@ -428,10 +428,10 @@ Script.complete();
 
                 {/* MEDIUM WIDGET (4x2) */}
                 {widgetSize === 'medium' && (
-                  <div className="w-full max-w-sm h-40 rounded-[26px] bg-zinc-950/95 border border-zinc-800 p-4 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[#E8590C]/50 transition-all">
+                  <div className="w-full max-w-sm h-40 rounded-[26px] bg-zinc-950/95 border border-zinc-800 p-4 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-all">
                     <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
                       <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-[#E8590C] animate-pulse" />
+                        <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
                         <span className="font-extrabold text-xs text-zinc-100 tracking-wider">
                           .CERO AGENDA
                         </span>
@@ -453,7 +453,7 @@ Script.complete();
                         </div>
                         <div className="w-full bg-zinc-800/80 rounded-full h-1.5 overflow-hidden">
                           <div 
-                            className="h-full bg-gradient-to-r from-amber-500 to-[#E8590C]"
+                            className="h-full bg-gradient-to-r from-amber-500 to-[var(--accent)]"
                             style={{ width: `${todayTasks.length > 0 ? (completedTasks.length / todayTasks.length) * 100 : 0}%` }}
                           />
                         </div>
@@ -470,7 +470,7 @@ Script.complete();
                             {t.completed ? (
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                             ) : (
-                              <Circle className="w-3.5 h-3.5 text-[#E8590C] shrink-0" />
+                              <Circle className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
                             )}
                             <span className={`truncate ${t.completed ? 'line-through text-zinc-500' : ''}`}>
                               {t.title}
@@ -489,18 +489,18 @@ Script.complete();
                       ) : (
                         <span className="text-zinc-500">Sin reuniones hoy</span>
                       )}
-                      <span className="text-[9px] font-semibold text-[#E8590C]">Tocar para abrir</span>
+                      <span className="text-[9px] font-semibold text-[var(--accent)]">Tocar para abrir</span>
                     </div>
                   </div>
                 )}
 
                 {/* LARGE WIDGET (4x4) */}
                 {widgetSize === 'large' && (
-                  <div className="w-full max-w-sm h-80 rounded-[30px] bg-zinc-950/95 border border-zinc-800 p-5 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[#E8590C]/50 transition-all">
+                  <div className="w-full max-w-sm h-80 rounded-[30px] bg-zinc-950/95 border border-zinc-800 p-5 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-all">
                     <div>
                       <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2.5">
                         <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-[#E8590C] animate-pulse" />
+                          <div className="w-2.5 h-2.5 rounded-full bg-[var(--accent)] animate-pulse" />
                           <span className="font-black text-sm text-zinc-100 tracking-wider">
                             .CERO CRM
                           </span>
@@ -520,7 +520,7 @@ Script.complete();
                         <button
                           type="button"
                           onClick={() => onOpenQuickAdd('tarea')}
-                          className="p-2 rounded-xl bg-[#E8590C] text-black font-bold text-xs flex items-center gap-1 active:scale-95 shadow-md shadow-[#E8590C]/20"
+                          className="p-2 rounded-xl bg-[var(--accent)] text-black font-bold text-xs flex items-center gap-1 active:scale-95 shadow-md shadow-[var(--accent)]/20"
                         >
                           <Plus className="w-3.5 h-3.5 stroke-[3]" />
                           <span>Tarea</span>
@@ -547,7 +547,7 @@ Script.complete();
                               {t.completed ? (
                                 <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                               ) : (
-                                <Circle className="w-4 h-4 text-[#E8590C] shrink-0" />
+                                <Circle className="w-4 h-4 text-[var(--accent)] shrink-0" />
                               )}
                               <span className={`truncate font-medium ${t.completed ? 'line-through text-zinc-500' : ''}`}>
                                 {t.title}
@@ -577,7 +577,7 @@ Script.complete();
               {/* Quick instructions for Haptic Touch */}
               <div className="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800 space-y-2 text-xs text-zinc-300">
                 <div className="font-bold text-zinc-100 flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-[#E8590C]" />
+                  <Smartphone className="w-4 h-4 text-[var(--accent)]" />
                   <span>Cómo instalarlo en tu iPhone 11 Pro:</span>
                 </div>
                 <ol className="list-decimal list-inside space-y-1 text-zinc-400 leading-relaxed">
@@ -643,7 +643,7 @@ Script.complete();
 
                       <a
                         href={sc.url}
-                        className="p-1.5 rounded-xl bg-zinc-800 hover:bg-[#E8590C] hover:text-black text-zinc-300 text-xs font-bold transition flex items-center justify-center"
+                        className="p-1.5 rounded-xl bg-zinc-800 hover:bg-[var(--accent)] hover:text-black text-zinc-300 text-xs font-bold transition flex items-center justify-center"
                         title="Probar acción ahora"
                       >
                         <ArrowRight className="w-4 h-4" />
@@ -700,7 +700,7 @@ Script.complete();
                 <button
                   type="button"
                   onClick={handleCopyScriptableCode}
-                  className="px-4 py-2 rounded-xl bg-[#E8590C] hover:bg-[#d94f08] text-black font-bold text-xs transition flex items-center gap-2 shadow-lg shadow-[#E8590C]/20 active:scale-95 cursor-pointer"
+                  className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-black font-bold text-xs transition flex items-center gap-2 shadow-lg shadow-[var(--accent)]/20 active:scale-95 cursor-pointer"
                 >
                   {copiedScript ? (
                     <>
@@ -734,15 +734,15 @@ Script.complete();
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-zinc-400">
                   <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800/80">
-                    <span className="font-black text-[#E8590C] text-sm">1.</span>
+                    <span className="font-black text-[var(--accent)] text-sm">1.</span>
                     <p className="mt-1">Abrí Scriptable en tu iPhone y tocá <strong>"+"</strong> para crear un script.</p>
                   </div>
                   <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800/80">
-                    <span className="font-black text-[#E8590C] text-sm">2.</span>
+                    <span className="font-black text-[var(--accent)] text-sm">2.</span>
                     <p className="mt-1">Pegá el código copiado arriba y ponele de nombre <strong>".Cero Agenda"</strong>.</p>
                   </div>
                   <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800/80">
-                    <span className="font-black text-[#E8590C] text-sm">3.</span>
+                    <span className="font-black text-[var(--accent)] text-sm">3.</span>
                     <p className="mt-1">Añadí el widget de Scriptable en tu pantalla de inicio y elegí tu script.</p>
                   </div>
                 </div>
@@ -804,7 +804,7 @@ Script.complete();
         {/* Modal Footer */}
         <div className="px-5 py-3.5 border-t border-zinc-800/80 bg-zinc-900/60 flex items-center justify-between shrink-0">
           <div className="text-[11px] text-zinc-400 flex items-center gap-1.5">
-            <Smartphone className="w-3.5 h-3.5 text-[#E8590C]" />
+            <Smartphone className="w-3.5 h-3.5 text-[var(--accent)]" />
             <span>Optimizado para iOS 16 / 17 / 18 en iPhone 11 Pro</span>
           </div>
 

@@ -178,7 +178,7 @@ export const InCallDrawer: React.FC<Props> = ({
   if (isMinimized) {
     return (
       <div className="fixed bottom-4 right-4 z-50 animate-in fade-in slide-in-from-bottom-2 duration-150">
-        <div className="bg-zinc-900/95 border border-[#E8590C]/50 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex items-center gap-3">
+        <div className="bg-zinc-900/95 border border-[var(--accent)]/50 rounded-2xl p-2.5 shadow-2xl backdrop-blur-md flex items-center gap-3">
           <div className="flex items-center gap-2">
             <span className={`w-2.5 h-2.5 rounded-full ${isTimerRunning ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
             <span className="font-mono font-bold text-xs text-zinc-100">
@@ -211,13 +211,13 @@ export const InCallDrawer: React.FC<Props> = ({
         className="px-4 pb-4 border-b border-zinc-800/90 bg-zinc-900/70 flex items-center justify-between shrink-0 safe-area-top-header"
       >
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#E8590C]/15 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C]">
+          <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]">
             <PhoneCall className="w-4 h-4" />
           </div>
           <div>
             <h3 className="text-xs font-extrabold uppercase tracking-wider text-zinc-200 flex items-center gap-1.5">
               <span>HUD de Llamada 1:1</span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#E8590C]/20 text-[#E8590C] font-bold">En Vivo</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] font-bold">En Vivo</span>
             </h3>
             <p className="text-[11px] text-zinc-400">Asistente táctico para sesiones de consultoría</p>
           </div>
@@ -251,7 +251,7 @@ export const InCallDrawer: React.FC<Props> = ({
           <select
             value={selectedProjectId}
             onChange={e => setSelectedProjectId(e.target.value)}
-            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-100 focus:outline-none focus:border-[#E8590C] cursor-pointer"
+            className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs font-semibold text-zinc-100 focus:outline-none focus:border-[var(--accent)] cursor-pointer"
           >
             {allCallClients.map(c => (
               <option key={c.id} value={c.id}>
@@ -303,7 +303,7 @@ export const InCallDrawer: React.FC<Props> = ({
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => handleAddHoursToProject(1)}
-              className="px-2.5 py-1.5 rounded-xl bg-[#E8590C]/15 hover:bg-[#E8590C] hover:text-white border border-[#E8590C]/30 text-[#E8590C] text-xs font-bold transition flex items-center gap-1 active:scale-95 shadow-xs"
+              className="px-2.5 py-1.5 rounded-xl bg-[var(--accent)]/15 hover:bg-[var(--accent)] hover:text-white border border-[var(--accent)]/30 text-[var(--accent)] text-xs font-bold transition flex items-center gap-1 active:scale-95 shadow-xs"
               title="Sumar 1 hora a las horas realizadas de consultoría del cliente arquitecto"
             >
               <Plus className="w-3 h-3" />
@@ -311,7 +311,7 @@ export const InCallDrawer: React.FC<Props> = ({
             </button>
             <button
               onClick={() => handleAddHoursToProject(1.5)}
-              className="px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-[#E8590C] hover:text-white text-zinc-200 text-xs font-bold transition flex items-center gap-1 active:scale-95"
+              className="px-2.5 py-1.5 rounded-xl bg-zinc-800 hover:bg-[var(--accent)] hover:text-white text-zinc-200 text-xs font-bold transition flex items-center gap-1 active:scale-95"
               title="Sumar 1.5 horas a la consultoría"
             >
               <Plus className="w-3 h-3" />
@@ -332,7 +332,7 @@ export const InCallDrawer: React.FC<Props> = ({
 
             <div className="w-full bg-zinc-800/80 h-2 rounded-full overflow-hidden">
               <div 
-                className="bg-[#E8590C] h-full transition-all duration-300 rounded-full"
+                className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
                 style={{
                   width: `${Math.min(100, (((activeProject.pafConsultingHoursDone || 0) / (activeProject.pafConsultingHoursTotal || 26)) * 100))}%`
                 }}
@@ -372,7 +372,7 @@ export const InCallDrawer: React.FC<Props> = ({
                   : 'text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <Icon className="w-3 h-3 text-[#E8590C]" />
+              <Icon className="w-3 h-3 text-[var(--accent)]" />
               <span>{tab.label}</span>
             </button>
           );
@@ -386,7 +386,7 @@ export const InCallDrawer: React.FC<Props> = ({
           <div className="space-y-3.5">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-[#E8590C]">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--accent)]">
                   Etapa Actual
                 </span>
                 <h4 className="text-xs font-bold text-zinc-100">
@@ -410,7 +410,7 @@ export const InCallDrawer: React.FC<Props> = ({
 
             <div className="p-3 rounded-2xl bg-zinc-900/70 border border-zinc-800 space-y-2.5">
               <div className="text-[11px] font-bold text-zinc-300 flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-[#E8590C]" />
+                <CheckCircle2 className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span>Requisitos de Salida para Desbloquear Avance:</span>
               </div>
 
@@ -497,12 +497,12 @@ export const InCallDrawer: React.FC<Props> = ({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-zinc-200 flex items-center gap-1.5">
-                <FileText className="w-3.5 h-3.5 text-[#E8590C]" />
+                <FileText className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span>Bitácora de la Llamada / Acuerdos:</span>
               </span>
               <button
                 onClick={handleSaveNotes}
-                className="px-2.5 py-1 rounded-lg bg-[#E8590C] hover:bg-[#d04e0a] text-white text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
+                className="px-2.5 py-1 rounded-lg bg-[var(--accent)] hover:bg-[#d04e0a] text-white text-xs font-bold transition flex items-center gap-1 shadow-xs active:scale-95"
               >
                 {notesSaved ? <Check className="w-3 h-3" /> : <Save className="w-3 h-3" />}
                 <span>{notesSaved ? 'Guardado' : 'Guardar'}</span>
@@ -514,7 +514,7 @@ export const InCallDrawer: React.FC<Props> = ({
               value={callNotes}
               onChange={e => setCallNotes(e.target.value)}
               placeholder="Tomá nota en vivo de dudas, objeciones, decisiones del comitente o tareas pactadas para la próxima llamada..."
-              className="w-full text-xs text-zinc-200 bg-zinc-900 border border-zinc-800 rounded-2xl p-3 focus:outline-none focus:border-[#E8590C] transition leading-relaxed custom-scrollbar font-mono resize-none shadow-inner"
+              className="w-full text-xs text-zinc-200 bg-zinc-900 border border-zinc-800 rounded-2xl p-3 focus:outline-none focus:border-[var(--accent)] transition leading-relaxed custom-scrollbar font-mono resize-none shadow-inner"
             />
           </div>
         )}
@@ -523,7 +523,7 @@ export const InCallDrawer: React.FC<Props> = ({
         {drawerTab === 'scripts' && (
           <div className="space-y-3">
             <div className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5 text-[#E8590C]" />
+              <MessageSquare className="w-3.5 h-3.5 text-[var(--accent)]" />
               <span>Rebatidor de Objeciones Frecuentes (En Llamada)</span>
             </div>
 
@@ -546,7 +546,7 @@ export const InCallDrawer: React.FC<Props> = ({
         {drawerTab === 'scoring' && (
           <div className="space-y-3">
             <div className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-              <Award className="w-3.5 h-3.5 text-[#E8590C]" />
+              <Award className="w-3.5 h-3.5 text-[var(--accent)]" />
               <span>Criterios de Lead Scoring para Arquitectos</span>
             </div>
 
@@ -562,7 +562,7 @@ export const InCallDrawer: React.FC<Props> = ({
                   <p className="text-[11px] text-zinc-400 leading-snug">
                     <strong className="text-zinc-300">Criterio:</strong> {info.criteria}
                   </p>
-                  <p className="text-[11px] text-[#E8590C] leading-snug font-medium">
+                  <p className="text-[11px] text-[var(--accent)] leading-snug font-medium">
                     <strong>Acción sugerida:</strong> {info.action}
                   </p>
                 </div>

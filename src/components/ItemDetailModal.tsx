@@ -206,7 +206,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
             <div className="flex items-center gap-2">
               <span className={`px-2.5 py-1 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
                 isTask
-                  ? 'bg-[#E8590C]/15 text-[#E8590C] border border-[#E8590C]/30'
+                  ? 'bg-[var(--accent)]/15 text-[var(--accent)] border border-[var(--accent)]/30'
                   : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
               }`}>
                 {isTask ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Calendar className="w-3.5 h-3.5" />}
@@ -250,7 +250,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   {isCompleted ? (
                     <CheckCircle2 className="w-6 h-6 text-emerald-400" />
                   ) : (
-                    <Circle className={`w-6 h-6 ${isTask ? 'text-[#E8590C]' : 'text-amber-400'}`} />
+                    <Circle className={`w-6 h-6 ${isTask ? 'text-[var(--accent)]' : 'text-amber-400'}`} />
                   )}
                 </button>
                 <input
@@ -258,7 +258,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onBlur={() => handleSave()}
-                  className={`w-full bg-zinc-950 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-3.5 py-2 text-sm sm:text-base font-semibold text-zinc-100 transition focus:outline-hidden ${
+                  className={`w-full bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3.5 py-2 text-sm sm:text-base font-semibold text-zinc-100 transition focus:outline-hidden ${
                     isCompleted ? 'line-through text-zinc-500' : ''
                   }`}
                   placeholder="Título del compromiso..."
@@ -283,7 +283,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                     date === today
-                      ? 'bg-[#E8590C] text-white'
+                      ? 'bg-[var(--accent)] text-white'
                       : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                   }`}
                 >
@@ -298,7 +298,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   }}
                   className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                     date === tomorrow
-                      ? 'bg-[#E8590C] text-white'
+                      ? 'bg-[var(--accent)] text-white'
                       : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
                   }`}
                 >
@@ -326,7 +326,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   if (isTask && onUpdateTask) onUpdateTask(data.id, { date: e.target.value });
                   if (!isTask && onUpdateMeeting) onUpdateMeeting(data.id, { date: e.target.value });
                 }}
-                className="w-full bg-zinc-950 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-3.5 py-2 text-sm text-zinc-200 transition focus:outline-hidden"
+                className="w-full bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3.5 py-2 text-sm text-zinc-200 transition focus:outline-hidden"
               />
             </div>
 
@@ -342,7 +342,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   value={time}
                   onChange={(e) => setTime(e.target.value)}
                   onBlur={() => handleSave()}
-                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-3.5 py-2 text-sm text-zinc-200 transition focus:outline-hidden"
+                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3.5 py-2 text-sm text-zinc-200 transition focus:outline-hidden"
                 />
               </div>
 
@@ -359,7 +359,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     if (isTask && onUpdateTask) onUpdateTask(data.id, { reminderMinutesBefore: val });
                     if (!isTask && onUpdateMeeting) onUpdateMeeting(data.id, { reminderMinutesBefore: val });
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-3 py-2 text-sm text-zinc-200 transition focus:outline-hidden"
+                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3 py-2 text-sm text-zinc-200 transition focus:outline-hidden"
                 >
                   <option value={0}>Al momento exacto</option>
                   <option value={5}>5 minutos antes</option>
@@ -394,7 +394,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   setSelectedProjectId(newId);
                   handleSave(newId);
                 }}
-                className="w-full bg-zinc-950 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-3.5 py-2 text-sm text-zinc-200 transition focus:outline-hidden cursor-pointer"
+                className="w-full bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3.5 py-2 text-sm text-zinc-200 transition focus:outline-hidden cursor-pointer"
               >
                 <option value="">-- Sin proyecto (General / Suelta) --</option>
                 {projects.map(p => (
@@ -413,11 +413,11 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5">
-                    <Target className="w-3.5 h-3.5 text-[#E8590C]" />
+                    <Target className="w-3.5 h-3.5 text-[var(--accent)]" />
                     <span>Misión de la Semana</span>
                   </label>
                   {selectedMissionId ? (
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#E8590C]/10 text-[#E8590C] border border-[#E8590C]/20">
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20">
                       ✓ En Misión
                     </span>
                   ) : (
@@ -433,7 +433,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     setSelectedMissionId(newMissionId);
                     handleSave(undefined, newMissionId);
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-3.5 py-2 text-sm text-zinc-200 transition focus:outline-hidden cursor-pointer"
+                  className="w-full bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3.5 py-2 text-sm text-zinc-200 transition focus:outline-hidden cursor-pointer"
                 >
                   <option value="">-- Suelto (Sin misión asignada) --</option>
                   {missions.map(m => (
@@ -581,7 +581,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
               <div className="space-y-2.5 pt-2 border-t border-zinc-800">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-300">
-                    <ListTodo className="w-4 h-4 text-[#E8590C]" />
+                    <ListTodo className="w-4 h-4 text-[var(--accent)]" />
                     <span>Subtareas ({completedSubtasks}/{subtasks.length})</span>
                   </div>
                   {subtasks.length > 0 && (
@@ -594,7 +594,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 {subtasks.length > 0 && (
                   <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
                     <div
-                      className="bg-[#E8590C] h-full transition-all duration-300"
+                      className="bg-[var(--accent)] h-full transition-all duration-300"
                       style={{ width: `${(completedSubtasks / subtasks.length) * 100}%` }}
                     />
                   </div>
@@ -614,7 +614,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                       >
                         <div className={`w-4 h-4 rounded-md border flex items-center justify-center transition shrink-0 ${
                           sub.completed
-                            ? 'bg-[#E8590C] border-[#E8590C] text-white'
+                            ? 'bg-[var(--accent)] border-[var(--accent)] text-white'
                             : 'border-zinc-700 bg-zinc-900'
                         }`}>
                           {sub.completed && <Check className="w-3 h-3 stroke-[3]" />}
@@ -646,12 +646,12 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
                     placeholder="Nueva subtarea..."
-                    className="flex-1 bg-zinc-950 border border-zinc-800 focus:border-[#E8590C] rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-hidden"
+                    className="flex-1 bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-hidden"
                   />
                   <button
                     type="submit"
                     disabled={!newSubtaskTitle.trim()}
-                    className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-[#E8590C] hover:text-white disabled:opacity-40 text-zinc-200 text-xs font-semibold transition"
+                    className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-[var(--accent)] hover:text-white disabled:opacity-40 text-zinc-200 text-xs font-semibold transition"
                   >
                     <Plus className="w-3.5 h-3.5" />
                   </button>
@@ -723,7 +723,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 onClick={handleMoveToTomorrow}
                 className="px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition flex items-center gap-1.5 active:scale-95"
               >
-                <ArrowRight className="w-3.5 h-3.5 text-[#E8590C]" />
+                <ArrowRight className="w-3.5 h-3.5 text-[var(--accent)]" />
                 <span>Pasar a mañana</span>
               </button>
 
@@ -734,7 +734,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   isCompleted
                     ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700'
                     : isTask
-                    ? 'bg-[#E8590C] hover:bg-[#d04e0a] text-white shadow-[#E8590C]/25'
+                    ? 'bg-[var(--accent)] hover:bg-[#d04e0a] text-white shadow-[var(--accent)]/25'
                     : 'bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/25'
                 }`}
               >

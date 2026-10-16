@@ -58,7 +58,7 @@ export const RepairTaskLinksModal: React.FC<Props> = ({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#E8590C]/15 border border-[#E8590C]/30 flex items-center justify-center text-[#E8590C]">
+            <div className="w-8 h-8 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]">
               <Link2 className="w-4 h-4" />
             </div>
             <div>
@@ -154,7 +154,7 @@ export const RepairTaskLinksModal: React.FC<Props> = ({
             type="button"
             onClick={handleRunRepair}
             disabled={isRunning}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-[#E8590C] hover:bg-[#cf4d07] text-white transition flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-white transition flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isRunning ? 'animate-spin' : ''}`} />
             <span>{isRunning ? 'Reparando vínculos…' : result ? 'Volver a escanear' : 'Ejecutar Reparación'}</span>
