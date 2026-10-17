@@ -9,12 +9,16 @@ import { GoogleGenAI, Type, FunctionDeclaration } from '@google/genai';
 import firebaseConfig from './firebase-applet-config.json';
 import { registerAutomationRoutes } from './server/automation';
 import { registerProspectAuditRoute } from './server/prospectAudit';
+import { registerProspectAIRoutes } from './server/prospectAI';
+import { registerCalendlyRoutes, registerCalendlyWebhook } from './server/calendly';
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Auto auditorías desde tu web: va antes del lector JSON general (llega como texto)
 registerProspectAuditRoute(app);
+// Reservas de Calendly (también necesita el cuerpo crudo, para verificar la firma)
+registerCalendlyWebhook(app);
 
 // Configuración de límite para audios pesados en Base64
 app.use(express.json({ limit: '25mb' }));
@@ -58,6 +62,7 @@ app.use('/api/ai', requireOwner);
 
 // Motor de automatización: Telegram, recordatorios, plan semanal y Google Calendar
 registerAutomationRoutes(app, requireOwner);
+registerCalendlyRoutes(app, requireOwner);
 
 // ---------------- COTIZACIÓN DEL DÓLAR ----------------
 // Proxy con caché de 30 min a dolarapi.com (precio de compra). Público: no expone datos tuyos.
@@ -188,6 +193,9 @@ async function generateWithFallback(
 
   throw lastError || new Error('No se pudo comunicar con los modelos de Gemini disponibles.');
 }
+
+// IA de prospección: frase personalizada y guion del video de auditoría
+registerProspectAIRoutes(app, { getAIClient, generateWithFallback });
 
 // ---------------- API ROUTES ----------------
 

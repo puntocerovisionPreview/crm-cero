@@ -23,9 +23,17 @@ export const DEFAULT_PROSPECTING_SETTINGS: ProspectingSettings = {
   weeklyBatchSize: 10,
   poolCountries: [],
   poolSegments: [],
+  workDays: [1, 2, 3, 4, 5],
+  weeklyGoal: 50,
+  bookingUrl: '',
   templates: {
-    first:
-      'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\nViendo el enfoque y la trayectoria que tienes en tu estudio, ¿me permites realizarte una consulta?',
+    first: 'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\n{personal}¿me permites realizarte una consulta?',
+    firstB: '',
+    secondChance:
+      'Hola {saludo}, te escribí hace un tiempo. Soy Juan, de .Cero. Sé que los meses pasan volando: ¿me permites hacerte una consulta rápida sobre cómo les llegan los clientes hoy?',
+    booking:
+      '¿Pudiste ver el video, {saludo}? Si te sirvió, armemos una llamada de 20 minutos para bajarlo a {estudio}. Elige el horario que te quede cómodo: {agenda}',
+    proposal: 'Hola {saludo}, ¿pudiste revisar la propuesta que te envié? Si te queda alguna duda, la vemos en 10 minutos cuando te quede cómodo.',
     followUp: [
       'Hola {saludo}, ¿pudiste ver mi mensaje? Me gustaría hacerte una consulta rápida sobre tu estudio.',
       '{saludo}, te escribo de nuevo por si se perdió el mensaje. Es una consulta corta, ¿me permites?',
@@ -50,8 +58,7 @@ export const DEFAULT_PROSPECTING_SETTINGS: ProspectingSettings = {
     },
     speech: DEFAULT_SPEECH,
     audit: DEFAULT_SPEECH,
-    video:
-      'Hola {saludo}, como te prometí, aquí va el video con el análisis de {estudio}: [pega aquí el link del video]\n¿Lo conversamos en una llamada de 20 minutos esta semana?',
+    video: 'Hola {saludo}, como te prometí, aquí va el video con el análisis de {estudio}: {video}\n¿Lo conversamos en una llamada de 20 minutos esta semana?',
   },
 };
 
@@ -256,15 +263,17 @@ function isWeekday(dateStr: string): boolean {
 }
 
 /** Reparte los primeros mensajes de la tanda en días hábiles, de a `perDay`, empezando hoy. */
-export function distributeFirstContacts(count: number, startDate: string, perDay: number): string[] {
+export function distributeFirstContacts(count: number, startDate: string, perDay: number, workDays?: number[]): string[] {
   const days: string[] = [];
   let day = startDate;
   let usedToday = 0;
-  while (!isWeekday(day)) day = addDays(day, 1);
+  const valid = workDays && workDays.length ? workDays : [1, 2, 3, 4, 5];
+  const isWork = (d: string) => valid.includes(parseLocalDate(d).getDay());
+  while (!isWork(day)) day = addDays(day, 1);
   for (let i = 0; i < count; i++) {
     if (usedToday >= Math.max(1, perDay)) {
       do day = addDays(day, 1);
-      while (!isWeekday(day));
+      while (!isWork(day));
       usedToday = 0;
     }
     days.push(day);
@@ -303,7 +312,8 @@ export type ProspectAction =
   | `conv_answer:${DifusionKey}`
   | 'conv_empathy_sent'
   | 'conv_agreed'
-  | 'snooze';
+  | 'snooze'
+  | 'do_not_contact';
 
 export function applyAction(
   p: Prospect,
@@ -315,9 +325,11 @@ export function applyAction(
   const next = addDays(today, settings.followUpDays);
   let updates: Partial<Prospect> = {};
   switch (action) {
-    case 'first_contact':
-      updates = { stage: 'contactado', followUps: 0, lastContactAt: today, nextActionDate: next };
-      break;
+    case 'first_contact': {
+      const variant = variantFor(p, settings);
+      updates = { stage: 'contactado', followUps: 0, lastContactAt: today, nextActionDate: next, variant, pulledOn: undefined };
+      return { updates, event: { prospectId: p.id, type: 'first_contact', date: today, note, variant } };
+    }
     case 'follow_up':
       updates = { followUps: (p.followUps || 0) + 1, lastContactAt: today, nextActionDate: next };
       break;
@@ -336,15 +348,32 @@ export function applyAction(
     case 'video_sent':
       updates = { stage: 'video_enviado', followUps: 0, lastContactAt: today, nextActionDate: next };
       break;
-    case 'call':
-      updates = { stage: 'llamada', nextActionDate: undefined };
+    case 'call': {
+      // note puede traer el día y la hora: "YYYY-MM-DD" o "YYYY-MM-DD HH:MM"
+      const m = (note || '').match(/^(\d{4}-\d{2}-\d{2})(?:\s+(\d{2}:\d{2}))?$/);
+      updates = { stage: 'llamada', nextActionDate: undefined, callDate: m ? m[1] : today, callTime: m?.[2], proposalSentAt: undefined };
+      // reprogramar no cuenta como otra llamada
+      const rescheduled = p.stage === 'llamada' && !p.proposalSentAt;
+      return { updates, event: rescheduled ? null : { prospectId: p.id, type: 'call', date: today } };
+    }
+    case 'proposal_sent':
+      updates = { stage: 'llamada', proposalSentAt: today, callDate: undefined, nextActionDate: addDays(today, 3) };
       break;
     case 'won':
       updates = { stage: 'cliente', nextActionDate: undefined };
       break;
     case 'lost':
-      updates = { stage: 'descartado', nextActionDate: undefined, lostReason: note || p.lostReason };
+      updates = {
+        stage: 'descartado',
+        nextActionDate: undefined,
+        lostReason: note || p.lostReason,
+        // Si no respondió nunca, vuelve a intentarse en 90 días con otro mensaje
+        recycleAfter: !p.doNotContact && /sin respuesta/i.test(note || '') && !p.secondChance ? addDays(today, 90) : undefined,
+      };
       break;
+    case 'do_not_contact':
+      updates = { stage: 'descartado', nextActionDate: undefined, doNotContact: true, recycleAfter: undefined, lostReason: 'Pidió que no lo contacten' };
+      return { updates, event: { prospectId: p.id, type: 'lost', date: today, note: 'Pidió que no lo contacten' } };
     case 'chatting':
       updates = { stage: 'contactado', followUps: 0, lastContactAt: today, lastOutcomeAt: today, nextActionDate: next };
       return { updates, event: null };
@@ -355,7 +384,11 @@ export function applyAction(
     case 'conv_agreed':
       return { updates: { convStep: 'speech', nextActionDate: today }, event: null };
     case 'snooze':
-      return { updates: { nextActionDate: addDays(today, 1) }, event: null };
+      // "Mañana": un primer mensaje se pasa de día; el resto, la próxima acción
+      return {
+        updates: p.stage === 'nuevo' ? { plannedFirstContact: addDays(today, 1), nextActionDate: addDays(today, 1), pulledOn: undefined } : { nextActionDate: addDays(today, 1) },
+        event: null,
+      };
     default:
       if (action.startsWith('conv_answer:')) {
         const difusion = action.slice('conv_answer:'.length) as DifusionKey;
@@ -367,7 +400,7 @@ export function applyAction(
 
 // ---------------- COLA DEL DÍA ----------------
 
-export type QueueKind = 'video' | 'responder' | 'seguimiento' | 'primer';
+export type QueueKind = 'video' | 'responder' | 'llamada' | 'propuesta' | 'seguimiento' | 'primer';
 
 export interface QueueItem {
   prospect: Prospect;
@@ -375,16 +408,69 @@ export interface QueueItem {
   overdueDays: number;
   suggestDiscard: boolean; // ya se le hicieron todos los seguimientos sin respuesta
   hot: boolean;
+  localTime?: LocalTime; // hora en su país
 }
 
 export const QUEUE_LABELS: Record<QueueKind, string> = {
   video: 'Mandar video de la auditoría',
   responder: 'Respondió: contestarle',
+  llamada: '¿Cómo salió la llamada?',
+  propuesta: 'Seguimiento de la propuesta',
   seguimiento: 'Seguimiento',
   primer: 'Primer mensaje',
 };
 
-const KIND_ORDER: Record<QueueKind, number> = { video: 0, responder: 1, seguimiento: 2, primer: 3 };
+const KIND_ORDER: Record<QueueKind, number> = { video: 0, responder: 1, llamada: 2, propuesta: 3, seguimiento: 4, primer: 5 };
+const MUST_DO: QueueKind[] = ['video', 'responder', 'llamada', 'propuesta'];
+
+// ---------------- HORA EN SU PAÍS ----------------
+
+export const COUNTRY_TZ: Record<string, string> = {
+  AR: 'America/Argentina/Buenos_Aires',
+  MX: 'America/Mexico_City',
+  CO: 'America/Bogota',
+  CL: 'America/Santiago',
+  PE: 'America/Lima',
+  EC: 'America/Guayaquil',
+  UY: 'America/Montevideo',
+  VE: 'America/Caracas',
+  PY: 'America/Asuncion',
+  BO: 'America/La_Paz',
+  CR: 'America/Costa_Rica',
+  BR: 'America/Sao_Paulo',
+  ES: 'Europe/Madrid',
+};
+
+export interface LocalTime {
+  label: string; // "07:40"
+  hour: number;
+  quality: 'bueno' | 'regular' | 'malo'; // horario para escribir por trabajo
+}
+
+/** Qué hora es en el país del contacto (para no escribirle a las 6 de la mañana). */
+export function localTimeFor(country: string | undefined, now: Date = new Date()): LocalTime | undefined {
+  const tz = country ? COUNTRY_TZ[country] : undefined;
+  if (!tz) return undefined;
+  const parts = new Intl.DateTimeFormat('es-AR', { timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now);
+  const hour = Number(parts.find((x) => x.type === 'hour')?.value || 0) % 24;
+  const minute = parts.find((x) => x.type === 'minute')?.value || '00';
+  const quality = hour >= 9 && hour < 19 ? 'bueno' : (hour >= 8 && hour < 9) || (hour >= 19 && hour < 21) ? 'regular' : 'malo';
+  return { label: `${String(hour).padStart(2, '0')}:${minute}`, hour, quality };
+}
+
+const TIME_RANK = { bueno: 0, regular: 1, malo: 2 } as const;
+
+function hashStr(s: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+/** Versión del primer mensaje (A/B). Sin segunda versión cargada, siempre A. */
+export function variantFor(p: Prospect, settings: ProspectingSettings = DEFAULT_PROSPECTING_SETTINGS): 'A' | 'B' {
+  if (!settings.templates.firstB?.trim()) return 'A';
+  return p.variant || (hashStr(p.id) % 2 ? 'B' : 'A');
+}
 
 const BIG_STUDIO = ['4 a 7 proyectos', '8 a 15 proyectos', 'Más de 15 proyectos'];
 
@@ -406,14 +492,22 @@ function daysBetween(from: string, to: string): number {
 export function buildDailyQueue(
   prospects: Prospect[],
   today: string,
-  settings: ProspectingSettings = DEFAULT_PROSPECTING_SETTINGS
+  settings: ProspectingSettings = DEFAULT_PROSPECTING_SETTINGS,
+  now: Date = new Date()
 ): { items: QueueItem[]; overflow: number } {
   const all: QueueItem[] = [];
   prospects.forEach((p) => {
-    if (CLOSED.includes(p.stage) || p.stage === 'llamada') return;
+    if (CLOSED.includes(p.stage)) return;
     let kind: QueueKind | null = null;
     let due = p.nextActionDate || today;
-    if (p.stage === 'auditoria_completada') {
+    if (p.stage === 'llamada') {
+      if (p.proposalSentAt) {
+        if ((p.nextActionDate || today) <= today) kind = 'propuesta';
+      } else if (p.callDate && p.callDate <= today) {
+        kind = 'llamada';
+        due = p.callDate;
+      }
+    } else if (p.stage === 'auditoria_completada') {
       kind = 'video';
       due = p.videoDueDate || today;
     } else if (p.stage === 'respondio' && (p.nextActionDate || today) <= today) kind = 'responder';
@@ -424,28 +518,55 @@ export function buildDailyQueue(
     }
     if (!kind) return;
     // Lo que ya se hizo hoy no vuelve a aparecer
-    if (kind !== 'video' && kind !== 'responder' && p.lastContactAt === today) return;
+    if ((kind === 'primer' || kind === 'seguimiento' || kind === 'propuesta') && p.lastContactAt === today) return;
     all.push({
       prospect: p,
       kind,
       overdueDays: Math.max(0, daysBetween(due, today)),
       suggestDiscard: kind === 'seguimiento' && (p.followUps || 0) >= settings.maxFollowUps,
       hot: isHot(p),
+      localTime: localTimeFor(p.country, now),
     });
   });
 
+  // Dentro de cada tipo: primero a quien le podés escribir ahora (horario de su país),
+  // después los calientes y los más atrasados
   all.sort(
     (a, b) =>
       KIND_ORDER[a.kind] - KIND_ORDER[b.kind] ||
+      TIME_RANK[a.localTime?.quality || 'bueno'] - TIME_RANK[b.localTime?.quality || 'bueno'] ||
       Number(b.hot) - Number(a.hot) ||
       b.overdueDays - a.overdueDays ||
       a.prospect.name.localeCompare(b.prospect.name)
   );
 
-  const mustDo = all.filter((i) => i.kind === 'video' || i.kind === 'responder');
-  const rest = all.filter((i) => i.kind !== 'video' && i.kind !== 'responder');
+  // Siempre entran: lo urgente y lo que sumaste a mano hoy. El resto, hasta el tope diario.
+  const forced = (i: QueueItem) => MUST_DO.includes(i.kind) || (i.kind === 'primer' && i.prospect.pulledOn === today);
+  const mustDo = all.filter(forced);
+  const rest = all.filter((i) => !forced(i));
   const room = Math.max(0, settings.dailyCap - mustDo.length);
   return { items: [...mustDo, ...rest.slice(0, room)], overflow: Math.max(0, rest.length - room) };
+}
+
+/**
+ * Pendientes de días anteriores: les escribiste y nunca anotaste qué pasó.
+ * Es lo primero que pide el inicio del día.
+ */
+export function pendingOutcomes(prospects: Prospect[], today: string): Prospect[] {
+  return prospects
+    .filter(
+      (p) =>
+        !!p.lastContactAt &&
+        p.lastContactAt < today &&
+        (p.lastOutcomeAt || '') < p.lastContactAt &&
+        ['contactado', 'auditoria_enviada', 'video_enviado'].includes(p.stage)
+    )
+    .sort((a, b) => (a.lastContactAt || '').localeCompare(b.lastContactAt || ''));
+}
+
+/** Descartados sin respuesta que ya cumplieron los 90 días: vuelven con otro mensaje. */
+export function recycleDue(prospects: Prospect[], today: string): Prospect[] {
+  return prospects.filter((p) => p.stage === 'descartado' && !p.doNotContact && !!p.recycleAfter && p.recycleAfter <= today);
 }
 
 /** Para el cierre del día: a quiénes les escribiste hoy y todavía no anotaste qué pasó. */
@@ -468,8 +589,19 @@ export function greetingFor(p: Prospect): string {
   return (p.studio || p.name || '').trim();
 }
 
-export function renderTemplate(template: string, p: Prospect): string {
+export const DEFAULT_PERSONAL = 'Viendo el enfoque y la trayectoria que tienes en tu estudio, ';
+
+/** La frase personalizada siempre termina en coma, para seguir con "¿me permites...?" */
+export function normalizePersonalLine(line?: string): string {
+  const t = (line || '').trim().replace(/[.;:!¡?¿\s]+$/, '');
+  return t ? `${t}, ` : '';
+}
+
+export function renderTemplate(template: string, p: Prospect, settings?: ProspectingSettings): string {
   return template
+    .replace(/\{personal\}/g, normalizePersonalLine(p.personalLine) || DEFAULT_PERSONAL)
+    .replace(/\{video\}/g, p.videoUrl || '[pega aquí el link del video]')
+    .replace(/\{agenda\}/g, bookingLinkFor(p, settings?.bookingUrl) || '[tu link para agendar]')
     .replace(/\{saludo\}/g, greetingFor(p))
     .replace(/\{nombre\}/g, firstName(p.name))
     .replace(/\{estudio\}/g, p.studio || 'tu estudio')
@@ -478,8 +610,15 @@ export function renderTemplate(template: string, p: Prospect): string {
 
 export function templateFor(item: QueueItem, settings: ProspectingSettings): string {
   const t = settings.templates;
-  if (item.kind === 'primer') return t.first;
+  const p = item.prospect;
+  if (item.kind === 'primer') {
+    if (p.secondChance && t.secondChance) return t.secondChance;
+    return variantFor(p, settings) === 'B' ? t.firstB : t.first;
+  }
   if (item.kind === 'video') return t.video;
+  if (item.kind === 'llamada') return '';
+  if (item.kind === 'propuesta') return t.proposal;
+  if (item.kind === 'seguimiento' && p.stage === 'video_enviado') return t.booking;
   if (item.kind === 'responder') {
     const step = item.prospect.convStep || 'pregunta';
     if (step === 'pregunta' || step === 'esperando_respuesta') return t.question;
@@ -613,4 +752,129 @@ export function metricsToCsv(weeks: WeekMetrics[]): string {
     row('Auto Auditorias', 'autoAuditorias'),
   ];
   return '﻿' + rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(';')).join('\n');
+}
+
+// ---------------- MÉTRICAS POR GRUPO, A/B Y MOTIVOS ----------------
+
+export interface GroupStat {
+  key: string;
+  contacted: number;
+  replied: number;
+  audits: number;
+}
+
+/**
+ * Tasa de respuesta por país, rubro, prioridad y versión del primer mensaje.
+ * "Contactado" = recibió primer mensaje; "respondió" = tiene una respuesta registrada.
+ */
+export function breakdownBy(
+  prospects: Prospect[],
+  events: ProspectEvent[],
+  keyOf: (p: Prospect) => string | undefined
+): GroupStat[] {
+  const contacted = new Set(events.filter((e) => e.type === 'first_contact').map((e) => e.prospectId));
+  const replied = new Set(events.filter((e) => e.type === 'reply').map((e) => e.prospectId));
+  const audits = new Set(events.filter((e) => e.type === 'audit_completed').map((e) => e.prospectId));
+  const m = new Map<string, GroupStat>();
+  prospects.forEach((p) => {
+    if (!contacted.has(p.id)) return;
+    const k = keyOf(p);
+    if (!k) return;
+    const g = m.get(k) || { key: k, contacted: 0, replied: 0, audits: 0 };
+    g.contacted++;
+    if (replied.has(p.id)) g.replied++;
+    if (audits.has(p.id)) g.audits++;
+    m.set(k, g);
+  });
+  return [...m.values()].sort((a, b) => b.contacted - a.contacted);
+}
+
+export function scoreTier(score?: number): 'A' | 'B' | 'C' | undefined {
+  if (score === undefined) return undefined;
+  return score >= 75 ? 'A' : score >= 60 ? 'B' : 'C';
+}
+
+/**
+ * Aprende de lo que te responden: países que contestan más que el promedio suben en la
+ * reserva, los que contestan menos bajan (solo con al menos 8 contactados en ese país).
+ */
+export function countryBoosts(prospects: Prospect[], events: ProspectEvent[]): Record<string, number> {
+  const stats = breakdownBy(prospects, events, (p) => p.country);
+  const totalC = stats.reduce((s, g) => s + g.contacted, 0);
+  const totalR = stats.reduce((s, g) => s + g.replied, 0);
+  if (totalC < 15) return {};
+  const avg = totalR / totalC;
+  const out: Record<string, number> = {};
+  stats.forEach((g) => {
+    if (g.contacted < 8) return;
+    out[g.key] = Math.max(-8, Math.min(8, Math.round((g.replied / g.contacted - avg) * 40)));
+  });
+  return out;
+}
+
+export function lostReasons(prospects: Prospect[]): { reason: string; count: number }[] {
+  const m = new Map<string, number>();
+  prospects
+    .filter((p) => p.stage === 'descartado' && p.lostReason)
+    .forEach((p) => m.set(p.lostReason!, (m.get(p.lostReason!) || 0) + 1));
+  return [...m.entries()].map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count);
+}
+
+/** Reporte de la semana para mandarle a tu mentor (texto para WhatsApp). */
+export function weeklyReportText(week: WeekMetrics, goal: number, studioName = '.Cero'): string {
+  const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—');
+  return [
+    `Reporte de prospección ${studioName} — ${week.label} (${week.range})`,
+    `Conversaciones OUT: ${week.conversacionesOut}${goal ? ` de ${goal} (meta)` : ''}`,
+    `Seguimientos: ${week.seguimientos}`,
+    `Respuestas: ${week.respuestas} (${pct(week.respuestas, week.conversacionesOut)} de respuesta)`,
+    `Auto auditorías: ${week.autoAuditorias}`,
+  ].join('\n');
+}
+
+// ---------------- LLAMADAS EN LA AGENDA ----------------
+
+/**
+ * Link para agendar con su id adentro: Calendly lo devuelve en el aviso de la reserva
+ * (utm_content) y así la app sabe exactamente quién agendó.
+ */
+export function bookingLinkFor(p: Prospect, bookingUrl?: string): string {
+  const url = (bookingUrl || '').trim();
+  if (!url || !/calendly\.com/i.test(url)) return url;
+  return `${url}${url.includes('?') ? '&' : '?'}utm_source=cero&utm_content=${encodeURIComponent(p.id)}`;
+}
+
+export const callMeetingId = (prospectId: string) => `call_${prospectId}`.slice(0, 120);
+
+/** La reunión que va a tu agenda (y a Google Calendar si está conectado). */
+export function callMeetingFor(
+  p: Prospect,
+  date: string,
+  time: string | undefined,
+  minutes = 30,
+  today = date,
+  extra: { notes?: string } = {}
+) {
+  const studio = p.studio || p.name;
+  return {
+    id: callMeetingId(p.id),
+    title: `Llamada: ${studio}`,
+    date,
+    time: time || undefined,
+    durationHours: Math.round((minutes / 60) * 100) / 100,
+    completed: false,
+    createdAt: today,
+    clientPhone: p.whatsapp,
+    reminderMinutesBefore: 15,
+    reminderNotified: false,
+    notes: [
+      `Prospecto de .Cero${p.city ? ` (${p.city})` : ''}.`,
+      p.whatsapp ? `WhatsApp: ${p.whatsapp}` : '',
+      p.audit ? `Auditoría ${p.audit.total}/30 (${p.audit.nivel}). Dolor: ${p.audit.dolorCaptacion || '—'}.` : '',
+      p.videoUrl ? `Video: ${p.videoUrl}` : '',
+      extra.notes || '',
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  };
 }

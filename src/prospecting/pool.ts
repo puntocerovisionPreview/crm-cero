@@ -328,11 +328,17 @@ export function buildPool(rows: Record<string, string>[], options: { excludeIds?
 }
 
 /** Reparto variado: no 10 del mismo país o rubro seguidos. Toma los mejores alternando. */
-export function pickBatch(available: PoolLead[], count: number, filters: { countries?: string[]; segments?: PoolSegment[] } = {}): PoolLead[] {
+export function pickBatch(
+  available: PoolLead[],
+  count: number,
+  filters: { countries?: string[]; segments?: PoolSegment[]; boosts?: Record<string, number> } = {}
+): PoolLead[] {
+  // boosts: puntos extra por país según cuánto te responden (aprende de tus métricas)
+  const sc = (l: PoolLead) => l.score + (filters.boosts?.[l.country] || 0);
   const pool = available
     .filter((l) => !filters.countries?.length || filters.countries.includes(l.country))
     .filter((l) => !filters.segments?.length || filters.segments.includes(l.segment))
-    .sort((a, b) => b.score - a.score || hash(a.id) - hash(b.id));
+    .sort((a, b) => sc(b) - sc(a) || hash(a.id) - hash(b.id));
   const picked: PoolLead[] = [];
   const perCountry = new Map<string, number>();
   const maxPerCountry = Math.max(2, Math.ceil(count / 3));

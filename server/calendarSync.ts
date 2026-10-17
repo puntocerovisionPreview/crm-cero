@@ -170,7 +170,8 @@ export async function runCalendarSync(db: Firestore, opts: { dryRun?: boolean } 
         linked.durationHours = remote.durationHours;
         linked.googleSyncHash = remoteHash;
       }
-    } else if (!ceroId) {
+    } else if (!ceroId && ![...meetings.values()].some((m) => m.date === local.date && m.time === local.time && !m.completed)) {
+      // (si ya hay una reunión a esa misma hora — por ejemplo, la que creó Calendly — no se duplica)
       // Evento nuevo creado en Google (por ejemplo, un turno reservado)
       const id = `gcal_${ev.id}`.slice(0, 120);
       const meeting = {

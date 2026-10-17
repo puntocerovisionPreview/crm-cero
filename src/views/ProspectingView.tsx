@@ -1,6 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   AlertCircle,
+  Ban,
+  Loader2,
+  Phone,
+  Sparkles,
+  Target,
+  Zap,
   Check,
   ChevronDown,
   ChevronUp,
@@ -30,14 +36,21 @@ import {
   normalizeInstagram,
   parsePastedProspects,
   pendingDayClose,
+  pendingOutcomes,
   renderTemplate,
   templateFor,
+  breakdownBy,
+  lostReasons,
+  scoreTier,
+  weeklyReportText,
   ProspectAction,
 } from '../prospecting/core';
+import { COUNTRY_NAMES } from '../prospecting/pool';
+import { friendlyError, generateVideoScript, markDayStarted, useAddMore, usePoolTakeOptions, useRecycle } from '../prospecting/actions';
+import { BurstMode, DayStartFlow, LocalTimeBadge, PersonalLineButton } from '../components/ProspectingDayStart';
 import { deleteProspect, recordProspectAction, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
 import { useProspecting } from '../prospecting/useProspecting';
 import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
-import { takeFromPool } from '../prospecting/poolStore';
 import { ReservaPanel } from '../components/ReservaPanel';
 import { CONV_STEP_LABELS, DIFUSION_LABELS } from '../prospecting/core';
 import { DifusionKey } from '../types';
@@ -45,7 +58,9 @@ import { buildWebSnippet } from '../prospecting/webSnippet';
 import { formatWhatsAppUrl } from '../utils/contact';
 import { hapticFeedback } from '../utils/haptics';
 import { playTaskDone } from '../utils/sound';
-import { parseLocalDate } from '../utils/dates';
+import { addDays, parseLocalDate, todayLocal } from '../utils/dates';
+import { saveMeetingToFirestore } from '../utils/firestoreService';
+import { callMeetingFor } from '../prospecting/core';
 
 type Tab = 'hoy' | 'prospectos' | 'reserva' | 'cargar' | 'metricas' | 'mensajes';
 
@@ -82,34 +97,58 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
   const list = prospects || [];
   const pool = usePool();
   const [poolNotice, setPoolNotice] = useState<string | null>(null);
-  useWeeklyAutoBatch(settings, settingsLoaded, today, (n) => {
-    setPoolNotice(`Empezó la semana: pasaron ${n} contactos nuevos de la reserva, repartidos en los días hábiles.`);
+  const [actError, setActError] = useState<string | null>(null);
+  const takeOpts = usePoolTakeOptions(list, events);
+  useWeeklyAutoBatch(settings, settingsLoaded, today, takeOpts, (n) => {
+    setPoolNotice(`Empezó la semana: pasaron ${n} contactos nuevos de la reserva, repartidos en tus días de trabajo.`);
     pool.refresh();
   });
+  const [recycled, setRecycled] = useState<string | null>(null);
+  useRecycle(prospects, today, (n) => setRecycled(`Volvieron ${n} ${n === 1 ? 'contacto' : 'contactos'} que no respondieron hace 90 días: les toca el mensaje de segunda chance.`));
 
-  // "Sumar más hoy": toma de la reserva y los deja para hoy (la reserva se va restando)
-  const addMoreToday = async (n: number) => {
-    hapticFeedback.medium();
-    const added = await takeFromPool(n, settings, today, { perDay: n }).catch(() => 0);
-    setPoolNotice(added ? `Sumaste ${added} ${added === 1 ? 'contacto' : 'contactos'} más para hoy.` : 'No quedan contactos en la reserva con tus filtros.');
-    pool.refresh();
-  };
+  // "Sumar más hoy": toma de la reserva y los deja para HOY (también sábado o domingo)
+  const more = useAddMore(settings, today, takeOpts, pool.refresh);
 
   const queue = useMemo(() => buildDailyQueue(list, today, settings), [list, today, settings]);
   const toClose = useMemo(() => pendingDayClose(list, today), [list, today]);
+  const pending = useMemo(() => pendingOutcomes(list, today), [list, today]);
   const monthKey = today.slice(0, 7);
   const weeks = useMemo(() => computeMonthMetrics(events, monthKey), [events, monthKey]);
   const thisWeek = weeks.find((w) => today >= w.start && today <= w.end);
 
+  // Inicio del día: lo primero al abrir Prospección (una vez por día)
+  const [dayStartOpen, setDayStartOpen] = useState(false);
+  const [burstOpen, setBurstOpen] = useState(false);
+  const [dayHandled, setDayHandled] = useState<string | null>(null);
+  const needsDayStart =
+    settingsLoaded &&
+    prospects !== null &&
+    settings.dayStartedOn !== today &&
+    dayHandled !== today &&
+    (pending.length > 0 || queue.items.length > 0 || pool.availableCount > 0);
+  useEffect(() => {
+    if (needsDayStart) setDayStartOpen(true);
+  }, [needsDayStart]);
+  const finishDayStart = () => {
+    setDayHandled(today);
+    setDayStartOpen(false);
+    markDayStarted(today).catch((err) => console.warn('Inicio del día:', err));
+  };
+
   const act = async (p: Prospect, action: ProspectAction, note?: string) => {
     hapticFeedback.medium();
-    if (action !== 'no_reply' && action !== 'lost') playTaskDone();
+    if (!['no_reply', 'lost', 'do_not_contact', 'snooze'].includes(action)) playTaskDone();
     try {
       await recordProspectAction(p, action, today, settings, note);
+      setActError(null);
     } catch (err) {
-      console.warn('No se pudo registrar la acción:', err);
+      setActError(`No se guardó lo de ${p.studio || p.name}: ${friendlyError(err)}`);
+      throw err;
     }
   };
+  const actSafe = (p: Prospect, action: ProspectAction, note?: string) => act(p, action, note).catch(() => undefined);
+  const goal = settings.weeklyGoal || 0;
+  const goalPct = goal > 0 && thisWeek ? Math.min(100, Math.round((thisWeek.conversacionesOut / goal) * 100)) : 0;
 
   return (
     <div className="space-y-4 pb-24 max-w-4xl">
@@ -120,7 +159,38 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
             ? `Esta semana: ${thisWeek.conversacionesOut} conversaciones, ${thisWeek.seguimientos} seguimientos, ${thisWeek.respuestas} respuestas y ${thisWeek.autoAuditorias} auditorías.`
             : 'Tu lista de contactos en frío, día por día.'}
         </p>
+        {goal > 0 && thisWeek && (
+          <div className="flex items-center gap-2 pt-1" title="Meta semanal de conversaciones nuevas">
+            <Target className="w-4 h-4 text-[var(--accent)] shrink-0" />
+            <div className="flex-1 h-2 rounded-full bg-[var(--bg-surface-muted)] overflow-hidden">
+              <div className={`h-full transition-all ${goalPct >= 100 ? 'bg-emerald-500' : 'bg-[var(--accent)]'}`} style={{ width: `${goalPct}%` }} />
+            </div>
+            <span className="text-xs tabular-nums text-[var(--text-secondary)] shrink-0">
+              {thisWeek.conversacionesOut} de {goal}
+            </span>
+          </div>
+        )}
       </header>
+
+      {dayStartOpen && prospects !== null && !burstOpen && (
+        <DayStartFlow
+          pending={pending}
+          queue={queue.items}
+          overflow={queue.overflow}
+          poolAvailable={pool.availableCount}
+          addMore={more}
+          onAct={act}
+          recycledNotice={recycled}
+          onBurst={() => {
+            finishDayStart();
+            setBurstOpen(true);
+          }}
+          onFinish={finishDayStart}
+        />
+      )}
+      {burstOpen && prospects !== null && (
+        <BurstMode queue={queue.items} prospects={list} settings={settings} today={today} onAct={act} onClose={() => setBurstOpen(false)} poolAvailable={pool.availableCount} addMore={more} />
+      )}
 
       <div className="flex gap-1 overflow-x-auto no-scrollbar p-1 rounded-[var(--radius-control)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]" role="tablist">
         {TABS.map((t) => (
@@ -148,23 +218,34 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
       )}
 
       {poolNotice && <p className="text-sm text-[var(--text-primary)] p-3 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)]">{poolNotice}</p>}
+      {recycled && !dayStartOpen && <p className="text-sm text-[var(--text-primary)] p-3 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)]">{recycled}</p>}
+      {actError && (
+        <p className="text-sm text-red-400 p-3 rounded-[var(--radius-control)] bg-red-500/10 flex items-center gap-2" role="alert">
+          <AlertCircle className="w-4 h-4 shrink-0" /> {actError}
+        </p>
+      )}
 
       {prospects !== null && tab === 'hoy' && (
         <TodayPanel
           poolAvailable={pool.availableCount}
-          onAddMore={addMoreToday}
+          onAddMore={more.addMore}
+          addMoreBusy={more.busy}
+          addMoreMessage={more.message}
+          onBurst={() => setBurstOpen(true)}
+          onStartDay={pending.length > 0 ? () => setDayStartOpen(true) : undefined}
+          pendingCount={pending.length}
           queue={queue.items}
           overflow={queue.overflow}
           toClose={toClose}
           showClose={hour >= settings.closeHour || toClose.length > 0}
           settings={settings}
-          onAct={act}
+          onAct={actSafe}
           onGoLoad={() => setTab(pool.availableCount > 0 ? 'reserva' : 'cargar')}
           isEvening={hour >= settings.closeHour}
         />
       )}
       {prospects !== null && tab === 'prospectos' && (
-        <ProspectList prospects={list} today={today} settings={settings} onAct={act} onAddProject={onAddProject} />
+        <ProspectList prospects={list} today={today} settings={settings} onAct={actSafe} onAddProject={onAddProject} />
       )}
       {prospects !== null && tab === 'cargar' && (
         <ImportPanel prospects={list} projects={projects} today={today} settings={settings} onDone={() => setTab('hoy')} />
@@ -181,7 +262,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           onChanged={pool.refresh}
         />
       )}
-      {prospects !== null && tab === 'metricas' && <MetricsPanel events={events} today={today} prospects={list} />}
+      {prospects !== null && tab === 'metricas' && <MetricsPanel events={events} today={today} prospects={list} settings={settings} />}
       {prospects !== null && tab === 'mensajes' && <SettingsPanel settings={settings} />}
     </div>
   );
@@ -201,8 +282,46 @@ export const TodayPanel: React.FC<{
   compact?: boolean;
   poolAvailable?: number;
   onAddMore?: (n: number) => void;
-}> = ({ queue, overflow, toClose, showClose, isEvening, settings, onAct, onGoLoad, compact, poolAvailable = 0, onAddMore }) => (
+  addMoreBusy?: boolean;
+  addMoreMessage?: { kind: 'ok' | 'error'; text: string } | null;
+  onBurst?: () => void;
+  onStartDay?: () => void;
+  pendingCount?: number;
+}> = ({
+  queue,
+  overflow,
+  toClose,
+  showClose,
+  isEvening,
+  settings,
+  onAct,
+  onGoLoad,
+  compact,
+  poolAvailable = 0,
+  onAddMore,
+  addMoreBusy,
+  addMoreMessage,
+  onBurst,
+  onStartDay,
+  pendingCount = 0,
+}) => {
+  const toWrite = queue.filter((i) => i.kind === 'primer' || i.kind === 'seguimiento').length;
+  return (
   <div className="space-y-4">
+    {onStartDay && pendingCount > 0 && (
+      <button type="button" onClick={onStartDay} className={`${card} w-full p-3 text-left flex items-center gap-2 border-amber-500/40`}>
+        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+        <span className="flex-1 text-sm text-[var(--text-primary)]">
+          {pendingCount} {pendingCount === 1 ? 'mensaje de días anteriores sin anotar' : 'mensajes de días anteriores sin anotar'} si respondieron
+        </span>
+        <span className="text-sm font-semibold text-[var(--accent)]">Anotar</span>
+      </button>
+    )}
+    {onBurst && toWrite > 1 && (
+      <button type="button" onClick={onBurst} className={`${btnPrimary} w-full py-3`}>
+        <Zap className="w-4 h-4" /> Modo ráfaga: {toWrite} mensajes uno tras otro
+      </button>
+    )}
     {showClose && toClose.length > 0 && (
       <section className={`${card} p-4 space-y-3 ${isEvening ? 'border-[var(--accent)]/50' : ''}`}>
         <div className="flex items-start gap-2">
@@ -261,25 +380,41 @@ export const TodayPanel: React.FC<{
       </p>
     )}
 
-    {onAddMore && poolAvailable > 0 && !queue.some((i) => i.kind === 'primer') && (
-      <section className={`${card} p-4 flex flex-col sm:flex-row sm:items-center gap-3`}>
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-[var(--text-primary)]">Ya no te quedan primeros mensajes para hoy. ¿Sumar más?</p>
-          <p className="text-xs text-[var(--text-secondary)]">
-            Quedan {poolAvailable.toLocaleString('es-AR')} contactos en la reserva. Se toman los mejores y se descuentan de la base.
-          </p>
+    {onAddMore && (poolAvailable > 0 || addMoreMessage) && (
+      <section className={`${card} p-4 space-y-2`}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-[var(--text-primary)]">
+              {queue.some((i) => i.kind === 'primer') ? '¿Querés escribirle a más gente hoy?' : 'Ya no te quedan primeros mensajes para hoy. ¿Sumar más?'}
+            </p>
+            <p className="text-xs text-[var(--text-secondary)]">
+              {poolAvailable > 0
+                ? `Quedan ${poolAvailable.toLocaleString('es-AR')} contactos en la reserva. Se toman los mejores, quedan para hoy y se descuentan de la base.`
+                : 'La reserva está vacía: subí el CSV en la pestaña Reserva.'}
+            </p>
+          </div>
+          {poolAvailable > 0 && (
+            <div className="flex gap-1.5 shrink-0">
+              {[2, 5, 10].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  disabled={addMoreBusy}
+                  className={`${n === 2 ? btnPrimary : btnGhost} py-1.5 text-xs min-w-[3rem] justify-center`}
+                  onClick={() => onAddMore(Math.min(n, poolAvailable))}
+                >
+                  {addMoreBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `+${n}`}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
-        <div className="flex gap-1.5 shrink-0">
-          {[2, 5, 10].map((n) => (
-            <button key={n} type="button" className={`${n === 2 ? btnPrimary : btnGhost} py-1.5 text-xs`} onClick={() => onAddMore(Math.min(n, poolAvailable))}>
-              +{n}
-            </button>
-          ))}
-        </div>
+        {addMoreMessage && <p className={`text-xs ${addMoreMessage.kind === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{addMoreMessage.text}</p>}
       </section>
     )}
   </div>
-);
+  );
+};
 
 const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAct: (p: Prospect, a: ProspectAction, n?: string) => void; compact?: boolean }> = ({
   item,
@@ -292,8 +427,26 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
     !compact && item.kind !== 'video' && !(item.kind === 'responder' && ['esperando_respuesta', 'esperando_acuerdo'].includes(item.prospect.convStep || ''))
   );
   const [copied, setCopied] = useState(false);
-  const message = renderTemplate(templateFor(item, settings), p);
+  const [callPicker, setCallPicker] = useState(false);
+  const [lostPicker, setLostPicker] = useState(false);
+  const [script, setScript] = useState<string | null>(null);
+  const [scriptBusy, setScriptBusy] = useState(false);
+  const [scriptErr, setScriptErr] = useState<string | null>(null);
+  const message = renderTemplate(templateFor(item, settings), p, settings);
   const ig = normalizeInstagram(p.instagram);
+  const igFirst = item.kind === 'seguimiento' && !!ig && (p.followUps || 0) >= 1;
+
+  const makeScript = async () => {
+    setScriptBusy(true);
+    setScriptErr(null);
+    try {
+      setScript(await generateVideoScript(p));
+    } catch (e) {
+      setScriptErr(friendlyError(e));
+    } finally {
+      setScriptBusy(false);
+    }
+  };
 
   const copy = () => {
     navigator.clipboard?.writeText(message).then(() => {
@@ -309,6 +462,8 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
       ? `${QUEUE_LABELS.seguimiento} ${Math.min((p.followUps || 0) + 1, settings.maxFollowUps)} de ${settings.maxFollowUps}`
       : item.kind === 'responder'
       ? `Conversación: ${CONV_STEP_LABELS[step]}`
+      : item.kind === 'primer' && p.secondChance
+      ? 'Segunda chance (pasaron 90 días)'
       : QUEUE_LABELS[item.kind];
 
   return (
@@ -324,6 +479,7 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
                 <Flame className="w-3.5 h-3.5" /> caliente
               </span>
             )}
+            <LocalTimeBadge item={item} />
           </p>
           <p className="text-[15px] font-semibold text-[var(--text-primary)] truncate">
             {p.name}
@@ -344,10 +500,53 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
 
       {item.kind === 'responder' && <ScriptSteps step={step} difusion={p.difusion} />}
 
-      {open && (
+      {open && message && (
         <div className="space-y-1">
           {waiting && <p className="text-[11px] text-[var(--text-tertiary)]">Ya enviado:</p>}
           <p className="text-sm whitespace-pre-wrap text-[var(--text-secondary)] p-2.5 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)]">{message}</p>
+        </div>
+      )}
+      {item.kind === 'primer' && !p.secondChance && open && settings.templates.first.includes('{personal}') && <PersonalLineButton prospect={p} small />}
+      {igFirst && <p className="text-xs text-amber-400">Por WhatsApp no contestó: probá esta vez por Instagram.</p>}
+
+      {item.kind === 'video' && (
+        <div className="space-y-2">
+          <div className="flex gap-1.5">
+            <input
+              defaultValue={p.videoUrl || ''}
+              placeholder="Pegá el link del video (Loom, YouTube, Drive)"
+              onBlur={(e) => e.target.value.trim() !== (p.videoUrl || '') && updateProspect(p.id, { videoUrl: e.target.value.trim() || undefined })}
+              className={`${input} text-xs`}
+              aria-label="Link del video"
+            />
+            <button type="button" className={`${btnGhost} py-1.5 text-xs shrink-0`} onClick={makeScript} disabled={scriptBusy} title="Guion de 60-90 segundos según sus respuestas">
+              {scriptBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />} Guion con IA
+            </button>
+          </div>
+          {scriptErr && <p className="text-xs text-red-400">{scriptErr}</p>}
+          {script && (
+            <div className="space-y-1">
+              <p className="text-xs whitespace-pre-wrap text-[var(--text-secondary)] p-2.5 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)] max-h-64 overflow-y-auto">{script}</p>
+              <button type="button" className={`${btnGhost} py-1 text-xs`} onClick={() => navigator.clipboard?.writeText(script)}>
+                <ClipboardCopy className="w-3.5 h-3.5" /> Copiar guion
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {callPicker && <CallScheduler prospect={p} onAct={onAct} onClose={() => setCallPicker(false)} />}
+      {lostPicker && (
+        <div className="flex items-center gap-1.5 flex-wrap p-2 rounded-[var(--radius-control)] bg-[var(--bg-app)]">
+          <span className="text-xs text-[var(--text-secondary)] w-full">¿Por qué no se dio?</span>
+          {LOST_REASONS.map((r) => (
+            <button key={r} type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'lost', r)}>
+              {r}
+            </button>
+          ))}
+          <button type="button" className="text-xs text-[var(--text-tertiary)] underline px-1" onClick={() => setLostPicker(false)}>
+            Cancelar
+          </button>
         </div>
       )}
 
@@ -366,7 +565,7 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
 
       <div className="flex flex-wrap gap-1.5">
         {p.whatsapp && (
-          <a href={formatWhatsAppUrl(p.whatsapp, message)} target="_blank" rel="noopener noreferrer" className={`${btnGhost} py-1.5 text-xs`}>
+          <a href={formatWhatsAppUrl(p.whatsapp, message || undefined)} target="_blank" rel="noopener noreferrer" className={`${btnGhost} py-1.5 text-xs`}>
             <MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp
           </a>
         )}
@@ -382,10 +581,12 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
             <Instagram className="w-3.5 h-3.5" /> Instagram
           </a>
         )}
-        <button type="button" onClick={copy} className={`${btnGhost} py-1.5 text-xs`}>
-          {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <ClipboardCopy className="w-3.5 h-3.5" />}
-          {copied ? 'Copiado' : 'Copiar'}
-        </button>
+        {message && (
+          <button type="button" onClick={copy} className={`${btnGhost} py-1.5 text-xs`}>
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <ClipboardCopy className="w-3.5 h-3.5" />}
+            {copied ? 'Copiado' : 'Copiar'}
+          </button>
+        )}
 
         <span className="flex-1" />
 
@@ -436,11 +637,14 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
                 Sigue mañana
               </button>
             )}
-            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'call')}>
-              Agendamos llamada
+            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setCallPicker(true)}>
+              <Phone className="w-3.5 h-3.5" /> Agendamos llamada
             </button>
             <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'lost', 'No le interesa')}>
               No le interesa
+            </button>
+            <button type="button" className={`${btnGhost} py-1.5 text-xs text-red-400`} onClick={() => onAct(p, 'do_not_contact')} title="No vuelve a aparecer nunca, ni en futuras cargas">
+              <Ban className="w-3.5 h-3.5" /> No contactar
             </button>
           </>
         )}
@@ -448,6 +652,40 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
           <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'video_sent')}>
             <Video className="w-3.5 h-3.5" /> Video enviado
           </button>
+        )}
+        {item.kind === 'seguimiento' && p.stage === 'video_enviado' && (
+          <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setCallPicker(true)}>
+            <Phone className="w-3.5 h-3.5" /> Agendó la llamada
+          </button>
+        )}
+        {item.kind === 'llamada' && (
+          <>
+            <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'proposal_sent')}>
+              Le mandé la propuesta
+            </button>
+            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'won')}>
+              Cerrado: es cliente
+            </button>
+            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setCallPicker(true)}>
+              Se pasó de día
+            </button>
+            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setLostPicker(true)}>
+              No se dio
+            </button>
+          </>
+        )}
+        {item.kind === 'propuesta' && (
+          <>
+            <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'follow_up')}>
+              <Check className="w-3.5 h-3.5" /> Seguimiento enviado
+            </button>
+            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'won')}>
+              Aceptó: es cliente
+            </button>
+            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setLostPicker(true)}>
+              No se dio
+            </button>
+          </>
         )}
       </div>
     </li>
@@ -466,6 +704,7 @@ const ProspectList: React.FC<{
   onAddProject?: Props['onAddProject'];
 }> = ({ prospects, today, onAct, onAddProject }) => {
   const [filter, setFilter] = useState<'activos' | ProspectStage>('activos');
+  const [callFor, setCallFor] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [q, setQ] = useState('');
 
@@ -545,6 +784,10 @@ const ProspectList: React.FC<{
                     {p.stage === 'nuevo' && p.plannedFirstContact ? ` — primer mensaje el ${shortDate(p.plannedFirstContact)}` : ''}
                     {['contactado', 'auditoria_enviada', 'video_enviado'].includes(p.stage) && p.nextActionDate ? ` — sigue el ${shortDate(p.nextActionDate)}` : ''}
                     {p.audit ? ` — ${p.audit.total}/30` : ''}
+                    {p.stage === 'llamada' && p.callDate ? ` — llamada el ${shortDate(p.callDate)}${p.callTime ? ` a las ${p.callTime}` : ''}` : ''}
+                    {p.stage === 'llamada' && p.proposalSentAt ? ` — propuesta enviada el ${shortDate(p.proposalSentAt)}` : ''}
+                    {p.stage === 'descartado' && p.lostReason ? ` — ${p.lostReason}` : ''}
+                    {p.stage === 'descartado' && p.recycleAfter ? ` — vuelve el ${shortDate(p.recycleAfter)}` : ''}
                   </p>
                 </div>
                 {isHot(p) && <Flame className="w-4 h-4 text-amber-400 shrink-0" aria-label="Caliente" />}
@@ -578,6 +821,8 @@ const ProspectList: React.FC<{
                     </div>
                   )}
 
+                  {callFor === p.id && <CallScheduler prospect={p} onAct={onAct} onClose={() => setCallFor(null)} />}
+
                   <label className="block space-y-1">
                     <span className="text-xs font-semibold text-[var(--text-secondary)]">Notas</span>
                     <textarea
@@ -604,8 +849,8 @@ const ProspectList: React.FC<{
                     </button>
                     {!['cliente', 'descartado'].includes(p.stage) && (
                       <>
-                        <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'call')}>
-                          Llamada agendada
+                        <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setCallFor(p.id)}>
+                          <Phone className="w-3.5 h-3.5" /> {p.stage === 'llamada' && p.callDate ? 'Cambiar día de la llamada' : 'Agendar llamada'}
                         </button>
                         {onAddProject && (
                           <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => convert(p)}>
@@ -617,11 +862,16 @@ const ProspectList: React.FC<{
                         </button>
                       </>
                     )}
+                    {!p.doNotContact && (
+                      <button type="button" className={`${btnGhost} py-1.5 text-xs text-red-400`} onClick={() => onAct(p, 'do_not_contact')} title="No vuelve a aparecer, ni en futuras cargas de la reserva">
+                        <Ban className="w-3.5 h-3.5" /> No contactar más
+                      </button>
+                    )}
                     {p.stage === 'descartado' && (
                       <button
                         type="button"
                         className={`${btnGhost} py-1.5 text-xs`}
-                        onClick={() => updateProspect(p.id, { stage: 'contactado', nextActionDate: today, followUps: 0 })}
+                        onClick={() => updateProspect(p.id, { stage: 'contactado', nextActionDate: today, followUps: 0, doNotContact: undefined, recycleAfter: undefined })}
                       >
                         Reactivar
                       </button>
@@ -666,7 +916,7 @@ const ImportPanel: React.FC<{ prospects: Prospect[]; projects: Project[]; today:
   const dups = useMemo(() => rows.map((r) => findDuplicate(r, prospects, projects)), [rows, prospects, projects]);
   const included = rows.map((_, i) => (skip[i] !== undefined ? !skip[i] : !dups[i]));
   const count = included.filter(Boolean).length;
-  const dates = distributeFirstContacts(count, today, perDay);
+  const dates = distributeFirstContacts(count, today, perDay, settings.workDays);
 
   const save = async () => {
     setSaving(true);
@@ -774,7 +1024,23 @@ const ImportPanel: React.FC<{ prospects: Prospect[]; projects: Project[]; today:
 
 // ======================= MÉTRICAS =======================
 
-const MetricsPanel: React.FC<{ events: import('../types').ProspectEvent[]; today: string; prospects: Prospect[] }> = ({ events, today, prospects }) => {
+const MetricsPanel: React.FC<{ events: import('../types').ProspectEvent[]; today: string; prospects: Prospect[]; settings: ProspectingSettings }> = ({
+  events,
+  today,
+  prospects,
+  settings,
+}) => {
+  const [reportCopied, setReportCopied] = useState(false);
+  const byCountry = useMemo(() => breakdownBy(prospects, events, (p) => p.country), [prospects, events]);
+  const bySegment = useMemo(() => breakdownBy(prospects, events, (p) => p.segment), [prospects, events]);
+  const byTier = useMemo(() => breakdownBy(prospects, events, (p) => scoreTier(p.score)), [prospects, events]);
+  const variantOf = useMemo(() => {
+    const m = new Map<string, 'A' | 'B'>();
+    events.forEach((e) => e.type === 'first_contact' && e.variant && m.set(e.prospectId, e.variant));
+    return m;
+  }, [events]);
+  const byVariant = useMemo(() => breakdownBy(prospects, events, (p) => variantOf.get(p.id) || p.variant), [prospects, events, variantOf]);
+  const reasons = useMemo(() => lostReasons(prospects), [prospects]);
   const difusion = useMemo(() => {
     const m: Partial<Record<DifusionKey, number>> = {};
     prospects.forEach((p) => p.difusion && (m[p.difusion] = (m[p.difusion] || 0) + 1));
@@ -806,11 +1072,23 @@ const MetricsPanel: React.FC<{ events: import('../types').ProspectEvent[]; today
     ['Auto Auditorías', 'autoAuditorias'],
   ];
 
+  const currentWeek = weeks.find((w) => today >= w.start && today <= w.end) || weeks[weeks.length - 1];
+  const copyReport = () => {
+    if (!currentWeek) return;
+    navigator.clipboard?.writeText(weeklyReportText(currentWeek, settings.weeklyGoal)).then(() => {
+      setReportCopied(true);
+      setTimeout(() => setReportCopied(false), 1500);
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
         <input type="month" value={monthKey} onChange={(e) => e.target.value && setMonthKey(e.target.value)} className={`${input} w-auto`} aria-label="Mes" />
         <span className="flex-1" />
+        <button type="button" className={btnGhost} onClick={copyReport} disabled={!currentWeek} title="Texto listo para mandarle a tu mentor por WhatsApp">
+          {reportCopied ? <Check className="w-4 h-4 text-emerald-400" /> : <ClipboardCopy className="w-4 h-4" />} {reportCopied ? 'Copiado' : 'Reporte para el mentor'}
+        </button>
         <button type="button" className={btnGhost} onClick={exportCsv}>
           <Download className="w-4 h-4" /> Exportar a Excel
         </button>
@@ -864,6 +1142,29 @@ const MetricsPanel: React.FC<{ events: import('../types').ProspectEvent[]; today
       )}
 
       <div className="grid sm:grid-cols-2 gap-3">
+        <BreakdownCard title="Respuesta por país" rows={byCountry} label={(k) => COUNTRY_NAMES[k] || k} />
+        <BreakdownCard title="Respuesta por rubro" rows={bySegment} label={(k) => k.charAt(0).toUpperCase() + k.slice(1)} />
+        <BreakdownCard title="Respuesta por prioridad" rows={byTier} label={(k) => `Prioridad ${k}`} />
+        {byVariant.length > 1 && <BreakdownCard title="Primer mensaje: versión A vs B" rows={byVariant} label={(k) => `Versión ${k}`} />}
+        {reasons.length > 0 && (
+          <div className={`${card} p-4 space-y-2`}>
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Por qué se perdieron</p>
+            <ul className="space-y-1">
+              {reasons.slice(0, 8).map((r) => (
+                <li key={r.reason} className="flex justify-between text-sm">
+                  <span className="text-[var(--text-secondary)]">{r.reason}</span>
+                  <span className="tabular-nums text-[var(--text-primary)]">{r.count}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+      <p className="text-xs text-[var(--text-tertiary)]">
+        Los países que responden más que el promedio (con al menos 8 contactados) suben solos en la reserva cuando sumás contactos.
+      </p>
+
+      <div className="grid sm:grid-cols-2 gap-3">
         <div className={`${card} p-4`}>
           <p className="text-xs text-[var(--text-secondary)]">Tasa de respuesta</p>
           <p className="text-2xl font-bold text-[var(--text-primary)] tabular-nums">{pct(resp, out)}</p>
@@ -893,7 +1194,7 @@ const SettingsPanel: React.FC<{ settings: ProspectingSettings }> = ({ settings }
     setTimeout(() => setSaved(false), 2000);
   };
 
-  const numberField = (label: string, key: 'followUpDays' | 'maxFollowUps' | 'dailyCap' | 'firstContactsPerDay' | 'closeHour', min: number, max: number) => (
+  const numberField = (label: string, key: 'followUpDays' | 'maxFollowUps' | 'dailyCap' | 'firstContactsPerDay' | 'closeHour' | 'weeklyGoal', min: number, max: number) => (
     <label className="space-y-1">
       <span className="text-xs font-semibold text-[var(--text-secondary)]">{label}</span>
       <input
@@ -924,17 +1225,50 @@ const SettingsPanel: React.FC<{ settings: ProspectingSettings }> = ({ settings }
           {numberField('Tope de acciones por día', 'dailyCap', 1, 40)}
           {numberField('Primeros mensajes por día', 'firstContactsPerDay', 1, 20)}
           {numberField('Cierre del día desde las (hora)', 'closeHour', 12, 23)}
+          {numberField('Meta semanal de conversaciones', 'weeklyGoal', 0, 300)}
         </div>
+        <div className="space-y-1">
+          <span className="text-xs font-semibold text-[var(--text-secondary)]">Días en que prospectás (la tanda semanal se reparte en estos)</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => {
+              const on = draft.workDays.includes(i);
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => {
+                    const next = on ? draft.workDays.filter((x) => x !== i) : [...draft.workDays, i].sort();
+                    if (next.length) setDraft({ ...draft, workDays: next });
+                  }}
+                  className={`px-2.5 py-1 rounded-full text-xs font-medium border ${on ? 'bg-[var(--accent)] text-[var(--on-accent)] border-transparent' : 'border-[var(--border-subtle)] text-[var(--text-secondary)]'}`}
+                >
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <label className="block space-y-1">
+          <span className="text-xs font-semibold text-[var(--text-secondary)]">Tu link para agendar llamadas (Google Calendar, Calendly, Cal.com)</span>
+          <input value={draft.bookingUrl} onChange={(e) => setDraft({ ...draft, bookingUrl: e.target.value.trim() })} placeholder="https://calendar.app.google/…" className={input} />
+        </label>
       </section>
 
       <section className={`${card} p-4 space-y-3`}>
         <div>
           <h2 className="text-base font-semibold text-[var(--text-primary)]">Mensajes</h2>
           <p className="text-xs text-[var(--text-secondary)]">
-            Se completan solos: <code>{'{saludo}'}</code> (su @ de Instagram o el nombre del estudio), <code>{'{nombre}'}</code> (primer nombre), <code>{'{estudio}'}</code> y <code>{'{link}'}</code> (su link personal de auditoría).
+            Se completan solos: <code>{'{saludo}'}</code> (su @ de Instagram o el nombre del estudio), <code>{'{nombre}'}</code> (primer nombre), <code>{'{estudio}'}</code>,{' '}
+            <code>{'{link}'}</code> (su link personal de auditoría), <code>{'{personal}'}</code> (la frase con IA sobre su estudio; si no hay, una genérica),{' '}
+            <code>{'{video}'}</code> (link del video) y <code>{'{agenda}'}</code> (tu link para agendar).
           </p>
         </div>
-        {tpl('Primer mensaje', draft.templates.first, (v) => setDraft({ ...draft, templates: { ...draft.templates, first: v } }))}
+        {tpl('Primer mensaje (versión A)', draft.templates.first, (v) => setDraft({ ...draft, templates: { ...draft.templates, first: v } }))}
+        {tpl('Primer mensaje versión B (opcional: si lo completás, la mitad recibe esta y en Métricas ves cuál responde más)', draft.templates.firstB, (v) =>
+          setDraft({ ...draft, templates: { ...draft.templates, firstB: v } })
+        )}
+        {tpl('Segunda chance (a los 90 días, a quien nunca respondió)', draft.templates.secondChance, (v) => setDraft({ ...draft, templates: { ...draft.templates, secondChance: v } }))}
         {draft.templates.followUp.map((f, i) =>
           tpl(`Seguimiento ${i + 1}`, f, (v) => {
             const followUp = [...draft.templates.followUp];
@@ -951,11 +1285,15 @@ const SettingsPanel: React.FC<{ settings: ProspectingSettings }> = ({ settings }
         )}
         {tpl('3. Speech (caballo de Troya) + link de auditoría', draft.templates.speech, (v) => setDraft({ ...draft, templates: { ...draft.templates, speech: v, audit: v } }))}
         {tpl('Video de la auditoría', draft.templates.video, (v) => setDraft({ ...draft, templates: { ...draft.templates, video: v } }))}
+        {tpl('Después del video: invitar a agendar la llamada', draft.templates.booking, (v) => setDraft({ ...draft, templates: { ...draft.templates, booking: v } }))}
+        {tpl('Seguimiento de la propuesta', draft.templates.proposal, (v) => setDraft({ ...draft, templates: { ...draft.templates, proposal: v } }))}
       </section>
 
       <button type="button" className={btnPrimary} onClick={save}>
         {saved ? <Check className="w-4 h-4" /> : null} {saved ? 'Guardado' : 'Guardar cambios'}
       </button>
+
+      <CalendlyConnect onUseLink={(url) => setDraft((d) => ({ ...d, bookingUrl: d.bookingUrl || url }))} />
 
       <section className={`${card} p-4 space-y-3`}>
         <div>
@@ -1011,5 +1349,185 @@ const ScriptSteps: React.FC<{ step: import('../types').ConvStep; difusion?: Difu
         </li>
       ))}
     </ol>
+  );
+};
+
+const LOST_REASONS = ['Precio', 'No es el momento', 'Eligió a otro', 'Dejó de responder', 'No era lo que buscaba'];
+
+const BreakdownCard: React.FC<{ title: string; rows: { key: string; contacted: number; replied: number }[]; label: (k: string) => string }> = ({ title, rows, label }) => {
+  if (rows.length === 0) return null;
+  return (
+    <div className={`${card} p-4 space-y-2`}>
+      <p className="text-sm font-semibold text-[var(--text-primary)]">{title}</p>
+      <ul className="space-y-1.5">
+        {rows.slice(0, 8).map((r) => {
+          const pct = r.contacted ? Math.round((r.replied / r.contacted) * 100) : 0;
+          return (
+            <li key={r.key} className="flex items-center gap-2 text-sm">
+              <span className="w-28 shrink-0 truncate text-[var(--text-secondary)]">{label(r.key)}</span>
+              <span className="flex-1 h-2 rounded-full bg-[var(--bg-surface-muted)] overflow-hidden">
+                <span className="block h-full bg-[var(--accent)]" style={{ width: `${pct}%` }} />
+              </span>
+              <span className="w-20 text-right tabular-nums text-xs text-[var(--text-primary)]">
+                {pct}% <span className="text-[var(--text-tertiary)]">de {r.contacted}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+};
+
+/**
+ * Agendar la llamada: día, hora y duración. Además de cambiar la etapa, la crea en tu
+ * agenda (y en Google Calendar si está conectado) con recordatorio 15 minutos antes.
+ * Si la reprogramás, se actualiza la misma reunión.
+ */
+const CallScheduler: React.FC<{ prospect: Prospect; onAct: (p: Prospect, a: ProspectAction, n?: string) => unknown; onClose: () => void }> = ({ prospect: p, onAct, onClose }) => {
+  const today = todayLocal();
+  const [date, setDate] = useState(p.callDate && p.callDate >= today ? p.callDate : addDays(today, 1));
+  const [time, setTime] = useState(p.callTime || '11:00');
+  const [minutes, setMinutes] = useState(30);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    if (!date || !time) return setErr('Elegí el día y la hora.');
+    setBusy(true);
+    setErr(null);
+    try {
+      await saveMeetingToFirestore(callMeetingFor(p, date, time, minutes, today) as any);
+      await onAct(p, 'call', `${date} ${time}`);
+      onClose();
+    } catch (e) {
+      setErr(`No se pudo agendar: ${friendlyError(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-2 p-3 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)]">
+      <p className="text-xs font-semibold text-[var(--text-primary)]">¿Cuándo es la llamada con {p.studio || p.name}? (hora de Argentina)</p>
+      <div className="flex items-center gap-1.5 flex-wrap">
+        <input type="date" value={date} min={today} onChange={(e) => setDate(e.target.value)} className={`${input} w-auto text-xs py-1.5`} aria-label="Día de la llamada" />
+        <input type="time" value={time} step={900} onChange={(e) => setTime(e.target.value)} className={`${input} w-auto text-xs py-1.5`} aria-label="Hora de la llamada" />
+        <select value={minutes} onChange={(e) => setMinutes(Number(e.target.value))} className={`${input} w-auto text-xs py-1.5`} aria-label="Duración">
+          {[20, 30, 45, 60].map((m) => (
+            <option key={m} value={m}>
+              {m} min
+            </option>
+          ))}
+        </select>
+      </div>
+      {err && <p className="text-xs text-red-400">{err}</p>}
+      <div className="flex gap-1.5">
+        <button type="button" disabled={busy} className={`${btnPrimary} py-1.5 text-xs`} onClick={save}>
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Agendar en mi agenda
+        </button>
+        <button type="button" disabled={busy} className={`${btnGhost} py-1.5 text-xs`} onClick={onClose}>
+          Cancelar
+        </button>
+      </div>
+      <p className="text-[11px] text-[var(--text-tertiary)]">Queda en Agenda con recordatorio 15 minutos antes. Si tenés Google Calendar conectado, aparece también ahí.</p>
+    </div>
+  );
+};
+
+/** Conectar Calendly: las reservas entran solas a la Agenda y pasan al prospecto a "Llamada". */
+const CalendlyConnect: React.FC<{ onUseLink: (url: string) => void }> = ({ onUseLink }) => {
+  const [status, setStatus] = useState<{ tokenConfigured: boolean; connected: boolean; connectedAt: string | null; schedulingUrl: string | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+
+  const load = async () => {
+    try {
+      const { getAuthHeaders } = await import('../utils/authAccess');
+      const r = await fetch('/api/calendly/status', { headers: await getAuthHeaders() });
+      if (r.ok) setStatus(await r.json());
+    } catch {
+      /* sin conexión: se muestra igual la explicación */
+    }
+  };
+  useEffect(() => {
+    load();
+  }, []);
+
+  const connect = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { getAuthHeaders } = await import('../utils/authAccess');
+      const r = await fetch('/api/calendly/connect', { method: 'POST', headers: await getAuthHeaders() });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || `Error ${r.status}`);
+      if (data.schedulingUrl) onUseLink(data.schedulingUrl);
+      const n = data.sync?.imported || 0;
+      setMsg({
+        kind: 'ok',
+        text: `Calendly conectado. ${n ? `Traje ${n} ${n === 1 ? 'reserva que ya tenías' : 'reservas que ya tenías'} a tu Agenda. ` : ''}Las próximas van a aparecer solas.`,
+      });
+      load();
+    } catch (e) {
+      setMsg({ kind: 'error', text: friendlyError(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const syncNow = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const { getAuthHeaders } = await import('../utils/authAccess');
+      const r = await fetch('/api/calendly/sync', { method: 'POST', headers: await getAuthHeaders() });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data?.error || `Error ${r.status}`);
+      setMsg({
+        kind: 'ok',
+        text: data.imported
+          ? `Listo: ${data.imported} ${data.imported === 1 ? 'reserva nueva' : 'reservas nuevas'} en tu Agenda (${data.matched} de prospectos).`
+          : 'No había reservas nuevas: tu Agenda ya está al día.',
+      });
+    } catch (e) {
+      setMsg({ kind: 'error', text: friendlyError(e) });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className={`${card} p-4 space-y-3`}>
+      <div>
+        <h2 className="text-base font-semibold text-[var(--text-primary)]">Calendly</h2>
+        <p className="text-xs text-[var(--text-secondary)]">
+          Cuando alguien reserva, la llamada entra sola a tu Agenda (con recordatorio) y el prospecto pasa a "Llamada". Si cancela, vuelve a "Respondió". Poné tu link de
+          Calendly arriba en "Tu link para agendar": la app le agrega el código de cada prospecto para reconocerlo.
+        </p>
+      </div>
+      {status?.connected ? (
+        <p className="text-sm text-emerald-400 flex items-center gap-1.5">
+          <Check className="w-4 h-4" /> Conectado{status.connectedAt ? ` desde el ${shortDate(status.connectedAt.slice(0, 10))}` : ''}
+        </p>
+      ) : status && !status.tokenConfigured ? (
+        <ol className="text-xs text-[var(--text-secondary)] list-decimal pl-4 space-y-1">
+          <li>En Calendly: Integraciones → API y webhooks → generá un token personal (hace falta plan Standard o superior).</li>
+          <li>
+            En AI Studio: Secrets → agregá <code>CALENDLY_TOKEN</code> con ese token y volvé a publicar.
+          </li>
+          <li>Volvé acá y tocá "Conectar Calendly".</li>
+        </ol>
+      ) : null}
+      <button type="button" className={status?.connected ? btnGhost : btnPrimary} disabled={busy || (status !== null && !status.tokenConfigured)} onClick={connect}>
+        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : null} {status?.connected ? 'Reconectar' : 'Conectar Calendly'}
+      </button>
+      {status?.connected && (
+        <button type="button" className={btnGhost} disabled={busy} onClick={syncNow}>
+          Traer reservas ya agendadas
+        </button>
+      )}
+      {msg && <p className={`text-xs ${msg.kind === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{msg.text}</p>}
+    </section>
   );
 };

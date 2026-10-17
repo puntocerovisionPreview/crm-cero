@@ -2,7 +2,8 @@ import React, { useMemo, useState } from 'react';
 import { Check, Database, Download, Loader2, Upload } from 'lucide-react';
 import { Project, Prospect, ProspectingSettings } from '../types';
 import { COUNTRY_NAMES, PoolLead, PoolReport, PoolSegment, buildPool, parseCsv, pickBatch, poolToCsv } from '../prospecting/pool';
-import { addToPool, takeFromPool } from '../prospecting/poolStore';
+import { TAKE_REASON_TEXT, addToPool, takeFromPool } from '../prospecting/poolStore';
+import { friendlyError } from '../prospecting/actions';
 import { saveProspectingSettings } from '../prospecting/store';
 import { phoneKey } from '../prospecting/core';
 
@@ -69,6 +70,8 @@ export const ReservaPanel: React.FC<Props> = ({ available, takenCount, loading, 
       setNotice(n === report.accepted.length ? `Listo: sumaste ${n} contactos a la reserva.` : `Sumaste ${n} nuevos (${report.accepted.length - n} ya estaban en la reserva).`);
       setReport(null);
       onChanged();
+    } catch (err) {
+      setNotice(`No se pudo guardar en la reserva: ${friendlyError(err)}`);
     } finally {
       setBusy(null);
     }
@@ -79,6 +82,8 @@ export const ReservaPanel: React.FC<Props> = ({ available, takenCount, loading, 
     try {
       await saveProspectingSettings({ ...settings, weeklyBatchSize: batchSize, poolCountries: countries, poolSegments: segments });
       setNotice('Configuración guardada.');
+    } catch (err) {
+      setNotice(`No se pudo guardar: ${friendlyError(err)}`);
     } finally {
       setBusy(null);
     }
@@ -87,9 +92,11 @@ export const ReservaPanel: React.FC<Props> = ({ available, takenCount, loading, 
   const takeNow = async () => {
     setBusy('take');
     try {
-      const n = await takeFromPool(batchSize, { ...settings, poolCountries: countries, poolSegments: segments }, today);
-      setNotice(n ? `Pasaron ${n} contactos a prospección, repartidos en la semana.` : 'No quedan contactos con esos filtros.');
+      const res = await takeFromPool(batchSize, { ...settings, poolCountries: countries, poolSegments: segments }, today);
+      setNotice(res.added ? `Pasaron ${res.added} contactos a prospección, repartidos en tus días de trabajo.` : res.reason ? TAKE_REASON_TEXT[res.reason] : 'No se sumó ningún contacto.');
       onChanged();
+    } catch (err) {
+      setNotice(`No se pudo pasar la tanda: ${friendlyError(err)}`);
     } finally {
       setBusy(null);
     }

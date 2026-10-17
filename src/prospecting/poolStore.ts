@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
 import { Prospect, ProspectingSettings } from '../types';
 import { PoolLead, PoolSegment, pickBatch } from './pool';
-import { distributeFirstContacts } from './core';
+import { distributeFirstContacts, phoneKey } from './core';
 import { startOfWeekMonday } from '../utils/dates';
 
 /**
@@ -44,7 +44,7 @@ export async function addToPool(leads: PoolLead[], today: string): Promise<numbe
   return fresh.length;
 }
 
-export function prospectFromLead(lead: PoolLead, plannedFirstContact: string, today: string): Prospect {
+export function prospectFromLead(lead: PoolLead, plannedFirstContact: string, today: string, pulledOn?: string): Prospect {
   return {
     id: `pros_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
     name: lead.name,
@@ -63,38 +63,61 @@ export function prospectFromLead(lead: PoolLead, plannedFirstContact: string, to
     plannedFirstContact,
     nextActionDate: plannedFirstContact,
     followUps: 0,
+    pulledOn,
   };
+}
+
+export interface TakeResult {
+  added: number;
+  /** por qué no se sumó nada (para mostrarlo en pantalla) */
+  reason?: 'reserva_vacia' | 'sin_coincidencias';
 }
 
 /**
  * Pasa los mejores de la reserva a prospección: crea los prospectos con su día de
  * primer mensaje y los marca como tomados (la reserva se va restando).
- * `firstDay` = desde qué día repartir; `perDay` = cuántos por día (con "sumar más hoy", todos hoy).
+ * - `now: true` ("sumar más hoy"): todos para HOY, aunque sea fin de semana, y entran a la
+ *   lista aunque se pase el tope diario.
+ * - si no: se reparten en tus días de trabajo, `firstContactsPerDay` por día.
+ * `blockedPhones`: teléfonos de quienes pidieron no ser contactados.
  */
 export async function takeFromPool(
   count: number,
   settings: ProspectingSettings,
   today: string,
-  opts: { firstDay?: string; perDay?: number } = {}
-): Promise<number> {
-  if (count <= 0) return 0;
-  const available = (await loadPool()).filter((d) => d.status === 'disponible');
-  const picked = pickBatch(available, count, {
+  opts: { now?: boolean; boosts?: Record<string, number>; blockedPhones?: Set<string> } = {}
+): Promise<TakeResult> {
+  if (count <= 0) return { added: 0 };
+  const available = (await loadPool()).filter(
+    (d) => d.status === 'disponible' && !(opts.blockedPhones && opts.blockedPhones.has(phoneKey(d.whatsapp)))
+  );
+  if (available.length === 0) return { added: 0, reason: 'reserva_vacia' };
+  let picked = pickBatch(available, count, {
     countries: settings.poolCountries,
     segments: settings.poolSegments as PoolSegment[],
+    boosts: opts.boosts,
   });
-  if (picked.length === 0) return 0;
-  const dates = distributeFirstContacts(picked.length, opts.firstDay || today, opts.perDay || settings.firstContactsPerDay);
+  // Si los filtros de país/rubro dejan sin nada y es "sumar más hoy", toma de toda la reserva
+  if (picked.length === 0 && opts.now) picked = pickBatch(available, count, { boosts: opts.boosts });
+  if (picked.length === 0) return { added: 0, reason: 'sin_coincidencias' };
+  const dates = opts.now
+    ? picked.map(() => today)
+    : distributeFirstContacts(picked.length, today, settings.firstContactsPerDay, settings.workDays);
   const nowIso = new Date().toISOString();
   const batch = writeBatch(db);
   picked.forEach((lead, i) => {
-    const p = prospectFromLead(lead, dates[i], today);
+    const p = prospectFromLead(lead, dates[i], today, opts.now ? today : undefined);
     batch.set(doc(db, 'prospects', p.id), deepSanitize(p));
     batch.set(doc(db, POOL, lead.id), { status: 'tomado', takenAt: nowIso, prospectId: p.id }, { merge: true });
   });
   await batch.commit();
-  return picked.length;
+  return { added: picked.length };
 }
+
+export const TAKE_REASON_TEXT: Record<NonNullable<TakeResult['reason']>, string> = {
+  reserva_vacia: 'La reserva está vacía: subí el CSV del scraper en la pestaña Reserva.',
+  sin_coincidencias: 'Ningún contacto de la reserva coincide con los países o rubros elegidos. Cambialos en Reserva.',
+};
 
 let weeklyRunning = false;
 
@@ -102,14 +125,20 @@ let weeklyRunning = false;
  * Tanda automática: la primera vez que abrís la app en la semana, pasan
  * `weeklyBatchSize` contactos de la reserva a prospección. Una sola vez por semana.
  */
-export async function maybeRunWeeklyBatch(settings: ProspectingSettings, today: string): Promise<number> {
+export async function maybeRunWeeklyBatch(
+  settings: ProspectingSettings,
+  today: string,
+  opts: { boosts?: Record<string, number>; blockedPhones?: Set<string> } = {}
+): Promise<number> {
   const monday = startOfWeekMonday(today);
   if (weeklyRunning || settings.weeklyBatchSize <= 0 || settings.lastBatchWeek === monday) return 0;
   weeklyRunning = true;
   try {
-    // Se marca la semana primero: si otra pestaña lo intenta a la vez, no duplica la tanda
-    await setDoc(doc(db, 'settings', 'prospecting'), { lastBatchWeek: monday }, { merge: true });
-    return await takeFromPool(settings.weeklyBatchSize, settings, today);
+    const res = await takeFromPool(settings.weeklyBatchSize, settings, today, opts);
+    // Solo se marca la semana si se sumó algo: con la reserva vacía, vuelve a intentar
+    // cuando subas el CSV (antes quedaba marcada y no sumaba nada en toda la semana)
+    if (res.added > 0) await setDoc(doc(db, 'settings', 'prospecting'), { lastBatchWeek: monday }, { merge: true });
+    return res.added;
   } finally {
     weeklyRunning = false;
   }

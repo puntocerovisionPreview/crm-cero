@@ -25,10 +25,16 @@ export function usePool() {
 }
 
 /** Tanda semanal automática: corre una vez por semana al abrir la app, con la configuración ya cargada. */
-export function useWeeklyAutoBatch(settings: ProspectingSettings, settingsLoaded: boolean, today: string, onDone?: (n: number) => void) {
+export function useWeeklyAutoBatch(
+  settings: ProspectingSettings,
+  settingsLoaded: boolean,
+  today: string,
+  opts: { boosts?: Record<string, number>; blockedPhones?: Set<string> },
+  onDone?: (n: number) => void
+) {
   useEffect(() => {
     if (!settingsLoaded) return;
-    maybeRunWeeklyBatch(settings, today)
+    maybeRunWeeklyBatch(settings, today, opts)
       .then((n) => n > 0 && onDone?.(n))
       .catch((err) => console.warn('Tanda semanal automática:', err));
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1004,6 +1004,18 @@ export interface Prospect {
   // Guion de conversación (cuando respondió)
   convStep?: ConvStep;
   difusion?: DifusionKey; // cómo difunde su trabajo hoy (su respuesta a la pregunta)
+  // Mejoras de prospección
+  pulledOn?: string; // día en que lo sumaste a mano ("sumar más hoy"): entra a la lista aunque pase el tope
+  variant?: 'A' | 'B'; // qué versión del primer mensaje recibió
+  personalLine?: string; // frase personalizada (IA) para el primer mensaje
+  videoUrl?: string; // link del video de la auditoría
+  callDate?: string; // día de la llamada agendada
+  callTime?: string; // hora de la llamada (HH:MM, hora de Argentina)
+  calendlyEventUri?: string; // si la agendó por Calendly
+  proposalSentAt?: string; // propuesta enviada después de la llamada
+  secondChance?: boolean; // volvió de descartados a los 90 días
+  recycleAfter?: string; // desde cuándo puede volver a la lista (descartado sin respuesta)
+  doNotContact?: boolean; // pidió que no lo contacten más
 }
 
 // Pasos del guion: pregunta → (su respuesta) → empatía → (acuerdo) → speech + link de auditoría
@@ -1012,6 +1024,7 @@ export type ConvStep = 'pregunta' | 'esperando_respuesta' | 'empatia' | 'esperan
 export type DifusionKey = 'portales' | 'referidos' | 'anuncios' | 'redes' | 'contenido_ig' | 'agencia' | 'otro';
 
 export type ProspectEventType =
+  | 'proposal_sent'
   | 'first_contact'
   | 'follow_up'
   | 'reply'
@@ -1029,6 +1042,7 @@ export interface ProspectEvent {
   type: ProspectEventType;
   date: string; // YYYY-MM-DD
   note?: string;
+  variant?: 'A' | 'B'; // en el primer mensaje: qué versión se mandó
   createdAt: string; // ISO
 }
 
@@ -1042,12 +1056,20 @@ export interface ProspectingSettings {
   poolCountries: string[]; // vacío = todos
   poolSegments: string[]; // vacío = todos
   lastBatchWeek?: string; // lunes de la última tanda automática
+  workDays: number[]; // días en que prospectás (0 domingo ... 6 sábado); la tanda se reparte en estos
+  weeklyGoal: number; // meta de conversaciones nuevas por semana
+  bookingUrl: string; // tu link para agendar llamada (Google Calendar / Cal.com)
+  dayStartedOn?: string; // último día en que hiciste el "inicio del día"
   templates: {
     first: string;
     followUp: string[]; // seguimiento 1, 2, 3
     question: string; // "¿Cómo haces para difundir tu trabajo...?"
     empathy: Record<DifusionKey, string>; // respuesta según cómo difunde
     speech: string; // caballo de Troya + link de auditoría
+    firstB: string; // segunda versión del primer mensaje (vacío = sin prueba A/B)
+    secondChance: string; // primer mensaje para quien vuelve a los 90 días
+    booking: string; // después del video: invitar a agendar la llamada
+    proposal: string; // seguimiento de la propuesta después de la llamada
     audit: string; // (compatibilidad: igual a speech)
     video: string;
   };
