@@ -77,7 +77,7 @@ export const TodayFocusMainCard: React.FC<Props> = ({
   }
 
   return (
-    <div className="card-swiss overflow-hidden transition-all duration-200">
+    <div className="card-swiss overflow-hidden transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-200">
       {/* Header bar */}
       <div 
         onClick={toggleCollapsed}
@@ -131,7 +131,7 @@ export const TodayFocusMainCard: React.FC<Props> = ({
       {/* Progress Bar Line */}
       <div className="w-full bg-[var(--bg-surface-muted)] h-1 overflow-hidden">
         <div 
-          className="bg-emerald-500 h-full transition-all duration-300"
+          className="bg-emerald-500 h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
           style={{ width: `${progressPercent}%` }}
         />
       </div>

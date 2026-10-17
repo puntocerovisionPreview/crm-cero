@@ -852,7 +852,7 @@ export const KnowledgeGraphCanvas: React.FC<Props> = ({
   return (
     <div 
       ref={containerRef}
-      className={`relative w-full rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden flex flex-col font-sans select-none transition-all ${
+      className={`relative w-full rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden flex flex-col font-sans select-none transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] ${
         isFullscreen ? '!fixed !inset-0 !z-50 !rounded-none !h-screen !w-screen !border-none' : ''
       }`}
       style={{ height: isFullscreen ? '100vh' : height }}
@@ -969,7 +969,7 @@ export const KnowledgeGraphCanvas: React.FC<Props> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar en la red..."
+              placeholder="Buscar en la red…"
               className="w-full bg-[var(--bg-surface-muted)] border border-[var(--border-subtle)] rounded-lg pl-8 pr-3 py-1 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-strong)]"
             />
             {searchQuery && (
@@ -1530,7 +1530,7 @@ export const KnowledgeGraphCanvas: React.FC<Props> = ({
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Nombre de la vista..."
+                  placeholder="Nombre de la vista…"
                   value={newViewName}
                   onChange={e => setNewViewName(e.target.value)}
                   className="flex-1 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"

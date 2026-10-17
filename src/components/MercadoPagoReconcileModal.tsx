@@ -86,13 +86,29 @@ export const MercadoPagoReconcileModal: React.FC<Props> = ({
   onReconcileAsPersonalTransaction,
   onDismissPayment,
 }) => {
+  // Antes había un "return null" antes de los useState: rompía las reglas de React al abrir/cerrar.
   if (!isOpen || !payment) return null;
+  return <ReconcileBody {...{ isOpen, onClose, payment, projects, personalAccounts, usdRate, onReconcileAsProjectPayment, onReconcileAsStudioIncome, onReconcileAsPersonalTransaction, onDismissPayment }} />;
+};
 
+const ReconcileBody: React.FC<Props & { payment: MercadoPagoIncomingPayment }> = ({
+  onClose,
+  payment,
+  projects,
+  personalAccounts,
+  usdRate = DEFAULT_USD_RATE,
+  onReconcileAsProjectPayment,
+  onReconcileAsStudioIncome,
+  onReconcileAsPersonalTransaction,
+  onDismissPayment,
+}) => {
   const [destination, setDestination] = useState<ReconcileDestination>('cliente');
   
   // Opción 1: Cliente
-  const activeProjects = projects.filter(p => p.status !== 'completado' && p.status !== 'cancelado');
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(activeProjects[0]?.id || projects[0]?.id || '');
+  // Arranca en el cliente que sugirió el servidor (si hay)
+  const activeProjects = projects.filter(p => !p.archived && p.status !== 'No concretado');
+  const suggestedId = payment.suggestion && projects.some(p => p.id === payment.suggestion!.projectId) ? payment.suggestion.projectId : '';
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(suggestedId || activeProjects[0]?.id || projects[0]?.id || '');
   const [invoiced, setInvoiced] = useState(false);
   const [noteProject, setNoteProject] = useState(payment.description || `Cobro Mercado Pago de ${payment.payerName || 'Cliente'}`);
 

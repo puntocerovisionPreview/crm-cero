@@ -642,7 +642,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Buscar proyectos, clientes, tareas, reuniones o acciones (⌘K)..."
+            placeholder="Buscar proyectos, clientes, tareas, reuniones o acciones (⌘K)…"
             className="w-full bg-transparent text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none"
           />
           {query && (

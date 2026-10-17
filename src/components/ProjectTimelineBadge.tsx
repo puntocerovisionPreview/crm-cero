@@ -259,7 +259,7 @@ export const ProjectTimelineBadge: React.FC<Props> = ({
         <div className="space-y-1 pt-0.5">
           <div className="w-full bg-black/40 h-1.5 rounded-full overflow-hidden border border-white/5">
             <div
-              className={`h-full ${themeStyles.bar} transition-all duration-300`}
+              className={`h-full ${themeStyles.bar} transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300`}
               style={{ width: `${timeline.progressPercent}%` }}
             />
           </div>

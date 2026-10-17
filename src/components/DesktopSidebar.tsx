@@ -116,7 +116,7 @@ export const DesktopSidebar: React.FC<Props> = ({
 
   return (
     <aside 
-      className={`hidden md:flex flex-col h-full bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] text-[var(--text-primary)] transition-all duration-200 select-none z-30 shrink-0 ${
+      className={`hidden md:flex flex-col h-full bg-[var(--bg-surface)] border-r border-[var(--border-subtle)] text-[var(--text-primary)] transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-200 select-none z-30 shrink-0 ${
         isCollapsed ? 'w-14' : 'w-56'
       }`}
     >
@@ -602,7 +602,7 @@ export const DesktopSidebar: React.FC<Props> = ({
           {/* Sync status indicator */}
           <div 
             className="flex items-center gap-1.5 px-1.5 py-0.5"
-            title={syncStatus === 'synced' ? 'Sincronizado' : 'Sincronizando...'}
+            title={syncStatus === 'synced' ? 'Sincronizado' : 'Sincronizando…'}
           >
             <span className={`w-2 h-2 rounded-full ${syncStatus === 'synced' ? 'bg-[#16A34A]' : 'bg-[#D97706] animate-pulse'}`} />
           </div>

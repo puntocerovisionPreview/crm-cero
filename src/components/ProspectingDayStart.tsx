@@ -338,7 +338,7 @@ export const BurstMode: React.FC<{
               {idx + 1} de {ids.length} · {sent} enviados
             </p>
             <div className="h-1.5 rounded-full bg-[var(--bg-surface-muted)] overflow-hidden mt-1">
-              <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${Math.round((idx / Math.max(1, ids.length)) * 100)}%` }} />
+              <div className="h-full bg-[var(--accent)] transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]" style={{ width: `${Math.round((idx / Math.max(1, ids.length)) * 100)}%` }} />
             </div>
           </div>
           <button type="button" onClick={onClose} className="p-2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]" aria-label="Salir del modo ráfaga">

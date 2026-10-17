@@ -912,7 +912,7 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
             </label>
             <input
               type="text"
-              placeholder="ej: DNS en Cloudflare, plan incluye 100 sitios, se refactura al cliente cuando renueva..."
+              placeholder="ej: DNS en Cloudflare, plan incluye 100 sitios, se refactura al cliente cuando renueva…"
               value={formNotes}
               onChange={e => setFormNotes(e.target.value)}
               className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl px-3 py-2 text-xs text-[var(--text-primary)] focus:outline-none"
@@ -973,7 +973,8 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
           <Search className="w-3.5 h-3.5 text-[var(--text-tertiary)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            placeholder="Buscar por nombre, cliente, proveedor..."
+            aria-label="Buscar gasto fijo"
+            placeholder="Buscar por nombre, cliente, proveedor…"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-xl pl-8 pr-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"

@@ -565,7 +565,7 @@ export const DailyTimeBudgetWidget: React.FC<Props> = ({
   }
 
   return (
-    <div className={`rounded-2xl bg-zinc-900 border border-zinc-800 shadow-sm transition-all overflow-hidden w-full max-w-full min-w-0 ${className}`}>
+    <div className={`rounded-2xl bg-zinc-900 border border-zinc-800 shadow-sm transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] overflow-hidden w-full max-w-full min-w-0 ${className}`}>
       {/* ============================================================ */}
       {/* 1. CABECERA LIMPIA Y ERGONÓMICA (Pensada 100% para móvil)    */}
       {/* ============================================================ */}
@@ -801,7 +801,7 @@ export const DailyTimeBudgetWidget: React.FC<Props> = ({
                   <div
                     key={key}
                     style={{ width: `${pct}%` }}
-                    className={`${cfg.progressBarColor} h-full transition-all duration-300`}
+                    className={`${cfg.progressBarColor} h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300`}
                     title={`${b.label}: ${formatMinutes(minutes)}`}
                   />
                 );
@@ -816,7 +816,7 @@ export const DailyTimeBudgetWidget: React.FC<Props> = ({
       {/* ============================================================ */}
       {activeSession && (
         <div 
-          className={`p-3.5 sm:p-4 border-b transition-all ${
+          className={`p-3.5 sm:p-4 border-b transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] ${
             isSessionTimeUp
               ? 'bg-amber-500/15 border-amber-500/40 ring-1 ring-amber-500/30'
               : 'bg-zinc-950 border-zinc-800'
@@ -996,7 +996,7 @@ export const DailyTimeBudgetWidget: React.FC<Props> = ({
                     return (
                       <div
                         key={key}
-                        className={`p-3 rounded-2xl border transition-all ${
+                        className={`p-3 rounded-2xl border transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] ${
                           isSessionThis
                             ? `bg-zinc-900 ${cfg.borderActive} shadow-md`
                             : isCurrent
@@ -1065,7 +1065,7 @@ export const DailyTimeBudgetWidget: React.FC<Props> = ({
                 return (
                   <div
                     key={key}
-                    className={`group p-3 rounded-xl border transition-all ${
+                    className={`group p-3 rounded-xl border transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] ${
                       isSessionThis
                         ? 'bg-zinc-900 border-[var(--accent)]/60 shadow-md'
                         : isDone 

@@ -144,7 +144,7 @@ export const Header: React.FC<Props> = ({
                 title="Buscar o comandos (⌘K)"
               >
                 <Search className="w-3.5 h-3.5 text-[var(--accent)]" />
-                <span className="hidden lg:inline text-zinc-400">Buscar...</span>
+                <span className="hidden lg:inline text-zinc-400">Buscar…</span>
                 <kbd className="hidden sm:inline-block px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-zinc-950 text-zinc-400 border border-zinc-800">
                   ⌘K
                 </kbd>
@@ -182,7 +182,7 @@ export const Header: React.FC<Props> = ({
                 className="p-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition shadow-sm"
                 title={
                   syncStatus === 'syncing'
-                    ? 'Sincronizando cambios con la nube...'
+                    ? 'Sincronizando cambios con la nube…'
                     : syncStatus === 'synced'
                     ? 'Nube: Todo sincronizado'
                     : 'Modo sin conexión'

@@ -480,7 +480,7 @@ export const PersonalFinanceQuickAddView: React.FC<Props> = ({
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Ej: Almuerzo, Uber, Factura luz, Nafta..."
+              placeholder="Ej: Almuerzo, Uber, Factura luz, Nafta…"
               className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl pl-3.5 pr-11 py-2.5 text-xs text-zinc-200 focus:outline-hidden transition"
             />
             <button

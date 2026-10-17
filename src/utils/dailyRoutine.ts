@@ -10,7 +10,7 @@ import {
   deleteField,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import { deepSanitize } from './firestoreService';
+import { deepSanitize } from './sanitize';
 
 /**
  * Rutina diaria: hábitos que se repiten (revisar mails, cobrar, publicar contenido...)

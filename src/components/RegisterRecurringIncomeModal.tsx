@@ -210,7 +210,7 @@ export const RegisterRecurringIncomeModal: React.FC<Props> = ({
             <label className="font-semibold text-zinc-300">Notas u Observaciones</label>
             <input
               type="text"
-              placeholder="Detalles del acuerdo o servicio prestado..."
+              placeholder="Detalles del acuerdo o servicio prestado…"
               value={notes}
               onChange={e => setNotes(e.target.value)}
               className="w-full px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800 text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none"

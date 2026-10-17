@@ -216,13 +216,15 @@ export interface MercadoPagoIncomingPayment {
   dateApproved?: string;
   reconciled: boolean;
   reconciledTo?: {
-    type: 'cliente' | 'estudio_libre' | 'personal';
+    type: 'cliente' | 'estudio_libre' | 'personal' | 'ignorado';
     targetId?: string;
     targetName?: string;
     reconciledAt: string;
     destinationAccountId?: string;
   };
   rawPayload?: any;
+  // Cliente probable que calculó el servidor (monto pendiente y/o nombre del pagador)
+  suggestion?: { projectId: string; clientName: string; reason: string; score: number };
 }
 
 export interface ProjectInstallment {

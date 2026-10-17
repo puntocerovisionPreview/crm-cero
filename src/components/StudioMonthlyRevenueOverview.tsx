@@ -272,7 +272,7 @@ export const StudioMonthlyRevenueOverview: React.FC<Props> = ({
         </div>
         <div className="w-full h-3 rounded-full bg-[var(--border-subtle)] overflow-hidden">
           <div
-            className="h-full bg-emerald-500 rounded-full transition-all duration-300"
+            className="h-full bg-emerald-500 rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
             style={{ width: `${summary.porcentajeAvance}%` }}
           />
         </div>
@@ -321,13 +321,13 @@ export const StudioMonthlyRevenueOverview: React.FC<Props> = ({
                 <div className="w-full flex items-end justify-center gap-1 h-24">
                   {/* Cobrado Bar */}
                   <div 
-                    className="w-3 sm:w-5 bg-emerald-500 rounded-t-sm transition-all duration-300 relative group-hover:brightness-110"
+                    className="w-3 sm:w-5 bg-emerald-500 rounded-t-sm transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 relative group-hover:brightness-110"
                     style={{ height: `${cobradoHeight}%` }}
                     title={`Cobrado: $ ${m.cobradoUnifiedARS.toLocaleString('es-AR')}`}
                   />
                   {/* Proyectado Bar */}
                   <div 
-                    className="w-3 sm:w-5 bg-zinc-700/80 rounded-t-sm transition-all duration-300 relative group-hover:bg-zinc-600"
+                    className="w-3 sm:w-5 bg-zinc-700/80 rounded-t-sm transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 relative group-hover:bg-zinc-600"
                     style={{ height: `${proyectadoHeight}%` }}
                     title={`Proyectado: $ ${m.proyectadoUnifiedARS.toLocaleString('es-AR')}`}
                   />
@@ -394,7 +394,7 @@ export const StudioMonthlyRevenueOverview: React.FC<Props> = ({
               return (
                 <div
                   key={`${item.projectId}_${item.cuotaId}`}
-                  className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all ${
+                  className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] ${
                     item.status === 'vencido' 
                       ? 'border-rose-500/40 bg-rose-500/5' 
                       : item.status === 'vence_hoy'

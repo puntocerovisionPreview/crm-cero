@@ -733,7 +733,7 @@ export const ClientDetailView: React.FC<Props> = ({
               {project.clientPhone ? (
                 <>
                   <a
-                    href={formatWhatsAppUrl(project.clientPhone, `Hola ${project.ownerName || project.clientName}, te escribo desde .Cero...`)}
+                    href={formatWhatsAppUrl(project.clientPhone, `Hola ${project.ownerName || project.clientName}, te escribo desde .Cero…`)}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition active:scale-95"
@@ -1431,7 +1431,7 @@ export const ClientDetailView: React.FC<Props> = ({
                         <form onSubmit={handleQuickAddTask} className="flex gap-2 p-3 bg-zinc-950/70 border border-zinc-800 rounded-xl">
                           <input
                             type="text"
-                            placeholder="Nombre de la tarea..."
+                            placeholder="Nombre de la tarea…"
                             value={newTaskTitle}
                             onChange={e => setNewTaskTitle(e.target.value)}
                             className="flex-1 bg-zinc-900 border border-zinc-700/80 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
@@ -1660,7 +1660,7 @@ export const ClientDetailView: React.FC<Props> = ({
                     rows={8}
                     value={notesText}
                     onChange={e => setNotesText(e.target.value)}
-                    placeholder="Escribí notas libres, requerimientos técnicos, links a Figma o Drive..."
+                    placeholder="Escribí notas libres, requerimientos técnicos, links a Figma o Drive…"
                     className="w-full bg-zinc-950 border border-zinc-700/80 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)] font-mono leading-relaxed resize-y"
                   />
                 ) : (

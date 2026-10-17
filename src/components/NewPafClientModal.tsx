@@ -602,7 +602,7 @@ export const NewPafClientModal: React.FC<Props> = ({
             className="px-6 py-2.5 rounded-full bg-[var(--accent)] hover:bg-[#d04e0a] text-white text-xs font-bold shadow-lg shadow-[var(--accent)]/20 transition flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
             <Check className="w-4 h-4" />
-            <span>{isSubmitting ? 'Creando...' : `Crear Cliente PAF (${projectType === 'paf_pro' ? 'PAF Pro' : 'PAF Base'})`}</span>
+            <span>{isSubmitting ? 'Creando…' : `Crear Cliente PAF (${projectType === 'paf_pro' ? 'PAF Pro' : 'PAF Base'})`}</span>
           </button>
         </div>
 

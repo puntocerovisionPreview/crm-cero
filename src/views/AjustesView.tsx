@@ -1221,7 +1221,7 @@ export const AjustesView: React.FC<Props> = ({
                 <div>
                   <span className="font-semibold text-[var(--text-primary)] block">Estado de conexión Firestore</span>
                   <span className="text-[11px] text-[var(--text-secondary)]">
-                    {syncStatus === 'synced' ? 'Sincronizado en tiempo real' : 'Sincronizando cambios...'}
+                    {syncStatus === 'synced' ? 'Sincronizado en tiempo real' : 'Sincronizando cambios…'}
                   </span>
                 </div>
                 {onForceSync && (

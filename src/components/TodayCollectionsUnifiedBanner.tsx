@@ -101,7 +101,7 @@ export const TodayCollectionsUnifiedBanner: React.FC<Props> = ({
   const todayCount = urgentCollections.length - overdueCount;
 
   return (
-    <div className="card-swiss border-[#D97706]/40 bg-[#D97706]/5 overflow-hidden transition-all duration-200">
+    <div className="card-swiss border-[#D97706]/40 bg-[#D97706]/5 overflow-hidden transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-200">
       {/* Header banner */}
       <div 
         onClick={toggleExpanded}

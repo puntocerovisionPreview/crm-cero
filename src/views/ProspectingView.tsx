@@ -163,7 +163,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           <div className="flex items-center gap-2 pt-1" title="Meta semanal de conversaciones nuevas">
             <Target className="w-4 h-4 text-[var(--accent)] shrink-0" />
             <div className="flex-1 h-2 rounded-full bg-[var(--bg-surface-muted)] overflow-hidden">
-              <div className={`h-full transition-all ${goalPct >= 100 ? 'bg-emerald-500' : 'bg-[var(--accent)]'}`} style={{ width: `${goalPct}%` }} />
+              <div className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] ${goalPct >= 100 ? 'bg-emerald-500' : 'bg-[var(--accent)]'}`} style={{ width: `${goalPct}%` }} />
             </div>
             <span className="text-xs tabular-nums text-[var(--text-secondary)] shrink-0">
               {thisWeek.conversacionesOut} de {goal}

@@ -131,7 +131,7 @@ export const PersonalFinanceAccountsView: React.FC<Props> = ({
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Mercado Pago, Banco Nación, Caja fuerte..."
+              placeholder="Ej: Mercado Pago, Banco Nación, Caja fuerte…"
               className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-sm text-zinc-100 focus:outline-hidden"
             />
           </div>

@@ -34,7 +34,7 @@ Si no lo usás, no hace falta: el cierre del día, la lista de prospección y lo
 4. Redesplegá la app. Abrí tu bot en Telegram y mandale `/start`.
 5. En la app: **Ajustes → Automatizaciones → Conectar Telegram**. Te llega un mensaje de confirmación.
 
-## 3. Reloj automático (solo si usás Telegram o Google Calendar)
+## 3. Reloj automático (para avisos con horario: Telegram, notificaciones, Calendar y Mercado Pago)
 
 El servidor no se despierta solo: un reloj externo lo llama en horarios fijos.
 
@@ -116,3 +116,32 @@ El mail te sigue llegando igual. Si el CRM no responde, el quiz funciona exactam
 **Link personal:** cuando le pasás la auditoría a alguien desde la app ("Le pasé la auditoría"), el mensaje ya incluye su link con `?p=...`. Así se identifica aunque escriba su WhatsApp distinto.
 
 **Requisito:** necesita la clave de servicio (paso 1). Sin ella, las auditorías solo llegan por mail.
+
+## 6. Notificaciones en el celular (sin configurar nada)
+
+Las notificaciones push nativas no necesitan claves ni otras apps.
+
+1. **En iPhone:** abrí la app en Safari → Compartir → **Agregar a inicio**, y abrila desde ese ícono (Apple solo permite notificaciones así). **En Android o en la computadora:** sirve el navegador normal.
+2. Andá a **Ajustes → Automatizaciones → Notificaciones en este dispositivo → Activar notificaciones** y aceptá el permiso. Te llega una de prueba.
+3. Repetilo en cada dispositivo donde quieras recibirlas.
+
+Con eso, el resumen del día, los avisos de reuniones, el plan del domingo y los pagos de Mercado Pago te llegan como notificación, además de Telegram si lo tenés conectado. Para que lleguen **a horario con la app cerrada** hace falta el reloj del paso 3.
+
+## 7. Mercado Pago: los cobros entran solos (opcional)
+
+1. Entrá a https://www.mercadopago.com.ar/developers/panel/app y creá una aplicación (nombre: ".Cero CRM").
+2. En **Credenciales de producción**, copiá el **Access Token** y guardalo en los Secrets como `MP_ACCESS_TOKEN`. Es una clave privada: no la compartas.
+3. **Para que el aviso sea instantáneo (recomendado):** en la aplicación de Mercado Pago, en **Webhooks**, configurá:
+   - URL: `https://TU-APP/api/mercadopago/webhook?key=TU_CLAVE` (tu `CRON_SECRET`)
+   - Evento: **Pagos**
+   - Opcional, más seguro: copiá la "clave secreta" del webhook en los Secrets como `MP_WEBHOOK_SECRET`.
+4. Sin webhook igual funciona: el reloj "cada 10 minutos" revisa los pagos de los últimos 15 días. También podés tocar el botón de actualizar en la bandeja de pagos.
+
+Qué pasa con cada pago aprobado:
+- La app te propone a qué cliente corresponde: si el monto coincide con una cuota o un saldo pendiente, y/o si el nombre del pagador coincide con el del cliente.
+- Te avisa ("Te entró un pago de $ X. ¿Es de Remodelante?").
+- En **Hoy** y en **Dinero** aparece "Pagos de Mercado Pago para registrar". Tocás **Registrar**, confirmás (cliente, ingreso del estudio o personal) y queda en el cliente, en Dinero y en tu cuenta.
+- Nada se registra sin tu confirmación.
+
+Limitación: las transferencias bancarias que entran a tu CVU no siempre aparecen en esta API de Mercado Pago (sí los pagos con link, QR, tarjeta y los envíos de dinero entre cuentas de Mercado Pago).
+

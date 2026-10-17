@@ -422,7 +422,7 @@ export const PafPricingConfigModal: React.FC<Props> = ({
               className="px-5 py-2 rounded-xl text-xs font-bold bg-[#34C38F] hover:bg-[#2DB382] text-[#0B0F17] flex items-center gap-1.5 shadow-md shadow-[#34C38F]/20 transition cursor-pointer disabled:opacity-50"
             >
               <Check className="w-4 h-4" />
-              <span>{isSaving ? 'Guardando...' : 'Guardar Precios'}</span>
+              <span>{isSaving ? 'Guardando…' : 'Guardar Precios'}</span>
             </button>
           </div>
         </div>

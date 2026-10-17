@@ -219,6 +219,6 @@ const Card: React.FC<{ title: string; children: React.ReactNode }> = ({ title, c
 
 const Bar: React.FC<{ pct: number }> = ({ pct }) => (
   <div className="h-2 rounded-full bg-zinc-800 overflow-hidden">
-    <div className="h-full rounded-full bg-amber-400 transition-all" style={{ width: `${pct}%` }} />
+    <div className="h-full rounded-full bg-amber-400 transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]" style={{ width: `${pct}%` }} />
   </div>
 );

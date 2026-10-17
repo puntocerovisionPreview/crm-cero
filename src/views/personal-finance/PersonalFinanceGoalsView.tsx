@@ -160,7 +160,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ej: Fondo de emergencia, Vacaciones, MacBook Pro..."
+              placeholder="Ej: Fondo de emergencia, Vacaciones, MacBook Pro…"
               className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-sm text-zinc-100 focus:outline-hidden"
             />
           </div>
@@ -410,7 +410,7 @@ export const PersonalFinanceGoalsView: React.FC<Props> = ({
                   <div className="space-y-1.5 mt-3">
                     <div className="w-full bg-zinc-900 rounded-full h-3 overflow-hidden border border-zinc-800">
                       <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-sky-400 rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-blue-500 to-sky-400 rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-500"
                         style={{ width: `${projection.percentage}%` }}
                       />
                     </div>

@@ -219,7 +219,7 @@ export const TimeTrackerSection: React.FC<Props> = ({
             </div>
             <div className="w-full bg-zinc-800 rounded-full h-2 overflow-hidden mt-1.5 mb-1">
               <div 
-                className="bg-amber-400 h-full rounded-full transition-all"
+                className="bg-amber-400 h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]"
                 style={{ width: `${Math.min(100, (consultingHours / 26) * 100)}%` }}
               />
             </div>

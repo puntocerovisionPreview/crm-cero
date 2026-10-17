@@ -14,6 +14,8 @@ import {
 import { mergeProspectingSettings } from '../src/prospecting/core';
 import { addDays, todayLocal } from '../src/utils/dates';
 import { runCalendarSync, isCalendarConfigured } from './calendarSync';
+import { countPushDevices, htmlToPush, PushPayload, registerPushRoutes, sendPushToAll } from './push';
+import { describeNewPayment, isMercadoPagoConfigured, registerMercadoPagoRoutes, syncRecentPayments } from './mercadopago';
 
 /**
  * MOTOR DE AUTOMATIZACIÓN
@@ -189,49 +191,79 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
   if (!db) return { job, skipped: 'El servidor no tiene acceso a la base de datos' };
   const today = todayLocal();
 
+  if (job === 'mercadopago') {
+    if (!isMercadoPagoConfigured()) return { job, skipped: 'Falta MP_ACCESS_TOKEN' };
+    const created = await syncRecentPayments(db);
+    if (options.dryRun) return { job, detail: created.map(describeNewPayment) };
+    for (const p of created) {
+      const n = describeNewPayment(p);
+      await notifyAll(db, n.title, n.body, '/dinero', `mp-${p.id}`);
+    }
+    return { job, sent: created.length };
+  }
+
   if (job === 'calendar-sync') {
     if (!isCalendarConfigured()) return { job, skipped: 'Falta GOOGLE_CALENDAR_ID' };
     return { job, detail: await runCalendarSync(db, { dryRun: options.dryRun }) };
   }
 
+  // Canales: notificación push en tus dispositivos y/o Telegram (lo que esté activado)
   const chatId = await getTelegramChatId(db);
-  if (!options.dryRun && !chatId) return { job, skipped: 'Telegram no está conectado' };
+  const pushDevices = await countPushDevices(db);
+  if (!options.dryRun && !chatId && pushDevices === 0) {
+    return { job, skipped: 'No hay dónde avisarte: activá las notificaciones en un dispositivo o conectá Telegram' };
+  }
+  const deliver = async (html: string, push: PushPayload) => {
+    let sent = 0;
+    if (chatId) {
+      await sendTelegram(html, chatId);
+      sent++;
+    }
+    if (pushDevices > 0) sent += await sendPushToAll(db, push);
+    return sent;
+  };
   const data = await loadAutomationData(db);
 
   if (job === 'daily-brief') {
     const text = buildDailyBrief(data, today);
     if (options.dryRun) return { job, detail: text };
-    await sendTelegram(text, chatId!);
-    return { job, sent: 1 };
+    return { job, sent: await deliver(text, htmlToPush(text, 'Tu día', '/agenda', 'resumen-diario')) };
   }
 
   if (job === 'weekly') {
     const text = buildWeeklyPlan(data, nextMonday(today), today);
     if (options.dryRun) return { job, detail: text };
-    await sendTelegram(text, chatId!);
-    return { job, sent: 1 };
+    return { job, sent: await deliver(text, htmlToPush(text, 'Tu semana', '/semana', 'plan-semanal')) };
   }
 
   if (job === 'prospecting-close') {
     const text = buildProspectingClose(data, today);
     if (options.dryRun) return { job, detail: text || 'Hoy no hay nadie para cerrar.' };
     if (!text) return { job, sent: 0 };
-    await sendTelegram(text, chatId!);
-    return { job, sent: 1 };
+    return { job, sent: await deliver(text, htmlToPush(text, 'Cierre de prospección', '/prospeccion', 'cierre-prospeccion')) };
   }
 
   if (job === 'reminders') {
     const due = getDueReminders(data, today, nowMinutesLocal());
     if (options.dryRun) return { job, detail: due };
+    let sent = 0;
     for (const r of due) {
-      await sendTelegram(buildReminderMessage(r), chatId!);
+      const html = buildReminderMessage(r);
+      sent += await deliver(html, htmlToPush(html, 'Recordatorio', '/agenda', `aviso-${r.id}`));
       // Marca para no repetir; se limpia sola si se reprograma (ver firestoreService)
       await db.collection(r.kind === 'reunion' ? 'meetings' : 'tasks').doc(r.id).set({ telegramReminded: true }, { merge: true });
     }
-    return { job, sent: due.length };
+    return { job, sent };
   }
 
   return { job, skipped: 'Tarea desconocida' };
+}
+
+/** Aviso corto por push y/o Telegram (lo que esté activado) */
+async function notifyAll(db: Firestore, title: string, body: string, url: string, tag: string) {
+  const chatId = await getTelegramChatId(db).catch(() => null);
+  if (chatId) await sendTelegram(`<b>${title.replace(/</g, '&lt;')}</b>\n${body.replace(/</g, '&lt;')}`, chatId).catch(() => {});
+  if ((await countPushDevices(db).catch(() => 0)) > 0) await sendPushToAll(db, { title, body, url, tag }).catch(() => 0);
 }
 
 // ---------------- RUTAS ----------------
@@ -243,15 +275,23 @@ function cronSecretOk(req: express.Request): boolean {
   return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
-const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prospecting-close'];
+const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prospecting-close', 'mercadopago'];
 
 export function registerAutomationRoutes(app: express.Express, requireOwner: express.RequestHandler) {
+  // Notificaciones push nativas (activar en cada dispositivo, prueba)
+  registerPushRoutes(app, requireOwner, getAdminDb);
+  // Mercado Pago: webhook, "Buscar pagos" y estado
+  registerMercadoPagoRoutes(app, requireOwner, getAdminDb, async (title, body) => {
+    const db = getAdminDb();
+    if (db) await notifyAll(db, title, body, '/dinero', 'mp');
+  });
+
   // Reloj externo: GET o POST /api/cron/<tarea>?key=CRON_SECRET
   // "frequent" junta lo que conviene correr cada 10-15 min (avisos + calendario)
   app.all('/api/cron/:job', async (req, res) => {
     if (!cronSecretOk(req)) return res.status(401).json({ error: 'Clave de cron inválida o no configurada' });
     const job = req.params.job;
-    const jobs = job === 'frequent' ? ['reminders', 'calendar-sync'] : CRON_JOBS.includes(job) ? [job] : [];
+    const jobs = job === 'frequent' ? ['reminders', 'calendar-sync', 'mercadopago'] : CRON_JOBS.includes(job) ? [job] : [];
     if (jobs.length === 0) return res.status(404).json({ error: 'Tarea desconocida' });
     const results: JobResult[] = [];
     for (const j of jobs) {
@@ -287,6 +327,8 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
       telegramChat: Boolean(telegramChat),
       telegramChatName,
       cronSecret: (process.env.CRON_SECRET || '').length >= 16,
+      mercadoPago: isMercadoPagoConfigured(),
+      pushDevices: db && dbAccess === 'ok' ? await countPushDevices(db).catch(() => 0) : 0,
       calendar: isCalendarConfigured(),
       calendarId: process.env.GOOGLE_CALENDAR_ID || null,
     });

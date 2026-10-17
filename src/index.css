@@ -487,7 +487,9 @@ html, body {
   max-width: 100vw;
   width: 100%;
   overscroll-behavior-x: none;
-  touch-action: pan-y;
+  /* manipulation: sin demora del doble toque, pero SÍ permite pellizcar para hacer zoom
+     (pan-y lo bloqueaba y dejaba sin zoom a quien lo necesita) */
+  touch-action: manipulation;
   position: relative;
   transition: background-color 150ms ease, color 150ms ease;
 }
@@ -843,5 +845,101 @@ h1, h2, h3, .font-heading {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 1ms !important;
+  }
+}
+
+
+/* ==========================================================================
+   PAUTAS DE INTERFAZ (web-interface-guidelines)
+   ========================================================================== */
+
+/* Controles nativos (barras de scroll, selects, fechas) en el tema correcto */
+.dark { color-scheme: dark; }
+.light { color-scheme: light; }
+
+/* Select nativo legible en modo oscuro de Windows */
+select {
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+}
+
+/* Modales y paneles: el scroll interno no arrastra la página de atrás */
+.fixed.inset-0,
+[role="dialog"] {
+  overscroll-behavior: contain;
+}
+
+/* Saltar al contenido: invisible hasta que se navega con teclado */
+.skip-link {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 100;
+  padding: 8px 14px;
+  border-radius: var(--radius-control);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 14px;
+  font-weight: 600;
+  transform: translateY(-200%);
+}
+.skip-link:focus { transform: none; }
+
+/* Títulos sin palabras sueltas en la última línea */
+h1, h2, h3 { text-wrap: balance; }
+
+
+/* ==========================================================================
+   TRANSICIONES ENTRE PANTALLAS (React <ViewTransition>)
+   ========================================================================== */
+:root {
+  --duration-exit: 140ms;
+  --duration-enter: 200ms;
+  --duration-move: 320ms;
+}
+
+@keyframes vt-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes vt-slide {
+  from { translate: var(--slide-offset); }
+  to { translate: 0; }
+}
+
+/* Raíz "viva": la barra lateral, la de arriba y la de abajo no se congelan ni parpadean;
+   solo anima el contenido de la pantalla */
+::view-transition-old(root) { display: none; }
+::view-transition-new(root) { animation: none; }
+::view-transition { pointer-events: none; }
+
+/* Entre secciones del menú: fundido corto */
+::view-transition-old(.fade-out) { animation: var(--duration-exit) ease-in both vt-fade reverse; }
+::view-transition-new(.fade-in) { animation: var(--duration-enter) ease-out var(--duration-exit) both vt-fade; }
+
+/* Entrar a un detalle desliza hacia adelante; volver, hacia atrás */
+::view-transition-old(.nav-forward) {
+  --slide-offset: -40px;
+  animation: var(--duration-exit) ease-in both vt-fade reverse, var(--duration-move) ease-in-out both vt-slide reverse;
+}
+::view-transition-new(.nav-forward) {
+  --slide-offset: 40px;
+  animation: var(--duration-enter) ease-out var(--duration-exit) both vt-fade, var(--duration-move) ease-in-out both vt-slide;
+}
+::view-transition-old(.nav-back) {
+  --slide-offset: 40px;
+  animation: var(--duration-exit) ease-in both vt-fade reverse, var(--duration-move) ease-in-out both vt-slide reverse;
+}
+::view-transition-new(.nav-back) {
+  --slide-offset: -40px;
+  animation: var(--duration-enter) ease-out var(--duration-exit) both vt-fade, var(--duration-move) ease-in-out both vt-slide;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }

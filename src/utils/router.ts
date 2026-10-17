@@ -1,4 +1,32 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, startTransition, addTransitionType } from 'react';
+
+// Dirección de la navegación para las animaciones entre pantallas:
+// entrar a un detalle (/clientes → /clientes/abc) desliza hacia adelante; volver, hacia atrás;
+// moverse entre secciones del menú es "lateral" (fundido suave, sin deslizar).
+let lastRoutePath = typeof window !== 'undefined' ? window.location.pathname : '/';
+
+export function getNavigationType(prev: string, next: string): 'nav-forward' | 'nav-back' | 'nav-lateral' {
+  const depth = (p: string) => p.split('/').filter(Boolean).length;
+  if (prev === next) return 'nav-lateral';
+  const strip = (p: string) => p.replace(/\/$/, '');
+  if (depth(next) > depth(prev) && next.startsWith(strip(prev) + '/')) return 'nav-forward';
+  if (depth(next) < depth(prev) && prev.startsWith(strip(next) + '/')) return 'nav-back';
+  return 'nav-lateral';
+}
+
+function navigationType(nextPath: string) {
+  const type = getNavigationType(lastRoutePath, nextPath);
+  lastRoutePath = nextPath;
+  return type;
+}
+
+function setRouteAnimated(setRoute: (r: RouteMatch) => void, next: RouteMatch) {
+  const type = navigationType(next.path);
+  startTransition(() => {
+    addTransitionType(type);
+    setRoute(next);
+  });
+}
 
 export type RouteName =
   | 'hoy'
@@ -236,11 +264,11 @@ export function useRouter() {
   useEffect(() => {
     const handlePopState = () => {
       const match = parseRoute(window.location.pathname, window.location.search);
-      setRoute(match);
+      setRouteAnimated(setRoute, match);
     };
 
     const listener: RouteListener = (newRoute) => {
-      setRoute(newRoute);
+      setRouteAnimated(setRoute, newRoute);
     };
 
     listeners.add(listener);

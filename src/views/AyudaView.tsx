@@ -320,7 +320,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
                 <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-2.5 top-2.5" />
                 <input
                   type="text"
-                  placeholder="Buscar atajo..."
+                  placeholder="Buscar atajo…"
                   value={shortcutSearch}
                   onChange={e => setShortcutSearch(e.target.value)}
                   className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"

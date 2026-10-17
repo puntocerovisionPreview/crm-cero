@@ -207,7 +207,7 @@ export const AppTopBar: React.FC<Props> = ({
           {/* Sync Dot (Discreet Color Dot, no text) */}
           <div 
             className="flex items-center justify-center w-7 h-7"
-            title={syncStatus === 'synced' ? 'Sincronizado' : 'Sincronizando con la nube...'}
+            title={syncStatus === 'synced' ? 'Sincronizado' : 'Sincronizando con la nube…'}
           >
             <span className={`w-2 h-2 rounded-full t-badge-pop ${syncStatus === 'synced' ? 'bg-[#16A34A]' : 'bg-[#D97706] animate-pulse'}`} />
           </div>

@@ -621,7 +621,7 @@ export const SemanaView: React.FC<Props> = ({
 
           <div className="w-full h-2.5 bg-[var(--bg-app)] rounded-full overflow-hidden border border-[var(--border-subtle)] relative">
             <div 
-              className={`h-full transition-all duration-300 ${capacitySemaphore.bar}`}
+              className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ${capacitySemaphore.bar}`}
               style={{ width: `${Math.min(100, capacityRatio * 100)}%` }}
             />
           </div>
@@ -831,7 +831,7 @@ export const SemanaView: React.FC<Props> = ({
                         {/* Barra de Relleno según Avance Real */}
                         <div className="absolute bottom-0 left-0 right-0 h-1.5 bg-zinc-800/60 rounded-full overflow-hidden">
                           <div 
-                            className="h-full rounded-full transition-all duration-300"
+                            className="h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                             style={{ 
                               width: `${progress.avancePct}%`,
                               backgroundColor: frenteCfg.hex,
@@ -1511,7 +1511,7 @@ const MissionDedicatedScreen: React.FC<MissionScreenProps> = ({
             </div>
             <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
               <div 
-                className="h-full rounded-full transition-all duration-300"
+                className="h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                 style={{ width: `${progress.avancePct}%`, backgroundColor: frenteCfg.hex }}
               />
             </div>

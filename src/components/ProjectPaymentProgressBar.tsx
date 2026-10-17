@@ -107,7 +107,7 @@ export const ProjectPaymentProgressBar: React.FC<Props> = ({
         {/* Progress Bar Track */}
         <div className="w-full h-1.5 bg-[var(--bg-surface-muted)] rounded-full overflow-hidden flex">
           <div 
-            className={`h-full transition-all duration-300 ${statusBadge.barClass}`}
+            className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ${statusBadge.barClass}`}
             style={{ width: `${Math.min(100, Math.max(0, porcentajeCobrado))}%` }}
           />
         </div>
@@ -162,7 +162,7 @@ export const ProjectPaymentProgressBar: React.FC<Props> = ({
       {/* Main Visual Progress Bar */}
       <div className="relative w-full h-2.5 bg-[var(--bg-surface-muted)] rounded-full overflow-hidden flex">
         <div 
-          className={`h-full transition-all duration-500 rounded-full ${statusBadge.barClass}`}
+          className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-500 rounded-full ${statusBadge.barClass}`}
           style={{ width: `${Math.min(100, Math.max(0, porcentajeCobrado))}%` }}
         />
       </div>

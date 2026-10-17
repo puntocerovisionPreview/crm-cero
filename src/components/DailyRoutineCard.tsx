@@ -243,7 +243,7 @@ export const DailyRoutineCard: React.FC = () => {
       {!collapsed && todayItems.length > 0 && !editing && (
         <div className="h-1 bg-[var(--bg-surface-muted)]">
           <div
-            className="h-full bg-[var(--accent)] transition-all duration-300"
+            className="h-full bg-[var(--accent)] transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
             style={{ width: `${Math.round((doneCount / todayItems.length) * 100)}%` }}
           />
         </div>

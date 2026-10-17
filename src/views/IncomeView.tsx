@@ -545,6 +545,7 @@ export const IncomeView: React.FC<Props> = ({
               <ChevronLeft className="w-3.5 h-3.5" />
             </button>
             <select
+              aria-label="Mes"
               value={selectedMonth}
               onChange={e => setSelectedMonth(e.target.value)}
               className="bg-transparent border-none text-xs font-bold text-[var(--text-primary)] px-1 focus:outline-none cursor-pointer"
@@ -1146,7 +1147,7 @@ export const IncomeView: React.FC<Props> = ({
                   <label className="text-[11px] text-[var(--text-secondary)] block mb-1">Notas (Opcional):</label>
                   <input
                     type="text"
-                    placeholder="Detalles, comprobante, referencia..."
+                    placeholder="Detalles, comprobante, referencia…"
                     value={formNotes}
                     onChange={e => setFormNotes(e.target.value)}
                     className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"
@@ -1442,7 +1443,7 @@ export const IncomeView: React.FC<Props> = ({
                                       type="text"
                                       value={cmt.title}
                                       onChange={e => handleUpdateCommitment(proj, cmt.id, { title: e.target.value })}
-                                      placeholder="Concepto..."
+                                      placeholder="Concepto…"
                                       className="bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg px-2.5 py-1 text-xs font-medium text-[var(--text-primary)] focus:outline-none"
                                     />
                                     <input

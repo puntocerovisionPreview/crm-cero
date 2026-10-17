@@ -612,7 +612,7 @@ export const FocusView: React.FC<Props> = ({
           {/* Global Progress Bar */}
           <div className="w-full h-1.5 bg-[var(--bg-surface-muted)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
             <div
-              className="h-full bg-[var(--solid-contrast-bg)] rounded-full transition-all duration-300 ease-out"
+              className="h-full bg-[var(--solid-contrast-bg)] rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ease-out"
               style={{ width: `${progressStats.percent}%` }}
             />
           </div>
@@ -1015,7 +1015,7 @@ export const FocusView: React.FC<Props> = ({
             return (
               <div
                 key={task.id}
-                className={`rounded-2xl border transition-all duration-300 animate-blur-enter ${staggerClass} ${
+                className={`rounded-2xl border transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 animate-blur-enter ${staggerClass} ${
                   isActive
                     ? 'bg-[var(--bg-surface)] border-[var(--text-primary)] ring-1 ring-[var(--text-primary)] shadow-md'
                     : isOverdue
@@ -1110,7 +1110,7 @@ export const FocusView: React.FC<Props> = ({
                     {totalSubs > 0 && (
                       <div className="w-12 h-1.5 bg-[var(--bg-app)] rounded-full overflow-hidden border border-[var(--border-subtle)] hidden sm:block">
                         <div
-                          className="h-full bg-[var(--solid-contrast-bg)] rounded-full transition-all duration-300"
+                          className="h-full bg-[var(--solid-contrast-bg)] rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                           style={{ width: `${subPercent}%` }}
                         />
                       </div>
@@ -1315,7 +1315,7 @@ export const FocusView: React.FC<Props> = ({
                               handleAddSubtarea(task);
                             }
                           }}
-                          placeholder="+ Agregar subtarea (Enter)..."
+                          placeholder="+ Agregar subtarea (Enter)…"
                           className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--text-primary)] transition"
                         />
                         <button
@@ -1344,7 +1344,7 @@ export const FocusView: React.FC<Props> = ({
                 type="text"
                 value={newTaskTitle}
                 onChange={e => setNewTaskTitle(e.target.value)}
-                placeholder="Nueva tarea para hoy... (Presiona Enter)"
+                placeholder="Nueva tarea para hoy… (Presiona Enter)"
                 className="w-full bg-transparent border-none text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none py-1"
               />
               <button

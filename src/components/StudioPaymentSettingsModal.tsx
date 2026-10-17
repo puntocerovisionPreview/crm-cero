@@ -109,7 +109,7 @@ export const StudioPaymentSettingsModal: React.FC<Props> = ({
               <label className="text-[10.5px] font-medium text-[var(--text-secondary)]">CBU / CVU ARS</label>
               <input
                 type="text"
-                placeholder="00000031000..."
+                placeholder="00000031000…"
                 value={cbuArs}
                 onChange={(e) => setCbuArs(e.target.value)}
                 className="w-full px-3 py-1.5 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] font-mono text-xs text-[var(--text-primary)] focus:outline-none"

@@ -286,7 +286,7 @@ widget.presentMedium();
             disabled={isSaving}
             className="px-4 py-2.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-strong)] text-[var(--on-accent)] text-xs font-bold transition shadow-sm"
           >
-            {isSaving ? 'Guardando...' : 'Actualizar'}
+            {isSaving ? 'Guardando…' : 'Actualizar'}
           </button>
         </div>
       </div>
@@ -315,7 +315,7 @@ widget.presentMedium();
               }}
               className="sr-only peer" 
             />
-            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[var(--accent)]" />
+            <div className="w-11 h-6 bg-zinc-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] peer-checked:bg-[var(--accent)]" />
           </label>
         </div>
 

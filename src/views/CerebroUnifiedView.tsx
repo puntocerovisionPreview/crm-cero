@@ -140,6 +140,7 @@ export const CerebroUnifiedView: React.FC<Props> = ({
           <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
           <input
             type="text"
+            aria-label="Buscar en el conocimiento"
             placeholder="Buscar en el conocimiento, notas, tareas o escribir [[link]]..."
             value={globalSearch}
             onChange={(e) => setGlobalSearch(e.target.value)}
@@ -185,7 +186,7 @@ export const CerebroUnifiedView: React.FC<Props> = ({
         {activeTab === 'grafo' && (
           <React.Suspense fallback={
             <div className="flex-1 flex items-center justify-center p-12 text-xs text-[var(--text-secondary)]">
-              Cargando grafo interactivo de conocimiento...
+              Cargando grafo interactivo de conocimiento…
             </div>
           }>
             <KnowledgeGraphView

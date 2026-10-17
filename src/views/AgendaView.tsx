@@ -1,18 +1,18 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { AgendaTask, AgendaMeeting, WeeklyGoal, WeeklyMission, IncomeRecord, Project, Payment, StudioPaymentSettings, PersonalAccount } from '../types';
 import { FRENTE_CONFIG, calculateMissionProgress } from '../utils/missions';
-import { 
-  Calendar, 
+import {
+  Calendar,
   CalendarDays,
-  Clock, 
-  CheckCircle2, 
-  Circle, 
-  ArrowRight, 
-  Trash2, 
-  Plus, 
-  ChevronLeft, 
+  Clock,
+  CheckCircle2,
+  Circle,
+  ArrowRight,
+  Trash2,
+  Plus,
+  ChevronLeft,
   ChevronRight,
-  ChevronDown, 
+  ChevronDown,
   ChevronUp,
   Check,
   CheckSquare,
@@ -37,10 +37,10 @@ import {
   ArrowUpDown
 } from 'lucide-react';
 import { getTaskCategoryConfig, TASK_PRIORITIES } from '../utils/taskCategories';
-import { 
-  getTodayString, 
-  addDays, 
-  formatDayName, 
+import {
+  getTodayString,
+  addDays,
+  formatDayName,
   formatShortDay,
   getWeekMonday
 } from '../utils/storage';
@@ -68,6 +68,24 @@ import { resolveTaskProject } from '../utils/taskProject';
 import { ModalPortal } from '../components/ModalPortal';
 import { TaskSortControl } from '../components/TaskSortControl';
 import { TaskSortMode, getStoredTaskSortMode, sortTasks, storeTaskSortMode } from '../utils/taskSort';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  MouseSensor,
+  TouchSensor,
+  closestCorners,
+  pointerWithin,
+  type CollisionDetection,
+  useDroppable,
+  useDraggable,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 interface Props {
   tasks: AgendaTask[];
@@ -187,6 +205,91 @@ export const AgendaView: React.FC<Props> = ({
     storeTaskSortMode(mode);
   };
   const tasks = useMemo(() => sortTasks(rawTasks, taskSortMode), [rawTasks, taskSortMode]);
+
+  // ---- Arrastrar y soltar (dnd-kit): mouse, táctil (mantener apretado) y teclado ----
+  // Mouse: arrastra al moverse 6 px (un clic sigue abriendo la tarea).
+  // Celular: hay que mantener apretado 220 ms; así no compite con el scroll ni con el deslizamiento.
+  const dndSensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const [activeDrag, setActiveDrag] = useState<{ type: 'tarea' | 'reunion'; title: string; keyboard: boolean } | null>(null);
+
+  // La agenda tiene montadas a la vez la vista de celular y la de computadora (una oculta por CSS).
+  // Solo la visible acepta arrastres; si no, la oculta (tamaño cero) "tapaba" las zonas reales.
+  const [dndScope, setDndScope] = useState<'mobile' | 'desktop'>(() =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches ? 'desktop' : 'mobile'
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setDndScope(mq.matches ? 'desktop' : 'mobile');
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Se suelta donde está el puntero o el dedo (una tarea si hay, si no el día).
+  // Si quedó entre columnas, el lugar más cercano.
+  const agendaCollision: CollisionDetection = (args) => {
+    const under = pointerWithin(args);
+    if (under.length > 0) {
+      const task = under.find(c => (c.data?.droppableContainer?.data?.current as any)?.type === 'tarea');
+      return task ? [task] : under;
+    }
+    return closestCorners(args);
+  };
+
+  const handleDndStart = (event: DragStartEvent) => {
+    const data = event.active.data.current as any;
+    // Con teclado se mueve la tarjeta real (sin "fantasma"): así la posición que se calcula es exacta
+    if (data) setActiveDrag({ type: data.type, title: data.title, keyboard: event.activatorEvent instanceof KeyboardEvent });
+    hapticFeedback.selection();
+  };
+
+  const handleDndEnd = (event: DragEndEvent) => {
+    setActiveDrag(null);
+    const { active, over } = event;
+    if (!over) return;
+    const a = active.data.current as any;
+    const o = over.data.current as any;
+    if (!a || !o?.date) return;
+    const targetDate: string = o.date;
+
+    if (a.type === 'reunion') {
+      if (a.date !== targetDate) {
+        onMoveMeetingDate(a.id, targetDate);
+        hapticFeedback.medium();
+      }
+      return;
+    }
+
+    if (a.date !== targetDate) {
+      onMoveTaskDate(a.id, targetDate);
+      hapticFeedback.medium();
+      return;
+    }
+
+    // Mismo día: reordenar
+    const dayTasks = tasks.filter(t => t.date === targetDate);
+    const from = dayTasks.findIndex(t => t.id === a.id);
+    const to = o.type === 'tarea' ? dayTasks.findIndex(t => t.id === o.id) : dayTasks.length - 1;
+    if (from < 0 || to < 0 || from === to) return;
+    onReorderTasks?.(targetDate, arrayMove(dayTasks, from, to));
+    hapticFeedback.medium();
+  };
+
+  // Lo que anuncia un lector de pantalla al mover con teclado
+  const dndAccessibility = {
+    screenReaderInstructions: {
+      draggable: 'Para mover, presioná espacio o Enter. Usá las flechas para cambiar de lugar y espacio otra vez para soltar. Escape cancela.',
+    },
+    announcements: {
+      onDragStart: ({ active }: any) => `Tomaste ${active.data.current?.title || 'el elemento'}.`,
+      onDragOver: ({ over }: any) => (over ? `Sobre ${over.data.current?.label || 'otra posición'}.` : 'Fuera de la agenda.'),
+      onDragEnd: ({ over }: any) => (over ? `Soltado en ${over.data.current?.label || 'la nueva posición'}.` : 'Movimiento cancelado.'),
+      onDragCancel: () => 'Movimiento cancelado.',
+    },
+  };
   // Arrastrar para reordenar implica orden propio: pasa a "Manual" para que se vea el cambio
   const onReorderTasks = onReorderTasksProp
     ? (date: string, reordered: AgendaTask[]) => {
@@ -302,8 +405,8 @@ export const AgendaView: React.FC<Props> = ({
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDateStr, i));
 
   // 3-day focus days (Ayer, Hoy, Mañana if today, or 3 consecutive days)
-  const focusDays = isViewingToday 
-    ? [addDays(today, -1), today, addDays(today, 1)] 
+  const focusDays = isViewingToday
+    ? [addDays(today, -1), today, addDays(today, 1)]
     : [startDateStr, addDays(startDateStr, 1), addDays(startDateStr, 2)];
 
   // Weekly Stats
@@ -362,6 +465,16 @@ export const AgendaView: React.FC<Props> = ({
   };
 
   return (
+    <DndContext
+      sensors={dndSensors}
+      collisionDetection={agendaCollision}
+      onDragStart={handleDndStart}
+      onDragEnd={handleDndEnd}
+      onDragCancel={() => setActiveDrag(null)}
+      accessibility={dndAccessibility}
+      // Desplazamiento automático suave y solo muy cerca del borde: antes "se pasaba" de columna
+      autoScroll={{ threshold: { x: 0.06, y: 0.12 }, acceleration: 4 }}
+    >
     <div className="space-y-4 pb-24">
       {/* MOBILE SEGMENTED BAR & QUICK ACTIONS (Visible only on Mobile) */}
       <div className="lg:hidden space-y-3">
@@ -613,6 +726,8 @@ export const AgendaView: React.FC<Props> = ({
 
             {/* Today's Full Day Column in Mobile Mode */}
             <DayColumn
+              dndScope="mobile"
+              dndEnabled={dndScope === "mobile"}
               dateStr={today}
               isToday={true}
               tasks={tasks.filter(t => t.date === today)}
@@ -702,8 +817,8 @@ export const AgendaView: React.FC<Props> = ({
                     </span>
                     {totalItems > 0 && (
                       <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-medium ${
-                        isSelected 
-                          ? 'bg-black/30 text-white' 
+                        isSelected
+                          ? 'bg-black/30 text-white'
                           : pendingItems > 0 ? 'bg-zinc-800 text-zinc-300' : 'bg-emerald-500/20 text-emerald-400'
                       }`}>
                         {pendingItems > 0 ? `${pendingItems} pend.` : '✓ al día'}
@@ -716,6 +831,8 @@ export const AgendaView: React.FC<Props> = ({
 
             {/* Selected Day View */}
             <DayColumn
+              dndScope="mobile"
+              dndEnabled={dndScope === "mobile"}
               dateStr={activeMobileDateStr}
               isToday={activeMobileDateStr === today}
               tasks={tasks.filter(t => t.date === activeMobileDateStr)}
@@ -928,8 +1045,8 @@ export const AgendaView: React.FC<Props> = ({
                     </span>
                   </div>
                   <div className="w-16 h-1.5 bg-[var(--bg-surface-muted)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
-                    <div 
-                      className="h-full bg-[#16A34A] rounded-full transition-all duration-300"
+                    <div
+                      className="h-full bg-[#16A34A] rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                       style={{ width: `${weekCompletionRate}%` }}
                     />
                   </div>
@@ -1015,8 +1132,8 @@ export const AgendaView: React.FC<Props> = ({
                         </span>
                         <div className="flex items-center gap-1.5 pl-1.5 border-l border-[var(--border-subtle)]">
                           <div className="w-10 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full rounded-full transition-all duration-300"
+                            <div
+                              className="h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                               style={{ width: `${prog.avancePct}%`, backgroundColor: cfg.hex }}
                             />
                           </div>
@@ -1196,7 +1313,7 @@ export const AgendaView: React.FC<Props> = ({
                 </div>
 
                 {/* Horizontal Scrollable Carousel Container with 300px Spacious Columns */}
-                <div 
+                <div
                   ref={desktopGridRef}
                   className="w-full min-w-0 max-w-full flex gap-4 overflow-x-auto pb-4 custom-scrollbar snap-x scroll-smooth overscroll-x-contain"
                 >
@@ -1208,12 +1325,14 @@ export const AgendaView: React.FC<Props> = ({
                     const pendingCount = rawTasks.filter(t => !t.completed).length + rawMeetings.filter(m => !m.completed).length;
 
                     return (
-                      <div 
-                        key={dateStr} 
+                      <div
+                        key={dateStr}
                         id={`agenda-desktop-col-${dateStr}`}
                         className="w-[305px] min-w-[305px] max-w-[330px] shrink-0 snap-start"
                       >
                         <DayColumn
+                          dndScope="desktop"
+                          dndEnabled={dndScope === "desktop"}
                           dateStr={dateStr}
                           isToday={isToday}
                           tasks={fTasks}
@@ -1260,6 +1379,8 @@ export const AgendaView: React.FC<Props> = ({
 
               return (
                 <DayColumn
+                  dndScope="desktop"
+                  dndEnabled={dndScope === "desktop"}
                   key={dateStr}
                   dateStr={dateStr}
                   isToday={isToday}
@@ -1304,11 +1425,11 @@ export const AgendaView: React.FC<Props> = ({
               const dayTotal = fTasks.length + fMeetings.length;
 
               return (
-                <div 
+                <div
                   key={dateStr}
                   className={`p-4 rounded-2xl border ${
-                    isToday 
-                      ? 'bg-zinc-900 border-[var(--accent)]/50 shadow-lg shadow-[var(--accent)]/5' 
+                    isToday
+                      ? 'bg-zinc-900 border-[var(--accent)]/50 shadow-lg shadow-[var(--accent)]/5'
                       : 'bg-zinc-900/80 border-zinc-800'
                   } space-y-3 transition`}
                 >
@@ -1355,7 +1476,7 @@ export const AgendaView: React.FC<Props> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {/* Meetings */}
                       {fMeetings.map(meet => (
-                        <div 
+                        <div
                           key={meet.id}
                           onClick={(e) => {
                             const target = e.target as HTMLElement;
@@ -1367,8 +1488,8 @@ export const AgendaView: React.FC<Props> = ({
                             }
                           }}
                           className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-pointer transition ${
-                            meet.completed 
-                              ? 'bg-zinc-950/40 border-zinc-800/40 opacity-60' 
+                            meet.completed
+                              ? 'bg-zinc-950/40 border-zinc-800/40 opacity-60'
                               : 'bg-zinc-950 border-zinc-800 hover:border-amber-500/50 hover:bg-zinc-900/60'
                           }`}
                         >
@@ -1476,7 +1597,7 @@ export const AgendaView: React.FC<Props> = ({
                               <div className="absolute -bottom-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
                             )}
 
-                            <div 
+                            <div
                               draggable={true}
                               onDragStart={(e) => {
                                 e.dataTransfer.setData('text/plain', JSON.stringify({ id: t.id, type: 'tarea', sourceDate: dateStr }));
@@ -1500,8 +1621,8 @@ export const AgendaView: React.FC<Props> = ({
                               className={`p-3 rounded-xl border flex items-start justify-between gap-3 cursor-grab active:cursor-grabbing transition ${
                                 isDragging
                                   ? 'opacity-40 scale-[0.98] border-dashed border-[var(--accent)]/60 bg-[var(--accent)]/5'
-                                  : t.completed 
-                                  ? 'bg-zinc-950/40 border-zinc-800/40 opacity-60' 
+                                  : t.completed
+                                  ? 'bg-zinc-950/40 border-zinc-800/40 opacity-60'
                                   : `${catCfg.cardBg} ${catCfg.cardBorder} ${catCfg.cardBorderHover}`
                               }`}
                             >
@@ -1844,11 +1965,48 @@ export const AgendaView: React.FC<Props> = ({
         </ModalPortal>
       )}
     </div>
+      {/* Lo que se ve bajo el dedo o el puntero mientras se arrastra */}
+      <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        {activeDrag && !activeDrag.keyboard ? (
+          <div className="px-3 py-2.5 rounded-xl border border-[var(--accent)] bg-[var(--bg-surface-elevated)] text-sm font-semibold text-[var(--text-primary)] shadow-2xl shadow-black/40 max-w-[280px] truncate rotate-[1deg]">
+            {activeDrag.type === 'reunion' ? 'Reunión: ' : ''}
+            {activeDrag.title}
+          </div>
+        ) : null}
+      </DragOverlay>
+    </DndContext>
+  );
+};
+
+// Envoltura arrastrable para reuniones (solo se mueven de día, no se reordenan)
+const DraggableMeeting: React.FC<{
+  meeting: AgendaMeeting;
+  dateLabel: string;
+  dndScope: string;
+  disabled?: boolean;
+  children: (drag: { setNodeRef: (el: HTMLElement | null) => void; handleProps: any; cardProps: any; isDragging: boolean }) => React.ReactNode;
+}> = ({ meeting, dateLabel, dndScope, disabled, children }) => {
+  const { setNodeRef, attributes, listeners, isDragging } = useDraggable({
+    id: `${dndScope}|meet|${meeting.id}`,
+    disabled,
+    data: { type: 'reunion', id: meeting.id, date: meeting.date, title: meeting.title, label: dateLabel },
+  });
+  return (
+    <>
+      {children({
+        setNodeRef,
+        isDragging,
+        handleProps: { ...attributes, onKeyDown: listeners?.onKeyDown },
+        cardProps: { onMouseDown: listeners?.onMouseDown, onTouchStart: listeners?.onTouchStart },
+      })}
+    </>
   );
 };
 
 // Subcomponent: Column for a single day
 interface DayColumnProps {
+  dndScope: 'mobile' | 'desktop';
+  dndEnabled: boolean;
   dateStr: string;
   isToday: boolean;
   tasks: AgendaTask[];
@@ -1872,6 +2030,8 @@ interface DayColumnProps {
 }
 
 const DayColumn: React.FC<DayColumnProps> = ({
+  dndScope,
+  dndEnabled,
   dateStr,
   isToday,
   tasks,
@@ -1893,178 +2053,28 @@ const DayColumn: React.FC<DayColumnProps> = ({
   onMovePendingToTomorrow,
   onReorderTasks,
 }) => {
-  const [isDragOver, setIsDragOver] = useState(false);
-  // Reorder drag state (Desktop HTML5 & Mobile Touch)
-  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
-  const [dragOverTaskId, setDragOverTaskId] = useState<string | null>(null);
-  const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
+  const tomorrowLabel = '';
+  void tomorrowLabel;
 
   const tomorrowStr = addDays(dateStr, 1);
   const dayName = formatDayName(dateStr);
   const shortDate = formatShortDay(dateStr);
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    if (!isDragOver) setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      setIsDragOver(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    try {
-      const raw = e.dataTransfer.getData('text/plain');
-      if (raw) {
-        const item = JSON.parse(raw);
-        if (item.type === 'tarea') {
-          if (item.sourceDate && item.sourceDate !== dateStr) {
-            onMoveTaskDate(item.id, dateStr);
-            hapticFeedback.medium();
-          } else if (onReorderTasks && tasks.some(t => t.id === item.id)) {
-            // Dragged to the bottom of the same day column
-            const without = tasks.filter(t => t.id !== item.id);
-            const dragged = tasks.find(t => t.id === item.id);
-            if (dragged) {
-              onReorderTasks(dateStr, [...without, dragged]);
-              hapticFeedback.medium();
-            }
-          }
-        } else if (item.type === 'reunion') {
-          onMoveMeetingDate(item.id, dateStr);
-          hapticFeedback.medium();
-        }
-      }
-    } catch (err) {
-      console.error('Error onDrop:', err);
-    }
-    setDraggedTaskId(null);
-    setDragOverTaskId(null);
-    setDropPosition(null);
-  };
-
-  // Reorder Handlers for Tasks inside this column
-  const handleTaskDragStart = (taskId: string, e: React.DragEvent) => {
-    e.dataTransfer.setData('text/plain', JSON.stringify({ id: taskId, type: 'tarea', sourceDate: dateStr }));
-    e.dataTransfer.effectAllowed = 'move';
-    setDraggedTaskId(taskId);
-  };
-
-  const handleTaskDragOver = (targetTaskId: string, e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    if (draggedTaskId === targetTaskId) return;
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const relY = e.clientY - rect.top;
-    const isTop = relY < rect.height / 2;
-    const pos = isTop ? 'before' : 'after';
-
-    if (dragOverTaskId !== targetTaskId || dropPosition !== pos) {
-      setDragOverTaskId(targetTaskId);
-      setDropPosition(pos);
-    }
-  };
-
-  const handleTaskDragLeave = (targetTaskId: string, e: React.DragEvent) => {
-    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-      if (dragOverTaskId === targetTaskId) {
-        setDragOverTaskId(null);
-        setDropPosition(null);
-      }
-    }
-  };
-
-  const handleTaskDrop = (targetTaskId: string, e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    let sourceTaskId = draggedTaskId;
-    let sourceDate = dateStr;
-    try {
-      const raw = e.dataTransfer.getData('text/plain');
-      if (raw) {
-        const item = JSON.parse(raw);
-        if (item.type === 'tarea') {
-          sourceTaskId = item.id;
-          if (item.sourceDate) sourceDate = item.sourceDate;
-        }
-      }
-    } catch {
-      // ignore
-    }
-
-    if (sourceTaskId && sourceTaskId !== targetTaskId) {
-      if (sourceDate === dateStr) {
-        const pos = dropPosition || 'before';
-        const reordered = reorderTasksList(tasks, sourceTaskId, targetTaskId, pos);
-        onReorderTasks?.(dateStr, reordered);
-        hapticFeedback.medium();
-      } else {
-        onMoveTaskDate(sourceTaskId, dateStr);
-        hapticFeedback.medium();
-      }
-    }
-
-    setDraggedTaskId(null);
-    setDragOverTaskId(null);
-    setDropPosition(null);
-  };
-
-  const handleTaskDragEnd = () => {
-    setDraggedTaskId(null);
-    setDragOverTaskId(null);
-    setDropPosition(null);
-  };
-
-  const handleTouchDragStart = (taskId: string, _e: React.TouchEvent) => {
-    setDraggedTaskId(taskId);
-    hapticFeedback.selection();
-  };
-
-  const handleTouchDragMove = (taskId: string, e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    if (!touch) return;
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    const taskCard = el?.closest('[data-task-id]') as HTMLElement | null;
-    if (taskCard) {
-      const targetId = taskCard.getAttribute('data-task-id');
-      if (targetId && targetId !== taskId) {
-        const rect = taskCard.getBoundingClientRect();
-        const isTop = touch.clientY < (rect.top + rect.height / 2);
-        setDragOverTaskId(targetId);
-        setDropPosition(isTop ? 'before' : 'after');
-      }
-    }
-  };
-
-  const handleTouchDragEnd = (taskId: string, _e: React.TouchEvent) => {
-    if (dragOverTaskId && dropPosition && dragOverTaskId !== taskId) {
-      const reordered = reorderTasksList(tasks, taskId, dragOverTaskId, dropPosition);
-      onReorderTasks?.(dateStr, reordered);
-      hapticFeedback.medium();
-    }
-    setDraggedTaskId(null);
-    setDragOverTaskId(null);
-    setDropPosition(null);
-  };
+  // Toda la columna recibe tareas y reuniones soltadas (también en otro día)
+  const { setNodeRef: setDropRef, isOver: isDragOver } = useDroppable({
+    id: `${dndScope}|day|${dateStr}`,
+    disabled: !dndEnabled,
+    data: { type: 'dia', date: dateStr, label: `${dayName} ${shortDate}` },
+  });
 
   return (
-    <div 
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      className={`flex flex-col bg-zinc-900/90 rounded-2xl border transition-all duration-200 ${
+    <div
+      ref={setDropRef}
+      className={`flex flex-col bg-zinc-900/90 rounded-2xl border transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-200 ${
         isDragOver
           ? 'border-[var(--accent)] bg-[var(--accent)]/10 ring-2 ring-[var(--accent)]/50 scale-[1.01]'
-          : isToday 
-          ? 'border-[var(--accent)]/60 shadow-lg shadow-[var(--accent)]/5 ring-1 ring-[var(--accent)]/30' 
+          : isToday
+          ? 'border-[var(--accent)]/60 shadow-lg shadow-[var(--accent)]/5 ring-1 ring-[var(--accent)]/30'
           : 'border-zinc-800'
       } overflow-hidden min-h-[420px]`}
     >
@@ -2144,19 +2154,19 @@ const DayColumn: React.FC<DayColumnProps> = ({
             </div>
 
             {meetings.map(meet => (
+              <DraggableMeeting key={meet.id} meeting={meet} dateLabel={`${dayName} ${shortDate}`} dndScope={dndScope} disabled={!dndEnabled}>
+              {({ setNodeRef: setMeetRef, cardProps, handleProps, isDragging: meetDragging }) => (
               <div
-                key={meet.id}
-                draggable={true}
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/plain', JSON.stringify({ id: meet.id, type: 'reunion' }));
-                  e.dataTransfer.effectAllowed = 'move';
-                }}
+                ref={setMeetRef}
+                {...cardProps}
+                {...handleProps}
+                aria-label={`Reunión ${meet.title}. Mantené apretado para moverla de día.`}
                 onClick={(e) => {
                   const target = e.target as HTMLElement;
                   if (target.closest('button') || target.closest('a')) return;
                   onSelectItem?.({ type: 'reunion', data: meet });
                 }}
-                className={`p-2.5 rounded-xl border transition cursor-grab active:cursor-grabbing ${
+                className={`p-2.5 rounded-xl border transition cursor-grab active:cursor-grabbing select-none ${meetDragging ? 'opacity-40' : ''} ${
                   meet.completed
                     ? 'bg-zinc-950/40 border-zinc-800/60 opacity-60'
                     : 'bg-zinc-950 border-zinc-800 hover:border-amber-500/50 hover:bg-zinc-900/50'
@@ -2310,6 +2320,8 @@ const DayColumn: React.FC<DayColumnProps> = ({
                   </div>
                 </div>
               </div>
+              )}
+              </DraggableMeeting>
             ))}
           </div>
         ) : (
@@ -2341,16 +2353,14 @@ const DayColumn: React.FC<DayColumnProps> = ({
                 {tasks.length > 1 && onReorderTasks && (
                   <span className="text-[9px] text-zinc-500 font-medium flex items-center gap-1">
                     <GripVertical className="w-3 h-3 text-zinc-500" />
-                    <span>Arrastrá para reordenar</span>
+                    <span>Mantené apretado para mover</span>
                   </span>
                 )}
               </div>
             )}
 
+            <SortableContext items={tasks.map(t => `${dndScope}|${t.id}`)} strategy={verticalListSortingStrategy} disabled={!dndEnabled}>
             {tasks.map((task) => {
-              const isDragging = draggedTaskId === task.id;
-              const isDragOver = dragOverTaskId === task.id;
-
               return (
                 <SwipeableTaskItem
                   key={task.id}
@@ -2358,17 +2368,8 @@ const DayColumn: React.FC<DayColumnProps> = ({
                   projects={projects}
                   missions={missions}
                   tomorrowStr={tomorrowStr}
-                  isDragging={isDragging}
-                  isDragOver={isDragOver}
-                  dropPosition={isDragOver ? dropPosition : null}
-                  onTaskDragStart={(e) => handleTaskDragStart(task.id, e)}
-                  onTaskDragOver={(e) => handleTaskDragOver(task.id, e)}
-                  onTaskDragLeave={(e) => handleTaskDragLeave(task.id, e)}
-                  onTaskDrop={(e) => handleTaskDrop(task.id, e)}
-                  onTaskDragEnd={handleTaskDragEnd}
-                  onTouchDragStart={handleTouchDragStart}
-                  onTouchDragMove={handleTouchDragMove}
-                  onTouchDragEnd={handleTouchDragEnd}
+                  dateLabel={`${dayName} ${shortDate}`}
+                  dndScope={dndScope}
                   onToggleTask={onToggleTask}
                   onMoveTaskDate={onMoveTaskDate}
                   onDeleteTask={onDeleteTask}
@@ -2379,6 +2380,7 @@ const DayColumn: React.FC<DayColumnProps> = ({
                 />
               );
             })}
+            </SortableContext>
           </div>
         ) : (
           meetings.length === 0 && (
@@ -2425,17 +2427,8 @@ interface SwipeableTaskItemProps {
   projects?: Project[];
   missions?: WeeklyMission[];
   tomorrowStr: string;
-  isDragging?: boolean;
-  isDragOver?: boolean;
-  dropPosition?: 'before' | 'after' | null;
-  onTaskDragStart?: (e: React.DragEvent) => void;
-  onTaskDragOver?: (e: React.DragEvent) => void;
-  onTaskDragLeave?: (e: React.DragEvent) => void;
-  onTaskDrop?: (e: React.DragEvent) => void;
-  onTaskDragEnd?: () => void;
-  onTouchDragStart?: (taskId: string, e: React.TouchEvent) => void;
-  onTouchDragMove?: (taskId: string, e: React.TouchEvent) => void;
-  onTouchDragEnd?: (taskId: string, e: React.TouchEvent) => void;
+  dateLabel?: string;
+  dndScope: string;
   onToggleTask: (id: string) => void;
   onMoveTaskDate: (id: string, targetDate: string) => void;
   onDeleteTask: (id: string) => void;
@@ -2450,17 +2443,8 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
   projects = [],
   missions = [],
   tomorrowStr,
-  isDragging,
-  isDragOver,
-  dropPosition,
-  onTaskDragStart,
-  onTaskDragOver,
-  onTaskDragLeave,
-  onTaskDrop,
-  onTaskDragEnd,
-  onTouchDragStart,
-  onTouchDragMove,
-  onTouchDragEnd,
+  dateLabel,
+  dndScope,
   onToggleTask,
   onMoveTaskDate,
   onDeleteTask,
@@ -2469,8 +2453,28 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
   onDeleteSubtask,
   onSelectItem,
 }) => {
+  const {
+    setNodeRef: setSortRef,
+    attributes: sortAttributes,
+    listeners: sortListeners,
+    transform: sortTransform,
+    transition: sortTransition,
+    isDragging,
+  } = useSortable({
+    id: `${dndScope}|${task.id}`,
+    data: { type: 'tarea', id: task.id, date: task.date, title: task.title, label: dateLabel ? `${task.title}, ${dateLabel}` : task.title },
+  });
+
   const [offsetX, setOffsetX] = useState(0);
   const [isSwiping, setIsSwiping] = useState(false);
+  // Si este toque terminó siendo un arrastre, el deslizamiento (hecha / mañana) no debe dispararse
+  const dragActivatedRef = useRef(false);
+  useEffect(() => {
+    if (isDragging) {
+      dragActivatedRef.current = true;
+      setOffsetX(0);
+    }
+  }, [isDragging]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -2498,11 +2502,12 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
     startXRef.current = e.touches[0].clientX;
     startYRef.current = e.touches[0].clientY;
     isHorizontalRef.current = null;
+    dragActivatedRef.current = false;
     setIsSwiping(true);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (!isSwiping) return;
+    if (!isSwiping || dragActivatedRef.current) return;
     const currentX = e.touches[0].clientX;
     const currentY = e.touches[0].clientY;
     const diffX = currentX - startXRef.current;
@@ -2526,6 +2531,11 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
   const handleTouchEnd = () => {
     setIsSwiping(false);
     const threshold = 55;
+    if (dragActivatedRef.current) {
+      setOffsetX(0);
+      isHorizontalRef.current = null;
+      return;
+    }
 
     if (offsetX > threshold) {
       // Swiped Right -> Toggle Done
@@ -2554,21 +2564,11 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
 
   return (
     <div
+      ref={setSortRef}
       data-task-id={task.id}
-      onDragOver={onTaskDragOver}
-      onDragLeave={onTaskDragLeave}
-      onDrop={onTaskDrop}
-      className="relative rounded-xl touch-pan-y"
+      style={{ transform: CSS.Translate.toString(sortTransform), transition: sortTransition }}
+      className={`relative rounded-xl touch-pan-y ${isDragging ? 'z-20' : ''}`}
     >
-      {/* Drop indicator bar at top */}
-      {isDragOver && dropPosition === 'before' && (
-        <div className="absolute -top-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
-      )}
-
-      {/* Drop indicator bar at bottom */}
-      {isDragOver && dropPosition === 'after' && (
-        <div className="absolute -bottom-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
-      )}
 
       {/* Background layer revealed during swipe */}
       <div
@@ -2595,14 +2595,12 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
 
       {/* Foreground Task Card */}
       <div
-        draggable={!isSwiping}
-        onDragStart={(e) => {
-          onTaskDragStart?.(e);
+        onMouseDown={sortListeners?.onMouseDown as React.MouseEventHandler<HTMLDivElement> | undefined}
+        onTouchStart={(e) => {
+          // mantener apretado = arrastrar (dnd-kit); deslizar = hecha / mañana
+          sortListeners?.onTouchStart?.(e);
+          handleTouchStart(e);
         }}
-        onDragEnd={() => {
-          onTaskDragEnd?.();
-        }}
-        onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onTouchCancel={handleTouchEnd}
@@ -2617,9 +2615,9 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
           transform: `translateX(${offsetX}px)`,
           transition: isSwiping ? 'none' : 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
-        className={`relative z-10 group p-2.5 rounded-xl border transition-all cursor-grab active:cursor-grabbing ${
+        className={`relative z-10 group p-2.5 rounded-xl border transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] cursor-grab active:cursor-grabbing select-none ${
           isDragging
-            ? 'opacity-40 scale-[0.98] border-dashed border-[var(--accent)]/60 bg-[var(--accent)]/5'
+            ? 'opacity-40 border-dashed border-[var(--accent)]/60 bg-[var(--accent)]/5'
             : task.completed
             ? 'bg-zinc-950/70 border-zinc-800/50 opacity-60'
             : `${catCfg.cardBg} ${catCfg.cardBorder} ${catCfg.cardBorderHover}`
@@ -2629,22 +2627,13 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
           <div className="flex items-start gap-1.5 flex-1 min-w-0">
             {/* Grip handle for reordering (Desktop drag + mobile touch) */}
             <div
-              className="no-swipe touch-none select-none p-0.5 mt-0.5 text-zinc-600 hover:text-zinc-300 active:text-[var(--accent)] cursor-grab active:cursor-grabbing rounded hover:bg-zinc-800/80 transition flex items-center justify-center shrink-0"
-              title="Arrastrar para reordenar"
-              onTouchStart={(e) => {
-                e.stopPropagation();
-                onTouchDragStart?.(task.id, e);
-              }}
-              onTouchMove={(e) => {
-                e.stopPropagation();
-                onTouchDragMove?.(task.id, e);
-              }}
-              onTouchEnd={(e) => {
-                e.stopPropagation();
-                onTouchDragEnd?.(task.id, e);
-              }}
+              {...sortAttributes}
+              onKeyDown={sortListeners?.onKeyDown as React.KeyboardEventHandler<HTMLDivElement> | undefined}
+              aria-label={`Mover tarea: ${task.title}`}
+              className="no-swipe select-none p-0.5 mt-0.5 text-zinc-600 hover:text-zinc-300 active:text-[var(--accent)] cursor-grab active:cursor-grabbing rounded hover:bg-zinc-800/80 transition flex items-center justify-center shrink-0"
+              title="Mover (mantené apretado o usá el teclado)"
             >
-              <GripVertical className="w-3.5 h-3.5" />
+              <GripVertical className="w-3.5 h-3.5" aria-hidden />
             </div>
 
             <button
@@ -2777,7 +2766,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                     {/* Visual Progress Bar */}
                     <div className="w-14 bg-zinc-800/80 h-1.5 rounded-full overflow-hidden shrink-0">
                       <div
-                        className={`h-full transition-all duration-300 ${
+                        className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ${
                           allSubtasksDone ? 'bg-emerald-500' : 'bg-[var(--accent)]'
                         }`}
                         style={{ width: `${(completedSubtasks / totalSubtasks) * 100}%` }}
@@ -2921,7 +2910,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                 <input
                   type="text"
                   autoFocus
-                  placeholder="Nueva subtarea..."
+                  placeholder="Nueva subtarea…"
                   value={newSubtaskTitle}
                   onChange={e => setNewSubtaskTitle(e.target.value)}
                   className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-[var(--accent)]"

@@ -204,7 +204,7 @@ export const PomodoroModal: React.FC<Props> = ({
             {timeFormatted}
           </span>
           <p className="text-xs text-[var(--text-secondary)] mt-2">
-            {isRunning ? 'Sesión en curso...' : 'Listo para iniciar bloque de foco'}
+            {isRunning ? 'Sesión en curso…' : 'Listo para iniciar bloque de foco'}
           </p>
         </div>
 

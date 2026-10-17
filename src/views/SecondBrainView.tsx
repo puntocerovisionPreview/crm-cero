@@ -644,7 +644,8 @@ export const SecondBrainView: React.FC<Props> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar en notas y conexiones..."
+              aria-label="Buscar en notas"
+              placeholder="Buscar en notas y conexiones…"
               className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-[var(--radius-control)] pl-8 pr-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--text-primary)] transition"
             />
           </div>
@@ -697,7 +698,7 @@ export const SecondBrainView: React.FC<Props> = ({
                     </div>
 
                     <p className="text-[11px] text-[var(--text-secondary)] line-clamp-2 mt-1 font-sans">
-                      {n.content ? n.content.slice(0, 90) : 'Sin contenido...'}
+                      {n.content ? n.content.slice(0, 90) : 'Sin contenido…'}
                     </p>
 
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-[var(--border-divider)] text-[10px] text-[var(--text-tertiary)] font-mono">
@@ -753,7 +754,7 @@ export const SecondBrainView: React.FC<Props> = ({
                   type="text"
                   value={activeNote.title}
                   onChange={(e) => handleUpdateActiveNote({ title: e.target.value })}
-                  placeholder="Título de la nota..."
+                  placeholder="Título de la nota…"
                   className="text-lg sm:text-xl font-bold font-heading text-[var(--text-primary)] bg-transparent border-none focus:outline-none flex-1 tracking-tight"
                 />
 
@@ -784,7 +785,7 @@ export const SecondBrainView: React.FC<Props> = ({
               <textarea
                 value={activeNote.content}
                 onChange={(e) => handleUpdateActiveNote({ content: e.target.value })}
-                placeholder="Escribe lo que mueve tu día... Escribe [[Nombre de Meta o Proyecto]] para conectar con nodos, o @tarea para incluir tareas."
+                placeholder="Escribe lo que mueve tu día… Escribe [[Nombre de Meta o Proyecto]] para conectar con nodos, o @tarea para incluir tareas."
                 rows={12}
                 className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-[var(--radius-control)] p-3 text-xs sm:text-sm text-[var(--text-primary)] font-mono leading-relaxed placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--text-primary)] transition resize-y"
               />

@@ -636,7 +636,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                 className="text-xs font-semibold px-2 py-0.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 focus:outline-none focus:border-[var(--accent)]"
                 title="Lead Scoring para arquitectos (A = Terreno + Plazo + Presupuesto)"
               >
-                <option value="">Scoring Lead...</option>
+                <option value="">Scoring Lead…</option>
                 <option value="A">⭐ Lead A (Calificado)</option>
                 <option value="B">🟡 Lead B (Potencial)</option>
                 <option value="C">⚪ Lead C (Curioso)</option>
@@ -1268,7 +1268,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                     </div>
                     <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800">
                       <div
-                        className={`h-full transition-all duration-300 ${
+                        className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ${
                           webInst1.paid && webInst2.paid
                             ? 'bg-emerald-500'
                             : webInst1.paid
@@ -1287,7 +1287,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
               {/* Card 2: Las Dos Instancias de Cobro (50% y 50%) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Instancia 1: Anticipo 50% */}
-                <div className={`p-4 sm:p-5 rounded-3xl border transition-all space-y-3 ${
+                <div className={`p-4 sm:p-5 rounded-3xl border transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] space-y-3 ${
                   webInst1.paid 
                     ? 'bg-emerald-950/15 border-emerald-800/40' 
                     : 'bg-zinc-950 border-amber-900/40 hover:border-amber-700/60'
@@ -1343,7 +1343,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                 </div>
 
                 {/* Instancia 2: Saldo Final 50% */}
-                <div className={`p-4 sm:p-5 rounded-3xl border transition-all space-y-3 ${
+                <div className={`p-4 sm:p-5 rounded-3xl border transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] space-y-3 ${
                   webInst2.paid 
                     ? 'bg-emerald-950/15 border-emerald-800/40' 
                     : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
@@ -1608,7 +1608,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                     type="text"
                     required
                     autoFocus
-                    placeholder="Título de la tarea..."
+                    placeholder="Título de la tarea…"
                     value={newTaskTitle}
                     onChange={e => setNewTaskTitle(e.target.value)}
                     className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[var(--accent)]"
@@ -1708,7 +1708,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                             {subtasks.length > 0 && (
                               <div className="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-emerald-500 transition-all duration-300"
+                                  className="h-full bg-emerald-500 transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                                   style={{
                                     width: `${Math.round((completedSub / subtasks.length) * 100)}%`,
                                   }}
@@ -1753,7 +1753,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                             <div className="flex items-center gap-1.5 pt-1">
                               <input
                                 type="text"
-                                placeholder="Escribir subtarea..."
+                                placeholder="Escribir subtarea…"
                                 value={inlineSubtaskText}
                                 onChange={e => setInlineSubtaskText(e.target.value)}
                                 onKeyDown={e => {
@@ -1812,7 +1812,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   <input
                     type="text"
                     required
-                    placeholder="Título o motivo de la reunión..."
+                    placeholder="Título o motivo de la reunión…"
                     value={newMeetingTitle}
                     onChange={e => setNewMeetingTitle(e.target.value)}
                     className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-amber-500"
@@ -1835,7 +1835,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   </div>
                   <textarea
                     rows={2}
-                    placeholder="Temas o notas para la reunión (opcional)..."
+                    placeholder="Temas o notas para la reunión (opcional)…"
                     value={newMeetingNotes}
                     onChange={e => setNewMeetingNotes(e.target.value)}
                     className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl p-2 resize-none"
@@ -1967,7 +1967,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   <input
                     type="text"
                     required
-                    placeholder="Concepto (ej: 50% Anticipo anteproyecto)..."
+                    placeholder="Concepto (ej: 50% Anticipo anteproyecto)…"
                     value={newIncomeConcept}
                     onChange={e => setNewIncomeConcept(e.target.value)}
                     className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-emerald-500"
@@ -2026,7 +2026,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                   <input
                     type="text"
                     required
-                    placeholder="Concepto (ej: Pago de renders 3D fachada)..."
+                    placeholder="Concepto (ej: Pago de renders 3D fachada)…"
                     value={newExpenseConcept}
                     onChange={e => setNewExpenseConcept(e.target.value)}
                     className="w-full text-xs text-zinc-100 bg-zinc-900 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-rose-500"
@@ -2249,8 +2249,8 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                 value={notesDraft}
                 onChange={e => setNotesDraft(e.target.value)}
                 placeholder={isPaf
-                  ? "Escribe aquí acuerdos, especificaciones, bitácora de obra o anotaciones importantes de este cliente..."
-                  : "Escribe aquí requerimientos del sitio web, credenciales de hosting/dominio, feedback de diseño o notas del cliente..."}
+                  ? "Escribe aquí acuerdos, especificaciones, bitácora de obra o anotaciones importantes de este cliente…"
+                  : "Escribe aquí requerimientos del sitio web, credenciales de hosting/dominio, feedback de diseño o notas del cliente…"}
                 className="w-full text-xs sm:text-sm text-zinc-200 bg-zinc-950 border border-zinc-800 rounded-2xl p-4 focus:outline-none focus:border-[var(--accent)] transition leading-relaxed resize-none"
               />
 
@@ -2384,7 +2384,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                     </div>
                     <div className="w-full bg-zinc-900 rounded-full h-2 overflow-hidden border border-zinc-800">
                       <div 
-                        className="bg-amber-400 h-full rounded-full transition-all duration-300"
+                        className="bg-amber-400 h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                         style={{ width: `${(project.pafMilestones.filter(m => m.completed).length / project.pafMilestones.length) * 100}%` }}
                       />
                     </div>
@@ -2461,7 +2461,7 @@ export const ProjectFicha360Modal: React.FC<Props> = ({
                           <label className="text-[10px] text-zinc-400 block mb-0.5">Acuerdos / Notas de la sesión</label>
                           <textarea
                             rows={2}
-                            placeholder="Alineaciones, correcciones de VSL, acuerdos de pauta..."
+                            placeholder="Alineaciones, correcciones de VSL, acuerdos de pauta…"
                             value={consultingNotes}
                             onChange={e => setConsultingNotes(e.target.value)}
                             className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-zinc-200 resize-none"

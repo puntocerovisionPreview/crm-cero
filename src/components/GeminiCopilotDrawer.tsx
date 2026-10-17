@@ -1171,7 +1171,7 @@ export const GeminiCopilotDrawer: React.FC<Props> = ({
                   <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-bounce [animation-delay:0.2s]" />
                   <span className="w-1.5 h-1.5 rounded-full bg-orange-300 animate-bounce [animation-delay:0.4s]" />
                 </div>
-                <span className="text-zinc-400 text-xs">Pensando y verificando acciones...</span>
+                <span className="text-zinc-400 text-xs">Pensando y verificando acciones…</span>
               </div>
             </div>
           )}
@@ -1203,7 +1203,7 @@ export const GeminiCopilotDrawer: React.FC<Props> = ({
               onChange={(e) => setInputPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
-              placeholder="Pedile a Gemini que anote una tarea, agende una reunión o te asesore..."
+              placeholder="Pedile a Gemini que anote una tarea, agende una reunión o te asesore…"
               rows={1}
               className="flex-1 bg-transparent text-xs sm:text-sm text-zinc-100 placeholder-zinc-500 resize-none max-h-32 focus:outline-none py-1.5 px-1 leading-relaxed custom-scrollbar"
             />

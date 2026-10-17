@@ -183,7 +183,7 @@ export const PersonalFinanceStudyView: React.FC<Props> = ({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ej: Curso de TypeScript Avanzado, Libro Clean Code..."
+              placeholder="Ej: Curso de TypeScript Avanzado, Libro Clean Code…"
               className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-purple-500 transition"
             />
           </div>
@@ -337,7 +337,7 @@ export const PersonalFinanceStudyView: React.FC<Props> = ({
               rows={3}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Puntos clave, temario, objetivos..."
+              placeholder="Puntos clave, temario, objetivos…"
               className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-purple-500 transition resize-none"
             />
           </div>

@@ -13,6 +13,7 @@ import {
   deleteField,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { deepSanitize } from './sanitize';
 import {
   AgendaTask,
   AgendaMeeting,
@@ -37,6 +38,7 @@ import {
   StudioPaymentSettings,
   StudioFixedExpense,
   Client,
+  MercadoPagoIncomingPayment,
 } from '../types';
 import { LinkRelation } from '../lib/links';
 import { todayLocal, monthOf, toSafeDateString, normalizeTimestamp } from './dates';
@@ -68,30 +70,8 @@ function updateSyncStatus(status: SyncStatusState) {
   }
 }
 
-// Sanitizar datos para evitar rechazo por campos undefined
-// Sanitiza profundamente un objeto o array eliminando cualquier valor undefined
-// a cualquier nivel de anidamiento, lo que previene que Firestore rechace escrituras.
-export function deepSanitize<T>(val: T): T {
-  if (val === undefined) return undefined as any;
-  if (val === null || typeof val !== 'object') return val;
-  // Preservar fechas y FieldValues de Firestore (ej. serverTimestamp())
-  if (val instanceof Date) return val;
-  if (val.constructor && val.constructor.name !== 'Object' && !Array.isArray(val)) {
-    return val;
-  }
-  if (Array.isArray(val)) {
-    return val
-      .filter((item) => item !== undefined)
-      .map((item) => deepSanitize(item)) as any;
-  }
-  const clean: Record<string, any> = {};
-  for (const [k, v] of Object.entries(val as Record<string, any>)) {
-    if (v !== undefined) {
-      clean[k] = deepSanitize(v);
-    }
-  }
-  return clean as any;
-}
+// deepSanitize vive en ./sanitize (módulo chico, lo usa también el portal del alumno)
+export { deepSanitize };
 
 function sanitize<T extends Record<string, any>>(data: T): T {
   return deepSanitize(data);
@@ -1113,6 +1093,7 @@ export const ALL_CRM_COLLECTIONS = [
   'prospects',
   'prospect_events',
   'prospect_pool',
+  'mp_incoming',
 ] as const;
 
 export type CrmCollectionName = (typeof ALL_CRM_COLLECTIONS)[number];
@@ -1820,4 +1801,26 @@ export async function applyClientLinks(newClients: Client[], links: { projectId:
   newClients.forEach((c) => ops.push((batch) => batch.set(doc(db, 'clients', c.id), deepSanitize(c), { merge: true })));
   links.forEach((l) => ops.push((batch) => batch.set(doc(db, 'projects', l.projectId), { clientId: l.clientId }, { merge: true })));
   await commitInChunks(ops);
+}
+
+// ---------------- PAGOS DE MERCADO PAGO PARA REGISTRAR ----------------
+// Los guarda el servidor (mp_incoming); acá se leen y se marcan como registrados o descartados.
+export function subscribeMpIncoming(onChanged: (items: MercadoPagoIncomingPayment[]) => void) {
+  return onSnapshot(
+    collection(db, 'mp_incoming'),
+    (snapshot) => {
+      const items: MercadoPagoIncomingPayment[] = [];
+      snapshot.forEach((d) => items.push({ ...(d.data() as MercadoPagoIncomingPayment), id: d.id }));
+      items.sort((a, b) => (b.dateCreated || '').localeCompare(a.dateCreated || ''));
+      onChanged(items);
+    },
+    (err) => console.warn('Firestore subscribeMpIncoming error:', err)
+  );
+}
+
+export async function markMpIncomingReconciled(
+  id: string,
+  reconciledTo: NonNullable<MercadoPagoIncomingPayment['reconciledTo']>
+): Promise<void> {
+  await setDoc(doc(db, 'mp_incoming', id), deepSanitize({ reconciled: true, reconciledTo }), { merge: true });
 }

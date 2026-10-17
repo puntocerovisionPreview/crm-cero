@@ -241,7 +241,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
               type="text"
               value={editNote}
               onChange={(e) => setEditNote(e.target.value)}
-              placeholder="Descripción del gasto o ingreso..."
+              placeholder="Descripción del gasto o ingreso…"
               className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-2xl p-3 text-xs text-zinc-200 focus:outline-hidden"
             />
           </div>
@@ -335,7 +335,7 @@ export const PersonalFinanceTransactionsView: React.FC<Props> = ({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por detalle, categoría, cuenta..."
+            placeholder="Buscar por detalle, categoría, cuenta…"
             className="w-full bg-zinc-900 border border-zinc-800 focus:border-[var(--accent)] rounded-xl pl-9 pr-8 py-2 text-xs text-zinc-200 focus:outline-hidden"
           />
           {search && (

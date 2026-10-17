@@ -6,7 +6,6 @@ import {
   persistentMultipleTabManager,
   Firestore,
 } from 'firebase/firestore';
-import { getAuth, setPersistence, browserLocalPersistence, Auth } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
@@ -28,9 +27,6 @@ try {
 
 export const db = dbInstance;
 
-export const auth: Auth = getAuth(app);
-setPersistence(auth, browserLocalPersistence).catch((err) => {
-  console.warn('Could not set browserLocalPersistence for auth:', err);
-});
+// El login vive en ./firebaseAuth: así el portal del alumno no descarga el módulo de login
 
 export default app;

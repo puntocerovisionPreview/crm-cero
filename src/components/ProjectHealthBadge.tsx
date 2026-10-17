@@ -150,7 +150,7 @@ export const ProjectHealthBadge: React.FC<ProjectHealthBadgeProps> = ({
       {showBar && (
         <div className="w-full h-1.5 bg-zinc-800/90 rounded-full overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all duration-300 ${health.barColor}`}
+            className={`h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ${health.barColor}`}
             style={{ width: `${Math.max(health.percentage, health.totalCount > 0 ? 5 : 0)}%` }}
           />
         </div>

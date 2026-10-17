@@ -388,7 +388,7 @@ Script.complete();
 
                 {/* SMALL WIDGET (2x2) */}
                 {widgetSize === 'small' && (
-                  <div className="w-40 h-40 rounded-[26px] bg-zinc-950/90 border border-zinc-800 p-3.5 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-all">
+                  <div className="w-40 h-40 rounded-[26px] bg-zinc-950/90 border border-zinc-800 p-3.5 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]">
                     <div>
                       <div className="flex items-center justify-between text-[10px]">
                         <span className="font-extrabold text-[var(--accent)] tracking-wider flex items-center gap-1">
@@ -428,7 +428,7 @@ Script.complete();
 
                 {/* MEDIUM WIDGET (4x2) */}
                 {widgetSize === 'medium' && (
-                  <div className="w-full max-w-sm h-40 rounded-[26px] bg-zinc-950/95 border border-zinc-800 p-4 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-all">
+                  <div className="w-full max-w-sm h-40 rounded-[26px] bg-zinc-950/95 border border-zinc-800 p-4 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]">
                     <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2">
                       <div className="flex items-center gap-2">
                         <div className="w-2 h-2 rounded-full bg-[var(--accent)] animate-pulse" />
@@ -496,7 +496,7 @@ Script.complete();
 
                 {/* LARGE WIDGET (4x4) */}
                 {widgetSize === 'large' && (
-                  <div className="w-full max-w-sm h-80 rounded-[30px] bg-zinc-950/95 border border-zinc-800 p-5 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-all">
+                  <div className="w-full max-w-sm h-80 rounded-[30px] bg-zinc-950/95 border border-zinc-800 p-5 shadow-2xl flex flex-col justify-between relative backdrop-blur-xl group hover:border-[var(--accent)]/50 transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]">
                     <div>
                       <div className="flex items-center justify-between border-b border-zinc-800/60 pb-2.5">
                         <div className="flex items-center gap-2">

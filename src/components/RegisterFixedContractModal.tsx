@@ -364,7 +364,7 @@ export const RegisterFixedContractModal: React.FC<Props> = ({
                   rows={2}
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
-                  placeholder="Detalle sobre el contrato o condiciones acordadas..."
+                  placeholder="Detalle sobre el contrato o condiciones acordadas…"
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-white focus:outline-none focus:border-violet-500 resize-none text-xs"
                 />
               </div>

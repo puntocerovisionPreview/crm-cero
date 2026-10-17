@@ -480,7 +480,7 @@ export const PafDashboard: React.FC<Props> = ({
 
                     <div className="w-full h-1.5 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800">
                       <div 
-                        className="h-full bg-gradient-to-r from-[var(--accent)] to-emerald-400 rounded-full transition-all duration-300"
+                        className="h-full bg-gradient-to-r from-[var(--accent)] to-emerald-400 rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                         style={{ width: `${progressPercent}%` }}
                       />
                     </div>

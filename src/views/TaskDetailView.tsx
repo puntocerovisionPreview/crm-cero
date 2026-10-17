@@ -273,7 +273,7 @@ export const TaskDetailView: React.FC<Props> = ({
                 type="text"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                placeholder="Título de la tarea o compromiso..."
+                placeholder="Título de la tarea o compromiso…"
                 className="w-full bg-transparent text-base sm:text-lg font-bold text-zinc-100 focus:outline-none focus:border-b focus:border-[var(--accent)] pb-1"
               />
               <span className="text-[11px] text-zinc-500 font-mono">
@@ -506,7 +506,7 @@ export const TaskDetailView: React.FC<Props> = ({
             <form onSubmit={handleAddSubtaskSubmit} className="flex gap-2">
               <input
                 type="text"
-                placeholder="Agregar paso o entregable específico..."
+                placeholder="Agregar paso o entregable específico…"
                 value={newSubtaskTitle}
                 onChange={e => setNewSubtaskTitle(e.target.value)}
                 className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
@@ -569,7 +569,7 @@ export const TaskDetailView: React.FC<Props> = ({
               rows={4}
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder="Objetivos de la llamada, acuerdos y próximos pasos acordados..."
+              placeholder="Objetivos de la llamada, acuerdos y próximos pasos acordados…"
               className="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
             />
 

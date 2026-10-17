@@ -5,7 +5,7 @@ import {
   signOut,
   User,
 } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth } from '../firebaseAuth';
 
 /**
  * Cuentas que pueden entrar al CRM. Tiene que coincidir con la lista de

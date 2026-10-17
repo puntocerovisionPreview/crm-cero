@@ -111,3 +111,33 @@ describe('Google Calendar', () => {
     expect(eventToLocal({ start: { date: '2026-10-16' } })).toBeNull();
   });
 });
+
+import { getNavigationType } from '../src/utils/router';
+
+describe('animación entre pantallas', () => {
+  it('entrar a un detalle es "adelante" y volver es "atrás"', () => {
+    expect(getNavigationType('/clientes', '/clientes/abc')).toBe('nav-forward');
+    expect(getNavigationType('/clientes/abc', '/clientes')).toBe('nav-back');
+  });
+  it('moverse entre secciones del menú es lateral (sin deslizar)', () => {
+    expect(getNavigationType('/agenda', '/dinero')).toBe('nav-lateral');
+    expect(getNavigationType('/clientes', '/clientesx/abc')).toBe('nav-lateral');
+    expect(getNavigationType('/dinero', '/dinero')).toBe('nav-lateral');
+  });
+});
+
+import { htmlToPush } from '../server/push';
+
+describe('notificaciones push', () => {
+  it('convierte el mensaje en título y cuerpo cortos, sin etiquetas', () => {
+    const p = htmlToPush('<b>Buen día. Hoy es lunes 19 de octubre.</b>\n\n<b>Reuniones</b>\n• 15:00 Remodelante &amp; Co', 'Tu día', '/agenda', 'resumen');
+    expect(p.title).toBe('Buen día. Hoy es lunes 19 de octubre.');
+    expect(p.body).toBe('Reuniones\n• 15:00 Remodelante & Co');
+    expect(p.url).toBe('/agenda');
+  });
+  it('recorta cuerpos largos', () => {
+    const p = htmlToPush('Título\n' + 'x'.repeat(400), 'T');
+    expect(p.body.length).toBeLessThanOrEqual(220);
+    expect(p.body.endsWith('…')).toBe(true);
+  });
+});

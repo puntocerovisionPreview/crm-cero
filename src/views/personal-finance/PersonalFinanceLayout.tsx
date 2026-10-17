@@ -115,7 +115,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
           {[0, 1, 2, 3].map((idx) => (
             <div
               key={idx}
-              className={`w-3.5 h-3.5 rounded-full transition-all duration-200 ${
+              className={`w-3.5 h-3.5 rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-200 ${
                 pinInput.length > idx 
                   ? pinError ? 'bg-rose-500 scale-110' : 'bg-[var(--accent)] scale-110'
                   : 'bg-zinc-800 border border-zinc-700'

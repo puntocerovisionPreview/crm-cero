@@ -192,7 +192,7 @@ export const ClientInstallmentTimeline: React.FC<Props> = ({
                   hapticFeedback.light();
                   onSelectCuota(cuota.id);
                 }}
-                className={`group flex-shrink-0 min-w-[130px] sm:min-w-[145px] p-2.5 rounded-xl border text-left transition-all duration-150 active:scale-[0.98] cursor-pointer hover:border-[var(--border-strong)] hover:shadow-xs relative bg-[var(--bg-app)]/70 ${
+                className={`group flex-shrink-0 min-w-[130px] sm:min-w-[145px] p-2.5 rounded-xl border text-left transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-150 active:scale-[0.98] cursor-pointer hover:border-[var(--border-strong)] hover:shadow-xs relative bg-[var(--bg-app)]/70 ${
                   cuota.status === 'vencido' ? 'border-rose-500/40 bg-rose-500/5' :
                   cuota.status === 'vence_hoy' ? 'border-amber-500/40 bg-amber-500/5 ring-1 ring-amber-500/20' :
                   isFullyPaid ? 'border-emerald-500/30' : 'border-[var(--border-subtle)]'
@@ -245,7 +245,7 @@ export const ClientInstallmentTimeline: React.FC<Props> = ({
       <div className="space-y-1.5 pt-1">
         <div className="w-full h-2 rounded-full bg-[var(--border-subtle)] overflow-hidden">
           <div 
-            className="h-full bg-emerald-500 transition-all duration-300 rounded-full"
+            className="h-full bg-emerald-500 transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 rounded-full"
             style={{ width: `${progressPct}%` }}
           />
         </div>

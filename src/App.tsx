@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { ViewTransition, useState, useEffect, useRef, useCallback } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
-import { ViewTab, AgendaTask, AgendaMeeting, Project, IncomeRecord, ExpenseRecord, SyncStatus, SubTask, SubtareaFoco, WeeklyGoal, WeeklyMission, TimeLog, SecondBrainNote, PersonalAccount, PersonalCategory, PersonalTransaction, PersonalRecurring, PersonalBudget, SavingsGoal, StudyItem, PersonalFinanceSettings, Payment, StudioPaymentSettings, TrashItem, StudioFixedExpense, Client } from './types';
+import { ViewTab, AgendaTask, AgendaMeeting, Project, IncomeRecord, ExpenseRecord, SyncStatus, SubTask, SubtareaFoco, WeeklyGoal, WeeklyMission, TimeLog, SecondBrainNote, PersonalAccount, PersonalCategory, PersonalTransaction, PersonalRecurring, PersonalBudget, SavingsGoal, StudyItem, PersonalFinanceSettings, Payment, StudioPaymentSettings, TrashItem, StudioFixedExpense, Client, MercadoPagoIncomingPayment } from './types';
 import { 
   getStoredTasks, 
   saveStoredTasks, 
@@ -127,6 +127,8 @@ import {
   seedPersonalFinanceDefaultsIfEmpty,
   resetAllFirestoreData,
   subscribeClients,
+  subscribeMpIncoming,
+  markMpIncomingReconciled,
   saveClientToFirestore,
   applyClientLinks,
   exportCompleteCrmBackup,
@@ -146,7 +148,7 @@ import { QuickAddModal, QuickAddType } from './components/QuickAddModal';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { AuthScreen } from './components/AuthScreen';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
@@ -155,54 +157,68 @@ import { PomodoroModal } from './components/PomodoroModal';
 import { PafGuideModal } from './components/PafGuideModal';
 import { PafPricingConfigModal } from './components/PafPricingConfigModal';
 import { RepairTaskLinksModal } from './components/RepairTaskLinksModal';
-import { IosWidgetsModal } from './components/IosWidgetsModal';
 import { StudioPaymentSettingsModal } from './components/StudioPaymentSettingsModal';
 import { RegisterPaymentModal } from './components/RegisterPaymentModal';
 import { resolveTaskProject } from './utils/taskProject';
 import { getProjectPayments } from './utils/paymentPlans';
-import { GeminiCopilotDrawer } from './components/GeminiCopilotDrawer';
 import { Sparkles } from 'lucide-react';
 
 // Views & Sub-pages
 import { AgendaView } from './views/AgendaView';
-import { CalendarView } from './views/CalendarView';
-import { ProjectsSimpleView } from './views/ProjectsSimpleView';
-import { IncomeView } from './views/IncomeView';
-import { ClientDetailView } from './views/ClientDetailView';
-import { NewClientWizardView } from './views/NewClientWizardView';
-import { TaskDetailView } from './views/TaskDetailView';
-import { AyudaView } from './views/AyudaView';
-import { SecondBrainView } from './views/SecondBrainView';
-import { NotesView } from './views/NotesView';
-import { FocusView } from './views/FocusView';
-import { HorizonView } from './views/HorizonView';
-import { DineroUnifiedView } from './views/DineroUnifiedView';
-import { StudioFixedExpensesSection } from './components/StudioFixedExpensesSection';
-import { CerebroUnifiedView } from './views/CerebroUnifiedView';
-import { AjustesView } from './views/AjustesView';
-import { NewPaymentView } from './views/NewPaymentView';
-import { AgreementEditorView } from './views/AgreementEditorView';
-import { SemanaView } from './views/SemanaView';
 import { migrateGoalsToMissions } from './utils/missions';
 import { useRouter } from './utils/router';
 
 // Personal Finance Views
-import { PersonalFinanceLayout } from './views/personal-finance/PersonalFinanceLayout';
-import { PersonalFinanceOverviewView } from './views/personal-finance/PersonalFinanceOverviewView';
-import { PersonalFinanceQuickAddView } from './views/personal-finance/PersonalFinanceQuickAddView';
-import { PersonalFinanceTransactionsView } from './views/personal-finance/PersonalFinanceTransactionsView';
-import { PersonalFinanceAccountsView } from './views/personal-finance/PersonalFinanceAccountsView';
-import { PersonalFinanceBudgetsView } from './views/personal-finance/PersonalFinanceBudgetsView';
-import { PersonalFinanceGoalsView } from './views/personal-finance/PersonalFinanceGoalsView';
-import { PersonalFinanceStudyView } from './views/personal-finance/PersonalFinanceStudyView';
-import { PersonalFinanceRecurringView } from './views/personal-finance/PersonalFinanceRecurringView';
-import { PersonalFinanceSettingsView } from './views/personal-finance/PersonalFinanceSettingsView';
 import { useUsdRates, resolveUsdRate } from './utils/currency';
 import { planClientLinks } from './utils/clients';
-import { ProspectingView } from './views/ProspectingView';
+import { MercadoPagoInbox } from './components/MercadoPagoInbox';
+import { MercadoPagoReconcileModal } from './components/MercadoPagoReconcileModal';
 
 // Lazy load Knowledge Graph module to preserve fast app bundle boot per spec
+function RouteLoading() {
+  return (
+    <div className="flex items-center justify-center py-24" role="status" aria-live="polite">
+      <span className="w-5 h-5 rounded-full border-2 border-[var(--border-subtle)] border-t-[var(--accent)] animate-spin" />
+      <span className="sr-only">Cargando…</span>
+    </div>
+  );
+}
+
 const KnowledgeGraphView = React.lazy(() => import('./views/KnowledgeGraphView'));
+// Pantallas que se descargan recién cuando las abrís (antes todo venía en un archivo de 3 MB).
+// Hoy/Agenda se carga de entrada porque es la primera pantalla.
+const CalendarView = React.lazy(() => import('./views/CalendarView').then((m) => ({ default: m.CalendarView })));
+const ProjectsSimpleView = React.lazy(() => import('./views/ProjectsSimpleView').then((m) => ({ default: m.ProjectsSimpleView })));
+const IncomeView = React.lazy(() => import('./views/IncomeView').then((m) => ({ default: m.IncomeView })));
+const ClientDetailView = React.lazy(() => import('./views/ClientDetailView').then((m) => ({ default: m.ClientDetailView })));
+const NewClientWizardView = React.lazy(() => import('./views/NewClientWizardView').then((m) => ({ default: m.NewClientWizardView })));
+const TaskDetailView = React.lazy(() => import('./views/TaskDetailView').then((m) => ({ default: m.TaskDetailView })));
+const AyudaView = React.lazy(() => import('./views/AyudaView').then((m) => ({ default: m.AyudaView })));
+const SecondBrainView = React.lazy(() => import('./views/SecondBrainView').then((m) => ({ default: m.SecondBrainView })));
+const NotesView = React.lazy(() => import('./views/NotesView').then((m) => ({ default: m.NotesView })));
+const FocusView = React.lazy(() => import('./views/FocusView').then((m) => ({ default: m.FocusView })));
+const HorizonView = React.lazy(() => import('./views/HorizonView').then((m) => ({ default: m.HorizonView })));
+const DineroUnifiedView = React.lazy(() => import('./views/DineroUnifiedView').then((m) => ({ default: m.DineroUnifiedView })));
+const StudioFixedExpensesSection = React.lazy(() => import('./components/StudioFixedExpensesSection').then((m) => ({ default: m.StudioFixedExpensesSection })));
+const CerebroUnifiedView = React.lazy(() => import('./views/CerebroUnifiedView').then((m) => ({ default: m.CerebroUnifiedView })));
+const AjustesView = React.lazy(() => import('./views/AjustesView').then((m) => ({ default: m.AjustesView })));
+const NewPaymentView = React.lazy(() => import('./views/NewPaymentView').then((m) => ({ default: m.NewPaymentView })));
+const AgreementEditorView = React.lazy(() => import('./views/AgreementEditorView').then((m) => ({ default: m.AgreementEditorView })));
+const SemanaView = React.lazy(() => import('./views/SemanaView').then((m) => ({ default: m.SemanaView })));
+const PersonalFinanceLayout = React.lazy(() => import('./views/personal-finance/PersonalFinanceLayout').then((m) => ({ default: m.PersonalFinanceLayout })));
+const PersonalFinanceOverviewView = React.lazy(() => import('./views/personal-finance/PersonalFinanceOverviewView').then((m) => ({ default: m.PersonalFinanceOverviewView })));
+const PersonalFinanceQuickAddView = React.lazy(() => import('./views/personal-finance/PersonalFinanceQuickAddView').then((m) => ({ default: m.PersonalFinanceQuickAddView })));
+const PersonalFinanceTransactionsView = React.lazy(() => import('./views/personal-finance/PersonalFinanceTransactionsView').then((m) => ({ default: m.PersonalFinanceTransactionsView })));
+const PersonalFinanceAccountsView = React.lazy(() => import('./views/personal-finance/PersonalFinanceAccountsView').then((m) => ({ default: m.PersonalFinanceAccountsView })));
+const PersonalFinanceBudgetsView = React.lazy(() => import('./views/personal-finance/PersonalFinanceBudgetsView').then((m) => ({ default: m.PersonalFinanceBudgetsView })));
+const PersonalFinanceGoalsView = React.lazy(() => import('./views/personal-finance/PersonalFinanceGoalsView').then((m) => ({ default: m.PersonalFinanceGoalsView })));
+const PersonalFinanceStudyView = React.lazy(() => import('./views/personal-finance/PersonalFinanceStudyView').then((m) => ({ default: m.PersonalFinanceStudyView })));
+const PersonalFinanceRecurringView = React.lazy(() => import('./views/personal-finance/PersonalFinanceRecurringView').then((m) => ({ default: m.PersonalFinanceRecurringView })));
+const PersonalFinanceSettingsView = React.lazy(() => import('./views/personal-finance/PersonalFinanceSettingsView').then((m) => ({ default: m.PersonalFinanceSettingsView })));
+const ProspectingView = React.lazy(() => import('./views/ProspectingView').then((m) => ({ default: m.ProspectingView })));
+const GeminiCopilotDrawer = React.lazy(() => import('./components/GeminiCopilotDrawer').then((m) => ({ default: m.GeminiCopilotDrawer })));
+const IosWidgetsModal = React.lazy(() => import('./components/IosWidgetsModal').then((m) => ({ default: m.IosWidgetsModal })));
+
 
 export default function App() {
   // Path-based SPA Router (syncs with window.location & browser history)
@@ -310,6 +326,9 @@ export default function App() {
   const [tasks, setTasks] = useState<AgendaTask[]>(() => getStoredTasks());
   const [meetings, setMeetings] = useState<AgendaMeeting[]>(() => getStoredMeetings());
   const [projects, setProjects] = useState<Project[]>(() => getStoredProjects());
+  // Pagos que entraron por Mercado Pago (los guarda el servidor) y el que se está registrando
+  const [mpIncoming, setMpIncoming] = useState<MercadoPagoIncomingPayment[]>([]);
+  const [mpToRegister, setMpToRegister] = useState<MercadoPagoIncomingPayment | null>(null);
   // Clientes (agrupan proyectos). Se vinculan solos cuando proyectos y clientes llegan de la nube.
   const [clients, setClients] = useState<Client[]>([]);
   const [cloudLoaded, setCloudLoaded] = useState({ projects: false, clients: false });
@@ -1204,6 +1223,8 @@ export default function App() {
       () => {}
     );
 
+    const unsubMp = subscribeMpIncoming(items => setMpIncoming(items));
+
     const unsubClients = subscribeClients(items => {
       setClients(items);
       setCloudLoaded(prev => (prev.clients ? prev : { ...prev, clients: true }));
@@ -1240,6 +1261,7 @@ export default function App() {
       unsubPersonalSettings();
       unsubStudioFixed();
       unsubClients();
+      unsubMp();
     };
   }, [authToken]);
 
@@ -1271,6 +1293,81 @@ export default function App() {
   const handleUpdateClient = (client: Client) => {
     setClients(prev => prev.map(c => (c.id === client.id ? client : c)));
     saveClientToFirestore(client).catch(err => console.warn('Error guardando cliente:', err));
+  };
+
+  // El Copiloto y los widgets se descargan la primera vez que se abren
+  const [copilotMounted, setCopilotMounted] = useState(false);
+  const [iosWidgetsMounted, setIosWidgetsMounted] = useState(false);
+  useEffect(() => {
+    if (showGeminiChat) setCopilotMounted(true);
+  }, [showGeminiChat]);
+  useEffect(() => {
+    if (showIosWidgetsModal) setIosWidgetsMounted(true);
+  }, [showIosWidgetsModal]);
+
+  // Con la app ya abierta y en reposo, se adelanta la descarga de las pantallas más usadas
+  // para que al tocarlas abran al instante
+  useEffect(() => {
+    if (!authToken) return;
+    const preload = () => {
+      import('./views/ProjectsSimpleView');
+      import('./views/DineroUnifiedView');
+      import('./views/IncomeView');
+      import('./views/SemanaView');
+      import('./views/AjustesView');
+    };
+    const w = window as any;
+    const id = w.requestIdleCallback ? w.requestIdleCallback(preload, { timeout: 4000 }) : setTimeout(preload, 2500);
+    return () => (w.cancelIdleCallback ? w.cancelIdleCallback(id) : clearTimeout(id));
+  }, [authToken]);
+
+  // ---- Registrar pagos de Mercado Pago ----
+  const pendingMp = mpIncoming.filter(p => !p.reconciled);
+
+  const handleMpAsProjectPayment = (
+    projectId: string,
+    data: { amount: number; currency: 'ARS' | 'USD'; date: string; method: any; note?: string; destinationAccountId?: string; invoiced?: boolean },
+    mpId: string
+  ) => {
+    const project = projects.find(p => p.id === projectId);
+    handleSaveProjectPayment(
+      projectId,
+      {
+        id: `pay_mp_${mpId}`,
+        projectId,
+        amount: data.amount,
+        currency: data.currency,
+        date: data.date,
+        method: 'mercadopago',
+        note: data.note,
+        invoiced: data.invoiced,
+        facturado: data.invoiced,
+        createdAt: new Date().toISOString(),
+      },
+      { destinationAccountId: data.destinationAccountId }
+    );
+    markMpIncomingReconciled(mpId, { type: 'cliente', targetId: projectId, targetName: project?.clientName, reconciledAt: new Date().toISOString(), destinationAccountId: data.destinationAccountId }).catch(err => console.warn(err));
+  };
+
+  const handleMpAsStudioIncome = (
+    data: { title: string; amount: number; currency: 'ARS' | 'USD'; date: string; category: any; notes?: string },
+    mpId: string
+  ) => {
+    handleAddIncome({ title: data.title, amount: data.amount, currency: data.currency, date: data.date, month: data.date.slice(0, 7), status: 'cobrado', category: data.category, notes: data.notes, source: 'mercadopago' } as any);
+    markMpIncomingReconciled(mpId, { type: 'estudio_libre', targetName: data.title, reconciledAt: new Date().toISOString() }).catch(err => console.warn(err));
+  };
+
+  const handleMpAsPersonal = (
+    data: { accountId: string; amount: number; currency: 'ARS' | 'USD'; date: string; note: string; category?: string },
+    mpId: string
+  ) => {
+    const incomeCategory = personalCategories.find(c => c.type === 'ingreso')?.id || 'cat_ing_cobros_cero';
+    handleSavePersonalTransaction({ type: 'ingreso', amount: data.amount, currency: data.currency, date: data.date, accountId: data.accountId, categoryId: data.category || incomeCategory, note: data.note, status: 'confirmado' });
+    markMpIncomingReconciled(mpId, { type: 'personal', targetId: data.accountId, reconciledAt: new Date().toISOString(), destinationAccountId: data.accountId }).catch(err => console.warn(err));
+  };
+
+  const handleMpDismiss = (mpId: string) => {
+    markMpIncomingReconciled(mpId, { type: 'ignorado', reconciledAt: new Date().toISOString() }).catch(err => console.warn(err));
   };
 
   // Portal del alumno: mantiene publicada la "foto" de cada alumno PAF con link activo
@@ -3386,7 +3483,7 @@ export default function App() {
     // 7. Grafo de Conocimiento (Simulación física Canvas con d3-force)
     if (path === '/grafo' || path === '/graph') {
       return (
-        <React.Suspense fallback={<div className="p-8 text-center text-xs text-[var(--text-tertiary)]">Cargando Grafo de Conocimiento...</div>}>
+        <React.Suspense fallback={<div className="p-8 text-center text-xs text-[var(--text-tertiary)]">Cargando Grafo de Conocimiento…</div>}>
           <KnowledgeGraphView
             tasks={tasks}
             meetings={meetings}
@@ -3830,6 +3927,7 @@ export default function App() {
 
   return (
     <div className="h-screen h-[100dvh] w-full max-w-full flex overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] font-sans">
+      <a href="#contenido" className="skip-link">Saltar al contenido</a>
       {/* Desktop Sidebar (hidden on mobile) */}
       <DesktopSidebar
         currentPath={currentRoute.path}
@@ -3892,14 +3990,45 @@ export default function App() {
         />
 
         <main 
+          id="contenido"
+          tabIndex={-1}
           key={currentRoute.path} 
-          className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-28 md:pb-12 min-w-0 overflow-x-hidden max-w-full t-page-enter"
+          className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-28 md:pb-12 min-w-0 overflow-x-hidden max-w-full"
         >
-          {renderCurrentRouteView()}
+          {['agenda', 'hoy', 'dinero', 'finanzas'].includes(currentRoute.name) && (
+            <MercadoPagoInbox pending={pendingMp} privacyMode={privacyMode} onRegister={setMpToRegister} />
+          )}
+          <React.Suspense fallback={<RouteLoading />}>
+            {/* Animación entre pantallas (ver index.css): adelante/atrás desliza, lateral funde.
+                Sin tipo (la pantalla terminó de cargar) aparece con un fundido. */}
+            <ViewTransition
+              key={currentRoute.path}
+              enter={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', 'nav-lateral': 'fade-in', default: 'fade-in' }}
+              exit={{ 'nav-forward': 'nav-forward', 'nav-back': 'nav-back', 'nav-lateral': 'fade-out', default: 'none' }}
+              default="none"
+            >
+              <div>{renderCurrentRouteView()}</div>
+            </ViewTransition>
+          </React.Suspense>
         </main>
       </div>
 
-      {/* Discreet Toast Notification with Undo option */}
+      <MercadoPagoReconcileModal
+        key={mpToRegister?.id || 'ninguno'}
+        isOpen={Boolean(mpToRegister)}
+        onClose={() => setMpToRegister(null)}
+        payment={mpToRegister}
+        projects={projects}
+        personalAccounts={personalAccounts}
+        usdRate={effectiveUsdRate}
+        onReconcileAsProjectPayment={handleMpAsProjectPayment}
+        onReconcileAsStudioIncome={handleMpAsStudioIncome}
+        onReconcileAsPersonalTransaction={handleMpAsPersonal}
+        onDismissPayment={handleMpDismiss}
+      />
+
+      {/* Discreet Toast Notification with Undo option (anunciado por lectores de pantalla) */}
+      <div role="status" aria-live="polite" className="sr-only">{toast?.message || ''}</div>
       {toast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-3.5 py-1.5 rounded-full bg-[#0A0A0A] text-[#FAFAFA] border border-[#262626] text-[11px] font-medium tracking-wide shadow-sm animate-in fade-in slide-in-from-top-2 duration-150 flex items-center gap-2.5">
           <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
@@ -4001,34 +4130,38 @@ export default function App() {
       )}
 
       {/* Gemini AI Copilot Drawer (Multi-turn Chat & Live App Actions) */}
-      <GeminiCopilotDrawer
-        isOpen={showGeminiChat}
-        onClose={() => setShowGeminiChat(false)}
-        projects={projects}
-        tasks={tasks}
-        meetings={meetings}
-        incomes={incomes}
-        expenses={expenses}
-        weeklyGoals={weeklyGoals}
-        notes={notes}
-        onAddTask={handleAddTask}
-        onAddMeeting={handleAddMeeting}
-        onAddIncome={handleAddIncome}
-        onAddExpense={handleAddExpense}
-        onAddProject={handleAddProject}
-        onAddWeeklyGoal={handleAddWeeklyGoal}
-        onAddNote={handleAddNote}
-        onToggleTask={handleToggleTask}
-        onToggleMeeting={handleToggleMeeting}
-        onDeleteTask={handleDeleteTask}
-        onNavigate={navigate}
-        personalAccounts={personalAccounts}
-        personalCategories={personalCategories}
-        personalTransactions={personalTransactions}
-        personalRecurrings={personalRecurrings}
-        onAddPersonalTransaction={handleSavePersonalTransaction}
-        onAddPersonalRecurring={handleSavePersonalRecurring}
-      />
+      {copilotMounted && (
+        <React.Suspense fallback={null}>
+        <GeminiCopilotDrawer
+          isOpen={showGeminiChat}
+          onClose={() => setShowGeminiChat(false)}
+          projects={projects}
+          tasks={tasks}
+          meetings={meetings}
+          incomes={incomes}
+          expenses={expenses}
+          weeklyGoals={weeklyGoals}
+          notes={notes}
+          onAddTask={handleAddTask}
+          onAddMeeting={handleAddMeeting}
+          onAddIncome={handleAddIncome}
+          onAddExpense={handleAddExpense}
+          onAddProject={handleAddProject}
+          onAddWeeklyGoal={handleAddWeeklyGoal}
+          onAddNote={handleAddNote}
+          onToggleTask={handleToggleTask}
+          onToggleMeeting={handleToggleMeeting}
+          onDeleteTask={handleDeleteTask}
+          onNavigate={navigate}
+          personalAccounts={personalAccounts}
+          personalCategories={personalCategories}
+          personalTransactions={personalTransactions}
+          personalRecurrings={personalRecurrings}
+          onAddPersonalTransaction={handleSavePersonalTransaction}
+          onAddPersonalRecurring={handleSavePersonalRecurring}
+        />
+        </React.Suspense>
+      )}
 
       {/* Global Keyboard Shortcuts Modal (?) */}
       <KeyboardShortcutsModal
@@ -4086,24 +4219,28 @@ export default function App() {
       />
 
       {/* iOS Widgets & Apple Shortcuts Hub Modal */}
-      <IosWidgetsModal
-        isOpen={showIosWidgetsModal}
-        onClose={() => setShowIosWidgetsModal(false)}
-        tasks={tasks}
-        meetings={meetings}
-        projects={projects}
-        incomes={incomes}
-        onOpenQuickAdd={(type) => {
-          setShowIosWidgetsModal(false);
-          setQuickAddModal({
-            isOpen: true,
-            type,
-            defaultDate: getTodayString(),
-          });
-        }}
-        onNavigate={navigate}
-        onToggleTask={handleToggleTask}
-      />
+      {iosWidgetsMounted && (
+        <React.Suspense fallback={null}>
+        <IosWidgetsModal
+          isOpen={showIosWidgetsModal}
+          onClose={() => setShowIosWidgetsModal(false)}
+          tasks={tasks}
+          meetings={meetings}
+          projects={projects}
+          incomes={incomes}
+          onOpenQuickAdd={(type) => {
+            setShowIosWidgetsModal(false);
+            setQuickAddModal({
+              isOpen: true,
+              type,
+              defaultDate: getTodayString(),
+            });
+          }}
+          onNavigate={navigate}
+          onToggleTask={handleToggleTask}
+        />
+        </React.Suspense>
+      )}
 
       {/* Studio Payment / Bank Settings Modal */}
       <StudioPaymentSettingsModal

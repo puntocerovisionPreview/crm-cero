@@ -3,7 +3,7 @@ import { db } from '../firebase';
 import { AgendaMeeting, PAF_STAGES, Project } from '../types';
 import { DEFAULT_PAF_STAGE_EXIT_MILESTONES } from './pafTemplates';
 import { addDays, todayLocal, toSafeDateString } from './dates';
-import { deepSanitize } from './firestoreService';
+import { deepSanitize } from './sanitize';
 
 /**
  * Portal del alumno (Método PAF)

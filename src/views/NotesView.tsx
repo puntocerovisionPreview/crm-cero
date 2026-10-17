@@ -509,7 +509,7 @@ export const NotesView: React.FC<Props> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar notas..."
+              placeholder="Buscar notas…"
               className="w-full pl-8 pr-3 py-1.5 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-lg text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--text-primary)] transition"
             />
           </div>
@@ -594,7 +594,7 @@ export const NotesView: React.FC<Props> = ({
                       </div>
                     </div>
                     <p className="text-[11px] text-[var(--text-tertiary)] line-clamp-2 mt-1 font-mono leading-relaxed">
-                      {n.content ? n.content.slice(0, 90) : 'Nota vacía...'}
+                      {n.content ? n.content.slice(0, 90) : 'Nota vacía…'}
                     </p>
                     <div className="flex items-center gap-2 text-[10px] text-[var(--text-tertiary)] font-mono mt-1.5">
                       <span>{n.date || 'Sin fecha'}</span>
@@ -638,7 +638,7 @@ export const NotesView: React.FC<Props> = ({
                     type="text"
                     value={activeNote.title}
                     onChange={(e) => onUpdateNote(activeNote.id, { title: e.target.value })}
-                    placeholder="Título de la nota..."
+                    placeholder="Título de la nota…"
                     className="text-lg sm:text-xl font-bold font-heading text-[var(--text-primary)] bg-transparent border-none focus:outline-none w-full tracking-tight"
                   />
                   <div className="flex items-center gap-3 text-[11px] text-[var(--text-tertiary)] font-mono flex-wrap">
@@ -650,7 +650,7 @@ export const NotesView: React.FC<Props> = ({
                       type="text"
                       value={activeNote.folder || ''}
                       onChange={(e) => onUpdateNote(activeNote.id, { folder: e.target.value.trim() || undefined })}
-                      placeholder="+ Carpeta..."
+                      placeholder="+ Carpeta…"
                       className="bg-transparent border-b border-[var(--border-subtle)] focus:border-[var(--text-primary)] focus:outline-none text-[11px] text-[var(--text-secondary)] px-1 py-0.2"
                     />
                   </div>
@@ -717,7 +717,7 @@ export const NotesView: React.FC<Props> = ({
                     ref={textareaRef}
                     value={activeNote.content}
                     onChange={handleTextareaChange}
-                    placeholder="Escribe aquí... Escribe [[ para vincular con metas, clientes o proyectos."
+                    placeholder="Escribe aquí… Escribe [[ para vincular con metas, clientes o proyectos."
                     rows={14}
                     className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[var(--text-primary)] font-mono leading-relaxed placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--text-primary)] transition resize-y"
                   />

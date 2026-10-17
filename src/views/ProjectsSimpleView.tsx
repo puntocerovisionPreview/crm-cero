@@ -1089,7 +1089,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
 
           <div className="w-full h-2.5 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800 relative">
             <div 
-              className={`h-full transition-all duration-500 rounded-full ${
+              className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-500 rounded-full ${
                 targetProgressPercent >= 100 
                   ? 'bg-gradient-to-r from-emerald-500 to-teal-400' 
                   : 'bg-gradient-to-r from-amber-500 to-emerald-500'
@@ -1581,7 +1581,8 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Buscar cliente, nota, teléfono..."
+                aria-label="Buscar cliente"
+                placeholder="Buscar cliente, nota, teléfono…"
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-8 pr-7 py-1.5 text-xs text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-[var(--accent)] transition"
               />
               {searchQuery && (
@@ -1597,6 +1598,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
 
             {/* Status Filter */}
             <select
+              aria-label="Filtrar por estado"
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
               className="bg-zinc-950 border border-zinc-800 rounded-xl px-2.5 py-1.5 text-xs text-zinc-300 focus:outline-none focus:border-[var(--accent)] cursor-pointer shrink-0"
@@ -1884,7 +1886,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                               type="text"
                               defaultValue={project.notes || ''}
                               onBlur={e => handleNotesChange(project.id, e.target.value)}
-                              placeholder="Agregar nota rápida..."
+                              placeholder="Agregar nota rápida…"
                               className="w-full bg-transparent text-zinc-300 placeholder-zinc-600 text-xs focus:bg-zinc-950 px-2 py-1 rounded border border-transparent focus:border-zinc-700 outline-none truncate"
                             />
                           </td>
@@ -2183,7 +2185,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                         {/* Visual Progress Bar */}
                         <div className="w-full bg-zinc-800/80 rounded-full h-2 overflow-hidden border border-zinc-800">
                           <div
-                            className="h-full bg-gradient-to-r from-amber-500 to-[var(--accent)] rounded-full transition-all duration-300"
+                            className="h-full bg-gradient-to-r from-amber-500 to-[var(--accent)] rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                             style={{ width: `${hoursPct}%` }}
                           />
                         </div>
@@ -2312,7 +2314,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                           rows={2}
                           defaultValue={project.notes}
                           onBlur={e => handleNotesChange(project.id, e.target.value)}
-                          placeholder="Anotar compromisos pedagógicos, links de entrega o dudas..."
+                          placeholder="Anotar compromisos pedagógicos, links de entrega o dudas…"
                           className="w-full text-xs text-zinc-200 bg-zinc-950/80 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-amber-500/60 transition leading-relaxed resize-none placeholder:text-zinc-600"
                         />
                       </div>
@@ -2719,7 +2721,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                         rows={2}
                         defaultValue={project.notes}
                         onBlur={e => handleNotesChange(project.id, e.target.value)}
-                        placeholder="Anotar acuerdos, entregables pendientes o dudas del cliente..."
+                        placeholder="Anotar acuerdos, entregables pendientes o dudas del cliente…"
                         className="w-full text-xs text-zinc-200 bg-zinc-950/80 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[var(--accent)]/60 transition leading-relaxed resize-none placeholder:text-zinc-600"
                       />
                     </div>
@@ -3208,7 +3210,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                 </label>
                 <textarea
                   rows={2}
-                  placeholder={serviceMode === 'paf' ? "ej. Objetivo principal del arquitecto, enlace a portfolio..." : "ej. Falta que envíen el logo en SVG y fotos de alta calidad..."}
+                  placeholder={serviceMode === 'paf' ? "ej. Objetivo principal del arquitecto, enlace a portfolio…" : "ej. Falta que envíen el logo en SVG y fotos de alta calidad…"}
                   value={newNotes}
                   onChange={e => setNewNotes(e.target.value)}
                   className="w-full text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[var(--accent)] resize-none"

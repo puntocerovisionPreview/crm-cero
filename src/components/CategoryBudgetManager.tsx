@@ -105,7 +105,7 @@ export const CategoryBudgetManager: React.FC<Props> = ({
         {/* Minimal Progress Bar */}
         <div className="w-full h-1.5 bg-[var(--bg-surface-muted)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
           <div 
-            className={`h-full rounded-full transition-all duration-300 ${
+            className={`h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ${
               isOverTotal ? 'bg-[#DC2626]' : 'bg-[var(--solid-contrast-bg)]'
             }`}
             style={{ width: `${Math.min(100, totalPercent)}%` }}
@@ -176,7 +176,7 @@ export const CategoryBudgetManager: React.FC<Props> = ({
 
               <div className="w-full h-1 bg-[var(--bg-surface-muted)] rounded-full overflow-hidden">
                 <div 
-                  className={`h-full rounded-full transition-all duration-300 ${
+                  className={`h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ${
                     isOver ? 'bg-[#DC2626]' : 'bg-[var(--solid-contrast-bg)]'
                   }`}
                   style={{ width: `${Math.min(100, percent)}%` }}

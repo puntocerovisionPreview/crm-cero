@@ -356,7 +356,7 @@ export const PersonalFinanceBudgetsView: React.FC<Props> = ({
                 <div className="space-y-1">
                   <div className="w-full bg-zinc-900 rounded-full h-2.5 overflow-hidden border border-zinc-800/80">
                     <div 
-                      className={`h-full ${barColor} rounded-full transition-all duration-300`}
+                      className={`h-full ${barColor} rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300`}
                       style={{ width: `${Math.min(100, percentageUsed)}%` }}
                     />
                   </div>

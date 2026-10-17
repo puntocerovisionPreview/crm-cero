@@ -235,12 +235,12 @@ export const WeeklyCloseModal: React.FC<Props> = ({
                 type="button"
                 onClick={handleGenerateAiGoals}
                 disabled={loadingAi}
-                className="px-3 py-1.5 rounded-xl bg-[#4C8DFF] hover:bg-[#3B7BF0] text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-all disabled:opacity-50 cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-[#4C8DFF] hover:bg-[#3B7BF0] text-white text-xs font-semibold flex items-center gap-1.5 shadow transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] disabled:opacity-50 cursor-pointer"
               >
                 {loadingAi ? (
                   <>
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    <span>Analizando...</span>
+                    <span>Analizando…</span>
                   </>
                 ) : (
                   <>

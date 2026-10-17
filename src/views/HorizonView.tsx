@@ -662,7 +662,7 @@ export const HorizonView: React.FC<Props> = ({
             {/* Barra Visual */}
             <div className="w-full h-3 bg-zinc-950 rounded-full overflow-hidden border border-zinc-800 relative">
               <div 
-                className={`h-full transition-all duration-500 rounded-full ${
+                className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-500 rounded-full ${
                   currentMonthProgressPercent >= 100 
                     ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_12px_rgba(16,185,129,0.5)]' 
                     : 'bg-gradient-to-r from-amber-500 to-emerald-500'
@@ -1066,7 +1066,7 @@ export const HorizonView: React.FC<Props> = ({
               <div
                 key={fw.frente}
                 style={{ width: `${percent}%` }}
-                className={`h-full ${fw.colorClass} transition-all duration-300 relative group`}
+                className={`h-full ${fw.colorClass} transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 relative group`}
                 title={`${fw.frente}: ${percent}% (${fw.count} proyectos)`}
               />
             );

@@ -219,7 +219,7 @@ export const WeeklyGoalsWidget: React.FC<Props> = ({
   };
 
   return (
-    <div className="card-swiss p-4 sm:p-5 mb-4 transition-all">
+    <div className="card-swiss p-4 sm:p-5 mb-4 transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]">
       {/* Widget Header with Icon + Title + Gray Subtitle + Circular Progress Ring */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
@@ -260,14 +260,14 @@ export const WeeklyGoalsWidget: React.FC<Props> = ({
                 cx="18"
                 cy="18"
                 r="15"
-                className="stroke-[#16A34A] fill-none transition-all duration-300"
+                className="stroke-[#16A34A] fill-none transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                 strokeWidth="3"
               />
               <circle
                 cx="18"
                 cy="18"
                 r="15"
-                className="stroke-[#16A34A] fill-none transition-all duration-300"
+                className="stroke-[#16A34A] fill-none transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                 strokeWidth="3"
                 strokeDasharray="94.2"
                 strokeDashoffset={94.2 - (94.2 * progressPercent) / 100}
@@ -280,6 +280,8 @@ export const WeeklyGoalsWidget: React.FC<Props> = ({
           </div>
 
           <button
+            aria-label={isCollapsed ? "Mostrar metas" : "Ocultar metas"}
+            aria-expanded={!isCollapsed}
             onClick={() => {
               hapticFeedback.selection();
               setIsCollapsed(prev => !prev);
@@ -301,7 +303,8 @@ export const WeeklyGoalsWidget: React.FC<Props> = ({
                 type="text"
                 value={inputTitle}
                 onChange={(e) => setInputTitle(e.target.value)}
-                placeholder="Definir meta (ej: Fondo de emergencia, Leer 12 libros, Lanzar el sitio)..."
+                aria-label="Nueva meta"
+                placeholder="Definir meta (ej: Fondo de emergencia, Leer 12 libros, Lanzar el sitio)…"
                 className="flex-1 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-[var(--radius-control)] px-3 py-1.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--text-primary)] transition"
               />
               <button
@@ -378,7 +381,7 @@ export const WeeklyGoalsWidget: React.FC<Props> = ({
                         type="text"
                         value={unitInput}
                         onChange={(e) => setUnitInput(e.target.value)}
-                        placeholder={targetType === 'currency' ? 'ARS o USD' : 'libros, km...'}
+                        placeholder={targetType === 'currency' ? 'ARS o USD' : 'libros, km…'}
                         className="w-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-primary)]"
                       />
                     </div>
@@ -596,7 +599,7 @@ export const WeeklyGoalsWidget: React.FC<Props> = ({
                         {isQuantitative && (
                           <div className="w-full h-1.5 bg-[var(--bg-surface-muted)] rounded-full overflow-hidden border border-[var(--border-subtle)]">
                             <div
-                              className="h-full bg-[#16A34A] rounded-full transition-all duration-300"
+                              className="h-full bg-[#16A34A] rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                               style={{ width: `${percent}%` }}
                             />
                           </div>
@@ -631,7 +634,7 @@ export const WeeklyGoalsWidget: React.FC<Props> = ({
                                     handleAddSubtask(goal);
                                   }
                                 }}
-                                placeholder="Nuevo hito (ej: Subir contenido)..."
+                                placeholder="Nuevo hito (ej: Subir contenido)…"
                                 className="flex-1 bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded px-2 py-0.5 text-[11px] text-[var(--text-primary)]"
                               />
                               <button

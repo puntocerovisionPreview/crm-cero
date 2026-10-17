@@ -286,13 +286,13 @@ export const QuickAddModal: React.FC<Props> = ({
     if (isMediaRecorderSupported()) {
       hapticFeedback.medium();
       setIsListening(true);
-      setSpeechStatusText('🎙️ Grabando audio... hablá y tocá el botón cuando termines');
+      setSpeechStatusText('🎙️ Grabando audio… hablá y tocá el botón cuando termines');
 
       audioRecorderRef.current = createAudioRecorder(
         async (audioBlob) => {
           setIsListening(false);
           setIsProcessingAI(true);
-          setSpeechStatusText('Procesando dictado con IA...');
+          setSpeechStatusText('Procesando dictado con IA…');
 
           try {
             const aiData = await transcribeAudioWithAI(audioBlob, today);
@@ -342,7 +342,7 @@ export const QuickAddModal: React.FC<Props> = ({
     if (isSpeechSupported()) {
       hapticFeedback.medium();
       setIsListening(true);
-      setSpeechStatusText('Escuchando... habla ahora');
+      setSpeechStatusText('Escuchando… habla ahora');
 
       recognizerRef.current = createSpeechRecognizer(
         (spokenText, isFinal) => {
@@ -1185,7 +1185,7 @@ export const QuickAddModal: React.FC<Props> = ({
                 <div className="flex items-center gap-2">
                   <input
                     type="text"
-                    placeholder="Escribir subtarea..."
+                    placeholder="Escribir subtarea…"
                     value={newSubtaskInput}
                     onChange={e => setNewSubtaskInput(e.target.value)}
                     onKeyDown={e => {
@@ -1464,7 +1464,7 @@ export const QuickAddModal: React.FC<Props> = ({
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="De qué se habló o qué falta repasar..."
+                  placeholder="De qué se habló o qué falta repasar…"
                   value={meetingNotes}
                   onChange={e => setMeetingNotes(e.target.value)}
                   className="w-full text-base sm:text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-3 focus:outline-none focus:border-[var(--accent)] resize-none"
@@ -1708,7 +1708,7 @@ export const QuickAddModal: React.FC<Props> = ({
                 </label>
                 <textarea
                   rows={2}
-                  placeholder="ej. Falta que envíen el logo en SVG y fotos..."
+                  placeholder="ej. Falta que envíen el logo en SVG y fotos…"
                   value={projectNotes}
                   onChange={e => setProjectNotes(e.target.value)}
                   className="w-full text-base sm:text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-3 focus:outline-none focus:border-[var(--accent)] resize-none"
@@ -1826,7 +1826,7 @@ export const QuickAddModal: React.FC<Props> = ({
                 <input
                   type="text"
                   required
-                  placeholder="ej. Hosting, Dominio, Render 3D, Freelancer..."
+                  placeholder="ej. Hosting, Dominio, Render 3D, Freelancer…"
                   value={expenseTitle}
                   onChange={e => setExpenseTitle(e.target.value)}
                   className="w-full text-base sm:text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-3 focus:outline-none focus:border-rose-500"
@@ -1940,7 +1940,7 @@ export const QuickAddModal: React.FC<Props> = ({
                 <input
                   type="text"
                   required
-                  placeholder="ej. Cerrar propuesta con Estudio Cane..."
+                  placeholder="ej. Cerrar propuesta con Estudio Cane…"
                   value={goalTitle}
                   onChange={e => setGoalTitle(e.target.value)}
                   className="w-full text-base sm:text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-3 focus:outline-none focus:border-[var(--accent)]"

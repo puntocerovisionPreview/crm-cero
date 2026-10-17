@@ -332,7 +332,7 @@ export const InCallDrawer: React.FC<Props> = ({
 
             <div className="w-full bg-zinc-800/80 h-2 rounded-full overflow-hidden">
               <div 
-                className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
+                className="bg-[var(--accent)] h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 rounded-full"
                 style={{
                   width: `${Math.min(100, (((activeProject.pafConsultingHoursDone || 0) / (activeProject.pafConsultingHoursTotal || 26)) * 100))}%`
                 }}
@@ -513,7 +513,7 @@ export const InCallDrawer: React.FC<Props> = ({
               rows={12}
               value={callNotes}
               onChange={e => setCallNotes(e.target.value)}
-              placeholder="Tomá nota en vivo de dudas, objeciones, decisiones del comitente o tareas pactadas para la próxima llamada..."
+              placeholder="Tomá nota en vivo de dudas, objeciones, decisiones del comitente o tareas pactadas para la próxima llamada…"
               className="w-full text-xs text-zinc-200 bg-zinc-900 border border-zinc-800 rounded-2xl p-3 focus:outline-none focus:border-[var(--accent)] transition leading-relaxed custom-scrollbar font-mono resize-none shadow-inner"
             />
           </div>

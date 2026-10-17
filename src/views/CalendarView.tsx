@@ -797,7 +797,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                placeholder="Buscar evento o cliente..."
+                placeholder="Buscar evento o cliente…"
                 className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-[var(--accent)]"
               />
               {searchQuery && (
@@ -1153,7 +1153,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
 
                       {dayEvents.length > 3 && (
                         <div className="text-[10px] font-bold text-zinc-500 pl-1">
-                          +{dayEvents.length - 3} más...
+                          +{dayEvents.length - 3} más…
                         </div>
                       )}
                     </div>

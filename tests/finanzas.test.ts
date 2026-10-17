@@ -102,3 +102,35 @@ describe('revisión de datos', () => {
     expect(kinds).toEqual(['cobrado_de_mas', 'pago_duplicado']);
   });
 });
+
+import { suggestProjectForPayment, describeNewPayment } from '../server/mercadopago';
+
+describe('Mercado Pago: a qué cliente corresponde un pago', () => {
+  const remodelante = { id: 'r', clientName: 'Remodelante', ownerName: 'Martín Gómez', estimatedPrice: 1110000, estimatedCurrency: 'ARS', status: 'En curso', archived: false, createdAt: '2026-10-01', updatedAt: '2026-10-01', notes: '', installments: [
+    { id: 'c1', number: 1, amount: 370000, dueDate: '2026-10-01', paid: true, paidAt: '2026-10-01' },
+    { id: 'c2', number: 2, amount: 370000, dueDate: '2026-11-01', paid: false },
+    { id: 'c3', number: 3, amount: 370000, dueDate: '2026-12-01', paid: false },
+  ], payments: [{ id: 'p1', amount: 370000, currency: 'ARS', date: '2026-10-01' }] } as any;
+  const claudio = { ...remodelante, id: 'c', clientName: 'Claudio', ownerName: '', estimatedPrice: 465000, installments: [], payments: [{ id: 'q', amount: 232500, currency: 'ARS', date: '2026-09-28' }] } as any;
+
+  it('monto igual a una cuota pendiente + nombre del pagador = sugerencia fuerte', () => {
+    const s = suggestProjectForPayment({ amount: 370000, currency: 'ARS', payerName: 'Martin Gomez' }, [remodelante, claudio], []);
+    expect(s?.projectId).toBe('r');
+    expect(s?.score).toBe(100);
+  });
+
+  it('solo el monto (el saldo pendiente de Claudio) alcanza para sugerir', () => {
+    const s = suggestProjectForPayment({ amount: 232500, currency: 'ARS', payerName: 'Otra Persona' }, [remodelante, claudio], []);
+    expect(s?.projectId).toBe('c');
+  });
+
+  it('sin coincidencias no inventa un cliente', () => {
+    expect(suggestProjectForPayment({ amount: 1234, currency: 'ARS', payerName: 'Nadie' }, [remodelante, claudio], [])).toBeNull();
+  });
+
+  it('el aviso pregunta por el cliente sugerido', () => {
+    const n = describeNewPayment({ amount: 370000, currency: 'ARS', payerName: 'Martin Gomez', suggestion: { projectId: 'r', clientName: 'Remodelante', reason: 'el monto coincide', score: 100 } });
+    expect(n.title).toBe('Te entró un pago de $ 370.000');
+    expect(n.body).toContain('¿Es de Remodelante?');
+  });
+});

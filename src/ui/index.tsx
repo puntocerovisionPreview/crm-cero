@@ -107,7 +107,7 @@ export const SectionCard: React.FC<SectionCardProps> = ({
   };
 
   return (
-    <div className={`rounded-[var(--radius-card)] border overflow-hidden transition-all duration-200 ${bgVariants[variant]} ${className}`}>
+    <div className={`rounded-[var(--radius-card)] border overflow-hidden transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-200 ${bgVariants[variant]} ${className}`}>
       <div
         onClick={collapsible ? toggle : undefined}
         className={`p-3.5 sm:p-4 flex items-center justify-between gap-3 select-none ${
@@ -214,7 +214,7 @@ export function SegmentedControl<T extends string>({
               hapticFeedback.selection();
               onChange(opt.id);
             }}
-            className={`flex items-center justify-center gap-1.5 rounded-lg font-medium transition-all duration-150 cursor-pointer min-h-[36px] select-none ${itemSizeStyles[size]} ${
+            className={`flex items-center justify-center gap-1.5 rounded-lg font-medium transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-150 cursor-pointer min-h-[36px] select-none ${itemSizeStyles[size]} ${
               active
                 ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] font-bold shadow-xs border border-[var(--border-subtle)]/60'
                 : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
@@ -269,7 +269,7 @@ export function TabBar<T extends string>({
                 hapticFeedback.selection();
                 onChange(tab.id);
               }}
-              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer min-h-[44px] select-none ${
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] cursor-pointer min-h-[44px] select-none ${
                 active
                   ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] shadow-xs font-bold'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
@@ -358,7 +358,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
   return (
     <div className={`w-full bg-[var(--bg-app)] rounded-full overflow-hidden border border-[var(--border-subtle)] ${heightClass} ${className}`}>
       <div
-        className={`h-full rounded-full transition-all duration-300 ease-out ${colorClass}`}
+        className={`h-full rounded-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300 ease-out ${colorClass}`}
         style={{ width: `${percentage}%` }}
       />
     </div>

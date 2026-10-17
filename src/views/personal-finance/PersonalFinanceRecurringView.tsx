@@ -199,7 +199,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ej: Internet Fibertel, Figma Pro, Alquiler..."
+              placeholder="Ej: Internet Fibertel, Figma Pro, Alquiler…"
               className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-sm focus:outline-none focus:border-[var(--accent)] transition"
             />
           </div>
@@ -366,7 +366,7 @@ export const PersonalFinanceRecurringView: React.FC<Props> = ({
               type="text"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Ej: Número de cliente, débito automático..."
+              placeholder="Ej: Número de cliente, débito automático…"
               className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs focus:outline-none focus:border-[var(--accent)] transition"
             />
           </div>

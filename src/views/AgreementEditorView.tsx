@@ -221,7 +221,7 @@ export const AgreementEditorView: React.FC<Props> = ({
                   key={t.id}
                   type="button"
                   onClick={() => handleRegenerateFromType(t.id)}
-                  className={`p-3 rounded-xl border text-left transition-all duration-150 cursor-pointer ${
+                  className={`p-3 rounded-xl border text-left transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-150 cursor-pointer ${
                     isSelected
                       ? 'border-emerald-500 bg-emerald-500/10 shadow-xs'
                       : 'border-[var(--border-subtle)] bg-[var(--bg-app)] hover:border-[var(--border-strong)]'

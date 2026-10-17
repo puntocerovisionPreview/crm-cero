@@ -82,7 +82,7 @@ export const MorningBriefingCard: React.FC<Props> = ({
   const hasPendingItems = todayPendingTasks.length > 0 || todayMeetings.some(m => !m.completed) || todayPendingIncomes.length > 0 || overdueTasks.length > 0;
 
   return (
-    <div className="w-full mb-4 rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900/90 to-zinc-950 border border-zinc-800 shadow-lg overflow-hidden transition-all">
+    <div className="w-full mb-4 rounded-2xl bg-gradient-to-br from-zinc-900 via-zinc-900/90 to-zinc-950 border border-zinc-800 shadow-lg overflow-hidden transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]">
       {/* Header Banner */}
       <div className="px-4 py-3 bg-zinc-950/60 border-b border-zinc-800/80 flex items-center justify-between">
         <div className="flex items-center gap-2.5">

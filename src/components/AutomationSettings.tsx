@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, Loader2, Send, Eye, RefreshCw, Copy, Check } from 'lucide-react';
 import { getAuthHeaders } from '../utils/authAccess';
+import { PushSettingsCard } from './PushSettingsCard';
 
 interface Status {
   serviceAccount: boolean;
@@ -130,7 +131,7 @@ export const AutomationSettings: React.FC = () => {
         <div>
           <h2 className="text-base font-semibold text-[var(--text-primary)]">Automatizaciones</h2>
           <p className="text-sm text-[var(--text-secondary)]">
-            Tu CRM te escribe por Telegram y sincroniza tu Google Calendar, aunque la app esté cerrada.
+            Tu CRM te avisa en el celular (notificaciones o Telegram) y sincroniza tu Google Calendar, aunque la app esté cerrada.
           </p>
         </div>
         <button
@@ -142,6 +143,8 @@ export const AutomationSettings: React.FC = () => {
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
+
+      <PushSettingsCard />
 
       {error && <p className="text-sm text-red-400">No se pudo leer el estado: {error}</p>}
       {!status && !error && <Loader2 className="w-5 h-5 animate-spin text-[var(--text-tertiary)]" />}

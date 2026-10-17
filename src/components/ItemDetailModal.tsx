@@ -261,7 +261,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   className={`w-full bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3.5 py-2 text-sm sm:text-base font-semibold text-zinc-100 transition focus:outline-hidden ${
                     isCompleted ? 'line-through text-zinc-500' : ''
                   }`}
-                  placeholder="Título del compromiso..."
+                  placeholder="Título del compromiso…"
                 />
               </div>
             </div>
@@ -569,7 +569,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     onChange={(e) => setNotes(e.target.value)}
                     onBlur={() => handleSave()}
                     rows={3}
-                    placeholder="Temas a tratar, presupuesto, acuerdos..."
+                    placeholder="Temas a tratar, presupuesto, acuerdos…"
                     className="w-full bg-zinc-950 border border-zinc-800 focus:border-amber-500 rounded-xl p-3 text-xs sm:text-sm text-zinc-200 transition focus:outline-hidden resize-none"
                   />
                 </div>
@@ -594,7 +594,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                 {subtasks.length > 0 && (
                   <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
                     <div
-                      className="bg-[var(--accent)] h-full transition-all duration-300"
+                      className="bg-[var(--accent)] h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-300"
                       style={{ width: `${(completedSubtasks / subtasks.length) * 100}%` }}
                     />
                   </div>
@@ -645,7 +645,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                     type="text"
                     value={newSubtaskTitle}
                     onChange={(e) => setNewSubtaskTitle(e.target.value)}
-                    placeholder="Nueva subtarea..."
+                    placeholder="Nueva subtarea…"
                     className="flex-1 bg-zinc-950 border border-zinc-800 focus:border-[var(--accent)] rounded-xl px-3 py-1.5 text-xs text-zinc-200 focus:outline-hidden"
                   />
                   <button

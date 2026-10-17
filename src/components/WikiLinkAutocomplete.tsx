@@ -118,7 +118,7 @@ export const WikiLinkAutocomplete: React.FC<Props> = ({
       <div className="max-h-60 overflow-y-auto no-scrollbar py-1">
         {filtered.length === 0 && !cleanQuery ? (
           <div className="px-3 py-2 text-zinc-500 text-center">
-            Escribe para buscar notas, tareas, proyectos...
+            Escribe para buscar notas, tareas, proyectos…
           </div>
         ) : (
           filtered.map((item, idx) => {

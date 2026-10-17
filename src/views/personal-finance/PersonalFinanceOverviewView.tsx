@@ -310,12 +310,12 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
         {/* Visual Dual Progress Bar */}
         <div className="w-full bg-zinc-900 rounded-full h-3 overflow-hidden flex border border-zinc-800/80">
           <div 
-            className="bg-emerald-500 h-full transition-all duration-500"
+            className="bg-emerald-500 h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-500"
             style={{ width: `${incomeSharePct}%` }}
             title={`Ingresos: ${incomeSharePct}%`}
           />
           <div 
-            className="bg-rose-500 h-full transition-all duration-500"
+            className="bg-rose-500 h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-500"
             style={{ width: `${100 - incomeSharePct}%` }}
             title={`Salidas: ${100 - incomeSharePct}%`}
           />
@@ -425,13 +425,13 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
                   <div className="w-full flex items-end justify-center gap-1 h-24">
                     {/* Income Bar */}
                     <div 
-                      className="w-2 sm:w-3 bg-emerald-500 rounded-t transition-all"
+                      className="w-2 sm:w-3 bg-emerald-500 rounded-t transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]"
                       style={{ height: `${incHeight}px` }}
                       title={`Ingresos ${w.weekLabel}: $${w.incomeARS}`}
                     />
                     {/* Expense Bar */}
                     <div 
-                      className="w-2 sm:w-3 bg-rose-500 rounded-t transition-all"
+                      className="w-2 sm:w-3 bg-rose-500 rounded-t transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]"
                       style={{ height: `${expHeight}px` }}
                       title={`Gastos ${w.weekLabel}: $${w.expenseARS}`}
                     />

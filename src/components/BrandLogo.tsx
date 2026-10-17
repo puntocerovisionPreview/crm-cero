@@ -20,8 +20,10 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   return (
     <div className={`flex items-center ${className}`}>
       <img 
-        src="/logo.png" 
-        alt="Logo" 
+        src="/logo.png"
+        alt=".Cero"
+        width={160}
+        height={160} 
         className={`${pixelSizes[size]} w-auto object-contain select-none`}
         loading="eager"
         referrerPolicy="no-referrer"

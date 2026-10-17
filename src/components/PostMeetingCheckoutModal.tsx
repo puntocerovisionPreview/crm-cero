@@ -199,7 +199,7 @@ export const PostMeetingCheckoutModal: React.FC<Props> = ({
           <button
             type="button"
             onClick={handleCreateTask}
-            className="w-full py-2 rounded-xl bg-[#4C8DFF] hover:bg-[#3B7BF0] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all cursor-pointer"
+            className="w-full py-2 rounded-xl bg-[#4C8DFF] hover:bg-[#3B7BF0] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] cursor-pointer"
           >
             <CheckSquare className="w-3.5 h-3.5" />
             <span>Crear Tarea Derivada</span>

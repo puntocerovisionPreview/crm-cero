@@ -101,7 +101,7 @@ export const TodayCollectionsBanner: React.FC<Props> = ({
   };
 
   return (
-    <div className="card-swiss p-4 sm:p-5 mb-4 relative overflow-hidden transition-all">
+    <div className="card-swiss p-4 sm:p-5 mb-4 relative overflow-hidden transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset]">
       {/* Widget Header */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-start gap-3 min-w-0">

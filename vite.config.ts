@@ -161,6 +161,8 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          // Recibe las notificaciones push y abre la pantalla al tocarlas
+          importScripts: ['push-sw.js'],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         },
@@ -169,6 +171,21 @@ export default defineConfig(() => {
         },
       }),
     ],
+    build: {
+      rollupOptions: {
+        output: {
+          // Librerías grandes en archivos propios: cambian poco, así el navegador
+          // las guarda y una actualización de la app no obliga a bajarlas de nuevo
+          manualChunks(id: string) {
+            if (id.includes('node_modules/@firebase/auth') || id.includes('node_modules/firebase/auth')) return 'firebase-auth';
+            if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) return 'firebase';
+            if (id.includes('node_modules/react') || id.includes('node_modules/scheduler')) return 'react';
+            if (id.includes('node_modules/d3-')) return 'd3';
+            return undefined;
+          },
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
