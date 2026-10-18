@@ -3,6 +3,7 @@ import { AgendaTask, AgendaMeeting, WeeklyGoal, WeeklyMission, IncomeRecord, Pro
 import { FRENTE_CONFIG, calculateMissionProgress } from '../utils/missions';
 import {
   Calendar,
+  Repeat,
   CalendarDays,
   Clock,
   CheckCircle2,
@@ -86,6 +87,7 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { describeRecurrence } from '../utils/recurrence';
 
 interface Props {
   tasks: AgendaTask[];
@@ -2699,6 +2701,15 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                       </span>
                     </div>
                   )}
+                </div>
+              )}
+
+              {task.recurrence && (
+                <div className="mt-1">
+                  <span className="inline-flex items-center gap-1 text-[9px] font-bold text-[var(--text-secondary)] bg-[var(--bg-surface-muted)] px-1.5 py-0.5 rounded-md" title="Se repite: al terminarla se crea la próxima">
+                    <Repeat className="w-2.5 h-2.5 shrink-0" aria-hidden />
+                    <span>{describeRecurrence(task.recurrence)}</span>
+                  </span>
                 </div>
               )}
 

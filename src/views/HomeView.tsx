@@ -6,6 +6,9 @@ import { getCollectedEntries, monthMatcher, sumByCurrency } from '../utils/ledge
 import { calculateProjectBilling } from '../utils/paymentPlans';
 import { useProspecting } from '../prospecting/useProspecting';
 import { buildDailyQueue, pendingOutcomes } from '../prospecting/core';
+import { ActivityHeatmap } from '../components/ActivityHeatmap';
+import { ColdClientsCard } from '../components/ColdClientsCard';
+import { coldClients } from '../utils/coldClients';
 import { hapticFeedback } from '../utils/haptics';
 
 interface Props {
@@ -17,6 +20,8 @@ interface Props {
   pendingPayments: number;
   privacyMode?: boolean;
   onNavigate: (path: string) => void;
+  onAddTask: (task: Omit<AgendaTask, 'id' | 'createdAt'>) => void;
+  onUpdateProject: (id: string, updates: Partial<Project>) => void;
 }
 
 const todayStr = () => {
@@ -40,10 +45,10 @@ interface Stat {
 }
 
 // Inicio: elegís el sector del estudio y entrás a sus pantallas
-export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, notes, pendingPayments, privacyMode, onNavigate }) => {
+export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, notes, pendingPayments, privacyMode, onNavigate, onAddTask, onUpdateProject }) => {
   const today = todayStr();
   const month = today.slice(0, 7);
-  const { prospects, settings, loadError } = useProspecting();
+  const { prospects, events, settings, loadError } = useProspecting();
 
   const data = useMemo(() => {
     const todayTasks = tasks.filter(t => t.date === today);
@@ -62,6 +67,8 @@ export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, 
     const collected = sumByCurrency(getCollectedEntries(incomes, projects, monthMatcher(month)));
     return { todayTasks, pendingToday, overdue, todayMeetings, active, leads, withBalance, collected };
   }, [tasks, meetings, projects, incomes, today, month]);
+
+  const cold = useMemo(() => coldClients(projects, meetings, tasks, today), [projects, meetings, tasks, today]);
 
   const prospecting = useMemo(() => {
     if (!prospects) return null;
@@ -84,6 +91,7 @@ export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, 
       { value: String(data.active.length), label: 'activos' },
       { value: String(data.withBalance.length), label: 'con saldo' },
       ...(data.leads.length ? [{ value: String(data.leads.length), label: data.leads.length === 1 ? 'posible' : 'posibles' }] : []),
+      ...(cold.length ? [{ value: String(cold.length), label: 'sin contacto', tone: 'warn' as const }] : []),
     ],
     finanzas: [
       { value: money(data.collected.ARS, 'ARS', privacyMode), label: 'cobrado este mes', tone: 'good' },
@@ -205,6 +213,27 @@ export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, 
           </article>
         ))}
       </section>
+
+      {/* Clientes que se enfrían */}
+      <ColdClientsCard
+        clients={cold}
+        onOpenClient={id => go(`/clientes/${id}`)}
+        onCreateTask={c =>
+          onAddTask({
+            title: `Escribirle a ${c.project.clientName}`,
+            date: today,
+            completed: false,
+            priority: 'media',
+            projectId: c.project.id,
+            projectName: c.project.clientName,
+            notes: `Último contacto hace ${c.daysSince} días.`,
+          })
+        }
+        onMarkContacted={c => onUpdateProject(c.project.id, { lastContactDate: today })}
+      />
+
+      {/* Constancia estilo GitHub */}
+      <ActivityHeatmap tasks={tasks} meetings={meetings} prospectEvents={events} today={today} />
 
       {/* Los demás sectores */}
       <section className="grid grid-cols-1 sm:grid-cols-3 gap-4" aria-label="Otros sectores">

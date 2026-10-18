@@ -175,6 +175,7 @@ import { planClientLinks } from './utils/clients';
 import { MercadoPagoInbox } from './components/MercadoPagoInbox';
 import { MercadoPagoReconcileModal } from './components/MercadoPagoReconcileModal';
 import { MercadoPagoPaymentAlert } from './components/MercadoPagoPaymentAlert';
+import { nextOccurrence } from './utils/recurrence';
 
 // Lazy load Knowledge Graph module to preserve fast app bundle boot per spec
 function RouteLoading() {
@@ -1605,8 +1606,10 @@ export default function App() {
     const task = tasks.find(t => t.id === taskId);
     if (!task) return;
     const nextCompleted = !task.completed;
+    // El día real en que la terminaste: alimenta el mapa de constancia
+    const completedAt = nextCompleted ? getTodayString() : null;
     setTasks(prev => {
-      const updated = prev.map(t => t.id === taskId ? { ...t, completed: nextCompleted } : t);
+      const updated = prev.map(t => t.id === taskId ? { ...t, completed: nextCompleted, completedAt } : t);
       saveStoredTasks(updated);
       return updated;
     });
@@ -1617,8 +1620,33 @@ export default function App() {
       playSubtaskToggle();
     }
 
+    // Tarea que se repite: al terminarla se crea sola la próxima (una sola vez)
+    const spawnNext = Boolean(nextCompleted && task.recurrence && !task.recurrenceSpawned);
+    if (spawnNext && task.recurrence) {
+      const nextDate = nextOccurrence(task.recurrence, task.date || getTodayString(), getTodayString());
+      handleAddTask({
+        title: task.title,
+        date: nextDate,
+        time: task.time,
+        completed: false,
+        category: task.category,
+        priority: task.priority,
+        projectId: task.projectId,
+        projectName: task.projectName,
+        missionId: task.missionId,
+        notes: task.notes,
+        estimadoMin: task.estimadoMin,
+        reminderMinutesBefore: task.reminderMinutesBefore,
+        reminderNotified: false,
+        recurrence: task.recurrence,
+        subtasks: task.subtasks?.map(st => ({ ...st, id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`, completed: false })),
+      });
+      setTasks(prev => prev.map(t => (t.id === taskId ? { ...t, recurrenceSpawned: true } : t)));
+      showToast(`Próxima: ${new Date(nextDate + 'T12:00:00').toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'short' })}`);
+    }
+
     try {
-      await updateTaskInFirestore(taskId, { completed: nextCompleted });
+      await updateTaskInFirestore(taskId, { completed: nextCompleted, completedAt, ...(spawnNext ? { recurrenceSpawned: true } : {}) });
     } catch (err) {
       console.error('Error toggling task:', err);
     }
@@ -3395,6 +3423,8 @@ export default function App() {
           pendingPayments={pendingMp.filter(p => p.direction !== 'enviado').length}
           privacyMode={privacyMode}
           onNavigate={navigate}
+          onAddTask={handleAddTask}
+          onUpdateProject={handleUpdateProject}
         />
       );
     }

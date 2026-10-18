@@ -19,12 +19,21 @@ export interface SubtareaFoco {
 
 export type TaskPriority = 'alta' | 'media' | 'baja';
 
+export type TaskRecurrencePreset = 'diaria' | 'habiles' | 'semanal' | 'quincenal' | 'mensual';
+export interface TaskRecurrence {
+  preset: TaskRecurrencePreset;
+  monthDay?: number; // para "mensual": el día del mes original (ej. 31 → último día en meses cortos)
+}
+
 export interface AgendaTask {
   id: string;
   title: string;
   date: string; // YYYY-MM-DD
   time?: string; // HH:MM opcional
   completed: boolean;
+  completedAt?: string | null; // YYYY-MM-DD del día en que se terminó (para el mapa de constancia)
+  recurrence?: TaskRecurrence | null; // si se repite: al terminarla se crea la próxima
+  recurrenceSpawned?: boolean; // ya se creó la próxima (evita duplicados si la destildás y retildás)
   createdAt: string;
   subtasks?: SubTask[];
   // Modo Foco & Estimaciones

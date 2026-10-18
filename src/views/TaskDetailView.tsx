@@ -27,6 +27,8 @@ import { BacklinksPanel } from '../components/BacklinksPanel';
 import { LocalGraphWidget } from '../components/LocalGraphWidget';
 import { buildLinkCatalog, extractAllAppRelations } from '../lib/links';
 import { resolveTaskProject } from '../utils/taskProject';
+import { RECURRENCE_OPTIONS, makeRecurrence } from '../utils/recurrence';
+import type { TaskRecurrencePreset } from '../types';
 
 interface Props {
   itemId: string;
@@ -489,6 +491,31 @@ export const TaskDetailView: React.FC<Props> = ({
                   );
                 })}
               </div>
+            </div>
+
+            {/* Repetir: al terminarla se crea sola la próxima */}
+            <div className="pt-2 border-t border-zinc-800/60">
+              <label htmlFor="detail-recurrence" className="text-xs font-bold text-zinc-400 mb-2 block uppercase tracking-wider">
+                Repetir
+              </label>
+              <select
+                id="detail-recurrence"
+                value={(data as AgendaTask).recurrence?.preset || ''}
+                onChange={(e) => {
+                  hapticFeedback.selection();
+                  const rec = makeRecurrence(e.target.value as TaskRecurrencePreset | '', data.date);
+                  onUpdateTask?.(data.id, { recurrence: rec, recurrenceSpawned: false });
+                }}
+                className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[var(--accent)] cursor-pointer"
+              >
+                <option value="">No se repite</option>
+                {RECURRENCE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+              {(data as AgendaTask).recurrence && (
+                <p className="text-[11px] text-zinc-500 mt-1.5">Cuando la termines, se crea sola la próxima.</p>
+              )}
             </div>
           </div>
         )}

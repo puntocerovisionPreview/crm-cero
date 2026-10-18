@@ -54,6 +54,8 @@ import { parseNaturalLanguageInput, ParsedNaturalLanguage } from '../utils/natur
 import { hapticFeedback } from '../utils/haptics';
 import { generateCalendarICS } from '../utils/calendarIcs';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../utils/notifications';
+import { RECURRENCE_OPTIONS, makeRecurrence } from '../utils/recurrence';
+import type { TaskRecurrencePreset } from '../types';
 
 export type QuickAddType = 'tarea' | 'reunion' | 'proyecto' | 'ingreso' | 'gasto' | 'objetivo';
 
@@ -112,6 +114,7 @@ export const QuickAddModal: React.FC<Props> = ({
   const [taskTitle, setTaskTitle] = useState('');
   const [taskCategory, setTaskCategory] = useState<DailyAllocationBucketId | 'general'>('general');
   const [taskPriority, setTaskPriority] = useState<TaskPriority>('media');
+  const [taskRecurrence, setTaskRecurrence] = useState<TaskRecurrencePreset | ''>('');
   const [taskDate, setTaskDate] = useState(today);
   const [taskTime, setTaskTime] = useState('');
   const [taskReminderActive, setTaskReminderActive] = useState(false);
@@ -449,6 +452,7 @@ export const QuickAddModal: React.FC<Props> = ({
         completed: false,
         category: finalCategory,
         priority: taskPriority,
+        recurrence: makeRecurrence(taskRecurrence, taskDate || today),
         projectId: pId,
         projectName: pName,
         missionId: taskMissionId || undefined,
@@ -1019,6 +1023,27 @@ export const QuickAddModal: React.FC<Props> = ({
                     );
                   })}
                 </div>
+              </div>
+
+              {/* Repetir */}
+              <div>
+                <label htmlFor="task-recurrence" className="text-[11px] font-bold text-zinc-400 block mb-1.5 uppercase">
+                  Repetir
+                </label>
+                <select
+                  id="task-recurrence"
+                  value={taskRecurrence}
+                  onChange={(e) => setTaskRecurrence(e.target.value as TaskRecurrencePreset | '')}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-[var(--accent)]"
+                >
+                  <option value="">No se repite</option>
+                  {RECURRENCE_OPTIONS.map(o => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                {taskRecurrence && (
+                  <p className="text-[11px] text-zinc-500 mt-1">Cuando la termines, se crea sola la próxima.</p>
+                )}
               </div>
 
               {projects.length > 0 && (

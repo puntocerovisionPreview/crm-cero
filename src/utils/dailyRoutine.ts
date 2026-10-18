@@ -38,10 +38,10 @@ export function subscribeRoutineItems(onChanged: (items: RoutineItem[]) => void)
   );
 }
 
-// Últimos 60 días de registro: alcanza para la racha y el día de hoy
-export function subscribeRoutineLogs(onChanged: (logs: Record<string, RoutineLog>) => void) {
+// Por defecto los últimos 60 días (racha y hoy); el mapa de constancia pide el año entero
+export function subscribeRoutineLogs(onChanged: (logs: Record<string, RoutineLog>) => void, maxDays = 60) {
   return onSnapshot(
-    query(collection(db, LOGS), orderBy('date', 'desc'), limit(60)),
+    query(collection(db, LOGS), orderBy('date', 'desc'), limit(maxDays)),
     (snap) => {
       const logs: Record<string, RoutineLog> = {};
       snap.forEach((d) => {
