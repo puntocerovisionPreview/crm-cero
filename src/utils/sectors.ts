@@ -1,10 +1,12 @@
 import {
+  BarChart3,
   Brain,
   Calendar,
   CalendarDays,
   Compass,
   KanbanSquare,
   DollarSign,
+  FileText,
   Send,
   Server,
   Sparkles,
@@ -60,6 +62,7 @@ export const SECTORS: Sector[] = [
       { label: 'Semana', path: '/semana', icon: Target, match: starts('/semana', '/misiones') },
       { label: 'Calendario', path: '/calendario', icon: CalendarDays, match: starts('/calendario', '/calendar') },
       { label: 'Modo foco', path: '/foco', icon: Sparkles, match: starts('/foco', '/focus') },
+      { label: 'Reportes', path: '/reportes', icon: BarChart3, match: starts('/reportes', '/revision-semanal') },
     ],
   },
   {
@@ -98,6 +101,7 @@ export const SECTORS: Sector[] = [
       { label: 'Dinero', path: '/dinero', icon: DollarSign, match: starts('/dinero', '/finanzas', '/ingresos') },
       { label: 'Gastos fijos', path: '/gastos-fijos', icon: Server, match: starts('/gastos-fijos', '/vencimientos', '/suscripciones', '/dominios', '/hosting', '/ias') },
       { label: 'Mis finanzas', path: '/mis-finanzas', icon: User, match: starts('/mis-finanzas', '/finanzas-personales') },
+      { label: 'Documentos', path: '/documentos', icon: FileText, match: starts('/documentos', '/presupuestos', '/recibos') },
     ],
   },
   {

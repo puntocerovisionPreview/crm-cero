@@ -7,6 +7,7 @@ import './index.css';
 // Cada uno se descarga por separado: un alumno nunca baja el código del CRM.
 const App = lazy(() => import('./App.tsx'));
 const StudentPortalView = lazy(() => import('./views/StudentPortalView').then((m) => ({ default: m.StudentPortalView })));
+const DocumentPublicView = lazy(() => import('./views/DocumentPublicView'));
 
 // Red de seguridad para las animaciones entre pantallas: si el navegador no está dibujando
 // (pestaña o app en segundo plano), la animación esperaría para siempre y la pantalla quedaría
@@ -28,12 +29,14 @@ if (typeof document !== 'undefined' && typeof document.startViewTransition === '
 }
 
 const portalMatch = window.location.pathname.match(/^\/alumno\/([^/?#]+)/);
+// Presupuestos y recibos con link: también públicos y sin el resto del CRM
+const docMatch = window.location.pathname.match(/^\/doc\/([^/?#]+)/);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <Suspense fallback={<div className="fixed inset-0 bg-[var(--bg-app)]" />}>
-        {portalMatch ? <StudentPortalView token={portalMatch[1]} /> : <App />}
+        {portalMatch ? <StudentPortalView token={portalMatch[1]} /> : docMatch ? <DocumentPublicView token={docMatch[1]} /> : <App />}
       </Suspense>
     </ErrorBoundary>
   </StrictMode>,

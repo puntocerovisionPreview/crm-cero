@@ -18,12 +18,16 @@ interface Status {
   mercadoPago?: boolean;
 }
 
-type Job = 'daily-brief' | 'reminders' | 'weekly' | 'calendar-sync' | 'prospecting-close';
+type Job = 'daily-brief' | 'reminders' | 'weekly' | 'calendar-sync' | 'prospecting-close' | 'weekly-collections' | 'paf-report' | 'month-close' | 'day-close';
 
 const JOBS: { id: Job; title: string; when: string; path: string }[] = [
   { id: 'daily-brief', title: 'Resumen del día', when: 'Todos los días a las 8:00', path: 'daily-brief' },
   { id: 'weekly', title: 'Plan de la semana', when: 'Domingos a las 19:00', path: 'weekly' },
   { id: 'prospecting-close', title: 'Cierre del día de prospección', when: 'De lunes a viernes a las 19:00', path: 'prospecting-close' },
+  { id: 'day-close', title: 'Recordatorio de cerrar el día', when: 'De lunes a viernes a las 19:30', path: 'day-close' },
+  { id: 'weekly-collections', title: 'Cobranza de la semana', when: 'Lunes a las 9:00', path: 'weekly-collections' },
+  { id: 'paf-report', title: 'Reporte de alumnos PAF', when: 'Viernes a las 17:00', path: 'paf-report' },
+  { id: 'month-close', title: 'Cierre de mes', when: 'El día 1 de cada mes a las 9:00', path: 'month-close' },
   { id: 'reminders', title: 'Avisos de reuniones y tareas', when: 'Cada 10 minutos (junto con el calendario)', path: 'frequent' },
   { id: 'calendar-sync', title: 'Sincronizar Google Calendar', when: 'Cada 10 minutos (junto con los avisos)', path: 'frequent' },
 ];

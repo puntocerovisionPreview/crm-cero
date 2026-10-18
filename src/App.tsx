@@ -176,6 +176,9 @@ import { MercadoPagoInbox } from './components/MercadoPagoInbox';
 import { MercadoPagoReconcileModal } from './components/MercadoPagoReconcileModal';
 import { MercadoPagoPaymentAlert } from './components/MercadoPagoPaymentAlert';
 import { nextOccurrence } from './utils/recurrence';
+import { StudioDocument, STUDIO_NAME, nextNumber, receiptFromPayment, saveDocument, subscribeDocuments } from './utils/documents';
+import { DocumentEditorModal, DocumentPrefill } from './components/DocumentEditorModal';
+import { DocumentShareSheet } from './components/DocumentShareSheet';
 
 // Lazy load Knowledge Graph module to preserve fast app bundle boot per spec
 function RouteLoading() {
@@ -190,6 +193,8 @@ function RouteLoading() {
 const KnowledgeGraphView = React.lazy(() => import('./views/KnowledgeGraphView'));
 const HomeView = React.lazy(() => import('./views/HomeView'));
 const PipelineView = React.lazy(() => import('./views/PipelineView'));
+const ReportsView = React.lazy(() => import('./views/ReportsView'));
+const DocumentsView = React.lazy(() => import('./views/DocumentsView'));
 // Pantallas que se descargan recién cuando las abrís (antes todo venía en un archivo de 3 MB).
 // Hoy/Agenda se carga de entrada porque es la primera pantalla.
 const CalendarView = React.lazy(() => import('./views/CalendarView').then((m) => ({ default: m.CalendarView })));
@@ -228,6 +233,13 @@ const IosWidgetsModal = React.lazy(() => import('./components/IosWidgetsModal').
 export default function App() {
   // Path-based SPA Router (syncs with window.location & browser history)
   const { currentRoute, navigate, goBack } = useRouter();
+
+  // Al cambiar de pantalla se vuelve arriba: antes la pantalla nueva aparecía
+  // con el scroll de la anterior (a mitad de página o "fuera de pantalla")
+  const mainScrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    mainScrollRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [currentRoute.path]);
 
   // Sesión real de Firebase (Google). authToken = uid de una cuenta autorizada.
   // Antes era un PIN guardado en el navegador que no protegía los datos.
@@ -335,6 +347,11 @@ export default function App() {
   // Pagos que entraron por Mercado Pago (los guarda el servidor) y el que se está registrando
   const [mpIncoming, setMpIncoming] = useState<MercadoPagoIncomingPayment[]>([]);
   const [mpToRegister, setMpToRegister] = useState<MercadoPagoIncomingPayment | null>(null);
+  // Presupuestos y recibos con link
+  const [documents, setDocuments] = useState<StudioDocument[]>([]);
+  const [docEditor, setDocEditor] = useState<{ open: boolean; prefill?: DocumentPrefill }>({ open: false });
+  const [docShare, setDocShare] = useState<StudioDocument | null>(null);
+  const openDocumentEditor = (prefill?: DocumentPrefill) => setDocEditor({ open: true, prefill });
   // Clientes (agrupan proyectos). Se vinculan solos cuando proyectos y clientes llegan de la nube.
   const [clients, setClients] = useState<Client[]>([]);
   const [cloudLoaded, setCloudLoaded] = useState({ projects: false, clients: false });
@@ -1230,6 +1247,7 @@ export default function App() {
     );
 
     const unsubMp = subscribeMpIncoming(items => setMpIncoming(items));
+    const unsubDocs = subscribeDocuments(setDocuments);
 
     const unsubClients = subscribeClients(items => {
       setClients(items);
@@ -1268,6 +1286,7 @@ export default function App() {
       unsubStudioFixed();
       unsubClients();
       unsubMp();
+      unsubDocs();
     };
   }, [authToken]);
 
@@ -2267,6 +2286,14 @@ export default function App() {
     };
     handleUpdateProject(projectId, projectUpdates);
 
+    // Recibo automático: cada pago nuevo de un cliente genera su recibo con link, listo para mandar
+    if (!isEditing) {
+      const receipt = receiptFromPayment(targetProject, paymentWithMeta, nextNumber(documents, 'recibo'), STUDIO_NAME);
+      saveDocument(receipt)
+        .then(() => setDocShare(receipt))
+        .catch(err => console.warn('No se pudo crear el recibo:', err));
+    }
+
     // Upsert IncomeRecord
     const existingIncome = incomes.find(i => i.id === incomeId);
     const incomeData: IncomeRecord = {
@@ -3048,6 +3075,24 @@ export default function App() {
       };
     }
 
+    if (path === '/documentos') {
+      return {
+        title: 'Documentos',
+        subtitle: 'Presupuestos y recibos con link',
+        breadcrumbs: [{ label: 'Documentos' }],
+        showBackButton: false,
+      };
+    }
+
+    if (path === '/reportes') {
+      return {
+        title: 'Reportes',
+        subtitle: 'Semana, alumnos PAF, prospección y mes',
+        breadcrumbs: [{ label: 'Reportes' }],
+        showBackButton: false,
+      };
+    }
+
     if (path === '/oportunidades') {
       return {
         title: 'Oportunidades',
@@ -3266,6 +3311,7 @@ export default function App() {
       }
       return (
         <ClientDetailView
+          onNewDocument={openDocumentEditor}
           project={project}
           tasks={tasks}
           meetings={meetings}
@@ -3435,6 +3481,10 @@ export default function App() {
           onNavigate={navigate}
           onAddTask={handleAddTask}
           onUpdateProject={handleUpdateProject}
+          onToggleTask={handleToggleTask}
+          onMoveTaskDate={handleMoveTaskDate}
+          studioSettings={studioPaymentSettings}
+          showToast={showToast}
         />
       );
     }
@@ -3443,9 +3493,44 @@ export default function App() {
       return <ProspectingView projects={projects} onAddProject={handleAddProject} />;
     }
 
+    if (path === '/documentos') {
+      return (
+        <DocumentsView
+          documents={documents}
+          today={getTodayString()}
+          privacyMode={privacyMode}
+          onNew={openDocumentEditor}
+          onShare={setDocShare}
+          onNavigate={navigate}
+          showToast={showToast}
+        />
+      );
+    }
+
+    if (path === '/reportes') {
+      return (
+        <ReportsView
+          tasks={tasks}
+          meetings={meetings}
+          projects={projects}
+          incomes={incomes}
+          expenses={expenses}
+          fixedExpenses={studioFixedExpenses}
+          weeklyGoals={weeklyGoals}
+          privacyMode={privacyMode}
+          initialTab={(currentRoute.query?.tab as any) || 'semana'}
+          onToggleTask={handleToggleTask}
+          onMoveTaskDate={handleMoveTaskDate}
+          onAddWeeklyGoal={handleAddWeeklyGoal}
+          onNavigate={navigate}
+        />
+      );
+    }
+
     if (path === '/oportunidades') {
       return (
         <PipelineView
+          onNewQuote={openDocumentEditor}
           projects={projects}
           privacyMode={privacyMode}
           onAddProject={handleAddProject}
@@ -4092,7 +4177,7 @@ export default function App() {
       />
 
       {/* Main Content Area with Dynamic AppTopBar */}
-      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto overflow-x-hidden w-full max-w-full overscroll-x-none bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+      <div ref={mainScrollRef} className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto overflow-x-hidden w-full max-w-full overscroll-x-none overscroll-y-contain bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
         <AppTopBar
           title={routeMeta.title}
           subtitle={routeMeta.subtitle}
@@ -4165,6 +4250,21 @@ export default function App() {
         onReconcileAsPersonalTransaction={handleMpAsPersonal}
         onDismissPayment={handleMpDismiss}
       />
+
+      <DocumentEditorModal
+        isOpen={docEditor.open}
+        prefill={docEditor.prefill}
+        projects={projects}
+        documents={documents}
+        settings={studioPaymentSettings}
+        today={getTodayString()}
+        onClose={() => setDocEditor({ open: false })}
+        onSaved={doc => {
+          setDocEditor({ open: false });
+          setDocShare(doc);
+        }}
+      />
+      <DocumentShareSheet doc={docShare} onClose={() => setDocShare(null)} />
 
       <MercadoPagoPaymentAlert
         payment={mpToRegister ? null : mpAlert}

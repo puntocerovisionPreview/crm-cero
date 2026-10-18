@@ -16,6 +16,8 @@ import { addDays, todayLocal } from '../src/utils/dates';
 import { runCalendarSync, isCalendarConfigured } from './calendarSync';
 import { countPushDevices, htmlToPush, PushPayload, registerPushRoutes, sendPushToAll } from './push';
 import { describeNewPayment, isMercadoPagoConfigured, registerMercadoPagoRoutes, syncRecentPayments } from './mercadopago';
+import { registerDocumentRoutes } from './documents';
+import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 
 /**
  * MOTOR DE AUTOMATIZACIÓN
@@ -127,8 +129,8 @@ function plainDates<T extends Record<string, any>>(items: T[]): T[] {
   });
 }
 
-export async function loadAutomationData(db: Firestore): Promise<AutomationData> {
-  const [tasks, meetings, projects, incomes, fixedExpenses, routine, prospects, prospectingDoc] = await Promise.all([
+export async function loadAutomationData(db: Firestore): Promise<PeriodicData> {
+  const [tasks, meetings, projects, incomes, fixedExpenses, routine, prospects, prospectingDoc, expenses, prospectEvents] = await Promise.all([
     readCollection<any>(db, 'tasks'),
     readCollection<any>(db, 'meetings'),
     readCollection<any>(db, 'projects'),
@@ -137,6 +139,8 @@ export async function loadAutomationData(db: Firestore): Promise<AutomationData>
     readCollection<any>(db, 'daily_routine'),
     readCollection<any>(db, 'prospects'),
     db.collection('settings').doc('prospecting').get(),
+    readCollection<any>(db, 'expenses'),
+    readCollection<any>(db, 'prospect_events'),
   ]);
   const savedSettings = (prospectingDoc.exists ? prospectingDoc.data() : {}) as any;
   return {
@@ -148,6 +152,8 @@ export async function loadAutomationData(db: Firestore): Promise<AutomationData>
     routine: plainDates(routine).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)),
     prospects: plainDates(prospects).map((p: any) => ({ followUps: 0, ...p })),
     prospectingSettings: mergeProspectingSettings(savedSettings),
+    expenses: plainDates(expenses),
+    prospectEvents: plainDates(prospectEvents),
   };
 }
 
@@ -227,15 +233,45 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
   const data = await loadAutomationData(db);
 
   if (job === 'daily-brief') {
-    const text = buildDailyBrief(data, today);
+    const top3 = buildTop3Section(data, today);
+    const brief = buildDailyBrief(data, today);
+    // "Tus 3 de hoy" va arriba de todo, después del saludo
+    const text = top3 ? brief.replace(/^(.*\n)/, `$1\n${top3}\n`) : brief;
     if (options.dryRun) return { job, detail: text };
     return { job, sent: await deliver(text, htmlToPush(text, 'Tu día', '/agenda', 'resumen-diario')) };
   }
 
   if (job === 'weekly') {
-    const text = buildWeeklyPlan(data, nextMonday(today), today);
+    const prospectingWeekText = buildProspectingWeek(data, today);
+    const text = [buildWeeklyPlan(data, nextMonday(today), today), prospectingWeekText].filter(Boolean).join('\n\n');
     if (options.dryRun) return { job, detail: text };
     return { job, sent: await deliver(text, htmlToPush(text, 'Tu semana', '/semana', 'plan-semanal')) };
+  }
+
+  if (job === 'weekly-collections') {
+    const text = buildWeeklyCollections(data, today);
+    if (options.dryRun) return { job, detail: text || 'No vence nada esta semana.' };
+    if (!text) return { job, sent: 0 };
+    return { job, sent: await deliver(text, htmlToPush(text, 'Cobranza de la semana', '/inicio', 'cobranza-semana')) };
+  }
+
+  if (job === 'paf-report') {
+    const text = buildPafReport(data, today);
+    if (options.dryRun) return { job, detail: text || 'No hay alumnos PAF activos.' };
+    if (!text) return { job, sent: 0 };
+    return { job, sent: await deliver(text, htmlToPush(text, 'Alumnos PAF', '/reportes?tab=paf', 'reporte-paf')) };
+  }
+
+  if (job === 'month-close') {
+    const text = buildMonthClose(data, today);
+    if (options.dryRun) return { job, detail: text };
+    return { job, sent: await deliver(text, htmlToPush(text, 'Cierre de mes', '/reportes?tab=mes', 'cierre-mes')) };
+  }
+
+  if (job === 'day-close') {
+    const text = buildDayCloseNudge(data, today);
+    if (options.dryRun) return { job, detail: text };
+    return { job, sent: await deliver(text, htmlToPush(text, 'Cerrá el día', '/inicio', 'cierre-dia')) };
   }
 
   if (job === 'prospecting-close') {
@@ -277,7 +313,7 @@ function cronSecretOk(req: express.Request): boolean {
   return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
-const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prospecting-close', 'mercadopago'];
+const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prospecting-close', 'mercadopago', 'weekly-collections', 'paf-report', 'month-close', 'day-close'];
 
 export function registerAutomationRoutes(app: express.Express, requireOwner: express.RequestHandler) {
   // Notificaciones push nativas (activar en cada dispositivo, prueba)
@@ -286,6 +322,11 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
   registerMercadoPagoRoutes(app, requireOwner, getAdminDb, async (title, body) => {
     const db = getAdminDb();
     if (db) await notifyAll(db, title, body, '/dinero', 'mp');
+  });
+  // Presupuestos: el cliente acepta desde el link
+  registerDocumentRoutes(app, getAdminDb, async (title, body) => {
+    const db = getAdminDb();
+    if (db) await notifyAll(db, title, body, '/documentos', 'doc');
   });
 
   // Reloj externo: GET o POST /api/cron/<tarea>?key=CRON_SECRET

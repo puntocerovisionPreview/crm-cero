@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowRight, Check, Phone, Send, X } from 'lucide-react';
+import { ArrowRight, Check, FileText, Phone, Send, X } from 'lucide-react';
+import type { DocumentPrefill } from '../components/DocumentEditorModal';
 import { Project, Prospect } from '../types';
 import { useProspecting } from '../prospecting/useProspecting';
 import { recordProspectAction, updateProspect } from '../prospecting/store';
@@ -17,13 +18,14 @@ interface Props {
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
   onNavigate: (path: string) => void;
   showToast?: (msg: string) => void;
+  onNewQuote?: (prefill: DocumentPrefill) => void;
 }
 
 const money = (n: number, cur: 'ARS' | 'USD', privacy?: boolean) =>
   privacy ? '••••' : `${cur === 'USD' ? 'US$' : '$'} ${Math.round(n).toLocaleString('es-AR')}`;
 
 // Tablero de oportunidades: el embudo de ventas desde que el prospecto responde hasta que firma
-export const PipelineView: React.FC<Props> = ({ projects, privacyMode, onAddProject, onUpdateProject, onNavigate, showToast }) => {
+export const PipelineView: React.FC<Props> = ({ projects, privacyMode, onAddProject, onUpdateProject, onNavigate, showToast, onNewQuote }) => {
   const { prospects, settings, today, loadError } = useProspecting();
   const [editingValue, setEditingValue] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -78,6 +80,27 @@ export const PipelineView: React.FC<Props> = ({ projects, privacyMode, onAddProj
         {col !== 'propuesta' && item.kind === 'prospect' && (
           <button type="button" disabled={busy === item.id} onClick={() => act(item, 'proposal_sent')} className={`${btn} bg-[var(--bg-surface-muted)] text-[var(--text-primary)]`}>
             <Send className="w-3.5 h-3.5" aria-hidden /> Propuesta
+          </button>
+        )}
+        {onNewQuote && (
+          <button
+            type="button"
+            onClick={() =>
+              onNewQuote({
+                kind: 'presupuesto',
+                projectId: item.kind === 'lead' ? item.id : undefined,
+                prospectId: item.kind === 'prospect' ? item.id : undefined,
+                clientName: item.title,
+                contactName: item.prospect?.name || item.project?.ownerName,
+                phone: item.prospect?.whatsapp || item.project?.clientPhone,
+                email: item.prospect?.email,
+                currency: item.currency,
+                items: [{ description: '', quantity: 1, unitPrice: item.value || 0 }],
+              })
+            }
+            className={`${btn} bg-[var(--bg-surface-muted)] text-[var(--text-primary)]`}
+          >
+            <FileText className="w-3.5 h-3.5" aria-hidden /> Presupuesto
           </button>
         )}
         <button type="button" disabled={busy === item.id} onClick={() => act(item, 'won')} className={`${btn} bg-[#34C759] text-white`}>

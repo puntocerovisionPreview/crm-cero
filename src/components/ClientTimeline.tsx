@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { CheckCircle2, DollarSign, FileText, GraduationCap, Mail, MessageCircle, Phone, Sparkles, Trash2, Users } from 'lucide-react';
+import { CheckCircle2, DollarSign, FileText, GraduationCap, Mail, MessageCircle, Phone, Receipt, Sparkles, Trash2, Users } from 'lucide-react';
+import type { DocumentPrefill } from './DocumentEditorModal';
 import { AgendaMeeting, AgendaTask, ContactLogEntry, Project } from '../types';
 import { CONTACT_TYPES, TimelineKind, buildTimeline, groupByMonth } from '../utils/clientTimeline';
 import { getTodayString } from '../utils/storage';
@@ -11,6 +12,7 @@ interface Props {
   meetings: AgendaMeeting[];
   privacyMode?: boolean;
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
+  onNewDocument?: (prefill: DocumentPrefill) => void;
 }
 
 const KIND_STYLE: Record<TimelineKind, { icon: React.ElementType; color: string }> = {
@@ -33,7 +35,7 @@ const monthTitle = (m: string) => {
 const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' });
 
 // Historial del cliente: todo lo que pasó, en una sola línea de tiempo
-export const ClientTimeline: React.FC<Props> = ({ project, tasks, meetings, privacyMode, onUpdateProject }) => {
+export const ClientTimeline: React.FC<Props> = ({ project, tasks, meetings, privacyMode, onUpdateProject, onNewDocument }) => {
   const today = getTodayString();
   const [type, setType] = useState<ContactLogEntry['type']>('whatsapp');
   const [text, setText] = useState('');
@@ -57,8 +59,27 @@ export const ClientTimeline: React.FC<Props> = ({ project, tasks, meetings, priv
     onUpdateProject(project.id, { contactLog: (project.contactLog || []).filter(c => c.id !== id) });
   };
 
+  const base: DocumentPrefill = {
+    projectId: project.id,
+    clientName: project.clientName,
+    contactName: project.ownerName,
+    phone: project.clientPhone,
+    currency: project.estimatedCurrency || 'USD',
+  };
+
   return (
     <div className="space-y-5">
+      {onNewDocument && (
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => onNewDocument({ ...base, kind: 'presupuesto' })} className="h-9 px-4 rounded-full bg-[var(--accent)] text-white text-[14px] font-semibold flex items-center gap-1.5 cursor-pointer">
+            <FileText className="w-4 h-4" aria-hidden /> Presupuesto
+          </button>
+          <button type="button" onClick={() => onNewDocument({ ...base, kind: 'recibo' })} className="h-9 px-4 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[14px] font-medium text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer">
+            <Receipt className="w-4 h-4" aria-hidden /> Recibo
+          </button>
+        </div>
+      )}
+
       {/* Registrar contacto */}
       <form onSubmit={addContact} className="card-swiss p-4 space-y-3" aria-label="Registrar un contacto">
         <h3 className="text-[15px] font-semibold text-[var(--text-primary)]">Registrar contacto</h3>
@@ -139,6 +160,25 @@ export const ClientTimeline: React.FC<Props> = ({ project, tasks, meetings, priv
                         {e.detail && <p className="text-[13px] text-[var(--text-secondary)] whitespace-pre-line line-clamp-3">{e.detail}</p>}
                         <p className="text-[12px] text-[var(--text-tertiary)]">{dayLabel(e.date)}</p>
                       </div>
+                      {e.kind === 'pago' && onNewDocument && e.amount !== undefined && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            onNewDocument({
+                              ...base,
+                              kind: 'recibo',
+                              currency: e.currency || base.currency,
+                              items: [{ description: e.detail || `Pago ${project.clientName}`, quantity: 1, unitPrice: e.amount || 0 }],
+                              paymentDate: e.date,
+                              paymentId: e.id.replace(/^p-/, ''),
+                            })
+                          }
+                          className="h-8 px-3 rounded-full bg-[var(--bg-surface-muted)] text-[12px] font-medium text-[var(--text-primary)] flex items-center gap-1 shrink-0 cursor-pointer"
+                          title="Generar recibo de este pago"
+                        >
+                          <Receipt className="w-3.5 h-3.5" aria-hidden /> Recibo
+                        </button>
+                      )}
                       {e.removable && (
                         <button
                           type="button"

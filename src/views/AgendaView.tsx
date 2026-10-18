@@ -354,14 +354,22 @@ export const AgendaView: React.FC<Props> = ({
   const isViewingToday = startDateStr === today;
   const currentWeekMonday = getWeekMonday(startDateStr);
 
+  // Centra una columna de día moviendo SOLO el carrusel de días.
+  // (scrollIntoView también movía el contenedor principal y la pantalla quedaba corrida)
+  const scrollToDayColumn = (dateStr: string, smooth = true) => {
+    const scroller = desktopGridRef.current;
+    const el = scroller?.querySelector(`#agenda-desktop-col-${dateStr}`) as HTMLElement | null;
+    if (!scroller || !el) return false;
+    const sc = scroller.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    scroller.scrollTo({ left: scroller.scrollLeft + (r.left - sc.left) - (sc.width - r.width) / 2, behavior: smooth ? 'smooth' : 'auto' });
+    return true;
+  };
+
   // Auto-scroll 7-day carousel so today's column is brought into view
   React.useEffect(() => {
-    if (desktopViewMode === 'semana' && desktopGridRef.current) {
-      const todayElement = desktopGridRef.current.querySelector(`#agenda-desktop-col-${today}`) as HTMLElement | null;
-      if (todayElement) {
-        todayElement.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-      }
-    }
+    if (desktopViewMode === 'semana') scrollToDayColumn(today);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [desktopViewMode, startDateStr, today]);
 
   // Wrapped toggle meeting handler that opens checkout modal if completing a meeting
@@ -1250,11 +1258,7 @@ export const AgendaView: React.FC<Props> = ({
                           key={dateStr}
                           type="button"
                           onClick={() => {
-                            const el = desktopGridRef.current?.querySelector(`#agenda-desktop-col-${dateStr}`) as HTMLElement | null;
-                            if (el) {
-                              el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                              hapticFeedback.light();
-                            }
+                            if (scrollToDayColumn(dateStr)) hapticFeedback.light();
                           }}
                           className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer border ${
                             isToday
@@ -1282,11 +1286,7 @@ export const AgendaView: React.FC<Props> = ({
                     <button
                       type="button"
                       onClick={() => {
-                        const el = desktopGridRef.current?.querySelector(`#agenda-desktop-col-${today}`) as HTMLElement | null;
-                        if (el) {
-                          el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-                          hapticFeedback.light();
-                        }
+                        if (scrollToDayColumn(today)) hapticFeedback.light();
                       }}
                       className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-bold transition flex items-center gap-1 cursor-pointer border border-zinc-700/60"
                       title="Desplazarse a la columna de Hoy"

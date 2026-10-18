@@ -1,6 +1,10 @@
-import React, { useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
-import { AgendaMeeting, AgendaTask, IncomeRecord, Project, SecondBrainNote } from '../types';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BarChart3, ChevronRight, Moon } from 'lucide-react';
+import { AgendaMeeting, AgendaTask, IncomeRecord, Project, SecondBrainNote, StudioPaymentSettings } from '../types';
+import { Top3Card } from '../components/Top3Card';
+import { CollectionsCard } from '../components/CollectionsCard';
+import { DayCloseModal } from '../components/DayCloseModal';
+import { JournalEntry, subscribeJournal } from '../utils/journal';
 import { SECTORS, Sector, SectorKey } from '../utils/sectors';
 import { getCollectedEntries, monthMatcher, sumByCurrency } from '../utils/ledger';
 import { calculateProjectBilling } from '../utils/paymentPlans';
@@ -22,6 +26,10 @@ interface Props {
   onNavigate: (path: string) => void;
   onAddTask: (task: Omit<AgendaTask, 'id' | 'createdAt'>) => void;
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
+  onToggleTask: (id: string) => void;
+  onMoveTaskDate: (id: string, date: string) => void;
+  studioSettings?: StudioPaymentSettings;
+  showToast?: (msg: string) => void;
 }
 
 const todayStr = () => {
@@ -31,7 +39,7 @@ const todayStr = () => {
 
 const greeting = () => {
   const h = new Date().getHours();
-  return h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+  return h < 6 ? 'Buenas noches' : h < 13 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
 };
 
 const money = (n: number, cur: 'ARS' | 'USD', privacy?: boolean) =>
@@ -45,8 +53,28 @@ interface Stat {
 }
 
 // Inicio: elegís el sector del estudio y entrás a sus pantallas
-export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, notes, pendingPayments, privacyMode, onNavigate, onAddTask, onUpdateProject }) => {
+export const HomeView: React.FC<Props> = ({
+  tasks,
+  meetings,
+  projects,
+  incomes,
+  notes,
+  pendingPayments,
+  privacyMode,
+  onNavigate,
+  onAddTask,
+  onUpdateProject,
+  onToggleTask,
+  onMoveTaskDate,
+  studioSettings,
+  showToast,
+}) => {
   const today = todayStr();
+  const [showDayClose, setShowDayClose] = useState(false);
+  const [journal, setJournal] = useState<Record<string, JournalEntry>>({});
+  useEffect(() => subscribeJournal(setJournal, 7), []);
+  const dayClosed = Boolean(journal[today]);
+  const evening = new Date().getHours() >= 18;
   const month = today.slice(0, 7);
   const { prospects, events, settings, loadError } = useProspecting();
 
@@ -150,7 +178,30 @@ export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, 
         </p>
         <h1 className="text-[34px] leading-tight font-bold tracking-tight text-[var(--text-primary)]">{greeting()}</h1>
         <p className="text-[15px] text-[var(--text-secondary)] mt-0.5">¿En qué parte del estudio querés trabajar?</p>
+        <div className="flex flex-wrap gap-2 mt-3">
+          <button
+            type="button"
+            onClick={() => setShowDayClose(true)}
+            className={`h-9 px-3.5 rounded-full text-[14px] font-medium flex items-center gap-1.5 cursor-pointer ${
+              evening && !dayClosed ? 'bg-[#5856D6] text-white' : 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)]'
+            }`}
+          >
+            <Moon className="w-4 h-4" aria-hidden />
+            {dayClosed ? 'Día cerrado ✓' : 'Cerrar el día'}
+          </button>
+          <button
+            type="button"
+            onClick={() => go('/reportes')}
+            className="h-9 px-3.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[14px] font-medium text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
+          >
+            <BarChart3 className="w-4 h-4" aria-hidden />
+            Reportes y revisión semanal
+          </button>
+        </div>
       </header>
+
+      {/* Tus 3 del día */}
+      <Top3Card tasks={tasks} today={today} onToggleTask={onToggleTask} onOpenTask={id => go(`/agenda/tarea/${id}`)} />
 
       {/* Sectores principales */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-label="Sectores principales">
@@ -214,6 +265,16 @@ export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, 
         ))}
       </section>
 
+      {/* Cobranza de la semana */}
+      <CollectionsCard
+        projects={projects}
+        incomes={incomes}
+        today={today}
+        settings={studioSettings}
+        privacyMode={privacyMode}
+        onRegisterPayment={id => go(`/clientes/${id}/cobro/nuevo`)}
+      />
+
       {/* Clientes que se enfrían */}
       <ColdClientsCard
         clients={cold}
@@ -256,6 +317,17 @@ export const HomeView: React.FC<Props> = ({ tasks, meetings, projects, incomes, 
           </button>
         ))}
       </section>
+
+      <DayCloseModal
+        isOpen={showDayClose}
+        onClose={() => setShowDayClose(false)}
+        tasks={tasks}
+        today={today}
+        initialText={journal[today]?.text || ''}
+        onMoveTaskDate={onMoveTaskDate}
+        onToggleTask={onToggleTask}
+        showToast={showToast}
+      />
 
       <p className="text-center text-[12px] text-[var(--text-tertiary)]">
         Dentro de cada sector, el menú muestra solo sus pantallas. Volvés acá con «Inicio».

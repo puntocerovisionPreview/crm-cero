@@ -1094,6 +1094,8 @@ export const ALL_CRM_COLLECTIONS = [
   'prospect_events',
   'prospect_pool',
   'mp_incoming',
+  'documents',
+  'journal',
 ] as const;
 
 export type CrmCollectionName = (typeof ALL_CRM_COLLECTIONS)[number];

@@ -665,8 +665,8 @@ export const ProjectsSimpleView: React.FC<Props> = ({
   };
 
   const tabBar = (
-      <div className="flex items-center justify-between gap-3 p-1.5 rounded-2xl bg-zinc-950/90 border border-zinc-800 shadow-sm backdrop-blur-md">
-      <div className="flex items-center gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-2 p-1.5 rounded-2xl bg-zinc-950/90 border border-zinc-800 shadow-sm backdrop-blur-md max-w-full">
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0 max-w-full">
         <button
           type="button"
           onClick={() => setDirectoryTab('proyectos')}

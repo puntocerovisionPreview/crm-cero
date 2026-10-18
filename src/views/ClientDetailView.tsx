@@ -128,6 +128,7 @@ interface Props {
   onSavePayment?: (projectId: string, payment: Payment, options?: any) => void;
   onDeletePayment?: (projectId: string, paymentId: string) => void;
   onOpenStudioPaymentSettings?: () => void;
+  onNewDocument?: (prefill: import('../components/DocumentEditorModal').DocumentPrefill) => void;
 }
 
 export const ClientDetailView: React.FC<Props> = ({
@@ -164,6 +165,7 @@ export const ClientDetailView: React.FC<Props> = ({
   onSavePayment,
   onDeletePayment,
   onOpenStudioPaymentSettings,
+  onNewDocument,
 }) => {
   const isPaf = project.serviceType === 'paf' || project.projectType === 'paf_pro' || project.projectType === 'paf_base';
 
@@ -1619,7 +1621,7 @@ export const ClientDetailView: React.FC<Props> = ({
 
             {/* HISTORIAL: todo lo que pasó con el cliente */}
             {activeTab === 'historial' && (
-              <ClientTimeline project={project} tasks={tasks} meetings={meetings} privacyMode={privacyMode} onUpdateProject={onUpdateProject} />
+              <ClientTimeline project={project} tasks={tasks} meetings={meetings} privacyMode={privacyMode} onUpdateProject={onUpdateProject} onNewDocument={onNewDocument} />
             )}
 
             {/* 4. NOTAS & LINKS */}

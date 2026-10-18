@@ -41,7 +41,7 @@ El servidor no se despierta solo: un reloj externo lo llama en horarios fijos.
 1. Inventá una clave larga, de 16 caracteres o más, sin espacios (por ejemplo `cero-reloj-8f3k2m9q7x`). Guardala en los Secrets como:
    `CRON_SECRET`
 2. Creá una cuenta gratis en https://cron-job.org.
-3. Creá estas 4 tareas. La dirección exacta, con tu dominio, la copiás desde **Ajustes → Automatizaciones**, y reemplazás `TU_CLAVE` por tu `CRON_SECRET`:
+3. Creá estas tareas. La dirección exacta, con tu dominio, la copiás desde **Ajustes → Automatizaciones**, y reemplazás `TU_CLAVE` por tu `CRON_SECRET`:
 
 | Tarea | Dirección | Cuándo |
 |---|---|---|
@@ -49,6 +49,12 @@ El servidor no se despierta solo: un reloj externo lo llama en horarios fijos.
 | Plan de la semana | `https://TU-APP/api/cron/weekly?key=TU_CLAVE` | Domingos, 19:00 |
 | Cierre de prospección | `https://TU-APP/api/cron/prospecting-close?key=TU_CLAVE` | Lunes a viernes, 19:00 |
 | Avisos + calendario | `https://TU-APP/api/cron/frequent?key=TU_CLAVE` | Cada 10 minutos |
+| Recordatorio de cerrar el día | `https://TU-APP/api/cron/day-close?key=TU_CLAVE` | Lunes a viernes, 19:30 |
+| Cobranza de la semana | `https://TU-APP/api/cron/weekly-collections?key=TU_CLAVE` | Lunes, 9:00 |
+| Reporte de alumnos PAF | `https://TU-APP/api/cron/paf-report?key=TU_CLAVE` | Viernes, 17:00 |
+| Cierre de mes | `https://TU-APP/api/cron/month-close?key=TU_CLAVE` | Día 1 de cada mes, 9:00 |
+
+El resumen de las 8:00 ahora arranca con **Tus 3 de hoy**, y el plan del domingo suma los **números de prospección** de la semana.
 
 En cron-job.org, configurá la zona horaria **America/Argentina/Buenos_Aires**.
 
