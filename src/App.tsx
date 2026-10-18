@@ -297,7 +297,7 @@ export default function App() {
         document.body.classList.remove('dark');
         document.body.classList.add('light');
       }
-      document.getElementById('theme-color')?.setAttribute('content', theme === 'dark' ? '#000000' : '#F2F2F7');
+      document.getElementById('theme-color')?.setAttribute('content', theme === 'dark' ? '#000000' : '#F5F5F5');
       localStorage.setItem('cero_theme', theme);
     }
   }, [theme]);

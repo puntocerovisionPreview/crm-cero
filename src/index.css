@@ -4,56 +4,77 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
-   .CERO · ESTILO APPLE (Human Interface Guidelines)
-   - Tipografía del sistema: SF Pro en Mac/iPhone; Inter (su par más cercano)
-     en Windows y Android.
-   - Grises neutros de Apple, sin tinte azulado.
-   - Un solo acento con rol fijo: azul del sistema = acciones, enlaces y foco.
-   - La plata y los cobros siguen en ámbar/verde (colores semánticos).
+   .CERO · ESTILO RIMU (monocromo editorial)
+   - Manrope liviana para todo; Instrument Serif itálica solo para acentos
+     (<em> dentro de títulos o la clase .font-accent).
+   - Grises 100% neutros (escala neutral), sin tinte azul ni cálido.
+   - El acento es la tinta: casi negro en claro, casi blanco en oscuro.
+     El único color es semántico: verde = cobrado, rojo = vencido/gasto.
+   - Bordes finos en lugar de sombras; tarjetas de 16px, controles de 10px.
    Reescribir la escala zinc recolorea de una vez las ~5000 clases zinc-*;
-   sky/cyan (el cian del diseño anterior) pasan a azul y teal de Apple.
+   sky/cyan (el azul del diseño anterior) pasan a grises de la misma escala.
    ========================================================================== */
 @theme {
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
-  --font-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-serif: 'Instrument Serif', ui-serif, Georgia, serif;
 
-  --color-zinc-50: #F5F5F7;
-  --color-zinc-100: #E8E8ED;
-  --color-zinc-200: #D2D2D7;
-  --color-zinc-300: #C7C7CC;
-  --color-zinc-400: #AEAEB2;
-  --color-zinc-500: #8E8E93;
-  --color-zinc-600: #636366;
-  --color-zinc-700: #48484A;
-  --color-zinc-800: #3A3A3C;
-  --color-zinc-900: #1C1C1E;
-  --color-zinc-950: #0B0B0C;
+  --color-zinc-50: #FAFAFA;
+  --color-zinc-100: #F5F5F5;
+  --color-zinc-200: #E5E5E5;
+  --color-zinc-300: #D4D4D4;
+  --color-zinc-400: #A3A3A3;
+  --color-zinc-500: #808080;
+  --color-zinc-600: #666666;
+  --color-zinc-700: #3A3A3A;
+  --color-zinc-800: #262626;
+  --color-zinc-900: #141414;
+  --color-zinc-950: #0A0A0A;
 
-  /* Azul del sistema */
-  --color-sky-50: #EEF6FF;
-  --color-sky-100: #D9EBFF;
-  --color-sky-200: #B3D7FF;
-  --color-sky-300: #7DBBFF;
-  --color-sky-400: #409CFF;
-  --color-sky-500: #0A84FF;
-  --color-sky-600: #0071E3;
-  --color-sky-700: #0060C0;
-  --color-sky-800: #004C99;
-  --color-sky-900: #003A75;
-  --color-sky-950: #00264D;
+  /* El "azul de acción" ahora es la tinta del tema (oscura en claro,
+     clara en oscuro); los /10, /20… quedan como velos neutros */
+  --color-sky-50: #FAFAFA;
+  --color-sky-100: #F5F5F5;
+  --color-sky-200: #E5E5E5;
+  --color-sky-300: var(--accent);
+  --color-sky-400: var(--accent);
+  --color-sky-500: var(--accent);
+  --color-sky-600: var(--accent-strong);
+  --color-sky-700: #404040;
+  --color-sky-800: #262626;
+  --color-sky-900: #171717;
+  --color-sky-950: #0A0A0A;
 
-  /* Teal del sistema (antes cian brillante) */
-  --color-cyan-50: #EDFAFC;
-  --color-cyan-100: #D3F2F7;
-  --color-cyan-200: #A8E4EE;
-  --color-cyan-300: #6FD0E0;
-  --color-cyan-400: #40C8E0;
-  --color-cyan-500: #30B0C7;
-  --color-cyan-600: #1E95AB;
-  --color-cyan-700: #187A8C;
-  --color-cyan-800: #14606E;
-  --color-cyan-900: #104B56;
-  --color-cyan-950: #0A3139;
+  /* Cian igual que el azul */
+  --color-cyan-50: #FAFAFA;
+  --color-cyan-100: #F5F5F5;
+  --color-cyan-200: #E5E5E5;
+  --color-cyan-300: var(--accent);
+  --color-cyan-400: var(--accent);
+  --color-cyan-500: var(--accent);
+  --color-cyan-600: var(--accent-strong);
+  --color-cyan-700: #454545;
+  --color-cyan-800: #2E2E2E;
+  --color-cyan-900: #1C1C1C;
+  --color-cyan-950: #0F0F0F;
+
+  /* Manrope se ve pesada en negrita: cada peso baja un escalón */
+  --font-weight-semibold: 550;
+  --font-weight-bold: 600;
+  --font-weight-extrabold: 650;
+  --font-weight-black: 650;
+
+  /* Esquinas: controles a 10px, tarjetas a 16px, paneles grandes a 20px */
+  --radius-xl: 10px;
+  --radius-2xl: 16px;
+  --radius-3xl: 20px;
+
+  /* Tarjetas sin relieve: rimu separa con bordes finos, no con sombras.
+     shadow-lg / xl / 2xl (modales y menús) quedan como estaban. */
+  --shadow-xs: 0 0 #0000;
+  --shadow-sm: 0 0 #0000;
+  --shadow: 0 0 #0000;
+  --shadow-md: 0 0 #0000;
 }
 
 /* ==========================================================================
@@ -62,134 +83,134 @@
    ========================================================================== */
 
 :root {
-  /* Fondos: gris agrupado de iOS detrás, tarjetas blancas encima */
-  --bg-app: #F2F2F7;
+  /* Fondos: gris casi blanco detrás, tarjetas blancas encima */
+  --bg-app: #F5F5F5;
   --bg-surface: #FFFFFF;
-  --bg-surface-elevated: #F5F5F7;
-  --bg-surface-muted: #E9E9EE;
-  --border-subtle: #E5E5EA;
-  --border-divider: #EBEBF0;
-  --border-strong: #C7C7CC;
+  --bg-surface-elevated: #FAFAFA;
+  --bg-surface-muted: #EDEDED;
+  --border-subtle: #E5E5E5;
+  --border-divider: #EFEFEF;
+  --border-strong: #D4D4D4;
 
-  /* Texto (label / secondaryLabel / tertiaryLabel con contraste AA) */
-  --text-primary: #1D1D1F;
-  --text-secondary: #5C5C61;
-  --text-tertiary: #737378;
+  /* Texto (tinta / secundario / terciario con contraste AA) */
+  --text-primary: #171717;
+  --text-secondary: #525252;
+  --text-tertiary: #737373;
 
-  --solid-contrast-bg: #1D1D1F;
+  --solid-contrast-bg: #171717;
   --solid-contrast-text: #FFFFFF;
-  --solid-contrast-hover: #3A3A3C;
+  --solid-contrast-hover: #3A3A3A;
 
   /* Colores semánticos (versión legible sobre blanco) */
-  --semantic-green: #248A3D;
-  --semantic-green-subtle: rgba(52, 199, 89, 0.14);
-  --semantic-red: #D70015;
-  --semantic-red-subtle: rgba(255, 59, 48, 0.12);
-  --semantic-amber: #C93400;
-  --semantic-amber-subtle: rgba(255, 149, 0, 0.14);
-  --semantic-indigo: #5856D6;
-  --semantic-indigo-subtle: rgba(88, 86, 214, 0.12);
+  --semantic-green: #047857;
+  --semantic-green-subtle: rgba(16, 185, 129, 0.12);
+  --semantic-red: #B91C1C;
+  --semantic-red-subtle: rgba(239, 68, 68, 0.10);
+  --semantic-amber: #B45309;
+  --semantic-amber-subtle: rgba(245, 158, 11, 0.12);
+  --semantic-indigo: #4F46E5;
+  --semantic-indigo-subtle: rgba(99, 102, 241, 0.10);
 
-  /* Acento: azul del sistema */
-  --accent: #0071E3;
-  --accent-strong: #0060C0;
+  /* Acento: la tinta */
+  --accent: #171717;
+  --accent-strong: #000000;
   --on-accent: #FFFFFF;
 
-  /* Sombras suaves de tarjeta (en oscuro separa el color, no la sombra) */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 12px rgba(0, 0, 0, 0.04);
-  --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  /* Casi sin sombras: los bordes finos separan las superficies */
+  --shadow-card: none;
+  --shadow-float: 0 4px 12px rgba(23, 23, 23, 0.06), 0 24px 64px rgba(23, 23, 23, 0.10);
 
-  /* Geometría: esquinas generosas como en iOS */
-  --radius-card: 20px;
-  --radius-control: 12px;
+  /* Geometría: tarjetas de 16px, controles de 10px */
+  --radius-card: 16px;
+  --radius-control: 10px;
   --radius-pill: 9999px;
   --border-width: 1px;
 
-  /* Movimiento: curvas de iOS, sin rebotes exagerados */
-  --t-ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1);
+  /* Movimiento: salidas suaves y largas, sin rebotes */
+  --t-ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --t-ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
   --t-ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
   --t-ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
-  --t-ease-soft-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-ease-soft-spring: cubic-bezier(0.16, 1, 0.3, 1);
   --t-ease-bounce: cubic-bezier(0.34, 1.3, 0.64, 1);
   --t-dur-instant: 120ms;
-  --t-dur-fast: 200ms;
-  --t-dur-normal: 280ms;
-  --t-dur-smooth: 380ms;
-  --t-dur-slow: 480ms;
+  --t-dur-fast: 180ms;
+  --t-dur-normal: 320ms;
+  --t-dur-smooth: 420ms;
+  --t-dur-slow: 700ms;
 }
 
 .light {
-  /* Fondos: gris agrupado de iOS detrás, tarjetas blancas encima */
-  --bg-app: #F2F2F7;
+  /* Fondos: gris casi blanco detrás, tarjetas blancas encima */
+  --bg-app: #F5F5F5;
   --bg-surface: #FFFFFF;
-  --bg-surface-elevated: #F5F5F7;
-  --bg-surface-muted: #E9E9EE;
-  --border-subtle: #E5E5EA;
-  --border-divider: #EBEBF0;
-  --border-strong: #C7C7CC;
+  --bg-surface-elevated: #FAFAFA;
+  --bg-surface-muted: #EDEDED;
+  --border-subtle: #E5E5E5;
+  --border-divider: #EFEFEF;
+  --border-strong: #D4D4D4;
 
-  /* Texto (label / secondaryLabel / tertiaryLabel con contraste AA) */
-  --text-primary: #1D1D1F;
-  --text-secondary: #5C5C61;
-  --text-tertiary: #737378;
+  /* Texto (tinta / secundario / terciario con contraste AA) */
+  --text-primary: #171717;
+  --text-secondary: #525252;
+  --text-tertiary: #737373;
 
-  --solid-contrast-bg: #1D1D1F;
+  --solid-contrast-bg: #171717;
   --solid-contrast-text: #FFFFFF;
-  --solid-contrast-hover: #3A3A3C;
+  --solid-contrast-hover: #3A3A3A;
 
   /* Colores semánticos (versión legible sobre blanco) */
-  --semantic-green: #248A3D;
-  --semantic-green-subtle: rgba(52, 199, 89, 0.14);
-  --semantic-red: #D70015;
-  --semantic-red-subtle: rgba(255, 59, 48, 0.12);
-  --semantic-amber: #C93400;
-  --semantic-amber-subtle: rgba(255, 149, 0, 0.14);
-  --semantic-indigo: #5856D6;
-  --semantic-indigo-subtle: rgba(88, 86, 214, 0.12);
+  --semantic-green: #047857;
+  --semantic-green-subtle: rgba(16, 185, 129, 0.12);
+  --semantic-red: #B91C1C;
+  --semantic-red-subtle: rgba(239, 68, 68, 0.10);
+  --semantic-amber: #B45309;
+  --semantic-amber-subtle: rgba(245, 158, 11, 0.12);
+  --semantic-indigo: #4F46E5;
+  --semantic-indigo-subtle: rgba(99, 102, 241, 0.10);
 
-  /* Acento: azul del sistema */
-  --accent: #0071E3;
-  --accent-strong: #0060C0;
+  /* Acento: la tinta */
+  --accent: #171717;
+  --accent-strong: #000000;
   --on-accent: #FFFFFF;
 
-  /* Sombras suaves de tarjeta (en oscuro separa el color, no la sombra) */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 12px rgba(0, 0, 0, 0.04);
-  --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+  /* Casi sin sombras: los bordes finos separan las superficies */
+  --shadow-card: none;
+  --shadow-float: 0 4px 12px rgba(23, 23, 23, 0.06), 0 24px 64px rgba(23, 23, 23, 0.10);
 }
 
 .dark {
-  /* Fondos oscuros de iOS: negro de base, cada elevación un gris más claro */
+  /* Negro puro de base; cada elevación es apenas un gris más claro */
   --bg-app: #000000;
-  --bg-surface: #1C1C1E;
-  --bg-surface-elevated: #2C2C2E;
-  --bg-surface-muted: #3A3A3C;
-  --border-subtle: #2C2C2E;
-  --border-divider: #242426;
-  --border-strong: #48484A;
+  --bg-surface: #0F0F0F;
+  --bg-surface-elevated: #171717;
+  --bg-surface-muted: #222222;
+  --border-subtle: rgba(239, 239, 239, 0.08);
+  --border-divider: rgba(239, 239, 239, 0.06);
+  --border-strong: rgba(239, 239, 239, 0.16);
 
-  --text-primary: #F5F5F7;
-  --text-secondary: #AEAEB2;
-  --text-tertiary: #8E8E93;
+  --text-primary: #EFEFEF;
+  --text-secondary: #A3A3A3;
+  --text-tertiary: #808080;
 
-  --accent: #0A84FF;
-  --accent-strong: #409CFF;
-  --on-accent: #FFFFFF;
-  --solid-contrast-bg: #F5F5F7;
-  --solid-contrast-text: #1D1D1F;
+  --accent: #EFEFEF;
+  --accent-strong: #FFFFFF;
+  --on-accent: #0A0A0A;
+  --solid-contrast-bg: #EFEFEF;
+  --solid-contrast-text: #0A0A0A;
   --solid-contrast-hover: #FFFFFF;
 
-  --semantic-green: #30D158;
-  --semantic-green-subtle: rgba(48, 209, 88, 0.16);
-  --semantic-red: #FF453A;
-  --semantic-red-subtle: rgba(255, 69, 58, 0.16);
-  --semantic-amber: #FF9F0A;
-  --semantic-amber-subtle: rgba(255, 159, 10, 0.16);
-  --semantic-indigo: #5E5CE6;
-  --semantic-indigo-subtle: rgba(94, 92, 230, 0.18);
+  --semantic-green: #10B981;
+  --semantic-green-subtle: rgba(16, 185, 129, 0.14);
+  --semantic-red: #EF4444;
+  --semantic-red-subtle: rgba(239, 68, 68, 0.14);
+  --semantic-amber: #F59E0B;
+  --semantic-amber-subtle: rgba(245, 158, 11, 0.14);
+  --semantic-indigo: #818CF8;
+  --semantic-indigo-subtle: rgba(129, 140, 248, 0.14);
 
   --shadow-card: none;
-  --shadow-float: 0 10px 40px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.08);
+  --shadow-float: 0 8px 60px rgba(129, 140, 248, 0.06), 0 2px 20px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(239, 239, 239, 0.08);
 }
 
 /* ==========================================================================
@@ -299,7 +320,7 @@ html:not(.dark) .hover\:bg-zinc-800\/80:hover,
 
 html:not(.dark) .hover\:bg-zinc-700:hover,
 .light .hover\:bg-zinc-700:hover {
-  background-color: #D1D1D6 !important;
+  background-color: #E0E0E0 !important;
 }
 
 /* Subtle dark badges converted to clean light badges */
@@ -449,22 +470,22 @@ html:not(.dark) select,
 .light textarea,
 .light select {
   background-color: #FFFFFF !important;
-  color: #1D1D1F !important;
-  border-color: #E5E5EA !important;
+  color: #171717 !important;
+  border-color: #E5E5E5 !important;
 }
 
 html:not(.dark) input::placeholder,
 html:not(.dark) textarea::placeholder,
 .light input::placeholder,
 .light textarea::placeholder {
-  color: #737378 !important;
+  color: #737373 !important;
   opacity: 1 !important;
 }
 
 html:not(.dark) option,
 .light option {
   background-color: #FFFFFF !important;
-  color: #1D1D1F !important;
+  color: #171717 !important;
 }
 
 /* Modal Content & Floating Card Containers in Light Mode */
@@ -473,8 +494,8 @@ html:not(.dark) .fixed .bg-zinc-950,
 .light .fixed .bg-zinc-900,
 .light .fixed .bg-zinc-950 {
   background-color: #FFFFFF !important;
-  color: #1D1D1F !important;
-  border-color: #E5E5EA !important;
+  color: #171717 !important;
+  border-color: #E5E5E5 !important;
 }
 
 html:not(.dark) .fixed .bg-zinc-950\/60,
@@ -483,8 +504,8 @@ html:not(.dark) .fixed .bg-zinc-950\/80,
 .light .fixed .bg-zinc-950\/60,
 .light .fixed .bg-zinc-950\/70,
 .light .fixed .bg-zinc-950\/80 {
-  background-color: #F2F2F7 !important;
-  border-color: #E5E5EA !important;
+  background-color: #F5F5F5 !important;
+  border-color: #E5E5E5 !important;
 }
 
 /* Anti-Yellow on White: In light mode, amber/yellow text is deep bronze/amber-700 */
@@ -496,15 +517,15 @@ html:not(.dark) .text-yellow-300,
 .light .text-amber-300,
 .light .text-yellow-400,
 .light .text-yellow-300 {
-  color: #C93400 !important;
+  color: #B45309 !important;
 }
 
 html:not(.dark) .bg-amber-500\/10,
 html:not(.dark) .bg-amber-500\/20,
 .light .bg-amber-500\/10,
 .light .bg-amber-500\/20 {
-  background-color: rgba(201, 52, 0, 0.1) !important;
-  border-color: rgba(201, 52, 0, 0.25) !important;
+  background-color: rgba(180, 83, 9, 0.1) !important;
+  border-color: rgba(180, 83, 9, 0.25) !important;
 }
 
 /* Modals & Backdrops in Light Mode: Keep backdrop dark dimming with blur */
@@ -519,7 +540,7 @@ html, body {
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-optical-sizing: auto;
-  letter-spacing: -0.006em;
+  letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-overflow-scrolling: touch;
@@ -535,10 +556,10 @@ html, body {
   transition: background-color 150ms ease, color 150ms ease;
 }
 
-/* Títulos como SF Pro Display: peso firme y tracking apretado */
+/* Títulos livianos con tracking apretado, como en rimu */
 h1, h2, h3, .font-heading {
   font-family: var(--font-sans);
-  letter-spacing: -0.022em;
+  letter-spacing: -0.025em;
 }
 
 #root {
@@ -981,6 +1002,39 @@ h1, h2, h3 { text-wrap: balance; }
 /* Campo de búsqueda estilo iOS: relleno gris también en modo claro */
 html:not(.dark) input.ios-search:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]),
 .light input.ios-search:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]) {
-  background-color: rgba(118, 118, 128, 0.12) !important;
+  background-color: rgba(23, 23, 23, 0.06) !important;
   border-color: transparent !important;
+}
+
+
+
+/* ==========================================================================
+   CAPA RIMU · titulares finos, acento serif y texto sobre la tinta
+   ========================================================================== */
+
+/* Números grandes y títulos de pantalla: finos, como el titular de rimu */
+:is(.text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl):is(.font-bold, .font-semibold, .font-extrabold, .font-black) {
+  font-weight: 300;
+  letter-spacing: -0.035em;
+}
+
+/* Acento serif itálico: <h2>Hola, <em>Juan</em></h2> o class="font-accent" */
+:is(h1, h2, h3) em,
+.font-accent {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* En oscuro la tinta es clara: el texto blanco encima pasa a negro */
+.dark :is(.bg-sky-400, .bg-sky-500, .bg-sky-600, .bg-cyan-500, .bg-cyan-600),
+.dark :is(.bg-sky-400, .bg-sky-500, .bg-sky-600, .bg-cyan-500, .bg-cyan-600) .text-white {
+  color: var(--on-accent);
+}
+
+/* Selección de texto en tinta */
+::selection {
+  background: var(--text-primary);
+  color: var(--bg-app);
 }
