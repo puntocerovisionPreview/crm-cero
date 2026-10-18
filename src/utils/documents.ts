@@ -44,7 +44,18 @@ export interface StudioDocument {
   status: DocumentStatus;
   acceptedAt?: string;
   acceptedName?: string;
+  // Firma digital con Documenso (la escribe el servidor)
+  signature?: DocumentSignature;
   createdAt: string;
+}
+
+export interface DocumentSignature {
+  provider: 'documenso';
+  envelopeId: string;
+  status: 'pendiente' | 'firmado' | 'rechazado';
+  signingUrl?: string;
+  sentAt: string;
+  signedAt?: string;
 }
 
 export const PUBLIC_PREFIX = 'doc_';
@@ -97,6 +108,8 @@ export function publicCopy(d: StudioDocument) {
     status: d.status,
     acceptedAt: d.acceptedAt || null,
     acceptedName: d.acceptedName || null,
+    signatureStatus: d.signature?.status || null,
+    signingUrl: d.signature?.status === 'pendiente' ? d.signature.signingUrl || null : null,
   };
 }
 export type PublicDocument = ReturnType<typeof publicCopy>;
@@ -165,6 +178,24 @@ export async function acceptPublicDocument(token: string, name: string): Promise
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Error ${res.status}`);
+  }
+}
+
+/** Envía el presupuesto a firmar con Documenso: arma el PDF acá y el servidor crea el sobre */
+export async function sendForSignature(d: StudioDocument, authHeaders: Record<string, string>): Promise<void> {
+  const { renderDocumentPdf } = await import('../pdf/DocumentPdf');
+  const { blob, pages } = await renderDocumentPdf(publicCopy(d));
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  const res = await fetch('/api/documenso/enviar', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...authHeaders },
+    body: JSON.stringify({ docId: d.id, pdfBase64: btoa(binary), pages }),
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));

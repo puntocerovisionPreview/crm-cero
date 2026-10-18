@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Check, Copy, ExternalLink, Mail, MessageCircle, X } from 'lucide-react';
-import { StudioDocument, docTitle, documentUrl, shareMessage } from '../utils/documents';
+import { Check, Copy, ExternalLink, Loader2, Mail, MessageCircle, PenLine, X } from 'lucide-react';
+import { StudioDocument, docTitle, documentUrl, sendForSignature, shareMessage } from '../utils/documents';
 import { whatsappLink } from '../utils/coldClients';
 import { hapticFeedback } from '../utils/haptics';
+import { getAuthHeaders } from '../utils/authAccess';
+import { Sheet } from './Sheet';
 
 interface Props {
   doc: StudioDocument | null;
@@ -10,10 +12,26 @@ interface Props {
   onClose: () => void;
 }
 
-// Después de crear un presupuesto o recibo: mandarlo por WhatsApp, mail o copiar el link
+// Después de crear un presupuesto o recibo: mandarlo por WhatsApp, mail, a firmar o copiar el link
 export const DocumentShareSheet: React.FC<Props> = ({ doc, title, onClose }) => {
   const [copied, setCopied] = useState(false);
+  const [signing, setSigning] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [signError, setSignError] = useState<string | null>(null);
   if (!doc) return null;
+  const signStatus = signing === 'sent' ? 'pendiente' : doc.signature?.status;
+
+  const sendToSign = async () => {
+    setSigning('sending');
+    setSignError(null);
+    try {
+      await sendForSignature(doc, await getAuthHeaders());
+      setSigning('sent');
+      hapticFeedback.success();
+    } catch (err) {
+      setSigning('idle');
+      setSignError((err as Error).message);
+    }
+  };
   const url = documentUrl(doc.token);
   const msg = shareMessage(doc, url);
   const wa = whatsappLink(doc.phone);
@@ -35,14 +53,8 @@ export const DocumentShareSheet: React.FC<Props> = ({ doc, title, onClose }) => 
   const icon = (bg: string) => `w-8 h-8 rounded-[9px] flex items-center justify-center text-white shrink-0 ${bg}`;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-[2px]" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="share-title"
-        onClick={e => e.stopPropagation()}
-        className="w-full sm:max-w-sm bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-t-[22px] sm:rounded-[22px] shadow-[var(--shadow-float)] p-4 space-y-3 safe-area-pb t-sheet-enter"
-      >
+    <Sheet label={title || `${docTitle(doc)} listo`} onClose={onClose} className="w-full sm:max-w-sm bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[22px] shadow-[var(--shadow-float)]">
+      <div className="p-4 space-y-3">
         <div className="flex items-start justify-between gap-3 px-1">
           <div>
             <h3 id="share-title" className="text-[17px] font-semibold text-[var(--text-primary)]">{title || `${docTitle(doc)} listo`}</h3>
@@ -65,6 +77,36 @@ export const DocumentShareSheet: React.FC<Props> = ({ doc, title, onClose }) => 
               Mail
             </a>
           </li>
+          {doc.kind === 'presupuesto' && (
+            <li>
+              <button
+                type="button"
+                onClick={sendToSign}
+                disabled={signing === 'sending' || Boolean(signStatus)}
+                className={`${row} disabled:cursor-default disabled:hover:bg-transparent`}
+              >
+                <span className={icon('bg-[#171717] dark:bg-[#3A3A3A]')}>
+                  {signing === 'sending' ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : signStatus === 'firmado' ? <Check className="w-4 h-4" aria-hidden /> : <PenLine className="w-4 h-4" aria-hidden />}
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block">
+                    {signStatus === 'firmado'
+                      ? 'Firmado'
+                      : signStatus === 'rechazado'
+                        ? 'Rechazó la firma'
+                        : signStatus === 'pendiente'
+                          ? 'Enviado a firmar'
+                          : signing === 'sending'
+                            ? 'Enviando a firmar…'
+                            : 'Enviar a firmar (Documenso)'}
+                  </span>
+                  <span className={`block text-[12px] ${signError ? 'text-[var(--semantic-red)]' : 'text-[var(--text-tertiary)]'}`}>
+                    {signError || (signStatus === 'pendiente' ? `Le llegó un mail a ${doc.email}` : doc.email ? `Le llega un mail a ${doc.email}` : 'Falta el mail del cliente')}
+                  </span>
+                </span>
+              </button>
+            </li>
+          )}
           <li>
             <button type="button" onClick={copy} className={row}>
               <span className={icon('bg-[#8E8E93]')}>{copied ? <Check className="w-4 h-4" aria-hidden /> : <Copy className="w-4 h-4" aria-hidden />}</span>
@@ -79,6 +121,6 @@ export const DocumentShareSheet: React.FC<Props> = ({ doc, title, onClose }) => 
           </li>
         </ul>
       </div>
-    </div>
+    </Sheet>
   );
 };

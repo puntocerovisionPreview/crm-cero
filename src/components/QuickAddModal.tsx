@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ModalPortal } from './ModalPortal';
+import { Sheet } from './Sheet';
 import { 
   AgendaTask, 
   AgendaMeeting, 
@@ -638,20 +638,14 @@ export const QuickAddModal: React.FC<Props> = ({
   };
 
   return (
-    <ModalPortal>
-      <div 
-        className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150"
-        onMouseDown={(e) => {
-          if (e.target === e.currentTarget) {
-            hapticFeedback.light();
-            onClose();
-          }
-        }}
-      >
-        <div 
-          className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden t-modal-enter my-auto cursor-default"
-          onClick={(e) => e.stopPropagation()}
-        >
+    <Sheet
+      label="Carga rápida"
+      onClose={() => {
+        hapticFeedback.light();
+        onClose();
+      }}
+      className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden cursor-default"
+    >
         {/* Pinned Header - always visible regardless of scroll */}
         <div className="px-5 py-3.5 border-b border-zinc-800 flex items-center justify-between shrink-0 bg-zinc-900/95 backdrop-blur-xs z-10">
           <div className="flex items-center gap-2">
@@ -2032,8 +2026,6 @@ export const QuickAddModal: React.FC<Props> = ({
           </div>
         </form>
         </div>
-      </div>
-    </div>
-  </ModalPortal>
+  </Sheet>
 );
 };

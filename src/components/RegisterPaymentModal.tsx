@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ModalPortal } from './ModalPortal';
+import { Sheet } from './Sheet';
 import { Project, Payment, PaymentMethod, PersonalAccount, IncomeRecord } from '../types';
 import { calculateProjectBilling, formatCurrencyAmount } from '../utils/paymentPlans';
 import { getTodayString } from '../utils/storage';
@@ -166,12 +166,11 @@ export const RegisterPaymentModal: React.FC<Props> = ({
   };
 
   return (
-    <ModalPortal>
-      <div className="fixed inset-0 z-[9999] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
-        <div 
-          className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden t-modal-enter my-auto text-zinc-100"
-          onClick={(e) => e.stopPropagation()}
-        >
+    <Sheet
+      label={isEditing ? 'Editar pago' : 'Registrar pago'}
+      onClose={onClose}
+      className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden text-zinc-100"
+    >
           {/* Header */}
           <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-950/80">
           <div>
@@ -454,8 +453,6 @@ export const RegisterPaymentModal: React.FC<Props> = ({
             </button>
           </div>
         </form>
-        </div>
-      </div>
-    </ModalPortal>
+    </Sheet>
   );
 };

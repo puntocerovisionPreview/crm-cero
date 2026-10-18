@@ -17,6 +17,7 @@ import { runCalendarSync, isCalendarConfigured } from './calendarSync';
 import { countPushDevices, htmlToPush, PushPayload, registerPushRoutes, sendPushToAll } from './push';
 import { describeNewPayment, isMercadoPagoConfigured, registerMercadoPagoRoutes, syncRecentPayments } from './mercadopago';
 import { registerDocumentRoutes } from './documents';
+import { registerDocumensoRoutes } from './documenso';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 
 /**
@@ -325,6 +326,11 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
   });
   // Presupuestos: el cliente acepta desde el link
   registerDocumentRoutes(app, getAdminDb, async (title, body) => {
+    const db = getAdminDb();
+    if (db) await notifyAll(db, title, body, '/documentos', 'doc');
+  });
+  // Presupuestos: firma digital con Documenso
+  registerDocumensoRoutes(app, requireOwner, getAdminDb, async (title, body) => {
     const db = getAdminDb();
     if (db) await notifyAll(db, title, body, '/documentos', 'doc');
   });

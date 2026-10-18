@@ -13,6 +13,7 @@ export const DocumentPublicView: React.FC<{ token: string }> = ({ token }) => {
   const [name, setName] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     // Siempre en claro: es un documento para leer e imprimir
@@ -62,6 +63,26 @@ export const DocumentPublicView: React.FC<{ token: string }> = ({ token }) => {
       setError((err as Error).message);
     } finally {
       setSending(false);
+    }
+  };
+
+  // PDF con react-pdf: se carga solo al tocar el botón (la librería pesa)
+  const downloadPdf = async () => {
+    setDownloading(true);
+    try {
+      const { renderDocumentPdf, pdfFileName } = await import('../pdf/DocumentPdf');
+      const { blob } = await renderDocumentPdf(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = pdfFileName(doc);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+      console.warn('PDF:', err);
+      window.print();
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -165,7 +186,17 @@ export const DocumentPublicView: React.FC<{ token: string }> = ({ token }) => {
             </div>
           </section>
         )}
-        {isQuote && doc.status !== 'aceptado' && !expired && (
+        {/* Firma digital con Documenso: si está enviado a firmar, se firma ahí */}
+        {isQuote && doc.status !== 'aceptado' && !expired && doc.signingUrl && (
+          <section className="no-print rounded-[16px] border border-[#E5E5E5] p-4 space-y-3">
+            <p className="text-[17px] font-semibold">Firmá el presupuesto</p>
+            <p className="text-[14px] text-[#737373]">Se abre la firma digital (Documenso). Cuando firmes, nos llega el aviso para arrancar.</p>
+            <a href={doc.signingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 px-6 rounded-[12px] bg-[#171717] text-white text-[16px] font-semibold items-center">
+              Firmar
+            </a>
+          </section>
+        )}
+        {isQuote && doc.status !== 'aceptado' && !expired && !doc.signingUrl && (
           <form onSubmit={accept} className="no-print rounded-[16px] border border-[#E5E5EA] p-4 space-y-3">
             <p className="text-[17px] font-semibold">¿Avanzamos?</p>
             <p className="text-[14px] text-[#6E6E73]">Escribí tu nombre y tocá "Acepto". Te vamos a escribir para arrancar.</p>
@@ -177,9 +208,9 @@ export const DocumentPublicView: React.FC<{ token: string }> = ({ token }) => {
                 minLength={2}
                 placeholder="Tu nombre y apellido"
                 aria-label="Tu nombre y apellido"
-                className="flex-1 h-11 rounded-[12px] bg-[#F2F2F7] border-0 px-3 text-[16px] focus:outline-none focus:ring-2 focus:ring-[#0071E3]/40"
+                className="flex-1 h-11 rounded-[12px] bg-[#F2F2F7] border-0 px-3 text-[16px] focus:outline-none focus:ring-2 focus:ring-[#171717]/30"
               />
-              <button type="submit" disabled={sending || name.trim().length < 2} className="h-11 px-6 rounded-[12px] bg-[#0071E3] text-white text-[16px] font-semibold disabled:opacity-50">
+              <button type="submit" disabled={sending || name.trim().length < 2} className="h-11 px-6 rounded-[12px] bg-[#171717] text-white text-[16px] font-semibold disabled:opacity-50">
                 {sending ? 'Enviando…' : 'Acepto'}
               </button>
             </div>
@@ -188,9 +219,9 @@ export const DocumentPublicView: React.FC<{ token: string }> = ({ token }) => {
         )}
 
         <div className="no-print flex justify-center">
-          <button type="button" onClick={() => window.print()} className="h-10 px-4 rounded-full bg-[#F2F2F7] text-[15px] font-medium flex items-center gap-2">
-            <Download className="w-4 h-4" aria-hidden />
-            Descargar PDF
+          <button type="button" onClick={downloadPdf} disabled={downloading} className="h-10 px-4 rounded-full bg-[#F2F2F7] text-[15px] font-medium flex items-center gap-2 disabled:opacity-60">
+            {downloading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Download className="w-4 h-4" aria-hidden />}
+            {downloading ? 'Armando PDF…' : 'Descargar PDF'}
           </button>
         </div>
       </article>

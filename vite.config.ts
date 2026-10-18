@@ -164,6 +164,8 @@ export default defineConfig(() => {
           // Recibe las notificaciones push y abre la pantalla al tocarlas
           importScripts: ['push-sw.js'],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          // El generador de PDF (react-pdf, ~1,2 MB) se baja solo cuando hace falta
+          globIgnores: ['**/DocumentPdf-*.js'],
           maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         },
         devOptions: {
