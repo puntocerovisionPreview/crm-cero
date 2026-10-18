@@ -189,6 +189,7 @@ function RouteLoading() {
 
 const KnowledgeGraphView = React.lazy(() => import('./views/KnowledgeGraphView'));
 const HomeView = React.lazy(() => import('./views/HomeView'));
+const PipelineView = React.lazy(() => import('./views/PipelineView'));
 // Pantallas que se descargan recién cuando las abrís (antes todo venía en un archivo de 3 MB).
 // Hoy/Agenda se carga de entrada porque es la primera pantalla.
 const CalendarView = React.lazy(() => import('./views/CalendarView').then((m) => ({ default: m.CalendarView })));
@@ -3047,6 +3048,15 @@ export default function App() {
       };
     }
 
+    if (path === '/oportunidades') {
+      return {
+        title: 'Oportunidades',
+        subtitle: 'Embudo de ventas',
+        breadcrumbs: [{ label: 'Oportunidades' }],
+        showBackButton: false,
+      };
+    }
+
     if (path === '/inicio') {
       return {
         title: 'Inicio',
@@ -3431,6 +3441,19 @@ export default function App() {
 
     if (path === '/prospeccion') {
       return <ProspectingView projects={projects} onAddProject={handleAddProject} />;
+    }
+
+    if (path === '/oportunidades') {
+      return (
+        <PipelineView
+          projects={projects}
+          privacyMode={privacyMode}
+          onAddProject={handleAddProject}
+          onUpdateProject={handleUpdateProject}
+          onNavigate={navigate}
+          showToast={showToast}
+        />
+      );
     }
 
     if (path === '/clientes') {

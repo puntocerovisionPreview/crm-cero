@@ -90,6 +90,9 @@ import { CuotaDetailView } from './CuotaDetailView';
 import { AgreementEditorView } from './AgreementEditorView';
 import { resolveProjectAgreement } from '../utils/paymentPlans';
 import { DEFAULT_USD_RATE } from '../utils/currency';
+import { ClientTimeline } from '../components/ClientTimeline';
+import { OnboardingTemplateCard } from '../components/OnboardingTemplateCard';
+import { History } from 'lucide-react';
 
 interface Props {
   project: Project;
@@ -210,7 +213,7 @@ export const ClientDetailView: React.FC<Props> = ({
   }, [notes, tasks, project, meetings, incomes, catalog]);
 
   // 5 Unified Tabs per Stage 3 spec: Resumen · Cobros · Trabajo · Notas · Horas
-  type ClientTab = 'resumen' | 'cobros' | 'trabajo' | 'notas' | 'horas';
+  type ClientTab = 'resumen' | 'historial' | 'cobros' | 'trabajo' | 'notas' | 'horas';
   const [activeTab, setActiveTab] = useState<ClientTab>('resumen');
 
   // Collapsible sections inside Trabajo
@@ -895,6 +898,7 @@ export const ClientDetailView: React.FC<Props> = ({
             <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
               {[
                 { id: 'resumen' as ClientTab, label: 'Resumen', icon: Sparkles },
+                { id: 'historial' as ClientTab, label: 'Historial', icon: History },
                 { id: 'cobros' as ClientTab, label: 'Cobros', icon: DollarSign },
                 { id: 'trabajo' as ClientTab, label: `Trabajo (${clientTasks.length + clientMeetings.length})`, icon: CheckCircle2 },
                 { id: 'notas' as ClientTab, label: 'Notas & Links', icon: FileText },
@@ -927,6 +931,11 @@ export const ClientDetailView: React.FC<Props> = ({
           {/* TAB CONTENTS (FADE-IN NO RELOAD) */}
           <div className="space-y-4">
             {/* 1. RESUMEN: 5-Second Executive Dashboard */}
+            {/* Cliente nuevo sin tareas: tareas de arranque con un toque */}
+            {activeTab === 'resumen' && !project.isLead && !project.onboardingApplied && clientTasks.length === 0 && (
+              <OnboardingTemplateCard project={project} onAddTask={onAddTask} onUpdateProject={onUpdateProject} />
+            )}
+
             {activeTab === 'resumen' && (
               <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-5 animate-in fade-in duration-150">
                 <div className="flex items-start justify-between gap-3">
@@ -1606,6 +1615,11 @@ export const ClientDetailView: React.FC<Props> = ({
                   )}
                 </div>
               </div>
+            )}
+
+            {/* HISTORIAL: todo lo que pasó con el cliente */}
+            {activeTab === 'historial' && (
+              <ClientTimeline project={project} tasks={tasks} meetings={meetings} privacyMode={privacyMode} onUpdateProject={onUpdateProject} />
             )}
 
             {/* 4. NOTAS & LINKS */}

@@ -61,6 +61,7 @@ import { playTaskDone } from '../utils/sound';
 import { addDays, parseLocalDate, todayLocal } from '../utils/dates';
 import { saveMeetingToFirestore } from '../utils/firestoreService';
 import { callMeetingFor } from '../prospecting/core';
+import { prospectToProject } from '../prospecting/convert';
 
 type Tab = 'hoy' | 'prospectos' | 'reserva' | 'cargar' | 'metricas' | 'mensajes';
 
@@ -721,25 +722,7 @@ const ProspectList: React.FC<{
 
   const convert = async (p: Prospect) => {
     if (!onAddProject) return;
-    onAddProject({
-      clientName: p.studio || p.name,
-      ownerName: p.name,
-      status: 'En curso',
-      notes: [
-        `Vino de prospección (${p.source || 'en frío'}).`,
-        p.audit ? `Auto auditoría: ${p.audit.total}/30, nivel ${p.audit.nivel}. Dolor: ${p.audit.dolorCaptacion || '—'}.` : '',
-        p.notes || '',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-      archived: false,
-      clientPhone: p.whatsapp,
-      instagramUrl: p.instagram ? `https://instagram.com/${normalizeInstagram(p.instagram)}` : undefined,
-      projectType: 'paf_pro',
-      serviceType: 'paf',
-      rubro: p.audit?.dedicacion,
-      lastContactDate: today,
-    } as any);
+    onAddProject(prospectToProject(p, today));
     await onAct(p, 'won');
   };
 

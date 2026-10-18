@@ -32,6 +32,7 @@ export type RouteName =
   | 'inicio'
   | 'hoy'
   | 'prospeccion'
+  | 'oportunidades'
   | 'agenda'
   | 'agenda-task'
   | 'calendario'
@@ -178,6 +179,10 @@ export function parseRoute(rawPathname: string, searchStr: string = ''): RouteMa
   if (path.startsWith('/proyectos/') || path.startsWith('/proyecto/') || path.startsWith('/fichas/') || path.startsWith('/ficha/')) {
     const id = path.replace(/^(\/proyectos\/|\/proyecto\/|\/fichas\/|\/ficha\/)/, '');
     return { name: 'cliente-detalle', path: `/clientes/${id}`, params: { id }, query };
+  }
+
+  if (path === '/oportunidades' || path === '/pipeline') {
+    return { name: 'oportunidades', path: '/oportunidades', params: {}, query };
   }
 
   if (path === '/prospeccion' || path === '/prospectos') {

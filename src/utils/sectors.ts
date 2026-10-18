@@ -3,6 +3,7 @@ import {
   Calendar,
   CalendarDays,
   Compass,
+  KanbanSquare,
   DollarSign,
   Send,
   Server,
@@ -64,11 +65,14 @@ export const SECTORS: Sector[] = [
   {
     key: 'prospeccion',
     label: 'Prospección',
-    description: 'Contactos en frío, seguimientos y auditorías',
+    description: 'Contactos en frío, seguimientos y oportunidades',
     icon: Send,
     tint: '#34C759',
     featured: true,
-    items: [{ label: 'Prospección', path: '/prospeccion', icon: Send, match: starts('/prospeccion', '/prospectos') }],
+    items: [
+      { label: 'Prospección', path: '/prospeccion', icon: Send, match: starts('/prospeccion', '/prospectos') },
+      { label: 'Oportunidades', path: '/oportunidades', icon: KanbanSquare, match: starts('/oportunidades', '/pipeline') },
+    ],
   },
   {
     key: 'clientes',

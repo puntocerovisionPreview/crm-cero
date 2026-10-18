@@ -1889,6 +1889,14 @@ export const AgendaView: React.FC<Props> = ({
           setCheckoutMeeting(null);
           onOpenQuickAdd('ingreso', today);
         }}
+        onSaveNotes={(m, notes) => {
+          // Lo que se habló queda en la reunión (y así en el historial del cliente)
+          onUpdateMeeting?.(m.id, { notes });
+          const project = m.projectId ? projects.find(p => p.id === m.projectId) : undefined;
+          if (project && (!project.lastContactDate || project.lastContactDate < m.date)) {
+            onUpdateProject?.(project.id, { lastContactDate: m.date });
+          }
+        }}
       />
 
       {/* CIERRE SEMANAL ESTRATÉGICO & METRICS */}

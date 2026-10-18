@@ -323,6 +323,14 @@ export interface Client {
   updatedAt?: string;
 }
 
+// Contacto registrado a mano en el historial del cliente
+export interface ContactLogEntry {
+  id: string;
+  date: string; // YYYY-MM-DD
+  type: 'whatsapp' | 'llamada' | 'email' | 'reunion' | 'nota';
+  text?: string;
+}
+
 export interface Project {
   id: string;
   clientId?: string; // Cliente al que pertenece (se vincula solo por nombre)
@@ -334,6 +342,8 @@ export interface Project {
   createdAt: string;
   updatedAt: string;
   lastContactDate?: string; // Fecha del último contacto / mensaje registrado (YYYY-MM-DD)
+  contactLog?: ContactLogEntry[]; // Historial de contactos (WhatsApp, llamadas, mails…)
+  onboardingApplied?: boolean; // ya se usó (o se descartó) la plantilla de arranque
   clientPhone?: string; // WhatsApp comercial
   instagramUrl?: string; // Perfil de Instagram institucional
   googleMapsUrl?: string; // Ficha de Google Business Profile (Maps)
@@ -1031,6 +1041,8 @@ export interface Prospect {
   secondChance?: boolean; // volvió de descartados a los 90 días
   recycleAfter?: string; // desde cuándo puede volver a la lista (descartado sin respuesta)
   doNotContact?: boolean; // pidió que no lo contacten más
+  dealValue?: number; // cuánto vale la oportunidad (tablero de oportunidades)
+  dealCurrency?: 'ARS' | 'USD';
 }
 
 // Pasos del guion: pregunta → (su respuesta) → empatía → (acuerdo) → speech + link de auditoría
