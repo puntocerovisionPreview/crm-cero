@@ -173,6 +173,7 @@ import { useRouter } from './utils/router';
 import { useUsdRates, resolveUsdRate } from './utils/currency';
 import { planClientLinks } from './utils/clients';
 import { MercadoPagoInbox } from './components/MercadoPagoInbox';
+import { CollectionsCard } from './components/CollectionsCard';
 import { MercadoPagoReconcileModal } from './components/MercadoPagoReconcileModal';
 import { MercadoPagoPaymentAlert } from './components/MercadoPagoPaymentAlert';
 import { nextOccurrence } from './utils/recurrence';
@@ -3914,6 +3915,20 @@ export default function App() {
     if (path === '/dinero') {
       const mode = currentRoute.query?.modo === 'personal' ? 'personal' : 'estudio';
       return (
+        <>
+        {/* Cobranza de la semana (antes en el Inicio): lo que vence en 7 días, con el WhatsApp armado */}
+        {mode === 'estudio' && (
+          <div className="mb-4">
+            <CollectionsCard
+              projects={projects}
+              incomes={incomes}
+              today={getTodayString()}
+              settings={studioPaymentSettings}
+              privacyMode={privacyMode}
+              onRegisterPayment={(id) => navigate(`/clientes/${id}/cobro/nuevo`)}
+            />
+          </div>
+        )}
         <DineroUnifiedView
           initialMode={mode}
           incomes={incomes}
@@ -3974,6 +3989,7 @@ export default function App() {
             });
           }}
         />
+        </>
       );
     }
 

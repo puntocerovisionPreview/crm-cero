@@ -310,6 +310,26 @@ export function registerMercadoPagoRoutes(
     }
   });
 
+  // Saldo actual de la cuenta (para la tarjeta de Dinero del Inicio).
+  // Mercado Pago no lo documenta para todas las cuentas: si responde error, la app muestra "—".
+  app.get('/api/mercadopago/balance', requireOwner, async (_req, res) => {
+    if (!isMercadoPagoConfigured()) return res.status(400).json({ error: 'Falta MP_ACCESS_TOKEN en los Secrets' });
+    try {
+      const me = await getMyAccount();
+      if (!me) return res.status(502).json({ error: 'No se pudo leer tu cuenta de Mercado Pago' });
+      const b = await mp(`/users/${encodeURIComponent(me.id)}/mercadopago_account/balance`);
+      res.json({
+        available: Number(b.available_balance) || 0,
+        total: Number(b.total_amount) || 0,
+        unavailable: Number(b.unavailable_balance) || 0,
+        currency: b.currency_id === 'USD' ? 'USD' : 'ARS',
+        at: new Date().toISOString(),
+      });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
   app.get('/api/mercadopago/status', requireOwner, (_req, res) => {
     res.json({ configured: isMercadoPagoConfigured(), webhookSigned: Boolean(process.env.MP_WEBHOOK_SECRET) });
   });

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart3, ChevronRight, Moon } from 'lucide-react';
 import { AgendaMeeting, AgendaTask, IncomeRecord, Project, SecondBrainNote, StudioPaymentSettings } from '../types';
 import { Top3Card } from '../components/Top3Card';
-import { CollectionsCard } from '../components/CollectionsCard';
+import { HomeMoneyCard } from '../components/HomeMoneyCard';
 import { DayCloseModal } from '../components/DayCloseModal';
 import { JournalEntry, subscribeJournal } from '../utils/journal';
 import { SECTORS, Sector, SectorKey } from '../utils/sectors';
@@ -265,15 +265,8 @@ export const HomeView: React.FC<Props> = ({
         ))}
       </section>
 
-      {/* Cobranza de la semana */}
-      <CollectionsCard
-        projects={projects}
-        incomes={incomes}
-        today={today}
-        settings={studioSettings}
-        privacyMode={privacyMode}
-        onRegisterPayment={id => go(`/clientes/${id}/cobro/nuevo`)}
-      />
+      {/* Dinero: saldo de Mercado Pago, último cobro y cobrado por mes */}
+      <HomeMoneyCard projects={projects} incomes={incomes} today={today} privacyMode={privacyMode} onOpen={() => go('/dinero')} />
 
       {/* Clientes que se enfrían */}
       <ColdClientsCard
