@@ -345,6 +345,7 @@ export interface Project {
   contactLog?: ContactLogEntry[]; // Historial de contactos (WhatsApp, llamadas, mails…)
   onboardingApplied?: boolean; // ya se usó (o se descartó) la plantilla de arranque
   clientPhone?: string; // WhatsApp comercial
+  clientEmail?: string; // Mail del cliente (presupuestos y firma digital)
   instagramUrl?: string; // Perfil de Instagram institucional
   googleMapsUrl?: string; // Ficha de Google Business Profile (Maps)
   websiteUrl?: string; // Sitio web oficial o URL de staging / desarrollo

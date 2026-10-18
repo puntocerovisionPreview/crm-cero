@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Check, Copy, ExternalLink, Loader2, Mail, MessageCircle, PenLine, X } from 'lucide-react';
-import { StudioDocument, docTitle, documentUrl, sendForSignature, shareMessage } from '../utils/documents';
+import { StudioDocument, docTitle, documentUrl, saveDocument, sendForSignature, shareMessage } from '../utils/documents';
 import { whatsappLink } from '../utils/coldClients';
 import { hapticFeedback } from '../utils/haptics';
 import { getAuthHeaders } from '../utils/authAccess';
@@ -17,14 +17,26 @@ export const DocumentShareSheet: React.FC<Props> = ({ doc, title, onClose }) => 
   const [copied, setCopied] = useState(false);
   const [signing, setSigning] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [signError, setSignError] = useState<string | null>(null);
+  // Mail cargado acá (presupuestos creados sin mail)
+  const [email, setEmail] = useState('');
+  const [askEmail, setAskEmail] = useState(false);
   if (!doc) return null;
   const signStatus = signing === 'sent' ? 'pendiente' : doc.signature?.status;
+  const signEmail = doc.email || email.trim();
 
   const sendToSign = async () => {
+    if (!signEmail) {
+      setAskEmail(true);
+      return;
+    }
     setSigning('sending');
     setSignError(null);
     try {
-      await sendForSignature(doc, await getAuthHeaders());
+      const target = doc.email ? doc : { ...doc, email: signEmail };
+      // El servidor lee el mail del presupuesto guardado: primero se guarda
+      if (!doc.email) await saveDocument(target);
+      await sendForSignature(target, await getAuthHeaders());
+      setAskEmail(false);
       setSigning('sent');
       hapticFeedback.success();
     } catch (err) {
@@ -101,10 +113,33 @@ export const DocumentShareSheet: React.FC<Props> = ({ doc, title, onClose }) => 
                             : 'Enviar a firmar (Documenso)'}
                   </span>
                   <span className={`block text-[12px] ${signError ? 'text-[var(--semantic-red)]' : 'text-[var(--text-tertiary)]'}`}>
-                    {signError || (signStatus === 'pendiente' ? `Le llegó un mail a ${doc.email}` : doc.email ? `Le llega un mail a ${doc.email}` : 'Falta el mail del cliente')}
+                    {signError || (signStatus === 'pendiente' ? `Le llegó un mail a ${signEmail}` : signEmail ? `Le llega un mail a ${signEmail}` : 'Tocá para cargar el mail del cliente')}
                   </span>
                 </span>
               </button>
+              {askEmail && !signStatus && (
+                <form
+                  className="px-4 pb-3 flex gap-2"
+                  onSubmit={e => {
+                    e.preventDefault();
+                    sendToSign();
+                  }}
+                >
+                  <input
+                    type="email"
+                    required
+                    autoFocus
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="mail@cliente.com"
+                    aria-label="Mail del cliente"
+                    className="flex-1 min-w-0 h-10 px-3 rounded-[10px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[16px] text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-strong)]"
+                  />
+                  <button type="submit" disabled={signing === 'sending'} className="h-10 px-4 rounded-[10px] btn-solid-primary text-[14px] disabled:opacity-60">
+                    Enviar
+                  </button>
+                </form>
+              )}
             </li>
           )}
           <li>

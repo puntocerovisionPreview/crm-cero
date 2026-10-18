@@ -28,6 +28,7 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
   const [projectId, setProjectId] = useState('');
   const [clientName, setClientName] = useState('');
   const [contactName, setContactName] = useState('');
+  const [email, setEmail] = useState('');
   const [items, setItems] = useState<DocItem[]>([{ description: '', quantity: 1, unitPrice: 0 }]);
   const [currency, setCurrency] = useState<'ARS' | 'USD'>('USD');
   const [validDays, setValidDays] = useState(15);
@@ -44,6 +45,7 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
     setProjectId(prefill?.projectId || '');
     setClientName(prefill?.clientName || '');
     setContactName(prefill?.contactName || '');
+    setEmail(prefill?.email || projects.find(p => p.id === prefill?.projectId)?.clientEmail || '');
     setItems(prefill?.items?.length ? prefill.items : [{ description: '', quantity: 1, unitPrice: 0 }]);
     setCurrency(prefill?.currency || 'USD');
     setNotes(prefill?.notes ?? (k === 'presupuesto' ? DEFAULT_NOTES : ''));
@@ -64,6 +66,7 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
     if (p) {
       setClientName(p.clientName);
       setContactName(p.ownerName || '');
+      if (p.clientEmail) setEmail(p.clientEmail);
       if (p.estimatedCurrency) setCurrency(p.estimatedCurrency);
     }
   };
@@ -86,7 +89,7 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
       clientName: clientName.trim(),
       contactName: contactName.trim() || undefined,
       phone: prefill?.phone || project?.clientPhone,
-      email: prefill?.email,
+      email: email.trim() || undefined,
       items: clean.map(i => ({ description: i.description.trim(), quantity: Number(i.quantity) || 1, unitPrice: Number(i.unitPrice) || 0 })),
       currency,
       issueDate: today,
@@ -159,6 +162,7 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <input value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Estudio o empresa" aria-label="Nombre del cliente" className={field} />
             <input value={contactName} onChange={e => setContactName(e.target.value)} placeholder="Persona de contacto" aria-label="Persona de contacto" className={field} />
+            <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Mail del cliente (para firmar)" aria-label="Mail del cliente" autoComplete="off" className={`${field} sm:col-span-2`} />
           </div>
         </div>
 
