@@ -4,30 +4,56 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* ==========================================================================
-   .CERO · "PLANO NOCTURNO"
-   Base pizarra azulada (papel de plano de noche) en vez de negro neutro.
-   Dos acentos con rol fijo:
-     - Cian plano  (--accent)  → acciones, navegación, foco
-     - Luz de obra (amber)     → plata, cobros y PAF
-   Tipografía única: Archivo; los títulos usan su eje de ancho expandido,
-   como la rotulación de un plano.
-   Reescribir la escala zinc recolorea de una vez las ~5000 clases zinc-*.
+   .CERO · ESTILO APPLE (Human Interface Guidelines)
+   - Tipografía del sistema: SF Pro en Mac/iPhone; Inter (su par más cercano)
+     en Windows y Android.
+   - Grises neutros de Apple, sin tinte azulado.
+   - Un solo acento con rol fijo: azul del sistema = acciones, enlaces y foco.
+   - La plata y los cobros siguen en ámbar/verde (colores semánticos).
+   Reescribir la escala zinc recolorea de una vez las ~5000 clases zinc-*;
+   sky/cyan (el cian del diseño anterior) pasan a azul y teal de Apple.
    ========================================================================== */
 @theme {
-  --font-sans: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'Archivo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Inter', 'Segoe UI Variable Text', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, sans-serif;
 
-  --color-zinc-50: #F2F5F8;
-  --color-zinc-100: #E6EBF0;
-  --color-zinc-200: #CDD5DE;
-  --color-zinc-300: #B0BBC8;
-  --color-zinc-400: #97A3B3;
-  --color-zinc-500: #7A8798;
-  --color-zinc-600: #586476;
-  --color-zinc-700: #3B4657;
-  --color-zinc-800: #293443;
-  --color-zinc-900: #1A222D;
-  --color-zinc-950: #121821;
+  --color-zinc-50: #F5F5F7;
+  --color-zinc-100: #E8E8ED;
+  --color-zinc-200: #D2D2D7;
+  --color-zinc-300: #C7C7CC;
+  --color-zinc-400: #AEAEB2;
+  --color-zinc-500: #8E8E93;
+  --color-zinc-600: #636366;
+  --color-zinc-700: #48484A;
+  --color-zinc-800: #3A3A3C;
+  --color-zinc-900: #1C1C1E;
+  --color-zinc-950: #0B0B0C;
+
+  /* Azul del sistema */
+  --color-sky-50: #EEF6FF;
+  --color-sky-100: #D9EBFF;
+  --color-sky-200: #B3D7FF;
+  --color-sky-300: #7DBBFF;
+  --color-sky-400: #409CFF;
+  --color-sky-500: #0A84FF;
+  --color-sky-600: #0071E3;
+  --color-sky-700: #0060C0;
+  --color-sky-800: #004C99;
+  --color-sky-900: #003A75;
+  --color-sky-950: #00264D;
+
+  /* Teal del sistema (antes cian brillante) */
+  --color-cyan-50: #EDFAFC;
+  --color-cyan-100: #D3F2F7;
+  --color-cyan-200: #A8E4EE;
+  --color-cyan-300: #6FD0E0;
+  --color-cyan-400: #40C8E0;
+  --color-cyan-500: #30B0C7;
+  --color-cyan-600: #1E95AB;
+  --color-cyan-700: #187A8C;
+  --color-cyan-800: #14606E;
+  --color-cyan-900: #104B56;
+  --color-cyan-950: #0A3139;
 }
 
 /* ==========================================================================
@@ -36,54 +62,56 @@
    ========================================================================== */
 
 :root {
-  /* Surface & Canvas (Light Theme Tokens by Default) */
-  --bg-app: #F8F9FA;
+  /* Fondos: gris agrupado de iOS detrás, tarjetas blancas encima */
+  --bg-app: #F2F2F7;
   --bg-surface: #FFFFFF;
-  --bg-surface-elevated: #F4F4F5;
-  --bg-surface-muted: #E4E4E7;
-  --border-subtle: #E2E8F0;
-  --border-divider: #E5E7EB;
+  --bg-surface-elevated: #F5F5F7;
+  --bg-surface-muted: #E9E9EE;
+  --border-subtle: #E5E5EA;
+  --border-divider: #EBEBF0;
+  --border-strong: #C7C7CC;
 
-  /* Typography (High Contrast Charcoal/Black - Clean Swiss) */
-  --text-primary: #09090B;
-  --text-secondary: #475569;
-  --text-tertiary: #64748B;
+  /* Texto (label / secondaryLabel / tertiaryLabel con contraste AA) */
+  --text-primary: #1D1D1F;
+  --text-secondary: #5C5C61;
+  --text-tertiary: #737378;
 
-  /* Solid Accent / Actions */
-  --solid-contrast-bg: #09090B;
+  --solid-contrast-bg: #1D1D1F;
   --solid-contrast-text: #FFFFFF;
-  --solid-contrast-hover: #18181B;
+  --solid-contrast-hover: #3A3A3C;
 
-  /* Semantic Colors (High contrast on white - NO bright yellow on white) */
-  --semantic-green: #15803D;
-  --semantic-green-subtle: rgba(21, 128, 61, 0.12);
-  --semantic-red: #B91C1C;
-  --semantic-red-subtle: rgba(185, 28, 28, 0.12);
-  --semantic-amber: #B45309; /* Deep bronze/amber-800 - crisp and readable on white */
-  --semantic-amber-subtle: rgba(180, 83, 9, 0.12);
-  --semantic-indigo: #4338CA;
-  --semantic-indigo-subtle: rgba(67, 56, 202, 0.12);
+  /* Colores semánticos (versión legible sobre blanco) */
+  --semantic-green: #248A3D;
+  --semantic-green-subtle: rgba(52, 199, 89, 0.14);
+  --semantic-red: #D70015;
+  --semantic-red-subtle: rgba(255, 59, 48, 0.12);
+  --semantic-amber: #C93400;
+  --semantic-amber-subtle: rgba(255, 149, 0, 0.14);
+  --semantic-indigo: #5856D6;
+  --semantic-indigo-subtle: rgba(88, 86, 214, 0.12);
 
-  /* Acento de acción (cian plano) */
-  --accent: #0E7FAD;
-  --accent-strong: #0B6A91;
+  /* Acento: azul del sistema */
+  --accent: #0071E3;
+  --accent-strong: #0060C0;
   --on-accent: #FFFFFF;
 
-  /* Geometry & Radii: jerarquía, no un radio único */
-  --radius-card: 16px;
-  --radius-control: 10px;
+  /* Sombras suaves de tarjeta (en oscuro separa el color, no la sombra) */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 12px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
+
+  /* Geometría: esquinas generosas como en iOS */
+  --radius-card: 20px;
+  --radius-control: 12px;
   --radius-pill: 9999px;
   --border-width: 1px;
 
-  /* ==========================================================================
-     TRANSITIONS.DEV DESIGN TOKENS (Jakub Antalik)
-     ========================================================================== */
-  --t-ease-standard: cubic-bezier(0.2, 0, 0, 1);
-  --t-ease-decelerate: cubic-bezier(0, 0, 0, 1);
-  --t-ease-accelerate: cubic-bezier(0.3, 0, 1, 1);
-  --t-ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  --t-ease-soft-spring: cubic-bezier(0.16, 1, 0.3, 1);
-  --t-ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Movimiento: curvas de iOS, sin rebotes exagerados */
+  --t-ease-standard: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --t-ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --t-ease-accelerate: cubic-bezier(0.4, 0, 1, 1);
+  --t-ease-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-ease-soft-spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --t-ease-bounce: cubic-bezier(0.34, 1.3, 0.64, 1);
   --t-dur-instant: 120ms;
   --t-dur-fast: 200ms;
   --t-dur-normal: 280ms;
@@ -92,66 +120,76 @@
 }
 
 .light {
-  /* Explicit Light Mode Support */
-  --accent: #0E7FAD;
-  --accent-strong: #0B6A91;
-  --on-accent: #FFFFFF;
-  --bg-app: #F3F6F8;
+  /* Fondos: gris agrupado de iOS detrás, tarjetas blancas encima */
+  --bg-app: #F2F2F7;
   --bg-surface: #FFFFFF;
-  --bg-surface-elevated: #F4F4F5;
-  --bg-surface-muted: #E4E4E7;
-  --border-subtle: #E2E8F0;
-  --border-divider: #E5E7EB;
+  --bg-surface-elevated: #F5F5F7;
+  --bg-surface-muted: #E9E9EE;
+  --border-subtle: #E5E5EA;
+  --border-divider: #EBEBF0;
+  --border-strong: #C7C7CC;
 
-  --text-primary: #09090B;
-  --text-secondary: #475569;
-  --text-tertiary: #64748B;
+  /* Texto (label / secondaryLabel / tertiaryLabel con contraste AA) */
+  --text-primary: #1D1D1F;
+  --text-secondary: #5C5C61;
+  --text-tertiary: #737378;
 
-  --solid-contrast-bg: #09090B;
+  --solid-contrast-bg: #1D1D1F;
   --solid-contrast-text: #FFFFFF;
-  --solid-contrast-hover: #18181B;
+  --solid-contrast-hover: #3A3A3C;
 
-  --semantic-green: #15803D;
-  --semantic-green-subtle: rgba(21, 128, 61, 0.12);
-  --semantic-red: #B91C1C;
-  --semantic-red-subtle: rgba(185, 28, 28, 0.12);
-  --semantic-amber: #B45309;
-  --semantic-amber-subtle: rgba(180, 83, 9, 0.12);
-  --semantic-indigo: #4338CA;
-  --semantic-indigo-subtle: rgba(67, 56, 202, 0.12);
+  /* Colores semánticos (versión legible sobre blanco) */
+  --semantic-green: #248A3D;
+  --semantic-green-subtle: rgba(52, 199, 89, 0.14);
+  --semantic-red: #D70015;
+  --semantic-red-subtle: rgba(255, 59, 48, 0.12);
+  --semantic-amber: #C93400;
+  --semantic-amber-subtle: rgba(255, 149, 0, 0.14);
+  --semantic-indigo: #5856D6;
+  --semantic-indigo-subtle: rgba(88, 86, 214, 0.12);
+
+  /* Acento: azul del sistema */
+  --accent: #0071E3;
+  --accent-strong: #0060C0;
+  --on-accent: #FFFFFF;
+
+  /* Sombras suaves de tarjeta (en oscuro separa el color, no la sombra) */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04), 0 2px 12px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .dark {
-  /* Surface & Canvas: pizarra azulada, cada nivel de elevación un paso más claro */
-  --bg-app: #121821;
-  --bg-surface: #18202A;
-  --bg-surface-elevated: #1F2834;
-  --bg-surface-muted: #293443;
-  --border-subtle: #2A3544;
-  --border-divider: #222B37;
+  /* Fondos oscuros de iOS: negro de base, cada elevación un gris más claro */
+  --bg-app: #000000;
+  --bg-surface: #1C1C1E;
+  --bg-surface-elevated: #2C2C2E;
+  --bg-surface-muted: #3A3A3C;
+  --border-subtle: #2C2C2E;
+  --border-divider: #242426;
+  --border-strong: #48484A;
 
-  /* Typography (Dark) */
-  --text-primary: #EEF2F6;
-  --text-secondary: #A5B1C0;
-  --text-tertiary: #7A8798;
+  --text-primary: #F5F5F7;
+  --text-secondary: #AEAEB2;
+  --text-tertiary: #8E8E93;
 
-  /* Acción principal: cian plano con texto oscuro (contraste AA) */
-  --accent: #5BC2E7;
-  --accent-strong: #8AD4EF;
-  --on-accent: #06222E;
-  --solid-contrast-bg: #5BC2E7;
-  --solid-contrast-text: #06222E;
-  --solid-contrast-hover: #8AD4EF;
+  --accent: #0A84FF;
+  --accent-strong: #409CFF;
+  --on-accent: #FFFFFF;
+  --solid-contrast-bg: #F5F5F7;
+  --solid-contrast-text: #1D1D1F;
+  --solid-contrast-hover: #FFFFFF;
 
-  /* Semantic Colors in Dark */
-  --semantic-green: #22C55E;
-  --semantic-green-subtle: rgba(34, 197, 94, 0.12);
-  --semantic-red: #EF4444;
-  --semantic-red-subtle: rgba(239, 68, 68, 0.12);
-  --semantic-amber: #F59E0B;
-  --semantic-amber-subtle: rgba(245, 158, 11, 0.12);
-  --semantic-indigo: #818CF8;
-  --semantic-indigo-subtle: rgba(129, 140, 248, 0.14);
+  --semantic-green: #30D158;
+  --semantic-green-subtle: rgba(48, 209, 88, 0.16);
+  --semantic-red: #FF453A;
+  --semantic-red-subtle: rgba(255, 69, 58, 0.16);
+  --semantic-amber: #FF9F0A;
+  --semantic-amber-subtle: rgba(255, 159, 10, 0.16);
+  --semantic-indigo: #5E5CE6;
+  --semantic-indigo-subtle: rgba(94, 92, 230, 0.18);
+
+  --shadow-card: none;
+  --shadow-float: 0 10px 40px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.08);
 }
 
 /* ==========================================================================
@@ -261,7 +299,7 @@ html:not(.dark) .hover\:bg-zinc-800\/80:hover,
 
 html:not(.dark) .hover\:bg-zinc-700:hover,
 .light .hover\:bg-zinc-700:hover {
-  background-color: #CBD5E1 !important;
+  background-color: #D1D1D6 !important;
 }
 
 /* Subtle dark badges converted to clean light badges */
@@ -275,7 +313,7 @@ html:not(.dark) .bg-black\/10,
 .light .bg-black\/20,
 .light .bg-black\/15,
 .light .bg-black\/10 {
-  background-color: rgba(15, 23, 42, 0.07) !important;
+  background-color: rgba(0, 0, 0, 0.07) !important;
 }
 
 /* Hardcoded Modal / Surface backgrounds */
@@ -411,22 +449,22 @@ html:not(.dark) select,
 .light textarea,
 .light select {
   background-color: #FFFFFF !important;
-  color: #09090B !important;
-  border-color: #E2E8F0 !important;
+  color: #1D1D1F !important;
+  border-color: #E5E5EA !important;
 }
 
 html:not(.dark) input::placeholder,
 html:not(.dark) textarea::placeholder,
 .light input::placeholder,
 .light textarea::placeholder {
-  color: #64748B !important;
+  color: #737378 !important;
   opacity: 1 !important;
 }
 
 html:not(.dark) option,
 .light option {
   background-color: #FFFFFF !important;
-  color: #09090B !important;
+  color: #1D1D1F !important;
 }
 
 /* Modal Content & Floating Card Containers in Light Mode */
@@ -435,8 +473,8 @@ html:not(.dark) .fixed .bg-zinc-950,
 .light .fixed .bg-zinc-900,
 .light .fixed .bg-zinc-950 {
   background-color: #FFFFFF !important;
-  color: #09090B !important;
-  border-color: #E2E8F0 !important;
+  color: #1D1D1F !important;
+  border-color: #E5E5EA !important;
 }
 
 html:not(.dark) .fixed .bg-zinc-950\/60,
@@ -445,8 +483,8 @@ html:not(.dark) .fixed .bg-zinc-950\/80,
 .light .fixed .bg-zinc-950\/60,
 .light .fixed .bg-zinc-950\/70,
 .light .fixed .bg-zinc-950\/80 {
-  background-color: #F8F9FA !important;
-  border-color: #E2E8F0 !important;
+  background-color: #F2F2F7 !important;
+  border-color: #E5E5EA !important;
 }
 
 /* Anti-Yellow on White: In light mode, amber/yellow text is deep bronze/amber-700 */
@@ -458,29 +496,32 @@ html:not(.dark) .text-yellow-300,
 .light .text-amber-300,
 .light .text-yellow-400,
 .light .text-yellow-300 {
-  color: #B45309 !important;
+  color: #C93400 !important;
 }
 
 html:not(.dark) .bg-amber-500\/10,
 html:not(.dark) .bg-amber-500\/20,
 .light .bg-amber-500\/10,
 .light .bg-amber-500\/20 {
-  background-color: rgba(180, 83, 9, 0.1) !important;
-  border-color: rgba(180, 83, 9, 0.25) !important;
+  background-color: rgba(201, 52, 0, 0.1) !important;
+  border-color: rgba(201, 52, 0, 0.25) !important;
 }
 
 /* Modals & Backdrops in Light Mode: Keep backdrop dark dimming with blur */
 html:not(.dark) .bg-black\/80,
 .light .bg-black\/80 {
-  background-color: rgba(15, 23, 42, 0.65) !important;
+  background-color: rgba(0, 0, 0, 0.65) !important;
 }
 
 /* Global Typography & Palette */
 html, body {
   background-color: var(--bg-app);
   color: var(--text-primary);
-  font-family: 'Archivo', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-variation-settings: 'wdth' 100;
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  letter-spacing: -0.006em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   -webkit-overflow-scrolling: touch;
   -webkit-tap-highlight-color: transparent;
   overflow-x: hidden;
@@ -494,12 +535,10 @@ html, body {
   transition: background-color 150ms ease, color 150ms ease;
 }
 
-/* Títulos con ancho expandido: la rotulación de plano es la voz de la marca */
+/* Títulos como SF Pro Display: peso firme y tracking apretado */
 h1, h2, h3, .font-heading {
-  font-family: 'Archivo', system-ui, sans-serif;
-  font-stretch: 112%;
-  font-variation-settings: 'wdth' 112;
-  letter-spacing: -0.015em;
+  font-family: var(--font-sans);
+  letter-spacing: -0.022em;
 }
 
 #root {
@@ -521,19 +560,20 @@ h1, h2, h3, .font-heading {
   background-color: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-card);
-  transition: border-color 150ms ease;
+  box-shadow: var(--shadow-card);
+  transition: border-color 150ms ease, box-shadow 200ms ease;
 }
 
 .card-swiss:hover {
-  border-color: var(--text-tertiary);
+  border-color: var(--border-strong);
 }
 
 .btn-solid-primary {
   background-color: var(--solid-contrast-bg);
   color: var(--solid-contrast-text);
   border-radius: var(--radius-control);
-  font-weight: 500;
-  transition: background-color 150ms ease, opacity 150ms ease;
+  font-weight: 600;
+  transition: background-color 150ms ease, opacity 150ms ease, transform 120ms ease;
 }
 
 .btn-solid-primary:hover {
@@ -565,15 +605,10 @@ h1, h2, h3, .font-heading {
 @keyframes blurEntrance {
   0% {
     opacity: 0;
-    filter: blur(8px);
-    transform: translateY(6px);
-  }
-  60% {
-    filter: blur(2px);
+    transform: translateY(4px);
   }
   100% {
     opacity: 1;
-    filter: none;
     transform: none;
   }
 }
@@ -614,8 +649,7 @@ h1, h2, h3, .font-heading {
 @keyframes tModalEnter {
   0% {
     opacity: 0;
-    transform: scale(0.95) translateY(8px);
-    filter: blur(4px);
+    transform: scale(0.97) translateY(6px);
   }
   100% {
     opacity: 1;
@@ -942,4 +976,11 @@ h1, h2, h3 { text-wrap: balance; }
     animation-duration: 0s !important;
     animation-delay: 0s !important;
   }
+}
+
+/* Campo de búsqueda estilo iOS: relleno gris también en modo claro */
+html:not(.dark) input.ios-search:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]),
+.light input.ios-search:not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"]) {
+  background-color: rgba(118, 118, 128, 0.12) !important;
+  border-color: transparent !important;
 }

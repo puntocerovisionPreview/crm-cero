@@ -134,3 +134,41 @@ describe('Mercado Pago: a qué cliente corresponde un pago', () => {
     expect(n.body).toContain('¿Es de Remodelante?');
   });
 });
+
+import { paymentDirection } from '../server/mercadopago';
+
+describe('Mercado Pago: recibido o enviado', () => {
+  const me = { id: '111', email: 'yo@mail.com' };
+
+  it('si el cobrador soy yo, es un cobro recibido', () => {
+    expect(paymentDirection({ collector_id: 111, payer: { id: 999, email: 'cliente@mail.com' } }, me)).toBe('recibido');
+  });
+
+  it('si el pagador soy yo, es un pago que hice', () => {
+    expect(paymentDirection({ collector_id: 555, payer: { id: 111 } }, me)).toBe('enviado');
+    expect(paymentDirection({ payer: { email: 'YO@mail.com' } }, me)).toBe('enviado');
+  });
+
+  it('cobrador de otra cuenta = enviado aunque falte el pagador', () => {
+    expect(paymentDirection({ collector_id: 555 }, me)).toBe('enviado');
+  });
+
+  it('el aviso de un pago propio no dice "te entró"', () => {
+    const n = describeNewPayment({ amount: 15000, currency: 'ARS', direction: 'enviado', description: 'Hosting' });
+    expect(n.title).toBe('Pagaste $ 15.000');
+  });
+});
+
+import { compareMpNewestFirst } from '../src/utils/firestoreService';
+
+describe('Mercado Pago: orden de la bandeja', () => {
+  const p = (id: string, dateCreated: string, dateTime?: string) => ({ id, mpPaymentId: id, dateCreated, dateTime } as any);
+  it('el más reciente primero, aunque sean del mismo día', () => {
+    const list = [p('1', '2026-10-17', '2026-10-17T09:00:00-03:00'), p('2', '2026-10-17', '2026-10-17T18:30:00-03:00'), p('3', '2026-10-16', '2026-10-16T22:00:00-03:00')];
+    expect(list.sort(compareMpNewestFirst).map((x) => x.id)).toEqual(['2', '1', '3']);
+  });
+  it('sin hora guardada, desempata por número de pago', () => {
+    const list = [p('100', '2026-10-17'), p('300', '2026-10-17'), p('200', '2026-10-17')];
+    expect(list.sort(compareMpNewestFirst).map((x) => x.id)).toEqual(['300', '200', '100']);
+  });
+});

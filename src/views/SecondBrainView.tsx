@@ -726,7 +726,8 @@ export const SecondBrainView: React.FC<Props> = ({
                 catalog={catalog}
                 relations={relations}
                 onNavigate={onNavigate}
-                height={viewMode === 'graph' || mobileTab === 'graph' ? 'calc(100vh - 240px)' : '380px'}
+                height={viewMode === 'graph' || mobileTab === 'graph' ? 'calc(100vh - 240px)' : '460px'}
+                compact={false}
               />
             </div>
           )}

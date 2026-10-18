@@ -195,11 +195,13 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
     if (!isMercadoPagoConfigured()) return { job, skipped: 'Falta MP_ACCESS_TOKEN' };
     const created = await syncRecentPayments(db);
     if (options.dryRun) return { job, detail: created.map(describeNewPayment) };
-    for (const p of created) {
+    // Solo se avisa lo que te pagaron; lo que pagaste vos queda en la bandeja sin aviso
+    const received = created.filter((p) => p.direction === 'recibido');
+    for (const p of received) {
       const n = describeNewPayment(p);
       await notifyAll(db, n.title, n.body, '/dinero', `mp-${p.id}`);
     }
-    return { job, sent: created.length };
+    return { job, sent: received.length };
   }
 
   if (job === 'calendar-sync') {

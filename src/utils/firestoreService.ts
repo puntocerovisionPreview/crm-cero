@@ -1805,13 +1805,21 @@ export async function applyClientLinks(newClients: Client[], links: { projectId:
 
 // ---------------- PAGOS DE MERCADO PAGO PARA REGISTRAR ----------------
 // Los guarda el servidor (mp_incoming); acá se leen y se marcan como registrados o descartados.
+/** Del más nuevo al más viejo: por fecha y hora; si falta la hora, por número de pago (crece con el tiempo) */
+export function compareMpNewestFirst(a: MercadoPagoIncomingPayment, b: MercadoPagoIncomingPayment) {
+  const ta = Date.parse(a.dateTime || '') || Date.parse(a.dateCreated || '') || 0;
+  const tb = Date.parse(b.dateTime || '') || Date.parse(b.dateCreated || '') || 0;
+  if (tb !== ta && (a.dateTime && b.dateTime || (a.dateCreated || '') !== (b.dateCreated || ''))) return tb - ta;
+  return (Number(b.mpPaymentId || b.id) || 0) - (Number(a.mpPaymentId || a.id) || 0);
+}
+
 export function subscribeMpIncoming(onChanged: (items: MercadoPagoIncomingPayment[]) => void) {
   return onSnapshot(
     collection(db, 'mp_incoming'),
     (snapshot) => {
       const items: MercadoPagoIncomingPayment[] = [];
       snapshot.forEach((d) => items.push({ ...(d.data() as MercadoPagoIncomingPayment), id: d.id }));
-      items.sort((a, b) => (b.dateCreated || '').localeCompare(a.dateCreated || ''));
+      items.sort(compareMpNewestFirst);
       onChanged(items);
     },
     (err) => console.warn('Firestore subscribeMpIncoming error:', err)
@@ -1827,9 +1835,20 @@ export async function markMpIncomingReconciled(
 
 export async function saveMpIncomingPayments(payments: MercadoPagoIncomingPayment[]): Promise<void> {
   if (!payments || payments.length === 0) return;
+  // Solo crea los que faltan: un pago ya registrado o descartado no vuelve a quedar pendiente.
+  // A los existentes solo se les corrige si entró o salió (recibido / enviado).
   const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
-  payments.forEach((p) => {
-    ops.push((batch) => batch.set(doc(db, 'mp_incoming', p.id), deepSanitize(p), { merge: true }));
+  const snaps = await Promise.all(payments.map((p) => getDoc(doc(db, 'mp_incoming', p.id))));
+  payments.forEach((p, i) => {
+    const ref = doc(db, 'mp_incoming', p.id);
+    if (snaps[i].exists()) {
+      const patch: Record<string, unknown> = {};
+      if (p.direction && snaps[i].get('direction') !== p.direction) patch.direction = p.direction;
+      if (p.dateTime && !snaps[i].get('dateTime')) patch.dateTime = p.dateTime;
+      if (Object.keys(patch).length) ops.push((batch) => batch.set(ref, patch, { merge: true }));
+      return;
+    }
+    ops.push((batch) => batch.set(ref, deepSanitize({ ...p, reconciled: false, receivedAt: new Date().toISOString() })));
   });
-  await commitInChunks(ops);
+  if (ops.length) await commitInChunks(ops);
 }

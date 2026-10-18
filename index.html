@@ -9,7 +9,7 @@
     <meta property="og:description" content="Herramienta ágil y simplificada de gestión diaria para operador único: Agenda a 7 días, Proyectos activos e Ingresos mensuales." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="theme-color" content="#121821" />
+    <meta name="theme-color" content="#000000" id="theme-color" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -20,10 +20,10 @@
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <link rel="mask-icon" href="/icon.svg" color="#121821" />
+    <link rel="mask-icon" href="/icon.svg" color="#000000" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&display=swap" rel="stylesheet">
     <script>
       (function() {
         try {
@@ -31,6 +31,8 @@
           if (saved === 'light') {
             document.documentElement.classList.remove('dark');
             document.documentElement.classList.add('light');
+            var meta = document.getElementById('theme-color');
+            if (meta) meta.setAttribute('content', '#F2F2F7');
           } else {
             document.documentElement.classList.add('dark');
             document.documentElement.classList.remove('light');

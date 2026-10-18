@@ -299,7 +299,7 @@ export const AjustesView: React.FC<Props> = ({
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--text-primary)]">
       {/* Top Header */}
-      <div className="sticky top-0 z-20 bg-[var(--bg-app)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] px-4 py-3 flex items-center justify-between safe-area-top-header">
+      <div className="sticky top-0 z-20 bg-[var(--bg-app)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {activeSection ? (
             <button

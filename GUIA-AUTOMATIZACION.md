@@ -135,7 +135,7 @@ Con eso, el resumen del día, los avisos de reuniones, el plan del domingo y los
    - URL: `https://TU-APP/api/mercadopago/webhook?key=TU_CLAVE` (tu `CRON_SECRET`)
    - Evento: **Pagos**
    - Opcional, más seguro: copiá la "clave secreta" del webhook en los Secrets como `MP_WEBHOOK_SECRET`.
-4. Sin webhook igual funciona: el reloj "cada 10 minutos" revisa los pagos de los últimos 15 días. También podés tocar el botón de actualizar en la bandeja de pagos.
+4. Sin webhook igual funciona: el reloj "cada 10 minutos" revisa los pagos de los últimos 15 días. También podés traerlos a mano desde **Ajustes → Automatizaciones → Mercado Pago → Buscar pagos de los últimos 15 días**.
 
 Qué pasa con cada pago aprobado:
 - La app te propone a qué cliente corresponde: si el monto coincide con una cuota o un saldo pendiente, y/o si el nombre del pagador coincide con el del cliente.

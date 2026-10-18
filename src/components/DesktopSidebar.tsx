@@ -25,7 +25,8 @@ import { Project, SyncStatus, AgendaTask, AgendaMeeting, IncomeRecord, ExpenseRe
 import { hapticFeedback } from '../utils/haptics';
 import { BrandLogo } from './BrandLogo';
 import { getUiPreferences } from '../utils/uiPreferences';
-import { Send } from 'lucide-react';
+import { Send, Home } from 'lucide-react';
+import { HOME_PATH, SECTORS, sectorForPath } from '../utils/sectors';
 
 interface Props {
   currentPath: string;
@@ -105,6 +106,9 @@ export const DesktopSidebar: React.FC<Props> = ({
   const isCerebro = currentPath.startsWith('/cerebro') || currentPath.startsWith('/notas') || currentPath.startsWith('/grafo') || currentPath.startsWith('/segundo-cerebro');
   const isAjustes = currentPath.startsWith('/ajustes') || currentPath === '/ayuda';
   const isProspeccion = currentPath.startsWith('/prospeccion');
+  const sector = sectorForPath(currentPath);
+  const isInicio = currentPath === HOME_PATH;
+  const visibleSectors = SECTORS.filter(sec => !(sec.key === 'cerebro' && prefs.hideCerebro));
 
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -123,9 +127,9 @@ export const DesktopSidebar: React.FC<Props> = ({
       {/* 1. Header with Logo & Collapse button */}
       <div className="h-14 px-3 border-b border-[var(--border-subtle)] flex items-center justify-between shrink-0">
         <div 
-          onClick={() => onNavigate('/hoy')}
+          onClick={() => onNavigate(HOME_PATH)}
           className="flex items-center gap-2.5 cursor-pointer overflow-hidden"
-          title="Ir a Hoy"
+          title="Ir a Inicio"
         >
           <BrandLogo size="xs" />
         </div>
@@ -189,293 +193,96 @@ export const DesktopSidebar: React.FC<Props> = ({
         )}
       </div>
 
-      {/* 3. Navigation Links (5 Sectors + Ajustes) */}
-      <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 no-scrollbar">
-        {/* Sector 1: Hoy */}
-        <button
-          type="button"
-          onClick={() => {
-            hapticFeedback.selection();
-            onNavigate('/hoy');
-          }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-            isHoy
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
-          }`}
-          title="Hoy (Agenda, Foco y Metas)"
-        >
-          <div className="flex items-center gap-2.5 truncate">
-            <Calendar className="w-4 h-4 shrink-0 stroke-[1.75]" />
-            {!isCollapsed && <span className="truncate">Hoy</span>}
-          </div>
-          {!isCollapsed && (
-            <kbd className="px-1.5 py-0.2 rounded bg-[var(--bg-surface-muted)] text-[10px] font-mono text-[var(--text-tertiary)]">
-              1
-            </kbd>
-          )}
-        </button>
+      {/* 3. Navegación por sector: en la Home, la lista de sectores; dentro de un sector, solo sus pantallas */}
+      <nav aria-label={sector ? `Sector ${sector.label}` : 'Sectores del estudio'} className="flex-1 overflow-y-auto px-2 py-2 space-y-1 no-scrollbar">
+        {sector ? (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                hapticFeedback.selection();
+                onNavigate(HOME_PATH);
+              }}
+              className={`w-full flex items-center gap-1 ${isCollapsed ? 'justify-center' : 'px-1.5'} h-8 rounded-[10px] text-[14px] text-[var(--accent)] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer`}
+              title="Volver a Inicio (elegir sector)"
+            >
+              <ChevronLeft className="w-4 h-4 shrink-0" strokeWidth={2.25} />
+              {!isCollapsed && <span>Inicio</span>}
+            </button>
 
-        {/* Semana (Misiones de la semana) */}
-        {isCollapsed ? (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/semana');
-            }}
-            className={`w-full flex items-center justify-center p-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-              isSemana
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Misiones de la Semana (/semana)"
-          >
-            <Target className="w-4 h-4 shrink-0 text-[var(--accent)] stroke-[1.75]" />
-          </button>
+            <div className={`flex items-center gap-2 ${isCollapsed ? 'justify-center py-1.5' : 'px-2.5 pt-2 pb-1.5'}`}>
+              <span className="w-6 h-6 rounded-[7px] flex items-center justify-center text-white shrink-0" style={{ backgroundColor: sector.tint }} aria-hidden>
+                <sector.icon className="w-3.5 h-3.5" strokeWidth={2.25} />
+              </span>
+              {!isCollapsed && <span className="text-[15px] font-semibold text-[var(--text-primary)] truncate">{sector.label}</span>}
+            </div>
+
+            {sector.items.map(item => {
+              const on = item.match(currentPath);
+              return (
+                <button
+                  key={item.path}
+                  type="button"
+                  onClick={() => {
+                    hapticFeedback.selection();
+                    onNavigate(item.path);
+                  }}
+                  aria-current={on ? 'page' : undefined}
+                  className={`w-full flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'px-2.5'} py-2 rounded-[10px] text-[13.5px] font-medium transition cursor-pointer ${
+                    on
+                      ? 'bg-[var(--accent)]/12 text-[var(--accent)] font-semibold'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
+                  }`}
+                  title={isCollapsed ? item.label : undefined}
+                >
+                  <item.icon className="w-4 h-4 shrink-0 stroke-[1.75]" />
+                  {!isCollapsed && <span className="truncate">{item.label}</span>}
+                </button>
+              );
+            })}
+          </>
         ) : (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/semana');
-            }}
-            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer group ${
-              isSemana
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Misiones de la Semana: Carriles, avance, capacidad y ritmo (/semana)"
-          >
-            <div className="flex items-center gap-2 truncate">
-              <Target className="w-3.5 h-3.5 shrink-0 text-[var(--accent)] group-hover:scale-110 transition-transform" />
-              <span className="truncate">Semana</span>
-            </div>
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                hapticFeedback.selection();
+                onNavigate(HOME_PATH);
+              }}
+              aria-current={isInicio ? 'page' : undefined}
+              className={`w-full flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'px-2.5'} py-2 rounded-[10px] text-[13.5px] font-medium transition cursor-pointer ${
+                isInicio
+                  ? 'bg-[var(--accent)]/12 text-[var(--accent)] font-semibold'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
+              }`}
+              title="Inicio"
+            >
+              <Home className="w-4 h-4 shrink-0 stroke-[1.75]" />
+              {!isCollapsed && <span className="truncate">Inicio</span>}
+            </button>
+
+            {!isCollapsed && <p className="px-2.5 pt-3 pb-1 text-[12px] font-medium text-[var(--text-tertiary)]">Sectores</p>}
+            {visibleSectors.map(sec => (
+              <button
+                key={sec.key}
+                type="button"
+                onClick={() => {
+                  hapticFeedback.selection();
+                  onNavigate(sec.items[0].path);
+                }}
+                className={`w-full flex items-center gap-2.5 ${isCollapsed ? 'justify-center' : 'px-2'} py-1.5 rounded-[10px] text-[13.5px] font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer`}
+                title={sec.description}
+              >
+                <span className="w-6 h-6 rounded-[7px] flex items-center justify-center text-white shrink-0" style={{ backgroundColor: sec.tint }} aria-hidden>
+                  <sec.icon className="w-3.5 h-3.5" strokeWidth={2.25} />
+                </span>
+                {!isCollapsed && <span className="truncate">{sec.label}</span>}
+              </button>
+            ))}
+          </>
         )}
 
-        {/* Calendario 360° (Vista Mensual) */}
-        {isCollapsed ? (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/calendario');
-            }}
-            className={`w-full flex items-center justify-center p-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-              isCalendario
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-amber-500 dark:hover:text-amber-300 hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Calendario 360° (Vista Mensual y Entregas) (C)"
-          >
-            <CalendarDays className="w-4 h-4 shrink-0 text-amber-500 dark:text-amber-400 stroke-[1.75]" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/calendario');
-            }}
-            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer group ${
-              isCalendario
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-amber-600 dark:hover:text-amber-300 hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Calendario 360°: Vista global del mes, entregas, reuniones y cobros (C)"
-          >
-            <div className="flex items-center gap-2 truncate">
-              <CalendarDays className="w-3.5 h-3.5 shrink-0 text-amber-500 dark:text-amber-400 group-hover:scale-110 transition-transform" />
-              <span className="truncate">Calendario</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <kbd className="hidden group-hover:inline-block px-1 py-0.2 rounded bg-[var(--bg-surface-muted)] text-[9px] font-mono text-[var(--text-tertiary)]">
-                C
-              </kbd>
-            </div>
-          </button>
-        )}
-
-        {/* Sector 2: Clientes */}
-        <button
-          type="button"
-          onClick={() => {
-            hapticFeedback.selection();
-            onNavigate('/clientes');
-          }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-            isClientes
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
-          }`}
-          title="Clientes (PAF, Web, Pipeline)"
-        >
-          <div className="flex items-center gap-2.5 truncate">
-            <Users className="w-4 h-4 shrink-0 stroke-[1.75]" />
-            {!isCollapsed && <span className="truncate">Clientes</span>}
-          </div>
-          {!isCollapsed && activeClientsCount > 0 && (
-            <span className="text-[10.5px] font-mono text-[var(--text-tertiary)]">
-              {activeClientsCount}
-            </span>
-          )}
-        </button>
-
-        {/* Horizonte (Largo Plazo, Gantt y Capacidad) */}
-        {isCollapsed ? (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/horizonte');
-            }}
-            className={`w-full flex items-center justify-center p-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-              isHorizonte
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-sky-600 dark:hover:text-sky-300 hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Horizonte: Planificación de largo plazo y cronograma Gantt (H)"
-          >
-            <Compass className="w-4 h-4 shrink-0 text-sky-500 dark:text-sky-400 stroke-[1.75]" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/horizonte');
-            }}
-            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer group ${
-              isHorizonte
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-sky-600 dark:hover:text-sky-300 hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Horizonte: Planificación de largo plazo, Gantt y balance de frentes (H)"
-          >
-            <div className="flex items-center gap-2 truncate">
-              <Compass className="w-3.5 h-3.5 shrink-0 text-sky-500 dark:text-sky-400 group-hover:rotate-45 transition-transform" />
-              <span className="truncate">Horizonte</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <kbd className="hidden group-hover:inline-block px-1 py-0.2 rounded bg-[var(--bg-surface-muted)] text-[9px] font-mono text-[var(--text-tertiary)]">
-                H
-              </kbd>
-            </div>
-          </button>
-        )}
-
-        {/* Prospección en frío */}
-        <button
-          type="button"
-          onClick={() => {
-            hapticFeedback.selection();
-            onNavigate('/prospeccion');
-          }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-            isProspeccion
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
-          }`}
-          title="Prospección: contactos en frío, seguimientos y auditorías"
-        >
-          <div className="flex items-center gap-2.5 truncate">
-            <Send className="w-4 h-4 shrink-0 stroke-[1.75]" />
-            {!isCollapsed && <span className="truncate">Prospección</span>}
-          </div>
-        </button>
-
-        {/* Sector 3: Dinero */}
-        <button
-          type="button"
-          onClick={() => {
-            hapticFeedback.selection();
-            onNavigate('/dinero');
-          }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-            isDinero
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-              : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
-          }`}
-          title="Dinero (Estudio & Personal)"
-        >
-          <div className="flex items-center gap-2.5 truncate">
-            <DollarSign className="w-4 h-4 shrink-0 stroke-[1.75]" />
-            {!isCollapsed && <span className="truncate">Dinero</span>}
-          </div>
-          {!isCollapsed && (
-            <kbd className="px-1.5 py-0.2 rounded bg-[var(--bg-surface-muted)] text-[10px] font-mono text-[var(--text-tertiary)]">
-              3
-            </kbd>
-          )}
-        </button>
-
-        {/* Gastos Fijos & Vencimientos (Dominios, Hosting e IAs) */}
-        {isCollapsed ? (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/gastos-fijos');
-            }}
-            className={`w-full flex items-center justify-center p-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-              isGastosFijos
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Gastos Fijos: Dominios, Hosting, IAs y Vencimientos"
-          >
-            <Server className="w-4 h-4 shrink-0 text-emerald-500 dark:text-emerald-400 stroke-[1.75]" />
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/gastos-fijos');
-            }}
-            className={`w-full flex items-center justify-between pl-8 pr-2.5 py-1.5 rounded-lg text-[13px] font-medium transition cursor-pointer group ${
-              isGastosFijos
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-emerald-600 dark:hover:text-emerald-300 hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Control de gastos fijos: Hosting, Dominios de clientes e IAs mensuales"
-          >
-            <div className="flex items-center gap-2 truncate">
-              <Server className="w-3.5 h-3.5 shrink-0 text-emerald-500 dark:text-emerald-400 group-hover:rotate-12 transition-transform" />
-              <span className="truncate">Gastos Fijos</span>
-            </div>
-            <div className="flex items-center gap-1">
-            </div>
-          </button>
-        )}
-
-        {/* Sector 4: Cerebro */}
-        {!prefs.hideCerebro && (
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.selection();
-              onNavigate('/cerebro');
-            }}
-            className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
-              isCerebro
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
-                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
-            }`}
-            title="Segundo Cerebro (Notas & Grafo)"
-          >
-            <div className="flex items-center gap-2.5 truncate">
-              <Brain className="w-4 h-4 shrink-0 stroke-[1.75]" />
-              {!isCollapsed && <span className="truncate">Cerebro</span>}
-            </div>
-            {!isCollapsed && (
-              <kbd className="px-1.5 py-0.2 rounded bg-[var(--bg-surface-muted)] text-[10px] font-mono text-[var(--text-tertiary)]">
-                4
-              </kbd>
-            )}
-          </button>
-        )}
+        <div className="pt-2 border-t border-[var(--border-subtle)] my-1" />
 
         {/* Sector 5: Ajustes */}
         <button
@@ -484,9 +291,9 @@ export const DesktopSidebar: React.FC<Props> = ({
             hapticFeedback.selection();
             onNavigate('/ajustes');
           }}
-          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer ${
+          className={`w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13.5px] font-medium transition cursor-pointer ${
             isAjustes
-              ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold shadow-[inset_3px_0_0_var(--accent)]'
+              ? 'bg-[var(--accent)]/12 text-[var(--accent)] font-semibold'
               : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]'
           }`}
           title="Ajustes y configuración"
@@ -507,7 +314,7 @@ export const DesktopSidebar: React.FC<Props> = ({
             hapticFeedback.selection();
             onNavigate('/foco');
           }}
-          className="w-full flex items-center justify-between px-2.5 py-2 rounded-lg text-[13px] font-medium transition cursor-pointer text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20"
+          className="w-full flex items-center justify-between px-2.5 py-2 rounded-[10px] text-[13.5px] font-medium transition cursor-pointer text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 border border-emerald-500/20"
           title="Modo Foco (F)"
         >
           <div className="flex items-center gap-2.5 truncate">
@@ -542,7 +349,7 @@ export const DesktopSidebar: React.FC<Props> = ({
             )}
           </button>
         )}
-      </div>
+      </nav>
 
       {/* 4. Footer: Copilot, Lock, Audio & Sync */}
       <div className="p-2 border-t border-[var(--border-subtle)] bg-[var(--bg-surface)] space-y-1">

@@ -664,7 +664,7 @@ export const HorizonView: React.FC<Props> = ({
               <div 
                 className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] duration-500 rounded-full ${
                   currentMonthProgressPercent >= 100 
-                    ? 'bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_12px_rgba(16,185,129,0.5)]' 
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-400' 
                     : 'bg-gradient-to-r from-amber-500 to-emerald-500'
                 }`}
                 style={{ width: `${Math.min(100, currentMonthProgressPercent)}%` }}
@@ -770,7 +770,7 @@ export const HorizonView: React.FC<Props> = ({
                   left: `calc(25% + (75% * ${todayLeftPercent / 100}))`,
                 }}
               >
-                <div className="w-[1.5px] h-full bg-sky-400 shadow-[0_0_8px_rgba(56,189,248,0.6)]" />
+                <div className="w-[1.5px] h-full bg-sky-400" />
                 <span className="absolute -top-1 -translate-x-1/2 px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-sky-500 text-black">
                   Hoy
                 </span>

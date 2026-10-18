@@ -205,6 +205,10 @@ export interface StudioPaymentSettings {
 export interface MercadoPagoIncomingPayment {
   id: string;
   mpPaymentId: string;
+  // recibido = te pagaron; enviado = pagaste vos (los viejos sin dato se toman como recibidos)
+  direction?: 'recibido' | 'enviado';
+  receivedAt?: string;
+  dateTime?: string; // fecha y hora del pago (ISO)
   status: 'approved' | 'pending' | 'in_process' | 'rejected' | 'refunded';
   amount: number;
   currency: 'ARS' | 'USD';
@@ -216,7 +220,7 @@ export interface MercadoPagoIncomingPayment {
   dateApproved?: string;
   reconciled: boolean;
   reconciledTo?: {
-    type: 'cliente' | 'estudio_libre' | 'personal' | 'ignorado';
+    type: 'cliente' | 'estudio_libre' | 'personal' | 'gasto_estudio' | 'gasto_personal' | 'ignorado';
     targetId?: string;
     targetName?: string;
     reconciledAt: string;

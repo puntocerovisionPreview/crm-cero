@@ -86,35 +86,29 @@ export const KnowledgeGraphView: React.FC<Props> = ({
 
   return (
     <div className="w-full space-y-4">
-      {/* Top Header */}
-      <div className="card-swiss p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="label-swiss text-[11px] font-bold">Base de Conocimiento</span>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-surface-muted)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
-              {catalog.length} entidades · {relations.length} relaciones
+      {/* Encabezado */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 px-1">
+        <div className="min-w-0">
+          <h2 className="text-[28px] leading-tight font-bold text-[var(--text-primary)] font-heading">Grafo</h2>
+          <p className="text-[15px] text-[var(--text-secondary)] mt-0.5">
+            Cómo se conectan tus notas, clientes, proyectos y tareas.{' '}
+            <span className="text-[var(--text-tertiary)] tabular-nums">
+              {catalog.length} elementos · {relations.length} conexiones
             </span>
-          </div>
-          <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-heading tracking-tight mt-1">
-            Grafo Interactivo de Relaciones
-          </h2>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Visualiza conexiones entre notas, clientes PAF, proyectos web, tareas y reuniones. Usa <code className="font-mono text-[var(--text-primary)] bg-[var(--bg-surface-muted)] px-1 py-0.5 rounded border border-[var(--border-subtle)]">[[Nombre]]</code> para crear nuevos enlaces.
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => {
               hapticFeedback.light();
               setShowGuideModal(true);
             }}
-            className="btn-swiss-secondary py-2 px-3 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
-            title="Ver guía visual de cómo usar el segundo cerebro y grafo"
+            className="h-9 px-3.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[14px] font-medium text-[var(--accent)] flex items-center gap-1.5 cursor-pointer"
           >
-            <BookOpen className="w-3.5 h-3.5 text-purple-500" />
-            <span>¿Cómo funciona?</span>
+            <BookOpen className="w-4 h-4" aria-hidden />
+            <span>Cómo funciona</span>
           </button>
           <button
             type="button"
@@ -122,10 +116,10 @@ export const KnowledgeGraphView: React.FC<Props> = ({
               hapticFeedback.light();
               if (onNavigate) onNavigate('/notas');
             }}
-            className="btn-swiss-secondary py-2 px-3 text-xs font-semibold rounded-xl flex items-center gap-1.5 cursor-pointer"
+            className="h-9 px-3.5 rounded-full bg-[var(--accent)] text-white text-[14px] font-semibold flex items-center gap-1.5 cursor-pointer"
           >
-            <FileText className="w-3.5 h-3.5" />
-            <span>Ver Notas</span>
+            <FileText className="w-4 h-4" aria-hidden />
+            <span>Notas</span>
           </button>
         </div>
       </div>
@@ -135,7 +129,7 @@ export const KnowledgeGraphView: React.FC<Props> = ({
         catalog={catalog}
         relations={relations}
         onNavigate={onNavigate}
-        height="calc(100vh - 220px)"
+        height="calc(100dvh - 230px)"
         privacyMode={privacyMode}
       />
 

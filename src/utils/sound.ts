@@ -293,3 +293,27 @@ export function playTimeboxAlarm(): void {
     osc2.stop(now + offset + 0.32);
   });
 }
+
+/** Cobro recibido: dos notas claras y cortas */
+export function playPaymentReceived(): void {
+  if (!isSoundEnabled()) return;
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  [
+    { freq: 987.77, time: 0, dur: 0.18 }, // B5
+    { freq: 1318.51, time: 0.09, dur: 0.32 }, // E6
+  ].forEach(({ freq, time, dur }) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, now + time);
+    gain.gain.setValueAtTime(0.0001, now + time);
+    gain.gain.exponentialRampToValueAtTime(0.14, now + time + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + time + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now + time);
+    osc.stop(now + time + dur);
+  });
+}

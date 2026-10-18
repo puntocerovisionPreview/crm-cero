@@ -1,57 +1,43 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { 
-  forceSimulation, 
-  forceManyBody, 
-  forceLink, 
-  forceCenter, 
-  forceCollide, 
-  SimulationNodeDatum, 
-  SimulationLinkDatum 
+import {
+  forceSimulation,
+  forceManyBody,
+  forceLink,
+  forceCenter,
+  forceCollide,
+  forceX,
+  forceY,
+  Simulation,
+  SimulationNodeDatum,
+  SimulationLinkDatum
 } from 'd3-force';
 import { select } from 'd3-selection';
-import { zoom, zoomIdentity, ZoomTransform } from 'd3-zoom';
+import { zoom, zoomIdentity, ZoomBehavior, ZoomTransform } from 'd3-zoom';
 import { drag } from 'd3-drag';
-import { 
-  GraphNode, 
-  GraphEdge, 
-  LinkCatalogItem, 
-  LinkEntityType, 
-  LinkRelation, 
-  buildGraph, 
-  getBacklinksForEntity,
-  getNodeShape
+import {
+  GraphNode,
+  LinkCatalogItem,
+  LinkEntityType,
+  LinkRelation,
+  buildGraph,
+  getNodeShape,
+  normalizeEntityTitle
 } from '../lib/links';
-import { 
-  Search, 
-  Filter, 
-  Maximize2, 
-  Minimize2,
-  RotateCcw, 
-  ArrowUpRight, 
-  X, 
-  FileText, 
-  CheckSquare, 
-  Building2, 
-  Briefcase, 
-  Calendar, 
-  Target, 
-  Zap,
-  HelpCircle,
-  Eye,
-  EyeOff,
-  Layers,
-  Sliders,
-  Bookmark,
+import {
+  Search,
+  X,
   Plus,
-  Table,
-  CircleDot,
-  Compass,
-  ArrowRight,
-  ZoomIn,
-  ZoomOut,
+  Minus,
+  Scan,
+  Maximize2,
+  Minimize2,
+  SlidersHorizontal,
+  Network,
+  List,
+  ChevronRight,
+  ArrowUpRight,
   BookOpen,
-  Sparkles,
-  Network
+  Bookmark
 } from 'lucide-react';
 import { hapticFeedback } from '../utils/haptics';
 import { SecondBrainGuideModal } from './SecondBrainGuideModal';
@@ -63,6 +49,8 @@ interface Props {
   height?: number | string;
   focusNodeId?: string;
   privacyMode?: boolean;
+  /** Versión chica (ficha de cliente, tarea o nota): sin barra ni panel lateral */
+  compact?: boolean;
 }
 
 interface SimulationNode extends GraphNode, SimulationNodeDatum {}
@@ -70,13 +58,73 @@ interface SimulationLink extends SimulationLinkDatum<SimulationNode> {
   id: string;
   isStructural: boolean;
   weight: number;
-  label?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Tipos de elemento: nombre, color (colores del sistema de Apple) y forma.
+// La forma acompaña al color para que el tipo no dependa solo del color.
+// ---------------------------------------------------------------------------
+type LayerKey = 'notas' | 'clientes' | 'objetivos' | 'tareas' | 'reuniones' | 'cobros' | 'personal' | 'etiquetas';
+
+const TYPE_META: Record<LinkEntityType, { label: string; plural: string; light: string; dark: string; layer: LayerKey }> = {
+  nota: { label: 'Nota', plural: 'Notas', light: '#007AFF', dark: '#0A84FF', layer: 'notas' },
+  cliente: { label: 'Cliente PAF', plural: 'Clientes PAF', light: '#FF9500', dark: '#FF9F0A', layer: 'clientes' },
+  proyecto: { label: 'Proyecto', plural: 'Proyectos', light: '#5856D6', dark: '#5E5CE6', layer: 'clientes' },
+  objetivo: { label: 'Objetivo', plural: 'Objetivos', light: '#FF2D55', dark: '#FF375F', layer: 'objetivos' },
+  habito: { label: 'Hábito', plural: 'Hábitos', light: '#A2845E', dark: '#AC8E68', layer: 'objetivos' },
+  tarea: { label: 'Tarea', plural: 'Tareas', light: '#34C759', dark: '#30D158', layer: 'tareas' },
+  'resumen-tareas': { label: 'Grupo de tareas', plural: 'Grupos de tareas', light: '#34C759', dark: '#30D158', layer: 'tareas' },
+  reunion: { label: 'Reunión', plural: 'Reuniones', light: '#30B0C7', dark: '#40C8E0', layer: 'reuniones' },
+  ingreso: { label: 'Cobro', plural: 'Cobros', light: '#00A89D', dark: '#63E6E2', layer: 'cobros' },
+  'finanza-personal': { label: 'Movimiento personal', plural: 'Finanzas personales', light: '#AF52DE', dark: '#BF5AF2', layer: 'personal' },
+  tag: { label: 'Etiqueta', plural: 'Etiquetas', light: '#8E8E93', dark: '#98989D', layer: 'etiquetas' },
+};
+
+const LAYERS: { key: LayerKey; label: string; types: LinkEntityType[] }[] = [
+  { key: 'notas', label: 'Notas', types: ['nota'] },
+  { key: 'clientes', label: 'Clientes y proyectos', types: ['cliente', 'proyecto'] },
+  { key: 'objetivos', label: 'Objetivos y hábitos', types: ['objetivo', 'habito'] },
+  { key: 'tareas', label: 'Tareas', types: ['tarea', 'resumen-tareas'] },
+  { key: 'reuniones', label: 'Reuniones', types: ['reunion'] },
+  { key: 'cobros', label: 'Cobros', types: ['ingreso'] },
+  { key: 'personal', label: 'Finanzas personales', types: ['finanza-personal'] },
+  { key: 'etiquetas', label: 'Etiquetas', types: ['tag'] },
+];
+
+type PresetKey = 'clients_notes' | 'knowledge' | 'clients_finances' | 'all';
+type Layers = Record<LayerKey, boolean>;
+
+const PRESETS: { key: PresetKey; label: string; layers: Layers; orphans: boolean }[] = [
+  {
+    key: 'knowledge',
+    label: 'Conocimiento',
+    layers: { notas: true, clientes: true, objetivos: true, tareas: true, reuniones: false, cobros: true, personal: false, etiquetas: false },
+    orphans: false,
+  },
+  {
+    key: 'clients_notes',
+    label: 'Clientes y notas',
+    layers: { notas: true, clientes: true, objetivos: false, tareas: false, reuniones: false, cobros: false, personal: false, etiquetas: false },
+    orphans: false,
+  },
+  {
+    key: 'clients_finances',
+    label: 'Cobros',
+    layers: { notas: true, clientes: true, objetivos: false, tareas: false, reuniones: false, cobros: true, personal: false, etiquetas: false },
+    orphans: false,
+  },
+  {
+    key: 'all',
+    label: 'Todo',
+    layers: { notas: true, clientes: true, objetivos: true, tareas: true, reuniones: true, cobros: true, personal: false, etiquetas: false },
+    orphans: true,
+  },
+];
 
 interface SavedGraphView {
   id: string;
   name: string;
-  viewMode: 'knowledge' | 'classic';
+  viewMode?: 'knowledge' | 'classic';
   filterTypes: LinkEntityType[];
   showOrphans: boolean;
   includeStructural: boolean;
@@ -84,32 +132,72 @@ interface SavedGraphView {
   focusDepth: number;
 }
 
-const STORAGE_SAVED_VIEWS = 'cero_v3_saved_graph_views';
+const LEGEND_SHAPE: Record<string, string> = {
+  circle: 'w-2.5 h-2.5 rounded-full',
+  'rounded-rect': 'w-2.5 h-2.5 rounded-[3px]',
+  diamond: 'w-2 h-2 rotate-45 rounded-[1px] mx-[1px]',
+  capsule: 'w-3.5 h-2 rounded-full',
+  hexagon: 'w-2.5 h-2.5 rounded-full',
+};
 
-function safeRoundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number
-) {
-  if (typeof (ctx as any).roundRect === 'function') {
-    (ctx as any).roundRect(x, y, w, h, r);
-  } else {
-    const radius = Math.max(0, Math.min(r, w / 2, h / 2));
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + w - radius, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + radius);
-    ctx.lineTo(x + w, y + h - radius);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
-    ctx.lineTo(x + radius, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
+const STORAGE_SAVED_VIEWS = 'cero_v3_saved_graph_views';
+const FONT_STACK = '-apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI", Roboto, sans-serif';
+
+const isDarkTheme = () => document.documentElement.classList.contains('dark');
+const typeColor = (type: LinkEntityType, dark: boolean) => (TYPE_META[type] ? (dark ? TYPE_META[type].dark : TYPE_META[type].light) : dark ? '#98989D' : '#8E8E93');
+const typeLabel = (type: LinkEntityType) => TYPE_META[type]?.label || type;
+
+// En modo privado se ocultan los montos que aparezcan en títulos y subtítulos
+const maskAmounts = (text: string) => text.replace(/(US?\$|\$)?\s?\d[\d.,]{2,}/g, '•••');
+
+function roundRectPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
+  const radius = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}
+
+// Dibuja la forma del nodo (círculo, cuadrado redondeado, rombo o cápsula)
+function shapePath(ctx: CanvasRenderingContext2D, shape: GraphNode['shape'], x: number, y: number, r: number) {
+  ctx.beginPath();
+  if (shape === 'rounded-rect') {
+    const side = r * 1.75;
+    roundRectPath(ctx, x - side / 2, y - side / 2, side, side, side * 0.3);
+  } else if (shape === 'diamond') {
+    const d = r * 1.3;
+    ctx.moveTo(x, y - d);
+    ctx.lineTo(x + d, y);
+    ctx.lineTo(x, y + d);
+    ctx.lineTo(x - d, y);
     ctx.closePath();
+  } else if (shape === 'capsule') {
+    roundRectPath(ctx, x - r * 1.2, y - r * 0.6, r * 2.4, r * 1.2, r * 0.6);
+  } else {
+    ctx.arc(x, y, r, 0, Math.PI * 2);
   }
 }
+
+// Interruptor estilo iOS
+const Switch: React.FC<{ checked: boolean; onChange: (v: boolean) => void; label: string }> = ({ checked, onChange, label }) => (
+  <label className="flex items-center justify-between gap-3 py-2 cursor-pointer text-[13px] text-[var(--text-primary)]">
+    <span>{label}</span>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative w-[42px] h-[26px] rounded-full shrink-0 transition-colors duration-200 ${checked ? 'bg-[#34C759]' : 'bg-[var(--bg-surface-muted)]'}`}
+    >
+      <span
+        className={`absolute top-[2px] left-[2px] w-[22px] h-[22px] rounded-full bg-white shadow-[0_2px_4px_rgba(0,0,0,0.2)] transition-transform duration-200 ${checked ? 'translate-x-4' : ''}`}
+      />
+    </button>
+  </label>
+);
 
 export const KnowledgeGraphCanvas: React.FC<Props> = ({
   catalog,
@@ -118,1441 +206,1208 @@ export const KnowledgeGraphCanvas: React.FC<Props> = ({
   height = '600px',
   focusNodeId,
   privacyMode = false,
+  compact: compactProp,
 }) => {
+  const compact = compactProp ?? (typeof height === 'number' ? height < 420 : /^\d+px$/.test(String(height)) && parseInt(String(height), 10) < 420);
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
 
-  // View Preset: "knowledge" (Clean default: Notes, Projects, PAF, Goals) vs "classic" (All loose nodes)
-  const [viewMode, setViewMode] = useState<'knowledge' | 'classic'>('knowledge');
-  const [quickPreset, setQuickPreset] = useState<'clients_notes' | 'knowledge' | 'clients_finances' | 'all'>('knowledge');
-  const [displayFormat, setDisplayFormat] = useState<'canvas' | 'table'>('canvas');
-  const [showGuideModal, setShowGuideModal] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // Layer toggles
-  const [showTasks, setShowTasks] = useState(true);
-  const [showMeetings, setShowMeetings] = useState(false);
-  const [showIncomes, setShowIncomes] = useState(true);
-  const [showPersonalFinance, setShowPersonalFinance] = useState(false);
-  const [showTags, setShowTags] = useState(false);
-  const [showOrphans, setShowOrphans] = useState(true);
+  // ---------------- Estado de la vista ----------------
+  const [preset, setPreset] = useState<PresetKey | 'custom'>(compact ? 'all' : 'knowledge');
+  const [layers, setLayers] = useState<Layers>(() => (compact ? { ...PRESETS[3].layers, personal: true } : { ...PRESETS[0].layers }));
+  const [showOrphans, setShowOrphans] = useState(compact);
   const [includeStructural, setIncludeStructural] = useState(true);
+  const [displayFormat, setDisplayFormat] = useState<'canvas' | 'list'>('canvas');
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [showOrphansPanel, setShowOrphansPanel] = useState(false);
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
-  // Focus & Depth State
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(focusNodeId || null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [focusDepth, setFocusDepth] = useState<number>(1); // 1, 2 or 3 jumps
-
-  // Physics tuning state
-  const [repulsionStrength, setRepulsionStrength] = useState<number>(180);
-  const [linkDistance, setLinkDistance] = useState<number>(85);
-  const [showPhysicsControls, setShowPhysicsControls] = useState(false);
-
-  // Search & Filters
+  const [focusDepth, setFocusDepth] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFolder, setSelectedFolder] = useState<string>('');
-  const [selectedTag, setSelectedTag] = useState<string>('');
 
-  // UI Panels
-  const [showOrphansPanel, setShowOrphansPanel] = useState(false);
-  const [showSavedViewsModal, setShowSavedViewsModal] = useState(false);
-  const [newViewName, setNewViewName] = useState('');
+  const [repulsionStrength, setRepulsionStrength] = useState(220);
+  const [linkDistance, setLinkDistance] = useState(70);
 
-  // Handle Fullscreen escape listener
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFullscreen]);
-
-  // Saved Views in LocalStorage
   const [savedViews, setSavedViews] = useState<SavedGraphView[]>(() => {
     try {
       const stored = localStorage.getItem(STORAGE_SAVED_VIEWS);
       if (stored) return JSON.parse(stored);
     } catch {}
-    return [
-      {
-        id: 'view_clients_notes',
-        name: 'Clientes & Notas',
-        viewMode: 'knowledge',
-        filterTypes: ['nota', 'proyecto', 'cliente'],
-        showOrphans: false,
-        includeStructural: true,
-        includeTags: false,
-        focusDepth: 1,
-      },
-      {
-        id: 'view_knowledge',
-        name: 'Conocimiento Puro',
-        viewMode: 'knowledge',
-        filterTypes: ['nota', 'proyecto', 'cliente', 'objetivo'],
-        showOrphans: false,
-        includeStructural: true,
-        includeTags: false,
-        focusDepth: 1,
-      },
-      {
-        id: 'view_all',
-        name: 'Ecosistema Completo',
-        viewMode: 'classic',
-        filterTypes: [],
-        showOrphans: true,
-        includeStructural: true,
-        includeTags: true,
-        focusDepth: 2,
-      },
-    ];
+    return [];
   });
+  const [newViewName, setNewViewName] = useState('');
 
-  const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
-  const transformRef = useRef<ZoomTransform>(zoomIdentity);
-  transformRef.current = transform;
+  useEffect(() => {
+    if (focusNodeId) setSelectedNodeId(focusNodeId);
+  }, [focusNodeId]);
 
-  // Active filter types based on quickPreset, viewMode and toggles
-  const activeFilterTypes = useMemo<LinkEntityType[]>(() => {
-    if (quickPreset === 'clients_notes') {
-      return ['cliente', 'proyecto', 'nota'];
-    }
-    if (quickPreset === 'clients_finances') {
-      return ['cliente', 'proyecto', 'nota', 'ingreso'];
-    }
-    if (quickPreset === 'all' || viewMode === 'classic') {
-      return showPersonalFinance ? [] : ['nota', 'tarea', 'proyecto', 'cliente', 'reunion', 'objetivo', 'habito', 'ingreso', 'tag', 'resumen-tareas'];
-    }
-    // 'knowledge'
-    const types: LinkEntityType[] = ['nota', 'proyecto', 'cliente', 'objetivo'];
-    if (showTasks) types.push('tarea');
-    if (showMeetings) types.push('reunion');
-    if (showIncomes) types.push('ingreso');
-    if (showTags) types.push('tag');
-    if (showPersonalFinance) types.push('finanza-personal');
-    return types;
-  }, [quickPreset, viewMode, showTasks, showMeetings, showIncomes, showPersonalFinance, showTags]);
+  // Esc cierra, en orden: opciones, panel, pantalla completa
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (showOptions) setShowOptions(false);
+      else if (showOrphansPanel) setShowOrphansPanel(false);
+      else if (selectedNodeId && !compact) setSelectedNodeId(null);
+      else if (isFullscreen) setIsFullscreen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showOptions, showOrphansPanel, selectedNodeId, isFullscreen, compact]);
 
-  // Zoom handlers for touch and controls
-  const handleZoomIn = () => {
-    hapticFeedback.light();
-    const current = transformRef.current;
-    const newK = Math.min(current.k * 1.35, 8);
-    const newTransform = zoomIdentity.translate(current.x, current.y).scale(newK);
-    setTransform(newTransform);
-    transformRef.current = newTransform;
-    draw();
+  const activeFilterTypes = useMemo<LinkEntityType[]>(
+    () => LAYERS.filter(l => layers[l.key]).flatMap(l => l.types),
+    [layers]
+  );
+
+  const applyPreset = (key: PresetKey) => {
+    const p = PRESETS.find(x => x.key === key)!;
+    hapticFeedback.selection();
+    setPreset(key);
+    setLayers({ ...p.layers });
+    setShowOrphans(p.orphans);
   };
 
-  const handleZoomOut = () => {
-    hapticFeedback.light();
-    const current = transformRef.current;
-    const newK = Math.max(current.k / 1.35, 0.15);
-    const newTransform = zoomIdentity.translate(current.x, current.y).scale(newK);
-    setTransform(newTransform);
-    transformRef.current = newTransform;
-    draw();
+  const toggleLayer = (key: LayerKey, value: boolean) => {
+    setLayers(prev => ({ ...prev, [key]: value }));
+    setPreset('custom');
   };
 
-  const handleResetZoom = () => {
-    hapticFeedback.light();
-    setTransform(zoomIdentity);
-    transformRef.current = zoomIdentity;
-    draw();
-  };
+  // ---------------- Datos del grafo ----------------
+  // La selección y la búsqueda NO reconstruyen la red (antes cada clic la reiniciaba)
+  const { nodes: rawNodes, edges: rawEdges } = useMemo(
+    () =>
+      buildGraph(catalog, relations, {
+        includeStructural,
+        includeTags: layers.etiquetas,
+        filterTypes: activeFilterTypes.length ? activeFilterTypes : ['nota'],
+        showOrphans,
+      }),
+    [catalog, relations, includeStructural, layers.etiquetas, activeFilterTypes, showOrphans]
+  );
 
-  // Compute filtered graph nodes and edges
-  const { nodes: rawNodes, edges: rawEdges } = useMemo(() => {
-    return buildGraph(catalog, relations, {
-      includeStructural,
-      includeTags: showTags,
-      filterTypes: activeFilterTypes,
-      searchQuery,
-      showOrphans: viewMode === 'classic' ? true : showOrphans,
-      filterFolder: selectedFolder,
-      filterTag: selectedTag,
-      focusNodeId: selectedNodeId || undefined,
-      focusDepth,
-    });
-  }, [
-    catalog, 
-    relations, 
-    includeStructural, 
-    showTags, 
-    activeFilterTypes, 
-    searchQuery, 
-    viewMode, 
-    showOrphans, 
-    selectedFolder, 
-    selectedTag, 
-    selectedNodeId, 
-    focusDepth
-  ]);
+  const catalogById = useMemo(() => new Map(catalog.map(c => [c.id, c])), [catalog]);
 
-  // Orphans list for review panel
+  const displayTitle = useCallback(
+    (title: string, type: LinkEntityType) => (privacyMode && (type === 'ingreso' || type === 'finanza-personal') ? maskAmounts(title) : title),
+    [privacyMode]
+  );
+
   const orphansList = useMemo(() => {
     const counts = new Map<string, number>();
-    catalog.forEach(item => counts.set(item.id, 0));
     relations.forEach(r => {
       counts.set(r.sourceId, (counts.get(r.sourceId) || 0) + 1);
       counts.set(r.targetId, (counts.get(r.targetId) || 0) + 1);
     });
-    return catalog.filter(item => (counts.get(item.id) || 0) === 0);
+    return catalog.filter(item => item.type !== 'tag' && !counts.get(item.id));
   }, [catalog, relations]);
 
-  // Simulation references
-  const simulationRef = useRef<any>(null);
+  // Vecinos directos de cada nodo (en ambos sentidos)
+  const adjacency = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    rawEdges.forEach(e => {
+      const s = typeof e.source === 'string' ? e.source : e.source.id;
+      const t = typeof e.target === 'string' ? e.target : e.target.id;
+      if (!map.has(s)) map.set(s, new Set());
+      if (!map.has(t)) map.set(t, new Set());
+      map.get(s)!.add(t);
+      map.get(t)!.add(s);
+    });
+    return map;
+  }, [rawEdges]);
+
+  const neighborhoodOf = useCallback(
+    (rootId: string, depth: number) => {
+      const seen = new Set<string>([rootId]);
+      let layer = [rootId];
+      for (let d = 0; d < depth; d++) {
+        const next: string[] = [];
+        layer.forEach(id => adjacency.get(id)?.forEach(n => {
+          if (!seen.has(n)) {
+            seen.add(n);
+            next.push(n);
+          }
+        }));
+        layer = next;
+      }
+      return seen;
+    },
+    [adjacency]
+  );
+
+  const searchMatches = useMemo(() => {
+    const q = normalizeEntityTitle(searchQuery);
+    if (!q) return null;
+    return new Set(rawNodes.filter(n => normalizeEntityTitle(n.title).includes(q)).map(n => n.id));
+  }, [searchQuery, rawNodes]);
+
+  // Lo que queda resaltado: el vecindario del elegido, el del que está bajo el mouse o lo buscado
+  const focusSet = useMemo(() => {
+    if (selectedNodeId && rawNodes.some(n => n.id === selectedNodeId)) return neighborhoodOf(selectedNodeId, focusDepth);
+    if (hoveredNodeId) return neighborhoodOf(hoveredNodeId, 1);
+    return searchMatches;
+  }, [selectedNodeId, hoveredNodeId, focusDepth, neighborhoodOf, searchMatches, rawNodes, adjacency]);
+
+  // Los más conectados llevan su nombre siempre visible
+  const hubIds = useMemo(() => {
+    const sorted = [...rawNodes].filter(n => n.connectionCount > 0).sort((a, b) => b.connectionCount - a.connectionCount);
+    return new Set(sorted.slice(0, Math.max(6, Math.round(sorted.length * 0.15))).map(n => n.id));
+  }, [rawNodes]);
+
+  // ---------------- Simulación ----------------
+  const simulationRef = useRef<Simulation<SimulationNode, SimulationLink> | null>(null);
   const simNodesRef = useRef<SimulationNode[]>([]);
   const simLinksRef = useRef<SimulationLink[]>([]);
-  const isSimulationFrozenRef = useRef(false);
+  const transformRef = useRef<ZoomTransform>(zoomIdentity);
+  const zoomRef = useRef<ZoomBehavior<HTMLCanvasElement, unknown> | null>(null);
+  const needsFitRef = useRef(true);
+  // Si la persona ya movió o hizo zoom, no se le cambia la cámara sola
+  const userMovedRef = useRef(false);
+  const animRef = useRef<number | null>(null);
 
-  // Selected & Hovered node details
-  const selectedNode = useMemo(() => {
-    return catalog.find(item => item.id === selectedNodeId) || null;
-  }, [catalog, selectedNodeId]);
+  const prefersReducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Compute active focus neighborhood with n-depth
-  const activeNeighborhood = useMemo(() => {
-    const rootId = selectedNodeId || hoveredNodeId;
-    if (!rootId) return null;
+  // ---------------- Dibujo ----------------
+  const stateRef = useRef({ focusSet, selectedNodeId, hoveredNodeId, hubIds, displayTitle });
+  stateRef.current = { focusSet, selectedNodeId, hoveredNodeId, hubIds, displayTitle };
 
-    const neighbors = new Set<string>();
-    neighbors.add(rootId);
-
-    let currentLayer = new Set<string>([rootId]);
-    const depthLimit = selectedNodeId ? focusDepth : 1;
-
-    for (let d = 0; d < depthLimit; d++) {
-      const nextLayer = new Set<string>();
-      rawEdges.forEach(e => {
-        const s = typeof e.source === 'string' ? e.source : (e.source as any).id;
-        const t = typeof e.target === 'string' ? e.target : (e.target as any).id;
-        if (currentLayer.has(s)) nextLayer.add(t);
-        if (currentLayer.has(t)) nextLayer.add(s);
-      });
-      nextLayer.forEach(id => neighbors.add(id));
-      currentLayer = nextLayer;
-    }
-
-    return neighbors;
-  }, [selectedNodeId, hoveredNodeId, focusDepth, rawEdges]);
-
-  // Monochromatic Neutral Palette
-  const getNodeColor = useCallback((type: LinkEntityType, isSelected: boolean, isNeighbor: boolean) => {
-    const isDark = document.documentElement.classList.contains('dark');
-    if (isSelected) {
-      return isDark ? '#FFFFFF' : '#09090B';
-    }
-    if (isNeighbor) {
-      return isDark ? '#E4E4E7' : '#18181B';
-    }
-    // Grayscale neutrals by entity hierarchy
-    switch (type) {
-      case 'nota':
-        return isDark ? '#71717A' : '#A1A1AA';
-      case 'proyecto':
-      case 'cliente':
-        return isDark ? '#A1A1AA' : '#52525B';
-      case 'objetivo':
-        return isDark ? '#D4D4D8' : '#3F3F46';
-      case 'tag':
-        return isDark ? '#52525B' : '#71717A';
-      case 'finanza-personal':
-        return isDark ? '#10B981' : '#059669';
-      default:
-        return isDark ? '#71717A' : '#A1A1AA';
-    }
-  }, []);
-
-  // Sync simulation nodes with position preservation
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const width = canvas.clientWidth || 800;
-    const height = canvas.clientHeight || 600;
-
-    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    const existingPos = new Map<string, { x: number; y: number; vx: number; vy: number; fx?: number | null; fy?: number | null }>();
-    simNodesRef.current.forEach(n => {
-      if (typeof n.x === 'number' && typeof n.y === 'number') {
-        existingPos.set(n.id, { x: n.x, y: n.y, vx: n.vx || 0, vy: n.vy || 0, fx: n.fx, fy: n.fy });
-      }
-    });
-
-    const newSimNodes: SimulationNode[] = rawNodes.map((n, i) => {
-      const prev = existingPos.get(n.id);
-      if (prev) {
-        return { ...n, x: prev.x, y: prev.y, vx: prev.vx, vy: prev.vy, fx: prev.fx, fy: prev.fy };
-      }
-      const angle = (i / Math.max(1, rawNodes.length)) * 2 * Math.PI;
-      const radius = 100 + Math.random() * 80;
-      return {
-        ...n,
-        x: width / 2 + Math.cos(angle) * radius,
-        y: height / 2 + Math.sin(angle) * radius,
-      };
-    });
-
-    const newSimLinks: SimulationLink[] = rawEdges.map(e => ({
-      id: e.id,
-      source: e.source,
-      target: e.target,
-      isStructural: e.isStructural,
-      weight: e.weight,
-      label: e.label,
-    }));
-
-    simNodesRef.current = newSimNodes;
-    simLinksRef.current = newSimLinks;
-
-    if (simulationRef.current) {
-      simulationRef.current.stop();
-    }
-
-    if (prefersReducedMotion) {
-      const sim = forceSimulation<SimulationNode>(newSimNodes)
-        .force('link', forceLink<SimulationNode, SimulationLink>(newSimLinks).id(d => d.id).distance(linkDistance))
-        .force('charge', forceManyBody().strength(-repulsionStrength))
-        .force('center', forceCenter(width / 2, height / 2))
-        .force('collide', forceCollide<SimulationNode>().radius(d => d.radius + 6))
-        .stop();
-      for (let i = 0; i < 70; ++i) sim.tick();
-      draw();
-      return;
-    }
-
-    // Fast-cooling simulation to prevent jitters and save battery
-    const sim = forceSimulation<SimulationNode>(newSimNodes)
-      .force('link', forceLink<SimulationNode, SimulationLink>(newSimLinks).id(d => d.id).distance(linkDistance))
-      .force('charge', forceManyBody().strength(-repulsionStrength))
-      .force('center', forceCenter(width / 2, height / 2))
-      .force('collide', forceCollide<SimulationNode>().radius(d => d.radius + 6))
-      .alphaDecay(0.04);
-
-    isSimulationFrozenRef.current = false;
-
-    sim.on('tick', () => {
-      draw();
-      if (sim.alpha() < 0.005) {
-        sim.stop();
-        isSimulationFrozenRef.current = true;
-      }
-    });
-
-    simulationRef.current = sim;
-
-    return () => {
-      sim.stop();
-    };
-  }, [rawNodes, rawEdges, repulsionStrength, linkDistance]);
-
-  // Main Canvas render loop with Culling and High-DPI support
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
     const width = canvas.clientWidth;
     const height = canvas.clientHeight;
-
-    if (width === 0 || height === 0) return;
-
-    if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
+    if (!width || !height) return;
+    const dpr = window.devicePixelRatio || 1;
+    if (canvas.width !== Math.round(width * dpr) || canvas.height !== Math.round(height * dpr)) {
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
     }
 
-    ctx.save();
-    ctx.scale(dpr, dpr);
+    const { focusSet: active, selectedNodeId: selId, hoveredNodeId: hovId, hubIds: hubs, displayTitle: titleOf } = stateRef.current;
+    const dark = isDarkTheme();
+    const t = transformRef.current;
+    const k = t.k;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, width, height);
 
-    const t = transformRef.current;
-    ctx.translate(t.x, t.y);
-    ctx.scale(t.k, t.k);
+    // Grilla de puntos suave (como Freeform), en pantalla
+    if (!compact) {
+      const step = 22 * k;
+      if (step >= 9) {
+        ctx.fillStyle = dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.075)';
+        const ox = ((t.x % step) + step) % step;
+        const oy = ((t.y % step) + step) % step;
+        for (let x = ox; x < width; x += step) {
+          for (let y = oy; y < height; y += step) {
+            ctx.fillRect(x - 0.75, y - 0.75, 1.5, 1.5);
+          }
+        }
+      }
+    }
 
-    const isDark = document.documentElement.classList.contains('dark');
+    ctx.translate(t.x, t.y);
+    ctx.scale(k, k);
+
     const nodes = simNodesRef.current;
     const links = simLinksRef.current;
-    const activeSet = activeNeighborhood;
+    const minX = -t.x / k - 60, maxX = (width - t.x) / k + 60;
+    const minY = -t.y / k - 60, maxY = (height - t.y) / k + 60;
+    const lw = 1 / Math.sqrt(Math.max(k, 0.3));
 
-    // Visible bounding box for text culling in screen space
-    const minX = -t.x / t.k - 50;
-    const maxX = (width - t.x) / t.k + 50;
-    const minY = -t.y / t.k - 50;
-    const maxY = (height - t.y) / t.k + 50;
-
-    // 1. Draw Edges
+    // 1. Conexiones
+    ctx.lineCap = 'round';
     links.forEach(link => {
-      const source = link.source as SimulationNode;
-      const target = link.target as SimulationNode;
-      if (!source || !target || typeof source.x !== 'number' || typeof target.x !== 'number') return;
-
-      const isConnectedToActive = activeSet
-        ? (activeSet.has(source.id) && activeSet.has(target.id))
-        : false;
-
+      const s = link.source as SimulationNode;
+      const tg = link.target as SimulationNode;
+      if (typeof s.x !== 'number' || typeof tg.x !== 'number') return;
+      const lit = active ? active.has(s.id) && active.has(tg.id) && (selId ? true : s.id === hovId || tg.id === hovId || !hovId) : false;
       ctx.beginPath();
-      ctx.moveTo(source.x, source.y);
-      ctx.lineTo(target.x, target.y);
-
-      if (link.isStructural) {
-        ctx.setLineDash([3, 3]);
+      ctx.moveTo(s.x, s.y!);
+      ctx.lineTo(tg.x, tg.y!);
+      ctx.setLineDash(link.isStructural ? [3 * lw, 4 * lw] : []);
+      if (active && lit) {
+        ctx.strokeStyle = dark ? 'rgba(10,132,255,0.85)' : 'rgba(0,113,227,0.8)';
+        ctx.lineWidth = 1.8 * lw;
+        ctx.globalAlpha = 1;
+      } else if (active) {
+        ctx.strokeStyle = dark ? '#FFFFFF' : '#000000';
+        ctx.lineWidth = 1 * lw;
+        ctx.globalAlpha = 0.04;
       } else {
-        ctx.setLineDash([]);
+        ctx.strokeStyle = dark ? '#FFFFFF' : '#000000';
+        ctx.lineWidth = (link.isStructural ? 1 : Math.min(2.4, 1.1 + (link.weight - 1) * 0.35)) * lw;
+        ctx.globalAlpha = link.isStructural ? 0.1 : 0.16;
       }
-
-      if (activeSet) {
-        if (isConnectedToActive) {
-          ctx.strokeStyle = isDark ? '#F4F4F5' : '#18181B';
-          ctx.lineWidth = Math.min(3, 1.4 + (link.weight - 1) * 0.5);
-          ctx.globalAlpha = 0.95;
-        } else {
-          ctx.strokeStyle = isDark ? '#27272A' : '#E4E4E7';
-          ctx.lineWidth = 0.7;
-          ctx.globalAlpha = 0.12;
-        }
-      } else {
-        ctx.strokeStyle = isDark ? '#3F3F46' : '#D4D4D8';
-        ctx.lineWidth = link.isStructural ? 0.8 : Math.min(2.5, 1.1 + (link.weight - 1) * 0.4);
-        ctx.globalAlpha = link.isStructural ? 0.45 : 0.65;
-      }
-
       ctx.stroke();
     });
-
     ctx.setLineDash([]);
+    ctx.globalAlpha = 1;
 
-    // 2. Draw Nodes
+    // 2. Nodos
+    const ring = dark ? '#1C1C1E' : '#FFFFFF';
+    const labels: { x: number; y: number; text: string; strong: boolean; alpha: number; priority: number }[] = [];
     nodes.forEach(node => {
       if (typeof node.x !== 'number' || typeof node.y !== 'number') return;
-
-      const isSelected = node.id === selectedNodeId;
-      const isHovered = node.id === hoveredNodeId;
-      const isNeighbor = activeSet ? activeSet.has(node.id) : false;
-
-      if (activeSet) {
-        ctx.globalAlpha = (isSelected || isHovered || isNeighbor) ? 1.0 : 0.12;
-      } else {
-        ctx.globalAlpha = 1.0;
-      }
-
-      const color = getNodeColor(node.type, isSelected, isNeighbor);
+      const isSel = node.id === selId;
+      const isHov = node.id === hovId;
+      const inFocus = active ? active.has(node.id) : true;
+      const alpha = inFocus ? 1 : 0.16;
       const r = node.radius;
+      const color = typeColor(node.type, dark);
 
-      // Selection Halo
-      if (isSelected || isHovered) {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, r + 4.5, 0, 2 * Math.PI);
-        ctx.fillStyle = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
+      ctx.globalAlpha = alpha;
+      if (isSel || isHov) {
+        shapePath(ctx, node.shape, node.x, node.y, r + 6);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.18;
         ctx.fill();
-        ctx.strokeStyle = isDark ? '#FFFFFF' : '#09090B';
-        ctx.lineWidth = 1.4;
-        ctx.stroke();
+        ctx.globalAlpha = alpha;
       }
-
-      // Geometric Shape Render
+      shapePath(ctx, node.shape, node.x, node.y, r);
       ctx.fillStyle = color;
-      ctx.strokeStyle = isDark ? '#27272A' : '#E4E4E7';
-      ctx.lineWidth = 1;
+      ctx.fill();
+      ctx.lineWidth = 2 * lw;
+      ctx.strokeStyle = isSel ? (dark ? '#FFFFFF' : '#1D1D1F') : ring;
+      ctx.stroke();
 
-      if (node.shape === 'rounded-rect') {
-        const side = r * 1.7;
-        const corner = 4;
-        ctx.beginPath();
-        safeRoundRect(ctx, node.x - side / 2, node.y - side / 2, side, side, corner);
-        ctx.fill();
-        ctx.stroke();
-      } else if (node.shape === 'diamond') {
-        const side = r * 1.3;
-        ctx.beginPath();
-        ctx.moveTo(node.x, node.y - side);
-        ctx.lineTo(node.x + side, node.y);
-        ctx.lineTo(node.x, node.y + side);
-        ctx.lineTo(node.x - side, node.y);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-      } else if (node.shape === 'capsule') {
-        const w = r * 2.2;
-        const h = r * 1.1;
-        ctx.beginPath();
-        safeRoundRect(ctx, node.x - w / 2, node.y - h / 2, w, h, h / 2);
-        ctx.fill();
-        ctx.stroke();
-      } else {
-        // Circle (default)
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, r, 0, 2 * Math.PI);
-        ctx.fill();
-        ctx.stroke();
-      }
-
-      // 3. Node Labels (Culling outside viewport & visibility with zoom or hover/selected)
-      const isVisibleInViewport = node.x >= minX && node.x <= maxX && node.y >= minY && node.y <= maxY;
-      const showLabel = isVisibleInViewport && (t.k >= 0.72 || isSelected || isHovered || isNeighbor);
-
-      if (showLabel) {
-        ctx.font = isSelected ? '600 11px system-ui, sans-serif' : '400 10px system-ui, sans-serif';
-        ctx.fillStyle = isDark ? '#F4F4F5' : '#18181B';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-
-        const titleText = node.title.length > 24 ? node.title.slice(0, 22) + '…' : node.title;
-        ctx.fillText(titleText, node.x, node.y + r + 4);
+      const visible = node.x >= minX && node.x <= maxX && node.y >= minY && node.y <= maxY;
+      const wantLabel =
+        isSel || isHov ||
+        (active ? inFocus && (active.size <= 40 || hubs.has(node.id)) : (k >= 1.05 || (hubs.has(node.id) && k >= 0.45) || compact));
+      if (visible && wantLabel) {
+        const title = titleOf(node.title, node.type);
+        labels.push({
+          x: node.x,
+          y: node.y + r + 5 / k,
+          text: title.length > 28 ? title.slice(0, 26) + '…' : title,
+          strong: isSel || hubs.has(node.id),
+          alpha,
+          priority: isSel || isHov ? 1e6 : (inFocus ? 1000 : 0) + node.connectionCount,
+        });
       }
     });
 
-    ctx.restore();
-  }, [activeNeighborhood, selectedNodeId, hoveredNodeId, getNodeColor]);
+    // 3. Nombres encima de todo, con halo del color de fondo (como en Mapas)
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.lineJoin = 'round';
+    const fontPx = (compact ? 11 : 12) / k;
+    // Sin nombres encimados: primero el elegido y los más conectados; el resto solo si hay lugar
+    const placed: { x0: number; y0: number; x1: number; y1: number }[] = [];
+    labels.sort((a, b) => b.priority - a.priority);
+    const visibleLabels = labels.filter(l => {
+      ctx.font = `${l.strong ? 600 : 500} ${fontPx}px ${FONT_STACK}`;
+      const w = ctx.measureText(l.text).width;
+      const box = { x0: l.x - w / 2 - 2 / k, y0: l.y, x1: l.x + w / 2 + 2 / k, y1: l.y + fontPx * 1.2 };
+      const clash = placed.some(p => box.x0 < p.x1 && box.x1 > p.x0 && box.y0 < p.y1 && box.y1 > p.y0);
+      if (clash && l.priority < 1e6) return false;
+      placed.push(box);
+      return true;
+    });
+    visibleLabels.forEach(l => {
+      ctx.globalAlpha = l.alpha;
+      ctx.font = `${l.strong ? 600 : 500} ${fontPx}px ${FONT_STACK}`;
+      ctx.lineWidth = 4 / k;
+      ctx.strokeStyle = dark ? 'rgba(0,0,0,0.85)' : 'rgba(255,255,255,0.92)';
+      ctx.strokeText(l.text, l.x, l.y);
+      ctx.fillStyle = dark ? '#F5F5F7' : '#1D1D1F';
+      ctx.fillText(l.text, l.x, l.y);
+    });
+    ctx.globalAlpha = 1;
+  }, [compact]);
 
   const drawRef = useRef(draw);
   drawRef.current = draw;
 
-  // Trigger draw on hover / selection / neighborhood changes
   useEffect(() => {
     draw();
-  }, [draw]);
+  }, [draw, focusSet, selectedNodeId, hoveredNodeId, hubIds, privacyMode]);
 
-  // D3 Zoom & Drag interaction (attached stably without churn on hover)
+  // ---------------- Cámara (zoom y paneo sincronizados con d3) ----------------
+  const setCamera = useCallback((next: ZoomTransform, animate = true) => {
+    const canvas = canvasRef.current;
+    const z = zoomRef.current;
+    if (!canvas || !z) return;
+    if (animRef.current) cancelAnimationFrame(animRef.current);
+    const sel = select(canvas);
+    if (!animate || prefersReducedMotion()) {
+      sel.call(z.transform, next);
+      return;
+    }
+    const from = transformRef.current;
+    const start = performance.now();
+    const duration = 380;
+    const ease = (x: number) => 1 - Math.pow(1 - x, 3);
+    const step = (now: number) => {
+      const p = Math.min(1, (now - start) / duration);
+      const e = ease(p);
+      const k = from.k + (next.k - from.k) * e;
+      const x = from.x + (next.x - from.x) * e;
+      const y = from.y + (next.y - from.y) * e;
+      sel.call(z.transform, zoomIdentity.translate(x, y).scale(k));
+      if (p < 1) animRef.current = requestAnimationFrame(step);
+      else animRef.current = null;
+    };
+    animRef.current = requestAnimationFrame(step);
+  }, []);
+
+  // Panel abierto: el nodo se centra en el espacio que queda libre
+  const viewportCenter = useCallback((panelOpen: boolean) => {
+    const canvas = canvasRef.current;
+    const w = canvas?.clientWidth || 800;
+    const h = canvas?.clientHeight || 600;
+    const isWide = w >= 640;
+    if (panelOpen && isWide) return { cx: (w - 336) / 2, cy: h / 2 };
+    if (panelOpen) return { cx: w / 2, cy: h * 0.3 };
+    return { cx: w / 2, cy: h / 2 };
+  }, []);
+
+  const fitToView = useCallback((animate = true) => {
+    const canvas = canvasRef.current;
+    const nodes = simNodesRef.current.filter(n => typeof n.x === 'number');
+    if (!canvas || nodes.length === 0) return;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    nodes.forEach(n => {
+      x0 = Math.min(x0, n.x! - n.radius);
+      y0 = Math.min(y0, n.y! - n.radius);
+      x1 = Math.max(x1, n.x! + n.radius);
+      y1 = Math.max(y1, n.y! + n.radius + 16);
+    });
+    // Margen extra abajo (leyenda) y a la derecha (zoom)
+    const [pl, pr, pt, pb] = compact ? [20, 44, 20, 20] : [40, 72, 36, 96];
+    const availW = Math.max(80, w - pl - pr);
+    const availH = Math.max(80, h - pt - pb);
+    const k = Math.max(0.2, Math.min(compact ? 1.4 : 1.6, Math.min(availW / Math.max(1, x1 - x0), availH / Math.max(1, y1 - y0))));
+    const tx = pl + availW / 2 - k * (x0 + x1) / 2;
+    const ty = pt + availH / 2 - k * (y0 + y1) / 2;
+    setCamera(zoomIdentity.translate(tx, ty).scale(k), animate);
+  }, [compact, setCamera]);
+
+  const centerOnNode = useCallback((id: string) => {
+    const node = simNodesRef.current.find(n => n.id === id);
+    if (!node || typeof node.x !== 'number') return;
+    const { cx, cy } = viewportCenter(!compact);
+    const k = Math.max(transformRef.current.k, 1.1);
+    setCamera(zoomIdentity.translate(cx - node.x * k, cy - node.y! * k).scale(k));
+  }, [setCamera, viewportCenter, compact]);
+
+  const zoomBy = (factor: number) => {
+    hapticFeedback.light();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const t = transformRef.current;
+    const k = Math.max(0.2, Math.min(5, t.k * factor));
+    const cx = canvas.clientWidth / 2, cy = canvas.clientHeight / 2;
+    const wx = (cx - t.x) / t.k, wy = (cy - t.y) / t.k;
+    setCamera(zoomIdentity.translate(cx - wx * k, cy - wy * k).scale(k));
+  };
+
+  const selectNode = useCallback((id: string | null, center = false) => {
+    setSelectedNodeId(id);
+    if (id && center) requestAnimationFrame(() => centerOnNode(id));
+  }, [centerOnNode]);
+
+  // ---------------- Simulación: se arma cuando cambian los datos ----------------
+  const nodeSetKey = useMemo(() => rawNodes.map(n => n.id).sort().join('|'), [rawNodes]);
+  const lastNodeSetKey = useRef('');
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const width = canvas.clientWidth || 800;
+    const height = canvas.clientHeight || 600;
+
+    if (lastNodeSetKey.current !== nodeSetKey) {
+      needsFitRef.current = true;
+      userMovedRef.current = false;
+      lastNodeSetKey.current = nodeSetKey;
+    }
+
+    const prev = new Map<string, SimulationNode>();
+    simNodesRef.current.forEach(n => prev.set(n.id, n));
+
+    const nodes: SimulationNode[] = rawNodes.map((n, i) => {
+      const old = prev.get(n.id);
+      if (old && typeof old.x === 'number') return { ...n, x: old.x, y: old.y, vx: 0, vy: 0 };
+      // Los nuevos nacen cerca de un vecino ya ubicado, o en espiral alrededor del centro
+      const neighbor = [...(adjacency.get(n.id) || [])].map(id => prev.get(id)).find(p => p && typeof p.x === 'number');
+      if (neighbor) return { ...n, x: neighbor.x! + (Math.random() - 0.5) * 40, y: neighbor.y! + (Math.random() - 0.5) * 40 };
+      const angle = i * 2.399963;
+      const radius = 14 * Math.sqrt(i + 1);
+      return { ...n, x: width / 2 + Math.cos(angle) * radius, y: height / 2 + Math.sin(angle) * radius };
+    });
+    const links: SimulationLink[] = rawEdges.map(e => ({
+      id: e.id,
+      source: typeof e.source === 'string' ? e.source : e.source.id,
+      target: typeof e.target === 'string' ? e.target : e.target.id,
+      isStructural: e.isStructural,
+      weight: e.weight,
+    }));
+
+    simNodesRef.current = nodes;
+    simLinksRef.current = links;
+    simulationRef.current?.stop();
+
+    const charge = compact ? Math.min(repulsionStrength, 140) : repulsionStrength;
+    const sim = forceSimulation<SimulationNode>(nodes)
+      .force('link', forceLink<SimulationNode, SimulationLink>(links).id(d => d.id).distance(l => (l.isStructural ? linkDistance * 0.8 : linkDistance)).strength(0.5))
+      .force('charge', forceManyBody<SimulationNode>().strength(d => -charge * (0.6 + Math.min(1.2, d.connectionCount * 0.08))).distanceMax(600))
+      .force('center', forceCenter(width / 2, height / 2))
+      .force('x', forceX(width / 2).strength(0.045))
+      .force('y', forceY(height / 2).strength(0.045))
+      .force('collide', forceCollide<SimulationNode>().radius(d => d.radius + 10))
+      .alphaDecay(0.035);
+
+    const hadPositions = nodes.every(n => prev.has(n.id));
+    if (hadPositions) sim.alpha(0.25);
+
+    if (prefersReducedMotion()) {
+      sim.stop();
+      for (let i = 0; i < 200; i++) sim.tick();
+      if (needsFitRef.current) {
+        needsFitRef.current = false;
+        requestAnimationFrame(() => fitToView(false));
+      }
+      drawRef.current();
+    } else {
+      let ticks = 0;
+      sim.on('tick', () => {
+        ticks++;
+        // Primero se ubica sola un momento y después se encuadra con una animación suave
+        if (needsFitRef.current && ticks === 60) fitToView(true);
+        drawRef.current();
+      });
+      sim.on('end', () => {
+        // Encuadre final cuando la red ya se acomodó (si nadie tocó la cámara)
+        if (needsFitRef.current && !userMovedRef.current) fitToView(true);
+        needsFitRef.current = false;
+      });
+    }
+    simulationRef.current = sim;
+    return () => {
+      sim.stop();
+    };
+    // adjacency se usa solo para ubicar nodos nuevos
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawNodes, rawEdges, repulsionStrength, linkDistance, compact, nodeSetKey]);
+
+  // ---------------- Interacción: zoom, arrastre, toque y mouse ----------------
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Node hit testing helper
-    const getNodeAt = (screenX: number, screenY: number): SimulationNode | null => {
+    const toWorld = (clientX: number, clientY: number) => {
       const rect = canvas.getBoundingClientRect();
-      const clickX = screenX - rect.left;
-      const clickY = screenY - rect.top;
-
       const t = transformRef.current;
-      const canvasX = (clickX - t.x) / t.k;
-      const canvasY = (clickY - t.y) / t.k;
-
-      for (let i = simNodesRef.current.length - 1; i >= 0; i--) {
-        const node = simNodesRef.current[i];
-        if (typeof node.x === 'number' && typeof node.y === 'number') {
-          const dx = canvasX - node.x;
-          const dy = canvasY - node.y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist <= Math.max(24, node.radius + 6)) {
-            return node;
-          }
+      return { x: (clientX - rect.left - t.x) / t.k, y: (clientY - rect.top - t.y) / t.k };
+    };
+    const nodeAt = (clientX: number, clientY: number): SimulationNode | null => {
+      const p = toWorld(clientX, clientY);
+      const tolerance = 8 / transformRef.current.k;
+      let best: SimulationNode | null = null;
+      let bestDist = Infinity;
+      for (const n of simNodesRef.current) {
+        if (typeof n.x !== 'number') continue;
+        const d = Math.hypot(p.x - n.x, p.y - n.y!);
+        if (d <= n.radius + tolerance && d < bestDist) {
+          best = n;
+          bestDist = d;
         }
       }
-      return null;
+      return best;
+    };
+    const pointOf = (event: any) => {
+      const src = event.sourceEvent || event;
+      const touch = src.touches?.[0] || src.changedTouches?.[0];
+      return { x: touch ? touch.clientX : src.clientX, y: touch ? touch.clientY : src.clientY };
     };
 
-    const zoomBehavior = zoom<HTMLCanvasElement, unknown>()
+    const z = zoom<HTMLCanvasElement, unknown>()
       .scaleExtent([0.2, 5])
-      .filter((event) => {
-        // Allow zoom/pan unless user is starting a drag on a specific node
-        if (event.type === 'pointerdown' || event.type === 'mousedown' || event.type === 'touchstart') {
-          const clientX = event.clientX ?? (event.touches ? event.touches[0]?.clientX : 0);
-          const clientY = event.clientY ?? (event.touches ? event.touches[0]?.clientY : 0);
-          const node = getNodeAt(clientX, clientY);
-          return !node; // If node hit, let dragBehavior handle it
+      .filter(event => {
+        if (event.type === 'mousedown' || event.type === 'touchstart' || event.type === 'pointerdown') {
+          if (event.button) return false;
+          const p = pointOf(event);
+          if (event.touches && event.touches.length > 1) return true;
+          return !nodeAt(p.x, p.y);
         }
-        return true;
+        if (event.type === 'dblclick') {
+          return !nodeAt(event.clientX, event.clientY);
+        }
+        return !event.button;
       })
-      .on('zoom', (event) => {
-        setTransform(event.transform);
+      .on('zoom', event => {
+        if (event.sourceEvent) userMovedRef.current = true;
         transformRef.current = event.transform;
         drawRef.current();
       });
+    zoomRef.current = z;
+    const sel = select(canvas);
+    sel.call(z);
+    sel.call(z.transform, transformRef.current);
 
-    const selection = select(canvas);
-    selection.call(zoomBehavior as any);
-
-    // Drag behavior (only activates when starting on a node)
+    let dragMoved = false;
     const dragBehavior = drag<HTMLCanvasElement, unknown>()
-      .filter((event) => {
-        if (event.button !== undefined && event.button !== 0) return false;
-        const source = event.sourceEvent || event;
-        const clientX = source.clientX ?? (source.touches ? source.touches[0]?.clientX : event.x);
-        const clientY = source.clientY ?? (source.touches ? source.touches[0]?.clientY : event.y);
-        const node = getNodeAt(clientX, clientY);
-        return !!node;
+      .container(canvas)
+      .filter(event => {
+        if (event.button) return false;
+        const p = pointOf(event);
+        return !!nodeAt(p.x, p.y);
       })
-      .subject((event) => {
-        const source = event.sourceEvent || event;
-        const clientX = source.clientX ?? (source.touches ? source.touches[0]?.clientX : event.x);
-        const clientY = source.clientY ?? (source.touches ? source.touches[0]?.clientY : event.y);
-        const node = getNodeAt(clientX, clientY);
-        return node || undefined;
+      .subject(event => {
+        const p = pointOf(event);
+        return nodeAt(p.x, p.y) || undefined;
       })
-      .on('start', (event) => {
-        if (!event.subject) return;
-        hapticFeedback.selection();
-        if (simulationRef.current) {
-          simulationRef.current.alphaTarget(0.3).restart();
+      .on('start', event => {
+        dragMoved = false;
+        const n = event.subject as SimulationNode;
+        n.fx = n.x;
+        n.fy = n.y;
+      })
+      .on('drag', event => {
+        const n = event.subject as SimulationNode;
+        const p = pointOf(event);
+        const w = toWorld(p.x, p.y);
+        if (!dragMoved) {
+          dragMoved = true;
+          simulationRef.current?.alphaTarget(0.25).restart();
+          canvas.style.cursor = 'grabbing';
         }
-        event.subject.fx = event.subject.x;
-        event.subject.fy = event.subject.y;
-      })
-      .on('drag', (event) => {
-        if (!event.subject) return;
-        const source = event.sourceEvent || event;
-        const clientX = source.clientX ?? (source.touches ? source.touches[0]?.clientX : event.x);
-        const clientY = source.clientY ?? (source.touches ? source.touches[0]?.clientY : event.y);
-        const rect = canvas.getBoundingClientRect();
-        const t = transformRef.current;
-        event.subject.fx = (clientX - rect.left - t.x) / t.k;
-        event.subject.fy = (clientY - rect.top - t.y) / t.k;
+        n.fx = w.x;
+        n.fy = w.y;
         drawRef.current();
       })
-      .on('end', (event) => {
-        if (!event.subject) return;
-        if (simulationRef.current) {
-          simulationRef.current.alphaTarget(0);
-        }
-        setSelectedNodeId(event.subject.id);
-        drawRef.current();
-      });
-
-    selection.call(dragBehavior as any);
-
-    // Double click to release pinned node
-    const handleDblClick = (e: MouseEvent) => {
-      const node = getNodeAt(e.clientX, e.clientY);
-      if (node) {
-        hapticFeedback.light();
-        node.fx = null;
-        node.fy = null;
-        if (simulationRef.current) {
-          simulationRef.current.alpha(0.15).restart();
-        }
-      }
-    };
-
-    // Hover hit test
-    const handleMouseMove = (e: MouseEvent) => {
-      const node = getNodeAt(e.clientX, e.clientY);
-      setHoveredNodeId(node ? node.id : null);
-      drawRef.current();
-    };
-
-    // Click selection
-    const handleClick = (e: MouseEvent) => {
-      const node = getNodeAt(e.clientX, e.clientY);
-      if (node) {
-        hapticFeedback.medium();
-        setSelectedNodeId(node.id);
-      }
-    };
-
-    canvas.addEventListener('dblclick', handleDblClick);
-    canvas.addEventListener('mousemove', handleMouseMove);
-    canvas.addEventListener('click', handleClick);
-
-    // Resize observer to handle container resizes and view switches smoothly
-    let resizeObserver: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
-      resizeObserver = new ResizeObserver(() => {
-        const w = canvas.clientWidth;
-        const h = canvas.clientHeight;
-        if (w > 0 && h > 0) {
-          if (simulationRef.current) {
-            simulationRef.current.force('center', forceCenter(w / 2, h / 2));
-            simulationRef.current.alpha(0.08).restart();
-          }
-          drawRef.current();
+      .on('end', event => {
+        const n = event.subject as SimulationNode;
+        simulationRef.current?.alphaTarget(0);
+        // Al soltarlo vuelve a acomodarse solo
+        n.fx = null;
+        n.fy = null;
+        canvas.style.cursor = '';
+        if (!dragMoved) {
+          hapticFeedback.selection();
+          setSelectedNodeId(n.id);
         }
       });
-      resizeObserver.observe(containerRef.current);
-    }
+    sel.call(dragBehavior);
 
-    const handleWinResize = () => {
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-      if (w > 0 && h > 0 && simulationRef.current) {
-        simulationRef.current.force('center', forceCenter(w / 2, h / 2));
-        simulationRef.current.alpha(0.05).restart();
+    let lastHover: string | null = null;
+    const onMove = (e: MouseEvent) => {
+      if (e.buttons) return;
+      const n = nodeAt(e.clientX, e.clientY);
+      const id = n ? n.id : null;
+      canvas.style.cursor = n ? 'pointer' : '';
+      if (id !== lastHover) {
+        lastHover = id;
+        setHoveredNodeId(id);
       }
-      drawRef.current();
     };
-    window.addEventListener('resize', handleWinResize);
+    const onLeave = () => {
+      lastHover = null;
+      setHoveredNodeId(null);
+    };
+    // Toque en vacío: suelta la selección
+    const onClick = (e: MouseEvent) => {
+      if (!nodeAt(e.clientX, e.clientY) && !compact) setSelectedNodeId(null);
+    };
+    canvas.addEventListener('mousemove', onMove);
+    canvas.addEventListener('mouseleave', onLeave);
+    canvas.addEventListener('click', onClick);
+
+    const ro = new ResizeObserver(() => {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      simulationRef.current?.force('center', forceCenter(w / 2, h / 2));
+      simulationRef.current?.force('x', forceX(w / 2).strength(0.045));
+      simulationRef.current?.force('y', forceY(h / 2).strength(0.045));
+      drawRef.current();
+    });
+    if (stageRef.current) ro.observe(stageRef.current);
+
+    // Cambio de tema claro/oscuro: redibuja con los colores nuevos
+    const mo = new MutationObserver(() => drawRef.current());
+    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    const onVisibility = () => {
+      if (document.hidden) simulationRef.current?.stop();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
 
     return () => {
-      canvas.removeEventListener('dblclick', handleDblClick);
-      canvas.removeEventListener('mousemove', handleMouseMove);
-      canvas.removeEventListener('click', handleClick);
-      window.removeEventListener('resize', handleWinResize);
-      if (resizeObserver) {
-        resizeObserver.disconnect();
-      }
+      canvas.removeEventListener('mousemove', onMove);
+      canvas.removeEventListener('mouseleave', onLeave);
+      canvas.removeEventListener('click', onClick);
+      document.removeEventListener('visibilitychange', onVisibility);
+      ro.disconnect();
+      mo.disconnect();
+      sel.on('.zoom', null).on('.drag', null);
+      if (animRef.current) cancelAnimationFrame(animRef.current);
     };
-  }, []);
+  }, [compact]);
 
-  // Pause simulation when container is hidden, or redraw on tab switch
+  // Al volver de la lista o pasar a pantalla completa, reencuadra
+  const firstLayoutRef = useRef(true);
   useEffect(() => {
-    if (displayFormat === 'canvas') {
-      requestAnimationFrame(() => {
-        draw();
-      });
+    if (firstLayoutRef.current) {
+      firstLayoutRef.current = false;
+      return;
     }
-  }, [displayFormat, draw]);
+    if (displayFormat !== 'canvas') return;
+    // Espera a que el contenedor tome su tamaño nuevo
+    const id = window.setTimeout(() => {
+      drawRef.current();
+      fitToView(true);
+    }, 60);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [displayFormat, isFullscreen]);
 
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.hidden && simulationRef.current) {
-        simulationRef.current.stop();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
-    return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
-
-  // Save current view preset
-  const handleSaveCurrentView = () => {
-    if (!newViewName.trim()) return;
-    const newView: SavedGraphView = {
-      id: `view_${Date.now()}`,
-      name: newViewName.trim(),
-      viewMode,
-      filterTypes: activeFilterTypes,
-      showOrphans,
-      includeStructural,
-      includeTags: showTags,
-      focusDepth,
-    };
-    const updated = [...savedViews, newView];
-    setSavedViews(updated);
+  // ---------------- Vistas guardadas ----------------
+  const persistViews = (views: SavedGraphView[]) => {
+    setSavedViews(views);
     try {
-      localStorage.setItem(STORAGE_SAVED_VIEWS, JSON.stringify(updated));
+      localStorage.setItem(STORAGE_SAVED_VIEWS, JSON.stringify(views));
     } catch {}
+  };
+  const handleSaveCurrentView = () => {
+    const name = newViewName.trim();
+    if (!name) return;
+    persistViews([
+      ...savedViews,
+      { id: `view_${Date.now()}`, name, filterTypes: activeFilterTypes, showOrphans, includeStructural, includeTags: layers.etiquetas, focusDepth },
+    ]);
     setNewViewName('');
-    setShowSavedViewsModal(false);
     hapticFeedback.success();
   };
-
   const handleApplySavedView = (view: SavedGraphView) => {
-    setViewMode(view.viewMode);
+    const types = view.filterTypes || [];
+    const next = {} as Layers;
+    LAYERS.forEach(l => {
+      next[l.key] = types.length === 0 ? l.key !== 'personal' : l.types.some(t => types.includes(t));
+    });
+    if (view.includeTags) next.etiquetas = true;
+    setLayers(next);
     setShowOrphans(view.showOrphans);
     setIncludeStructural(view.includeStructural);
-    setShowTags(view.includeTags);
-    setFocusDepth(view.focusDepth);
-    setShowTasks(view.filterTypes.includes('tarea'));
-    setShowMeetings(view.filterTypes.includes('reunion'));
-    setShowIncomes(view.filterTypes.includes('ingreso'));
-    setShowSavedViewsModal(false);
+    setFocusDepth(view.focusDepth || 1);
+    setPreset('custom');
+    setShowOptions(false);
     hapticFeedback.light();
   };
+  const handleDeleteView = (id: string) => persistViews(savedViews.filter(v => v.id !== id));
 
-  // Backlinks of currently selected node
-  const selectedBacklinks = useMemo(() => {
+  // ---------------- Datos del panel ----------------
+  const selectedItem = selectedNodeId ? catalogById.get(selectedNodeId) || null : null;
+  const selectedConnections = useMemo(() => {
     if (!selectedNodeId) return [];
-    return getBacklinksForEntity(selectedNodeId, relations, catalog);
-  }, [selectedNodeId, relations, catalog]);
+    const seen = new Map<string, { id: string; title: string; type: LinkEntityType; path: string; structural: boolean }>();
+    relations.forEach(r => {
+      if (!includeStructural && r.isStructural) return;
+      let otherId: string | null = null;
+      if (r.sourceId === selectedNodeId) otherId = r.targetId;
+      else if (r.targetId === selectedNodeId) otherId = r.sourceId;
+      if (!otherId || seen.has(otherId)) return;
+      const item = catalogById.get(otherId);
+      if (!item) return;
+      seen.set(otherId, { id: otherId, title: item.title, type: item.type, path: item.path, structural: Boolean(r.isStructural) });
+    });
+    return [...seen.values()].sort((a, b) => typeLabel(a.type).localeCompare(typeLabel(b.type)) || a.title.localeCompare(b.title));
+  }, [selectedNodeId, relations, catalogById, includeStructural]);
+
+  const legend = useMemo(() => {
+    const counts = new Map<LinkEntityType, number>();
+    rawNodes.forEach(n => counts.set(n.type, (counts.get(n.type) || 0) + 1));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [rawNodes]);
+
+  const listGroups = useMemo(() => {
+    const q = normalizeEntityTitle(searchQuery);
+    const groups = new Map<LinkEntityType, GraphNode[]>();
+    rawNodes
+      .filter(n => !q || normalizeEntityTitle(n.title).includes(q))
+      .forEach(n => {
+        if (!groups.has(n.type)) groups.set(n.type, []);
+        groups.get(n.type)!.push(n);
+      });
+    return [...groups.entries()].map(([type, items]) => [type, items.sort((a, b) => b.connectionCount - a.connectionCount)] as const);
+  }, [rawNodes, searchQuery]);
+
+  const submitSearch = () => {
+    if (!searchMatches || searchMatches.size === 0) return;
+    const first = rawNodes.filter(n => searchMatches.has(n.id)).sort((a, b) => b.connectionCount - a.connectionCount)[0];
+    if (first) {
+      hapticFeedback.selection();
+      selectNode(first.id, true);
+    }
+  };
+
+  const dark = typeof document !== 'undefined' && isDarkTheme();
+  const glass = 'bg-[var(--bg-surface)]/85 backdrop-blur-xl backdrop-saturate-150 border border-[var(--border-subtle)] shadow-[var(--shadow-float)]';
+  const iconBtn = 'w-9 h-9 flex items-center justify-center rounded-full text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] transition-colors cursor-pointer';
 
   return (
-    <div 
-      ref={containerRef}
-      className={`relative w-full rounded-2xl bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden flex flex-col font-sans select-none transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] ${
-        isFullscreen ? '!fixed !inset-0 !z-50 !rounded-none !h-screen !w-screen !border-none' : ''
+    <div
+      className={`w-full flex flex-col overflow-hidden select-none bg-[var(--bg-surface)] ${
+        isFullscreen ? 'fixed inset-0 z-50 rounded-none' : 'relative rounded-[var(--radius-card)] border border-[var(--border-subtle)] shadow-[var(--shadow-card)]'
       }`}
-      style={{ height: isFullscreen ? '100vh' : height }}
+      style={{ height: isFullscreen ? '100dvh' : height }}
     >
-      {/* 1. Control Header Bar (Sobrio / Swiss Minimal) */}
-      <div className="p-2.5 sm:p-3 border-b border-[var(--border-subtle)] bg-[var(--bg-app)] flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 z-20">
-        
-        {/* Left: Quick Presets (Clientes & Notas, Conocimiento, Cobros, Todo) & Canvas/Table */}
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-0.5 sm:pb-0">
-          {/* Quick Filter Presets */}
-          <div className="flex p-0.5 rounded-lg bg-[var(--bg-surface-muted)] border border-[var(--border-subtle)] text-xs font-medium shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                hapticFeedback.selection();
-                setQuickPreset('clients_notes');
-                setShowOrphans(false);
-              }}
-              className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[11px] sm:text-xs whitespace-nowrap ${
-                quickPreset === 'clients_notes'
-                  ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] font-semibold shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Solo ver Clientes y sus Notas asociadas"
-            >
-              Clientes & Notas
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                hapticFeedback.selection();
-                setQuickPreset('knowledge');
-                setShowOrphans(false);
-              }}
-              className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[11px] sm:text-xs whitespace-nowrap ${
-                quickPreset === 'knowledge'
-                  ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] font-semibold shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Notas, Proyectos, Clientes y Metas"
-            >
-              Conocimiento
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                hapticFeedback.selection();
-                setQuickPreset('clients_finances');
-                setShowOrphans(false);
-              }}
-              className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[11px] sm:text-xs whitespace-nowrap ${
-                quickPreset === 'clients_finances'
-                  ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] font-semibold shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Clientes, Proyectos y Cobros"
-            >
-              Cobros
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                hapticFeedback.selection();
-                setQuickPreset('all');
-                setViewMode('classic');
-                setShowOrphans(true);
-              }}
-              className={`px-2.5 py-1 rounded-md transition cursor-pointer text-[11px] sm:text-xs whitespace-nowrap ${
-                quickPreset === 'all'
-                  ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] font-semibold shadow-xs'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-              title="Todos los nodos del ecosistema"
-            >
-              Todo
-            </button>
+      {/* Barra superior: control segmentado, búsqueda y opciones */}
+      {!compact && (
+        <div className={`relative flex flex-wrap items-center gap-2 px-3 py-2.5 border-b border-[var(--border-subtle)] z-10 ${isFullscreen ? 'safe-area-pt' : ''}`}>
+          <div role="tablist" aria-label="Qué mostrar" className="flex p-[3px] rounded-[10px] bg-[var(--bg-surface-muted)]/70 overflow-x-auto no-scrollbar max-w-full">
+            {PRESETS.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                role="tab"
+                aria-selected={preset === p.key}
+                onClick={() => applyPreset(p.key)}
+                className={`px-3 h-7 rounded-[8px] text-[13px] whitespace-nowrap transition-[background-color,color,box-shadow] duration-200 cursor-pointer ${
+                  preset === p.key
+                    ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] font-semibold shadow-[0_1px_3px_rgba(0,0,0,0.12),0_0_0_0.5px_rgba(0,0,0,0.04)]'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
 
-          {/* Canvas vs Table Toggle */}
-          <div className="flex p-0.5 rounded-lg bg-[var(--bg-surface-muted)] border border-[var(--border-subtle)] text-xs shrink-0">
-            <button
-              type="button"
-              onClick={() => setDisplayFormat('canvas')}
-              className={`p-1 rounded-md transition cursor-pointer ${
-                displayFormat === 'canvas' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs' : 'text-[var(--text-tertiary)]'
-              }`}
-              title="Vista Canvas Grafo"
-            >
-              <CircleDot className="w-3.5 h-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setDisplayFormat('table')}
-              className={`p-1 rounded-md transition cursor-pointer ${
-                displayFormat === 'table' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-xs' : 'text-[var(--text-tertiary)]'
-              }`}
-              title="Vista Tabla Accesible"
-            >
-              <Table className="w-3.5 h-3.5" />
-            </button>
-          </div>
-
-          <div className="text-[11px] font-mono text-[var(--text-secondary)] pl-1 whitespace-nowrap hidden sm:inline">
-            {rawNodes.length} nodos · {rawEdges.length} enlaces
-          </div>
-        </div>
-
-        {/* Center & Right Controls */}
-        <div className="flex items-center gap-2 justify-between lg:justify-end">
-          {/* Search input */}
-          <div className="relative flex-1 sm:w-52">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] pointer-events-none" aria-hidden />
             <input
-              type="text"
+              type="search"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar en la red…"
-              className="w-full bg-[var(--bg-surface-muted)] border border-[var(--border-subtle)] rounded-lg pl-8 pr-3 py-1 text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--border-strong)]"
+              onChange={e => setSearchQuery(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') submitSearch();
+              }}
+              placeholder="Buscar"
+              aria-label="Buscar en el grafo"
+              className="ios-search w-full h-9 rounded-[10px] bg-[var(--bg-surface-muted)]/70 border-0 pl-8 pr-8 text-[14px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+                aria-label="Borrar búsqueda"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-[var(--text-tertiary)]/60 text-[var(--bg-surface)] flex items-center justify-center cursor-pointer"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3 h-3" strokeWidth={3} />
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            {/* Guide Button */}
-            <button
-              type="button"
-              onClick={() => {
-                hapticFeedback.light();
-                setShowGuideModal(true);
-              }}
-              className="px-2 py-1 rounded-lg bg-[var(--bg-surface-muted)] hover:bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer font-medium"
-              title="Guía: Cómo usar el 2° Cerebro y el Grafo"
-            >
-              <BookOpen className="w-3.5 h-3.5 text-purple-500" />
-              <span className="hidden sm:inline">¿Cómo funciona?</span>
-            </button>
-
-            {/* Saved Views Button */}
-            <button
-              type="button"
-              onClick={() => setShowSavedViewsModal(true)}
-              className="px-2 py-1 rounded-lg bg-[var(--bg-surface-muted)] hover:bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-xs text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer"
-              title="Vistas Guardadas"
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Vistas</span>
-            </button>
-
-            {/* Physics Tuning Toggle */}
-            <button
-              type="button"
-              onClick={() => setShowPhysicsControls(prev => !prev)}
-              className={`p-1.5 rounded-lg border text-xs transition cursor-pointer ${
-                showPhysicsControls
-                  ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] border-transparent'
-                  : 'bg-[var(--bg-surface-muted)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
-              }`}
-              title="Ajustar Físicas d3"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Reset Zoom & Pan */}
-            <button
-              type="button"
-              onClick={handleResetZoom}
-              className="p-1.5 rounded-lg bg-[var(--bg-surface-muted)] hover:bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-secondary)] cursor-pointer"
-              title="Recentrar vista"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-
-            {/* Fullscreen Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                hapticFeedback.light();
-                setIsFullscreen(prev => !prev);
-              }}
-              className={`p-1.5 rounded-lg border text-xs transition cursor-pointer ${
-                isFullscreen
-                  ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] border-transparent'
-                  : 'bg-[var(--bg-surface-muted)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
-              }`}
-              title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
-            >
-              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Optional Layer Toggles Bar (Subtle Strip) */}
-      <div className="px-3 py-1.5 bg-[var(--bg-surface)] border-b border-[var(--border-subtle)] flex items-center justify-between text-xs text-[var(--text-secondary)] gap-2 z-10 overflow-x-auto scrollbar-none">
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-mono uppercase text-[var(--text-tertiary)] mr-1">Capas:</span>
-          
-          <button
-            type="button"
-            onClick={() => setShowTasks(prev => !prev)}
-            className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition cursor-pointer whitespace-nowrap ${
-              showTasks
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] border-[var(--border-strong)]'
-                : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            Tareas
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowMeetings(prev => !prev)}
-            className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition cursor-pointer whitespace-nowrap ${
-              showMeetings
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] border-[var(--border-strong)]'
-                : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            Reuniones
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowIncomes(prev => !prev)}
-            className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition cursor-pointer whitespace-nowrap ${
-              showIncomes
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] border-[var(--border-strong)]'
-                : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            Cobros
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowPersonalFinance(prev => !prev)}
-            className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition cursor-pointer whitespace-nowrap ${
-              showPersonalFinance
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] border-[var(--border-strong)]'
-                : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            Finanzas Personales
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowTags(prev => !prev)}
-            className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition cursor-pointer whitespace-nowrap ${
-              showTags
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] border-[var(--border-strong)]'
-                : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            #Tags
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setIncludeStructural(prev => !prev)}
-            className={`px-2 py-0.5 rounded-md border text-[11px] font-medium transition cursor-pointer whitespace-nowrap ${
-              includeStructural
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] border-[var(--border-strong)]'
-                : 'border-transparent text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-            }`}
-            title="Líneas punteadas automáticas"
-          >
-            Estructurales
-          </button>
-        </div>
-
-        {/* Orphans reviewer toggle button */}
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => setShowOrphansPanel(prev => !prev)}
-            className={`px-2 py-0.5 rounded-md text-[11px] transition cursor-pointer flex items-center gap-1 whitespace-nowrap ${
-              showOrphansPanel
-                ? 'bg-[var(--bg-surface-muted)] text-[var(--text-primary)] font-semibold'
-                : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-            }`}
-          >
-            <span>Huérfanos ({orphansList.length})</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 3. Focus Active Banner (with depth adjuster & exit button) */}
-      {selectedNodeId && (
-        <div className="absolute top-24 left-3 z-30 px-3 py-1.5 rounded-xl bg-[var(--bg-app)]/95 border border-[var(--border-subtle)] shadow-md backdrop-blur-sm flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-top-1 duration-150 max-w-[90vw]">
-          <div className="flex items-center gap-1.5 text-[var(--text-primary)] font-medium truncate">
-            <span className="w-2 h-2 rounded-full bg-[var(--solid-contrast-bg)] shrink-0" />
-            <span className="truncate max-w-[140px]">{selectedNode?.title || 'Elemento'}</span>
-          </div>
-
-          <div className="flex items-center gap-1 border-l border-[var(--border-subtle)] pl-2 text-[11px] text-[var(--text-secondary)] shrink-0">
-            <span>Saltos:</span>
-            {[1, 2, 3].map(d => (
+          <div className="flex items-center gap-1 ml-auto">
+            <div className="flex p-[3px] rounded-[10px] bg-[var(--bg-surface-muted)]/70" role="tablist" aria-label="Formato">
               <button
-                key={d}
                 type="button"
-                onClick={() => setFocusDepth(d)}
-                className={`px-1.5 py-0.2 rounded font-mono cursor-pointer ${
-                  focusDepth === d ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)] font-bold' : 'hover:text-[var(--text-primary)]'
-                }`}
+                role="tab"
+                aria-selected={displayFormat === 'canvas'}
+                aria-label="Ver como red"
+                title="Red"
+                onClick={() => setDisplayFormat('canvas')}
+                className={`w-8 h-7 rounded-[8px] flex items-center justify-center cursor-pointer ${displayFormat === 'canvas' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[0_1px_3px_rgba(0,0,0,0.12)]' : 'text-[var(--text-secondary)]'}`}
               >
-                {d}
+                <Network className="w-4 h-4" aria-hidden />
               </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setSelectedNodeId(null)}
-            className="p-1 rounded-md text-[var(--text-tertiary)] hover:text-[var(--text-primary)] ml-1 cursor-pointer shrink-0"
-            title="Salir del modo foco"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
-
-      {/* 4. Physics Tuning Floating Drawer */}
-      {showPhysicsControls && (
-        <div className="absolute top-24 right-3 z-30 w-64 p-4 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] shadow-xl text-xs space-y-3 animate-in fade-in duration-100">
-          <div className="flex items-center justify-between font-semibold text-[var(--text-primary)]">
-            <span>Físicas de la Red</span>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={displayFormat === 'list'}
+                aria-label="Ver como lista"
+                title="Lista"
+                onClick={() => setDisplayFormat('list')}
+                className={`w-8 h-7 rounded-[8px] flex items-center justify-center cursor-pointer ${displayFormat === 'list' ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-[0_1px_3px_rgba(0,0,0,0.12)]' : 'text-[var(--text-secondary)]'}`}
+              >
+                <List className="w-4 h-4" aria-hidden />
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => setShowPhysicsControls(false)}
-              className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)]"
+              onClick={() => setShowOptions(v => !v)}
+              aria-expanded={showOptions}
+              aria-label="Opciones del grafo"
+              title="Opciones"
+              className={`${iconBtn} ${showOptions ? 'bg-[var(--accent)]/12 !text-[var(--accent)]' : ''}`}
             >
-              <X className="w-3.5 h-3.5" />
+              <SlidersHorizontal className="w-[18px] h-[18px]" aria-hidden />
             </button>
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex justify-between text-[11px] text-[var(--text-secondary)]">
-              <span>Repulsión:</span>
-              <span className="font-mono">{repulsionStrength}</span>
-            </div>
-            <input
-              type="range"
-              min="50"
-              max="400"
-              value={repulsionStrength}
-              onChange={e => setRepulsionStrength(Number(e.target.value))}
-              className="w-full h-1 bg-[var(--bg-surface-muted)] rounded-lg appearance-none cursor-pointer"
-            />
-          </div>
-
-          <div className="space-y-1">
-            <div className="flex justify-between text-[11px] text-[var(--text-secondary)]">
-              <span>Distancia de resortes:</span>
-              <span className="font-mono">{linkDistance}px</span>
-            </div>
-            <input
-              type="range"
-              min="40"
-              max="200"
-              value={linkDistance}
-              onChange={e => setLinkDistance(Number(e.target.value))}
-              className="w-full h-1 bg-[var(--bg-surface-muted)] rounded-lg appearance-none cursor-pointer"
-            />
+            <button
+              type="button"
+              onClick={() => {
+                hapticFeedback.light();
+                setIsFullscreen(v => !v);
+              }}
+              aria-label={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'}
+              title={isFullscreen ? 'Salir de pantalla completa (Esc)' : 'Pantalla completa'}
+              className={iconBtn}
+            >
+              {isFullscreen ? <Minimize2 className="w-[18px] h-[18px]" aria-hidden /> : <Maximize2 className="w-[18px] h-[18px]" aria-hidden />}
+            </button>
           </div>
         </div>
       )}
 
-      {/* 5. Main Canvas Display with Floating Zoom / Touch Controls */}
-      <div className="relative flex-1 w-full h-full overflow-hidden">
+      {/* Lienzo */}
+      <div ref={stageRef} className={`relative flex-1 min-h-0 ${displayFormat === 'canvas' ? '' : 'hidden'}`}>
         <canvas
           ref={canvasRef}
-          className={`w-full h-full cursor-grab active:cursor-grabbing touch-none ${
-            displayFormat === 'canvas' ? 'block' : 'hidden'
-          }`}
+          className="absolute inset-0 w-full h-full touch-none outline-none"
+          role="img"
+          aria-label={`Grafo con ${rawNodes.length} elementos y ${rawEdges.length} conexiones. Para recorrerlo con teclado usá la vista de lista.`}
         />
 
-        {/* Empty state when no nodes match current filter */}
-        {displayFormat === 'canvas' && rawNodes.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10 bg-[var(--bg-app)]/85 backdrop-blur-xs animate-in fade-in duration-200">
-            <div className="w-12 h-12 rounded-2xl bg-[var(--bg-surface-muted)] border border-[var(--border-subtle)] flex items-center justify-center text-[var(--text-tertiary)] mb-3">
-              <Network className="w-6 h-6" />
+        {rawNodes.length === 0 && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--text-tertiary)] mb-3">
+              <Network className="w-7 h-7" aria-hidden />
             </div>
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
-              No hay elementos visibles en el grafo
-            </h3>
-            <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-sm">
-              Puedes cambiar el preset a &quot;Todo&quot; o activar elementos sin conexiones para explorar notas, proyectos, tareas y cobros.
+            <h3 className="text-[17px] font-semibold text-[var(--text-primary)]">Todavía no hay conexiones para mostrar</h3>
+            <p className="text-[14px] text-[var(--text-secondary)] mt-1 max-w-sm">
+              Escribí <code className="px-1 rounded bg-[var(--bg-surface-muted)]">[[Nombre]]</code> en una nota para conectarla con un cliente, un proyecto o una tarea.
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
+            {!compact && (
+              <div className="flex flex-wrap justify-center gap-2 mt-4">
+                <button type="button" onClick={() => applyPreset('all')} className="h-9 px-4 rounded-full bg-[var(--accent)] text-white text-[14px] font-semibold cursor-pointer">
+                  Mostrar todo
+                </button>
+                <button type="button" onClick={() => setShowGuideModal(true)} className="h-9 px-4 rounded-full bg-[var(--bg-surface-muted)] text-[var(--text-primary)] text-[14px] font-medium cursor-pointer">
+                  Cómo conectar notas
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Leyenda */}
+        {!compact && legend.length > 0 && (
+          <div className={`absolute left-3 bottom-3 z-10 max-w-[calc(100%-5.5rem)] rounded-2xl px-3 py-2 ${glass} ${selectedItem ? 'hidden sm:block' : ''}`}>
+            <ul className="flex flex-wrap gap-x-3 gap-y-1">
+              {legend.map(([type, count]) => (
+                <li key={type} className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+                  <span
+                    aria-hidden
+                    className={`shrink-0 ${LEGEND_SHAPE[getNodeShape(type)] || LEGEND_SHAPE.circle}`}
+                    style={{ backgroundColor: typeColor(type, dark) }}
+                  />
+                  <span>{TYPE_META[type]?.plural || type}</span>
+                  <span className="tabular-nums text-[var(--text-tertiary)]">{count}</span>
+                </li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-[var(--text-tertiary)] mt-1 tabular-nums">{rawEdges.length} conexiones · tocá un punto para ver sus vínculos</p>
+          </div>
+        )}
+
+        {/* Zoom */}
+        {rawNodes.length > 0 && (
+          <div className={`absolute right-3 z-10 flex flex-col rounded-full p-1 ${glass} ${compact ? 'bottom-2 right-2 scale-90 origin-bottom-right' : 'bottom-3'} ${selectedItem && !compact ? 'max-sm:hidden sm:right-[348px]' : ''}`}>
+            <button type="button" onClick={() => zoomBy(1.4)} aria-label="Acercar" title="Acercar" className={iconBtn}>
+              <Plus className="w-[18px] h-[18px]" aria-hidden />
+            </button>
+            <button type="button" onClick={() => zoomBy(1 / 1.4)} aria-label="Alejar" title="Alejar" className={iconBtn}>
+              <Minus className="w-[18px] h-[18px]" aria-hidden />
+            </button>
+            <div className="h-px mx-2 bg-[var(--border-subtle)]" />
+            <button type="button" onClick={() => { hapticFeedback.light(); fitToView(true); }} aria-label="Ver todo" title="Ver todo" className={iconBtn}>
+              <Scan className="w-[18px] h-[18px]" aria-hidden />
+            </button>
+          </div>
+        )}
+
+        {/* Versión chica: botón para abrir lo elegido */}
+        {compact && selectedItem && onNavigate && selectedNodeId !== focusNodeId && (
+          <button
+            type="button"
+            onClick={() => onNavigate(selectedItem.path)}
+            className={`absolute left-2 bottom-2 z-10 h-8 pl-3 pr-2 rounded-full flex items-center gap-1 text-[12px] font-semibold text-[var(--accent)] max-w-[70%] cursor-pointer ${glass}`}
+          >
+            <span className="truncate">Abrir {displayTitle(selectedItem.title, selectedItem.type)}</span>
+            <ChevronRight className="w-3.5 h-3.5 shrink-0" aria-hidden />
+          </button>
+        )}
+
+        {/* Inspector del elemento elegido: tarjeta flotante en compu, hoja inferior en el celular */}
+        {selectedItem && !compact && (
+          <aside
+            aria-label={`Detalle de ${selectedItem.title}`}
+            className={`z-30 flex flex-col overflow-hidden ${glass}
+              fixed inset-x-0 bottom-0 max-h-[62vh] rounded-t-[22px] safe-area-pb
+              sm:absolute sm:inset-x-auto sm:right-3 sm:top-3 sm:bottom-3 sm:w-[320px] sm:max-h-none sm:rounded-[18px]
+              t-sheet-enter`}
+          >
+            <div className="w-9 h-[5px] rounded-full bg-[var(--text-tertiary)]/40 mx-auto mt-2 sm:hidden" aria-hidden />
+            <div className="px-4 pt-3 pb-3 flex items-start gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 text-[12px] font-medium text-[var(--text-secondary)]">
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: typeColor(selectedItem.type, dark) }} aria-hidden />
+                  {typeLabel(selectedItem.type)}
+                </div>
+                <h3 className="text-[19px] leading-tight font-semibold text-[var(--text-primary)] mt-1 break-words">
+                  {displayTitle(selectedItem.title, selectedItem.type)}
+                </h3>
+                {selectedItem.subtitle && (
+                  <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">
+                    {privacyMode ? maskAmounts(selectedItem.subtitle) : selectedItem.subtitle}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
-                onClick={() => {
-                  hapticFeedback.light();
-                  setQuickPreset('all');
-                  setViewMode('classic');
-                  setShowOrphans(true);
-                  setShowTasks(true);
-                  setShowIncomes(true);
-                  setSearchQuery('');
-                  setSelectedFolder('');
-                  setSelectedTag('');
-                }}
-                className="btn-solid-primary text-xs font-semibold px-3 py-1.5 rounded-xl cursor-pointer active:scale-98"
+                onClick={() => setSelectedNodeId(null)}
+                aria-label="Cerrar detalle"
+                className="w-7 h-7 rounded-full bg-[var(--bg-surface-muted)] text-[var(--text-secondary)] flex items-center justify-center shrink-0 cursor-pointer"
               >
-                Mostrar todos los nodos
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowGuideModal(true)}
-                className="btn-swiss-secondary text-xs font-medium px-3 py-1.5 rounded-xl cursor-pointer"
-              >
-                Ver cómo conectar notas
+                <X className="w-4 h-4" strokeWidth={2.5} aria-hidden />
               </button>
             </div>
-          </div>
-        )}
 
-        {/* Floating Controls for Mobile Touch & Quick Zoom */}
-        {displayFormat === 'canvas' && (
-          <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-1.5 bg-[var(--bg-app)]/90 backdrop-blur-md p-1 rounded-xl border border-[var(--border-subtle)] shadow-lg">
-            <button
-              type="button"
-              onClick={handleZoomIn}
-              className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer"
-              title="Acercar (Zoom In)"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleZoomOut}
-              className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer"
-              title="Alejar (Zoom Out)"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={handleResetZoom}
-              className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer"
-              title="Recentrar vista"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                hapticFeedback.light();
-                setIsFullscreen(prev => !prev);
-              }}
-              className="p-2 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] transition cursor-pointer"
-              title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa'}
-            >
-              {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-          </div>
-        )}
-      </div>
+            <div className="px-4 pb-3 flex items-center justify-between gap-2">
+              <span className="text-[13px] text-[var(--text-secondary)]">Mostrar a</span>
+              <div className="flex p-[2px] rounded-[9px] bg-[var(--bg-surface-muted)]/70" role="radiogroup" aria-label="Distancia de vínculos">
+                {[1, 2, 3].map(d => (
+                  <button
+                    key={d}
+                    type="button"
+                    role="radio"
+                    aria-checked={focusDepth === d}
+                    onClick={() => setFocusDepth(d)}
+                    className={`px-2.5 h-6 rounded-[7px] text-[12px] cursor-pointer ${focusDepth === d ? 'bg-[var(--bg-surface)] text-[var(--text-primary)] font-semibold shadow-[0_1px_2px_rgba(0,0,0,0.12)]' : 'text-[var(--text-secondary)]'}`}
+                  >
+                    {d === 1 ? '1 paso' : `${d} pasos`}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-      {/* Accessible Table View */}
-      {displayFormat === 'table' && (
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[var(--bg-surface)]">
-          <div className="text-xs font-semibold text-[var(--text-primary)] mb-2">
-            Vista Estructurada y Accesible de Nodos ({rawNodes.length})
-          </div>
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-[var(--border-subtle)] text-[var(--text-secondary)] font-mono text-[11px]">
-                <th className="py-2">Tipo</th>
-                <th className="py-2">Título</th>
-                <th className="py-2 text-right">Conexiones</th>
-                <th className="py-2 text-right">Acción</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--border-subtle)]">
-              {rawNodes.map(node => (
-                <tr key={node.id} className="hover:bg-[var(--bg-surface-muted)]/50">
-                  <td className="py-2 capitalize text-[var(--text-secondary)] font-mono text-[11px]">
-                    {node.type}
-                  </td>
-                  <td className="py-2 font-medium text-[var(--text-primary)]">
-                    {node.title}
-                  </td>
-                  <td className="py-2 text-right font-mono text-[var(--text-secondary)]">
-                    {node.connectionCount}
-                  </td>
-                  <td className="py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (onNavigate) onNavigate(node.path);
-                      }}
-                      className="px-2 py-1 rounded bg-[var(--bg-surface-muted)] text-[var(--text-primary)] text-[11px] font-semibold hover:bg-[var(--solid-contrast-bg)] hover:text-[var(--solid-contrast-text)] cursor-pointer"
-                    >
-                      Abrir
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+            <div className="flex-1 min-h-0 overflow-y-auto px-3 pb-2">
+              <h4 className="px-1 pb-1.5 text-[13px] font-semibold text-[var(--text-secondary)]">
+                {selectedConnections.length === 0
+                  ? 'Sin conexiones todavía'
+                  : `Conectado con ${selectedConnections.length} ${selectedConnections.length === 1 ? 'elemento' : 'elementos'}`}
+              </h4>
+              {selectedConnections.length > 0 && (
+                <ul className="rounded-[12px] bg-[var(--bg-surface-elevated)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+                  {selectedConnections.map(c => (
+                    <li key={c.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          hapticFeedback.light();
+                          selectNode(c.id, true);
+                        }}
+                        className="w-full min-h-[44px] px-3 py-2 flex items-center gap-2.5 text-left hover:bg-[var(--bg-surface-muted)]/60 transition-colors cursor-pointer"
+                      >
+                        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: typeColor(c.type, dark) }} aria-hidden />
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[14px] text-[var(--text-primary)] truncate">{displayTitle(c.title, c.type)}</span>
+                          <span className="block text-[12px] text-[var(--text-tertiary)]">
+                            {typeLabel(c.type)}
+                            {c.structural ? ' · automática' : ''}
+                          </span>
+                        </span>
+                        <ChevronRight className="w-4 h-4 text-[var(--text-tertiary)] shrink-0" aria-hidden />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
-      {/* 6. Orphans Panel (Responsive: Bottom sheet on mobile, right drawer on sm+) */}
-      {showOrphansPanel && (
-        <div className="fixed sm:absolute inset-x-0 bottom-0 sm:inset-y-0 sm:left-auto sm:right-0 sm:top-12 sm:w-72 max-h-[75vh] sm:max-h-full bg-[var(--bg-app)] border-t sm:border-t-0 sm:border-l border-[var(--border-subtle)] rounded-t-2xl sm:rounded-none shadow-2xl z-40 p-4 flex flex-col space-y-3 animate-in slide-in-from-bottom sm:slide-in-from-right duration-150">
-          <div className="w-10 h-1 bg-[var(--border-subtle)] rounded-full mx-auto -mt-1 sm:hidden shrink-0" />
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
-            <h4 className="text-xs font-bold text-[var(--text-primary)] uppercase tracking-wider">
-              Nodos Huérfanos ({orphansList.length})
-            </h4>
-            <button
-              type="button"
-              onClick={() => setShowOrphansPanel(false)}
-              className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <p className="text-[11px] text-[var(--text-secondary)]">
-            Elementos sin conexiones en la red. Escribe <code className="px-1 py-0.5 rounded bg-[var(--bg-surface-muted)]">[[Nombre]]</code> para vincularlos.
-          </p>
-          <div className="flex-1 overflow-y-auto space-y-1.5 pr-1">
-            {orphansList.map(item => (
-              <div 
-                key={item.id}
-                className="p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] flex items-center justify-between text-xs"
-              >
-                <div className="min-w-0 flex-1 pr-2">
-                  <span className="font-medium text-[var(--text-primary)] truncate block">{item.title}</span>
-                  <span className="text-[10px] text-[var(--text-tertiary)] capitalize">{item.type}</span>
-                </div>
+            {onNavigate && (
+              <div className="p-3 border-t border-[var(--border-subtle)]">
                 <button
                   type="button"
                   onClick={() => {
-                    if (onNavigate) onNavigate(item.path);
+                    hapticFeedback.medium();
+                    onNavigate(selectedItem.path);
                   }}
-                  className="p-1 rounded bg-[var(--bg-surface-muted)] hover:bg-[var(--solid-contrast-bg)] hover:text-[var(--solid-contrast-text)] transition cursor-pointer"
-                  title="Abrir elemento"
+                  className="w-full h-11 rounded-[12px] bg-[var(--accent)] text-white text-[15px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer t-press"
                 >
-                  <ArrowUpRight className="w-3.5 h-3.5" />
+                  Abrir
+                  <ArrowUpRight className="w-4 h-4" aria-hidden />
                 </button>
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 7. Selected Node Detail Panel (Responsive: Bottom sheet on mobile, right drawer on sm+) */}
-      {selectedNode && (
-        <div className="fixed sm:absolute inset-x-0 bottom-0 sm:inset-y-0 sm:left-auto sm:right-0 sm:top-12 sm:w-80 max-h-[80vh] sm:max-h-full bg-[var(--bg-app)] border-t sm:border-t-0 sm:border-l border-[var(--border-subtle)] rounded-t-2xl sm:rounded-none shadow-2xl z-40 p-4 sm:p-5 flex flex-col space-y-3 sm:space-y-4 animate-in slide-in-from-bottom sm:slide-in-from-right duration-150 overflow-y-auto">
-          {/* Mobile grab handle */}
-          <div className="w-10 h-1 bg-[var(--border-subtle)] rounded-full mx-auto -mt-1 sm:hidden shrink-0" />
-          
-          <div className="flex items-start justify-between border-b border-[var(--border-subtle)] pb-3">
-            <div>
-              <span className="text-[10px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full bg-[var(--bg-surface-muted)] text-[var(--text-secondary)]">
-                {selectedNode.type}
-              </span>
-              <h3 className="text-sm font-bold text-[var(--text-primary)] mt-1.5 font-heading">
-                {selectedNode.title}
-              </h3>
-            </div>
-            <button
-              type="button"
-              onClick={() => setSelectedNodeId(null)}
-              className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] p-1 cursor-pointer"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between py-1 border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
-              <span>Conexiones totales:</span>
-              <span className="font-mono font-bold text-[var(--text-primary)]">{selectedBacklinks.length}</span>
-            </div>
-            {selectedNode.date && (
-              <div className="flex justify-between py-1 border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                <span>Fecha:</span>
-                <span className="font-mono text-[var(--text-primary)]">{selectedNode.date}</span>
-              </div>
             )}
-          </div>
+          </aside>
+        )}
+      </div>
 
-          {/* Backlinks list */}
-          <div className="space-y-2 flex-1">
-            <h4 className="text-[11px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
-              Menciones y Conexiones ({selectedBacklinks.length})
-            </h4>
-            {selectedBacklinks.length === 0 ? (
-              <div className="text-[11px] text-[var(--text-tertiary)] italic">
-                Sin menciones entrantes.
-              </div>
-            ) : (
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                {selectedBacklinks.map(b => (
-                  <button
-                    key={`${b.sourceId}-${b.sourceTitle}`}
-                    type="button"
-                    onClick={() => {
-                      hapticFeedback.light();
-                      setSelectedNodeId(b.sourceId);
-                    }}
-                    className="w-full text-left p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] transition cursor-pointer flex items-center justify-between text-xs"
-                  >
-                    <span className="truncate text-[var(--text-primary)]">{b.sourceTitle}</span>
-                    <span className="text-[10px] font-mono text-[var(--text-tertiary)] shrink-0 ml-1">
-                      {b.isStructural ? 'estructural' : 'link'}
-                    </span>
-                  </button>
+      {/* Lista agrupada (alternativa accesible al lienzo) */}
+      {displayFormat === 'list' && (
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-5 bg-[var(--bg-app)]">
+          {listGroups.length === 0 && <p className="text-center text-[14px] text-[var(--text-secondary)] py-10">No hay elementos con estos filtros.</p>}
+          {listGroups.map(([type, items]) => (
+            <section key={type}>
+              <h4 className="px-4 pb-1.5 text-[13px] font-medium text-[var(--text-secondary)]">
+                {TYPE_META[type]?.plural || type} · {items.length}
+              </h4>
+              <ul className="rounded-[12px] bg-[var(--bg-surface)] overflow-hidden divide-y divide-[var(--border-subtle)] border border-[var(--border-subtle)]">
+                {items.map(node => (
+                  <li key={node.id}>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate?.(node.path)}
+                      className="w-full min-h-[44px] px-4 py-2 flex items-center gap-3 text-left hover:bg-[var(--bg-surface-muted)]/50 cursor-pointer"
+                    >
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: typeColor(node.type, dark) }} aria-hidden />
+                      <span className="flex-1 min-w-0 text-[15px] text-[var(--text-primary)] truncate">{displayTitle(node.title, node.type)}</span>
+                      <span className="text-[13px] text-[var(--text-tertiary)] tabular-nums shrink-0">
+                        {node.connectionCount} {node.connectionCount === 1 ? 'conexión' : 'conexiones'}
+                      </span>
+                      <ChevronRight className="w-4 h-4 text-[var(--text-tertiary)] shrink-0" aria-hidden />
+                    </button>
+                  </li>
                 ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              hapticFeedback.medium();
-              if (onNavigate) onNavigate(selectedNode.path);
-            }}
-            className="w-full py-2.5 rounded-xl btn-solid-primary text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer active:scale-98"
-          >
-            <span>Abrir Pantalla Completa</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+              </ul>
+            </section>
+          ))}
         </div>
       )}
 
-      {/* 8. Saved Views Modal */}
-      {showSavedViewsModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-2">
-              <h3 className="text-sm font-bold text-[var(--text-primary)]">Vistas Guardadas del Grafo</h3>
-              <button
-                type="button"
-                onClick={() => setShowSavedViewsModal(false)}
-                className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer"
-              >
-                <X className="w-4 h-4" />
+      {/* Opciones: capas, separación y vistas guardadas */}
+      {showOptions && !compact && (
+        <>
+          <div className="fixed inset-0 z-30 sm:absolute" onClick={() => setShowOptions(false)} aria-hidden />
+          <div
+            role="dialog"
+            aria-label="Opciones del grafo"
+            className={`z-40 overflow-y-auto ${glass} fixed inset-x-0 bottom-0 max-h-[75vh] rounded-t-[22px] safe-area-pb sm:absolute sm:inset-x-auto sm:bottom-auto sm:right-3 sm:top-[60px] sm:w-[300px] sm:max-h-[calc(100%-72px)] sm:rounded-[18px] t-dropdown-enter`}
+          >
+            <div className="w-9 h-[5px] rounded-full bg-[var(--text-tertiary)]/40 mx-auto mt-2 sm:hidden" aria-hidden />
+            <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+              <h3 className="text-[17px] font-semibold text-[var(--text-primary)]">Opciones</h3>
+              <button type="button" onClick={() => setShowOptions(false)} aria-label="Cerrar opciones" className="w-7 h-7 rounded-full bg-[var(--bg-surface-muted)] text-[var(--text-secondary)] flex items-center justify-center cursor-pointer">
+                <X className="w-4 h-4" strokeWidth={2.5} aria-hidden />
               </button>
             </div>
 
-            <div className="space-y-2">
-              <div className="text-xs text-[var(--text-secondary)]">Vistas Disponibles:</div>
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
-                {savedViews.map(view => (
-                  <button
-                    key={view.id}
-                    type="button"
-                    onClick={() => handleApplySavedView(view)}
-                    className="w-full p-2.5 rounded-xl bg-[var(--bg-app)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] text-left flex items-center justify-between text-xs cursor-pointer"
-                  >
-                    <span className="font-semibold text-[var(--text-primary)]">{view.name}</span>
-                    <span className="text-[10px] font-mono text-[var(--text-tertiary)] uppercase">{view.viewMode}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <div className="px-4 pb-4 space-y-4">
+              <section>
+                <h4 className="text-[13px] font-medium text-[var(--text-secondary)] pb-1">Mostrar</h4>
+                <div className="rounded-[12px] bg-[var(--bg-surface-elevated)] px-3 divide-y divide-[var(--border-subtle)]">
+                  {LAYERS.map(l => (
+                    <Switch key={l.key} label={l.label} checked={layers[l.key]} onChange={v => toggleLayer(l.key, v)} />
+                  ))}
+                </div>
+                <div className="rounded-[12px] bg-[var(--bg-surface-elevated)] px-3 divide-y divide-[var(--border-subtle)] mt-3">
+                  <Switch label="Conexiones automáticas" checked={includeStructural} onChange={v => { setIncludeStructural(v); setPreset('custom'); }} />
+                  <Switch label="Elementos sin conexiones" checked={showOrphans} onChange={v => { setShowOrphans(v); setPreset('custom'); }} />
+                </div>
+                <p className="text-[12px] text-[var(--text-tertiary)] px-1 pt-1.5">
+                  Las automáticas (punteadas) unen, por ejemplo, una tarea con su proyecto.
+                </p>
+              </section>
 
-            <div className="pt-2 border-t border-[var(--border-subtle)] space-y-2">
-              <span className="text-xs text-[var(--text-secondary)]">Guardar Configuración Actual:</span>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Nombre de la vista…"
-                  value={newViewName}
-                  onChange={e => setNewViewName(e.target.value)}
-                  className="flex-1 bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={handleSaveCurrentView}
-                  className="px-3 py-1.5 rounded-xl btn-solid-primary text-xs font-semibold cursor-pointer"
-                >
-                  Guardar
+              <section>
+                <h4 className="text-[13px] font-medium text-[var(--text-secondary)] pb-1">Distribución</h4>
+                <div className="rounded-[12px] bg-[var(--bg-surface-elevated)] px-3 py-2 space-y-3">
+                  <label className="block text-[13px] text-[var(--text-primary)]">
+                    <span className="flex justify-between"><span>Separación</span><span className="text-[var(--text-tertiary)] tabular-nums">{repulsionStrength}</span></span>
+                    <input type="range" min={60} max={500} value={repulsionStrength} onChange={e => setRepulsionStrength(Number(e.target.value))} className="w-full mt-1 accent-[var(--accent)]" />
+                  </label>
+                  <label className="block text-[13px] text-[var(--text-primary)]">
+                    <span className="flex justify-between"><span>Largo de las conexiones</span><span className="text-[var(--text-tertiary)] tabular-nums">{linkDistance}</span></span>
+                    <input type="range" min={30} max={200} value={linkDistance} onChange={e => setLinkDistance(Number(e.target.value))} className="w-full mt-1 accent-[var(--accent)]" />
+                  </label>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-[13px] font-medium text-[var(--text-secondary)] pb-1">Vistas guardadas</h4>
+                <div className="rounded-[12px] bg-[var(--bg-surface-elevated)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+                  {savedViews.map(v => (
+                    <div key={v.id} className="flex items-center">
+                      <button type="button" onClick={() => handleApplySavedView(v)} className="flex-1 min-h-[44px] px-3 flex items-center gap-2 text-left text-[14px] text-[var(--text-primary)] cursor-pointer">
+                        <Bookmark className="w-4 h-4 text-[var(--accent)]" aria-hidden />
+                        <span className="truncate">{v.name}</span>
+                      </button>
+                      <button type="button" onClick={() => handleDeleteView(v.id)} aria-label={`Borrar vista ${v.name}`} className="px-3 h-[44px] text-[13px] text-[var(--semantic-red)] cursor-pointer">
+                        Borrar
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-2 p-2">
+                    <input
+                      type="text"
+                      value={newViewName}
+                      onChange={e => setNewViewName(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') handleSaveCurrentView(); }}
+                      placeholder="Nombre de esta vista…"
+                      aria-label="Nombre de la vista"
+                      className="flex-1 min-w-0 h-9 rounded-[9px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] px-2.5 text-[14px] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40"
+                    />
+                    <button type="button" onClick={handleSaveCurrentView} disabled={!newViewName.trim()} className="h-9 px-3 rounded-[9px] bg-[var(--accent)] text-white text-[14px] font-semibold disabled:opacity-40 cursor-pointer">
+                      Guardar
+                    </button>
+                  </div>
+                </div>
+              </section>
+
+              <div className="rounded-[12px] bg-[var(--bg-surface-elevated)] overflow-hidden divide-y divide-[var(--border-subtle)]">
+                <button type="button" onClick={() => { setShowOptions(false); setShowOrphansPanel(true); }} className="w-full min-h-[44px] px-3 flex items-center justify-between text-[14px] text-[var(--text-primary)] cursor-pointer">
+                  <span>Elementos sin conexiones</span>
+                  <span className="flex items-center gap-1 text-[var(--text-tertiary)] tabular-nums">{orphansList.length}<ChevronRight className="w-4 h-4" aria-hidden /></span>
+                </button>
+                <button type="button" onClick={() => { setShowOptions(false); setShowGuideModal(true); }} className="w-full min-h-[44px] px-3 flex items-center gap-2 text-[14px] text-[var(--accent)] cursor-pointer">
+                  <BookOpen className="w-4 h-4" aria-hidden />
+                  Cómo funciona el grafo
                 </button>
               </div>
             </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* 9. Second Brain Guide Modal */}
-      <SecondBrainGuideModal
-        isOpen={showGuideModal}
-        onClose={() => setShowGuideModal(false)}
-      />
+      {/* Elementos sin conexiones */}
+      {showOrphansPanel && !compact && (
+        <>
+          <div className="fixed inset-0 z-30 bg-black/20 sm:bg-transparent sm:absolute" onClick={() => setShowOrphansPanel(false)} aria-hidden />
+          <div
+            role="dialog"
+            aria-label="Elementos sin conexiones"
+            className={`z-40 flex flex-col ${glass} fixed inset-x-0 bottom-0 max-h-[70vh] rounded-t-[22px] safe-area-pb sm:absolute sm:inset-x-auto sm:right-3 sm:top-[60px] sm:bottom-3 sm:w-[320px] sm:max-h-none sm:rounded-[18px] t-sheet-enter`}
+          >
+            <div className="px-4 pt-4 pb-2 flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-[17px] font-semibold text-[var(--text-primary)]">Sin conexiones · {orphansList.length}</h3>
+                <p className="text-[13px] text-[var(--text-secondary)] mt-0.5">
+                  Mencionalos con <code className="px-1 rounded bg-[var(--bg-surface-muted)]">[[Nombre]]</code> en una nota para sumarlos a la red.
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowOrphansPanel(false)} aria-label="Cerrar" className="w-7 h-7 rounded-full bg-[var(--bg-surface-muted)] text-[var(--text-secondary)] flex items-center justify-center shrink-0 cursor-pointer">
+                <X className="w-4 h-4" strokeWidth={2.5} aria-hidden />
+              </button>
+            </div>
+            <ul className="flex-1 overflow-y-auto mx-3 mb-3 rounded-[12px] bg-[var(--bg-surface-elevated)] divide-y divide-[var(--border-subtle)]">
+              {orphansList.map(item => (
+                <li key={item.id}>
+                  <button type="button" onClick={() => onNavigate?.(item.path)} className="w-full min-h-[44px] px-3 py-2 flex items-center gap-2.5 text-left cursor-pointer">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: typeColor(item.type, dark) }} aria-hidden />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[14px] text-[var(--text-primary)] truncate">{displayTitle(item.title, item.type)}</span>
+                      <span className="block text-[12px] text-[var(--text-tertiary)]">{typeLabel(item.type)}</span>
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-[var(--text-tertiary)] shrink-0" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
+
+      <SecondBrainGuideModal isOpen={showGuideModal} onClose={() => setShowGuideModal(false)} />
     </div>
   );
 };

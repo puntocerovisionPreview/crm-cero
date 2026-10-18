@@ -1591,10 +1591,10 @@ export const AgendaView: React.FC<Props> = ({
                           >
                             {/* Visual Drop line */}
                             {isDragOver && listDropPosition === 'before' && (
-                              <div className="absolute -top-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
+                              <div className="absolute -top-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full z-30 pointer-events-none animate-pulse" />
                             )}
                             {isDragOver && listDropPosition === 'after' && (
-                              <div className="absolute -bottom-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_8px_#E8590C] z-30 pointer-events-none animate-pulse" />
+                              <div className="absolute -bottom-1 left-2 right-2 h-1 bg-[var(--accent)] rounded-full z-30 pointer-events-none animate-pulse" />
                             )}
 
                             <div

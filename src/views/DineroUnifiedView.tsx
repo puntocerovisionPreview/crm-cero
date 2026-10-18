@@ -182,7 +182,7 @@ export const DineroUnifiedView: React.FC<Props> = ({
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[var(--bg-app)] text-[var(--text-primary)]">
       {/* Fixed Sticky Top Header: Segmented Switch (Estudio | Personal) */}
-      <div className="sticky top-0 z-20 bg-[var(--bg-app)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] px-4 py-2.5 flex items-center justify-between gap-3 safe-area-top-header">
+      <div className="sticky top-0 z-20 bg-[var(--bg-app)]/95 backdrop-blur-md border-b border-[var(--border-subtle)] px-4 py-2.5 flex items-center justify-between gap-3">
         {/* Segmented Switch: Estudio | Personal */}
         <div className="flex p-0.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface)]">
           <button

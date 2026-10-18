@@ -607,7 +607,7 @@ export const ClientDetailView: React.FC<Props> = ({
       {/* Top Mobile Bar / Desktop Breadcrumb Bar */}
       <div 
         style={{ paddingTop: 'max(0.75rem, calc(env(safe-area-inset-top, 0px) + 0.65rem))' }}
-        className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/80 px-4 pb-3 flex items-center justify-between safe-area-top-header touch-manipulation"
+        className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/80 px-4 py-3 flex items-center justify-between touch-manipulation"
       >
         <div className="flex items-center gap-3">
           <button

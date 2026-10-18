@@ -1,4 +1,4 @@
-import React, { ViewTransition, useState, useEffect, useRef, useCallback } from 'react';
+import React, { ViewTransition, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { ViewTab, AgendaTask, AgendaMeeting, Project, IncomeRecord, ExpenseRecord, SyncStatus, SubTask, SubtareaFoco, WeeklyGoal, WeeklyMission, TimeLog, SecondBrainNote, PersonalAccount, PersonalCategory, PersonalTransaction, PersonalRecurring, PersonalBudget, SavingsGoal, StudyItem, PersonalFinanceSettings, Payment, StudioPaymentSettings, TrashItem, StudioFixedExpense, Client, MercadoPagoIncomingPayment } from './types';
 import { 
@@ -60,7 +60,8 @@ import {
   playItemCreated,
   playItemDeleted,
   playPostpone,
-  playAllDone
+  playAllDone,
+  playPaymentReceived
 } from './utils/sound';
 import { hapticFeedback } from './utils/haptics';
 import {
@@ -173,6 +174,7 @@ import { useUsdRates, resolveUsdRate } from './utils/currency';
 import { planClientLinks } from './utils/clients';
 import { MercadoPagoInbox } from './components/MercadoPagoInbox';
 import { MercadoPagoReconcileModal } from './components/MercadoPagoReconcileModal';
+import { MercadoPagoPaymentAlert } from './components/MercadoPagoPaymentAlert';
 
 // Lazy load Knowledge Graph module to preserve fast app bundle boot per spec
 function RouteLoading() {
@@ -185,6 +187,7 @@ function RouteLoading() {
 }
 
 const KnowledgeGraphView = React.lazy(() => import('./views/KnowledgeGraphView'));
+const HomeView = React.lazy(() => import('./views/HomeView'));
 // Pantallas que se descargan recién cuando las abrís (antes todo venía en un archivo de 3 MB).
 // Hoy/Agenda se carga de entrada porque es la primera pantalla.
 const CalendarView = React.lazy(() => import('./views/CalendarView').then((m) => ({ default: m.CalendarView })));
@@ -280,6 +283,7 @@ export default function App() {
         document.body.classList.remove('dark');
         document.body.classList.add('light');
       }
+      document.getElementById('theme-color')?.setAttribute('content', theme === 'dark' ? '#000000' : '#F2F2F7');
       localStorage.setItem('cero_theme', theme);
     }
   }, [theme]);
@@ -1369,6 +1373,58 @@ export default function App() {
   const handleMpDismiss = (mpId: string) => {
     markMpIncomingReconciled(mpId, { type: 'ignorado', reconciledAt: new Date().toISOString() }).catch(err => console.warn(err));
   };
+
+  // Pagos que hiciste vos: se anotan como gasto (del estudio o personal) o se ignoran
+  const handleMpSentAsExpense = (payment: MercadoPagoIncomingPayment, kind: 'estudio' | 'personal') => {
+    const date = payment.dateApproved || payment.dateCreated || getTodayString();
+    const title = payment.description || 'Pago con Mercado Pago';
+    if (kind === 'estudio') {
+      handleAddExpense({ title, category: 'Otros', month: date.slice(0, 7), date, amount: payment.amount, currency: payment.currency, status: 'pagado', notes: `Mercado Pago #${payment.mpPaymentId}` });
+      markMpIncomingReconciled(payment.id, { type: 'gasto_estudio', targetName: title, reconciledAt: new Date().toISOString() }).catch(err => console.warn(err));
+    } else {
+      const account = personalAccounts.find(a => /mercado/i.test(a.name)) || personalAccounts[0];
+      const category = personalCategories.find(c => c.type === 'gasto')?.id || '';
+      handleSavePersonalTransaction({ type: 'gasto', amount: payment.amount, currency: payment.currency, date, accountId: account?.id || '', categoryId: category, note: title, status: 'confirmado' });
+      markMpIncomingReconciled(payment.id, { type: 'gasto_personal', targetId: account?.id, reconciledAt: new Date().toISOString() }).catch(err => console.warn(err));
+    }
+  };
+
+  // ---- Aviso en pantalla apenas entra un cobro ----
+  // Se muestra una sola vez por pago (recordado en este dispositivo) y solo si es de las últimas 48 hs.
+  const MP_SEEN_KEY = 'cero_mp_alert_seen';
+  const [mpSeen, setMpSeen] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(MP_SEEN_KEY) || '[]'));
+    } catch {
+      return new Set();
+    }
+  });
+  const markMpSeen = useCallback((id: string) => {
+    setMpSeen(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem(MP_SEEN_KEY, JSON.stringify([...next].slice(-300)));
+      } catch {}
+      return next;
+    });
+  }, []);
+  const mpAlertQueue = useMemo(() => {
+    const cutoff = Date.now() - 48 * 3600 * 1000;
+    return mpIncoming.filter(p => {
+      if (p.reconciled || p.direction === 'enviado' || p.status !== 'approved' || mpSeen.has(p.id)) return false;
+      const when = Date.parse(p.receivedAt || p.dateApproved || p.dateCreated || '');
+      return Number.isFinite(when) && when >= cutoff;
+    });
+  }, [mpIncoming, mpSeen]);
+  const mpAlert = mpAlertQueue[0] || null;
+  const lastAlertedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!mpAlert || lastAlertedRef.current === mpAlert.id) return;
+    lastAlertedRef.current = mpAlert.id;
+    playPaymentReceived();
+    hapticFeedback.success();
+  }, [mpAlert]);
 
   // Portal del alumno: mantiene publicada la "foto" de cada alumno PAF con link activo
   const publishedPortalKeysRef = useRef<Map<string, string>>(new Map());
@@ -2963,6 +3019,15 @@ export default function App() {
       };
     }
 
+    if (path === '/inicio') {
+      return {
+        title: 'Inicio',
+        subtitle: 'Elegí el sector del estudio',
+        breadcrumbs: [{ label: 'Inicio' }],
+        showBackButton: false,
+      };
+    }
+
     if (path === '/hoy' || path === '/') {
       return {
         title: 'Hoy',
@@ -3315,6 +3380,21 @@ export default function App() {
           onDeletePayment={handleDeleteProjectPayment}
           personalAccounts={personalAccounts}
           usdRate={effectiveUsdRate}
+        />
+      );
+    }
+
+    if (path === '/inicio') {
+      return (
+        <HomeView
+          tasks={tasks}
+          meetings={meetings}
+          projects={projects}
+          incomes={incomes}
+          notes={notes}
+          pendingPayments={pendingMp.filter(p => p.direction !== 'enviado').length}
+          privacyMode={privacyMode}
+          onNavigate={navigate}
         />
       );
     }
@@ -3996,7 +4076,13 @@ export default function App() {
           className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-28 md:pb-12 min-w-0 overflow-x-hidden max-w-full"
         >
           {['agenda', 'hoy', 'dinero', 'finanzas'].includes(currentRoute.name) && (
-            <MercadoPagoInbox pending={pendingMp} privacyMode={privacyMode} onRegister={setMpToRegister} />
+            <MercadoPagoInbox
+              pending={pendingMp}
+              privacyMode={privacyMode}
+              onRegister={setMpToRegister}
+              onRegisterSent={handleMpSentAsExpense}
+              onIgnore={p => handleMpDismiss(p.id)}
+            />
           )}
           <React.Suspense fallback={<RouteLoading />}>
             {/* Animación entre pantallas (ver index.css): adelante/atrás desliza, lateral funde.
@@ -4025,6 +4111,17 @@ export default function App() {
         onReconcileAsStudioIncome={handleMpAsStudioIncome}
         onReconcileAsPersonalTransaction={handleMpAsPersonal}
         onDismissPayment={handleMpDismiss}
+      />
+
+      <MercadoPagoPaymentAlert
+        payment={mpToRegister ? null : mpAlert}
+        remaining={Math.max(0, mpAlertQueue.length - 1)}
+        privacyMode={privacyMode}
+        onRegister={p => {
+          markMpSeen(p.id);
+          setMpToRegister(p);
+        }}
+        onLater={p => markMpSeen(p.id)}
       />
 
       {/* Discreet Toast Notification with Undo option (anunciado por lectores de pantalla) */}

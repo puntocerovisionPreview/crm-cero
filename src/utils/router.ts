@@ -29,6 +29,7 @@ function setRouteAnimated(setRoute: (r: RouteMatch) => void, next: RouteMatch) {
 }
 
 export type RouteName =
+  | 'inicio'
   | 'hoy'
   | 'prospeccion'
   | 'agenda'
@@ -110,6 +111,14 @@ export function parseRoute(rawPathname: string, searchStr: string = ''): RouteMa
     path === '/ias'
   ) {
     return { name: 'gastos-fijos', path: '/gastos-fijos', params: {}, query };
+  }
+
+  // 0) INICIO: la Home con los sectores del estudio (también al abrir la app)
+  if (path === '/inicio' || path === '/home') {
+    return { name: 'inicio', path: '/inicio', params: {}, query };
+  }
+  if (path === '/' && !(typeof localStorage !== 'undefined' && localStorage.getItem('cero_pref_default_view') === 'foco')) {
+    return { name: 'inicio', path: '/inicio', params: {}, query };
   }
 
   // 1) HOY (handles /, /agenda, /hoy)
@@ -276,7 +285,8 @@ export function useRouter() {
 
     // Initial normalize if at root '/'
     if (window.location.pathname === '/') {
-      window.history.replaceState({}, '', '/agenda');
+      const startsInFocus = localStorage.getItem('cero_pref_default_view') === 'foco';
+      window.history.replaceState({}, '', startsInFocus ? '/foco' : '/inicio');
     }
 
     return () => {
