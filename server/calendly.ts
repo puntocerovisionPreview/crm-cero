@@ -266,7 +266,14 @@ export function registerCalendlyRoutes(app: express.Express, requireOwner: expre
   app.get('/api/calendly/status', requireOwner, async (_req, res) => {
     const db = getAdminDb();
     const cfg = db ? ((await db.collection('settings').doc(SETTINGS_DOC).get()).data() as any) : null;
-    res.json({ tokenConfigured: !!process.env.CALENDLY_TOKEN, connected: !!cfg?.webhookUri, connectedAt: cfg?.connectedAt || null, schedulingUrl: cfg?.schedulingUrl || null });
+    const connected = !!(cfg?.webhookUri || cfg?.mode === 'sync' || cfg?.connectedAt);
+    res.json({
+      tokenConfigured: !!process.env.CALENDLY_TOKEN,
+      connected,
+      connectedAt: cfg?.connectedAt || null,
+      schedulingUrl: cfg?.schedulingUrl || null,
+      mode: cfg?.mode || (cfg?.webhookUri ? 'webhook' : 'sync'),
+    });
   });
 
   // Crea (o recrea) la suscripción de avisos con una clave de firma nueva
@@ -278,32 +285,49 @@ export function registerCalendlyRoutes(app: express.Express, requireOwner: expre
       const me = (await calendly('/users/me')).resource;
       const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0];
       const url = `${proto}://${req.get('host')}/api/calendly/webhook`;
-      if (/localhost|127\.0\.0\.1/.test(url)) return res.status(400).json({ error: 'Conectá Calendly desde la app publicada, no desde localhost (Calendly no puede llegar a tu compu).' });
 
-      // Borra suscripciones viejas a esta misma dirección
-      const existing = await calendly(`/webhook_subscriptions?organization=${encodeURIComponent(me.current_organization)}&user=${encodeURIComponent(me.uri)}&scope=user&count=100`);
-      for (const s of existing?.collection || []) {
-        if (s.callback_url === url) await calendly(s.uri, { method: 'DELETE' }).catch(() => undefined);
+      let webhookUri: string | null = null;
+      let signingKey: string | null = null;
+      let mode: 'webhook' | 'sync' = 'webhook';
+
+      // Si no es localhost, intentamos registrar el webhook (disponible en planes Standard/Pro)
+      if (!/localhost|127\.0\.0\.1/.test(url)) {
+        try {
+          const existing = await calendly(`/webhook_subscriptions?organization=${encodeURIComponent(me.current_organization)}&user=${encodeURIComponent(me.uri)}&scope=user&count=100`).catch(() => null);
+          for (const s of existing?.collection || []) {
+            if (s.callback_url === url) await calendly(s.uri, { method: 'DELETE' }).catch(() => undefined);
+          }
+          signingKey = crypto.randomBytes(32).toString('hex');
+          const created = await calendly('/webhook_subscriptions', {
+            method: 'POST',
+            body: JSON.stringify({ url, events: ['invitee.created', 'invitee.canceled'], organization: me.current_organization, user: me.uri, scope: 'user', signing_key: signingKey }),
+          });
+          webhookUri = created.resource?.uri || null;
+        } catch (subErr: any) {
+          if (subErr?.status === 403 || String(subErr?.message || '').includes('Standard')) {
+            mode = 'sync';
+            console.info('[calendly] Plan sin soporte de webhooks (Standard requerido). Conectado en modo sincronización periódica.');
+          } else {
+            throw subErr;
+          }
+        }
+      } else {
+        mode = 'sync';
       }
-      const signingKey = crypto.randomBytes(32).toString('hex');
-      const created = await calendly('/webhook_subscriptions', {
-        method: 'POST',
-        body: JSON.stringify({ url, events: ['invitee.created', 'invitee.canceled'], organization: me.current_organization, user: me.uri, scope: 'user', signing_key: signingKey }),
-      });
+
       await db.collection('settings').doc(SETTINGS_DOC).set(
-        { webhookUri: created.resource?.uri || null, callbackUrl: url, signingKey, schedulingUrl: me.scheduling_url || null, connectedAt: new Date().toISOString() },
+        { webhookUri, callbackUrl: webhookUri ? url : null, signingKey, schedulingUrl: me.scheduling_url || null, connectedAt: new Date().toISOString(), mode },
         { merge: true }
       );
       const sync = await importUpcomingBookings(db).catch((err) => {
         console.warn('[calendly] No se pudieron traer las reservas existentes:', err?.message || err);
         return null;
       });
-      res.json({ ok: true, schedulingUrl: me.scheduling_url || null, sync });
+      res.json({ ok: true, schedulingUrl: me.scheduling_url || null, sync, mode });
     } catch (err: any) {
       const msg = String(err?.message || err);
       console.error('[calendly] No se pudo conectar:', msg);
-      const plan = err?.status === 403 ? ' Tu plan de Calendly no incluye webhooks (hace falta Standard o superior).' : '';
-      res.status(500).json({ error: `No se pudo conectar con Calendly.${plan}`, details: msg.slice(0, 200) });
+      res.status(500).json({ error: `No se pudo conectar con Calendly.`, details: msg.slice(0, 200) });
     }
   });
 }

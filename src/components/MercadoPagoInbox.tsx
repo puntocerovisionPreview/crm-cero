@@ -24,6 +24,10 @@ export const MercadoPagoInbox: React.FC<Props> = ({ pending, privacyMode, onRegi
       const res = await fetch('/api/mercadopago/sync', { method: 'POST', headers: { ...(await getAuthHeaders()) } });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      if (Array.isArray(data.payments) && data.payments.length > 0) {
+        const { saveMpIncomingPayments } = await import('../utils/firestoreService');
+        await saveMpIncomingPayments(data.payments);
+      }
       setNote(data.nuevos ? `Encontré ${data.nuevos} ${data.nuevos === 1 ? 'pago nuevo' : 'pagos nuevos'}.` : 'No hay pagos nuevos.');
     } catch (err) {
       setNote((err as Error).message);

@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
+
 // Todas las fechas del servidor ("hoy", horarios de avisos) en hora argentina,
 // igual que en la app. Cloud Run corre en UTC y después de las 21 hs ya sería "mañana".
 process.env.TZ = process.env.TZ || 'America/Argentina/Cordoba';

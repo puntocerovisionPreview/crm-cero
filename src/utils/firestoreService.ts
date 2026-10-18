@@ -1824,3 +1824,12 @@ export async function markMpIncomingReconciled(
 ): Promise<void> {
   await setDoc(doc(db, 'mp_incoming', id), deepSanitize({ reconciled: true, reconciledTo }), { merge: true });
 }
+
+export async function saveMpIncomingPayments(payments: MercadoPagoIncomingPayment[]): Promise<void> {
+  if (!payments || payments.length === 0) return;
+  const ops: Array<(batch: ReturnType<typeof writeBatch>) => void> = [];
+  payments.forEach((p) => {
+    ops.push((batch) => batch.set(doc(db, 'mp_incoming', p.id), deepSanitize(p), { merge: true }));
+  });
+  await commitInChunks(ops);
+}

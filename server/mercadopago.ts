@@ -183,27 +183,67 @@ export function registerMercadoPagoRoutes(
     res.status(200).end();
     try {
       const db = getDb();
-      const type = String(req.query.type || req.query.topic || req.body?.type || '');
-      const id = String((req.query['data.id'] as string) || req.body?.data?.id || '');
-      if (!db || !isMercadoPagoConfigured() || type !== 'payment' || !id) return;
-      const created = await ingestPayments(db, [await mp(`/v1/payments/${encodeURIComponent(id)}`)]);
-      for (const p of created) {
-        const n = describeNewPayment(p);
+      const type = String(req.query.type || req.query.topic || req.body?.type || req.body?.topic || req.body?.action || '');
+      const id = String((req.query['data.id'] as string) || req.query.id || req.body?.data?.id || req.body?.id || '');
+      if (!isMercadoPagoConfigured() || !id) return;
+
+      let rawPayment: any = null;
+      try {
+        rawPayment = await mp(`/v1/payments/${encodeURIComponent(id)}`);
+      } catch (mpErr) {
+        console.warn('[mercadopago] No se pudo obtener el pago', id, (mpErr as Error).message);
+        return;
+      }
+      if (!rawPayment) return;
+
+      const incoming = toIncoming(rawPayment);
+      let suggestion: MpSuggestion | null = null;
+      if (db) {
+        try {
+          const { projects, incomes } = await loadForMatching(db);
+          suggestion = suggestProjectForPayment(incoming, projects, incomes);
+          const ref = db.collection('mp_incoming').doc(String(rawPayment.id));
+          await ref.set({ ...incoming, ...(suggestion ? { suggestion } : {}), receivedAt: new Date().toISOString() });
+        } catch (dbErr) {
+          console.warn('[mercadopago] No se pudo persistir en Firestore (se mandará aviso igual):', (dbErr as Error).message);
+        }
+      }
+
+      if (rawPayment.status === 'approved') {
+        const n = describeNewPayment({ ...incoming, suggestion });
         await notify(n.title, n.body);
       }
     } catch (err) {
-      console.error('[mercadopago] webhook:', (err as Error).message);
+      console.error('[mercadopago] webhook error:', (err as Error).message);
     }
   });
 
   // Botón "Buscar pagos" en la app
   app.post('/api/mercadopago/sync', requireOwner, async (_req, res) => {
-    const db = getDb();
     if (!isMercadoPagoConfigured()) return res.status(400).json({ error: 'Falta MP_ACCESS_TOKEN en los Secrets' });
-    if (!db) return res.status(503).json({ error: 'El servidor no tiene acceso a la base de datos' });
     try {
-      const created = await syncRecentPayments(db);
-      res.json({ ok: true, nuevos: created.length });
+      const q = new URLSearchParams({
+        sort: 'date_created',
+        criteria: 'desc',
+        range: 'date_created',
+        begin_date: 'NOW-15DAYS',
+        end_date: 'NOW',
+        limit: '50',
+      });
+      const data = await mp(`/v1/payments/search?${q}`);
+      const rawPayments = data.results || [];
+      const db = getDb();
+      let created: any[] = [];
+      if (db) {
+        try {
+          created = await ingestPayments(db, rawPayments);
+        } catch (dbErr) {
+          console.warn('[mercadopago] sync en Firestore con permiso insuficiente, devolviendo pagos al cliente:', (dbErr as Error).message);
+        }
+      }
+      const approved = rawPayments.filter((r: any) => r?.status === 'approved' && Number(r.transaction_amount) > 0);
+      const incomingList = approved.map(toIncoming);
+      res.json({ ok: true, nuevos: created.length || incomingList.length, payments: incomingList });
     } catch (err) {
       res.status(502).json({ error: (err as Error).message });
     }

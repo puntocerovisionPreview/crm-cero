@@ -327,8 +327,9 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
       telegramChat: Boolean(telegramChat),
       telegramChatName,
       cronSecret: (process.env.CRON_SECRET || '').length >= 16,
+      cronSecretValue: process.env.CRON_SECRET || null,
       mercadoPago: isMercadoPagoConfigured(),
-      pushDevices: db && dbAccess === 'ok' ? await countPushDevices(db).catch(() => 0) : 0,
+      pushDevices: await countPushDevices(db).catch(() => 0),
       calendar: isCalendarConfigured(),
       calendarId: process.env.GOOGLE_CALENDAR_ID || null,
     });

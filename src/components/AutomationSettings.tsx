@@ -12,8 +12,10 @@ interface Status {
   telegramChat: boolean;
   telegramChatName: string | null;
   cronSecret: boolean;
+  cronSecretValue?: string | null;
   calendar: boolean;
   calendarId: string | null;
+  mercadoPago?: boolean;
 }
 
 type Job = 'daily-brief' | 'reminders' | 'weekly' | 'calendar-sync' | 'prospecting-close';
@@ -238,6 +240,63 @@ export const AutomationSettings: React.FC = () => {
                 <code>{status.serviceAccountEmail || 'el correo de la cuenta de servicio'}</code> con permiso "Hacer cambios en los
                 eventos". Después guardá tu Gmail en los Secrets como <code>GOOGLE_CALENDAR_ID</code>.
               </p>
+            )}
+          </Step>
+
+          <Step done={Boolean(status.mercadoPago)} title="4. Mercado Pago (cobros y notificaciones)">
+            {!status.mercadoPago ? (
+              <p>
+                Copiá tu Access Token de producción de Mercado Pago y guardalo en los Secrets como <code>MP_ACCESS_TOKEN</code>.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                <p>Configurado con tu cuenta de Mercado Pago.</p>
+                <div className="p-2.5 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)] space-y-1.5">
+                  <span className="font-semibold text-xs text-[var(--text-primary)]">Webhook para recibir avisos instantáneos al cobrar:</span>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 min-w-0 truncate text-[11px]">
+                      {origin}/api/mercadopago/webhook{status.cronSecretValue ? `?key=${status.cronSecretValue}` : ''}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => copy(`${origin}/api/mercadopago/webhook${status.cronSecretValue ? `?key=${status.cronSecretValue}` : ''}`, 'mp-url')}
+                      className="p-1.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] text-xs flex items-center gap-1 shrink-0"
+                    >
+                      {copied === 'mp-url' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copied === 'mp-url' ? 'Copiada' : 'Copiar'}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[var(--text-tertiary)]">
+                    En Mercado Pago Developers → tu app → Webhooks: pegá esta URL exacta con el evento <b>Pagos</b> activado.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setBusy('mp-sync');
+                    setNotice(null);
+                    try {
+                      const res = await fetch('/api/mercadopago/sync', { method: 'POST', headers: { ...(await getAuthHeaders()) } });
+                      const data = await res.json().catch(() => ({}));
+                      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+                      if (Array.isArray(data.payments) && data.payments.length > 0) {
+                        const { saveMpIncomingPayments } = await import('../utils/firestoreService');
+                        await saveMpIncomingPayments(data.payments);
+                      }
+                      setNotice(`Sincronización de Mercado Pago: ${data.nuevos ? `se encontraron ${data.nuevos} pagos.` : 'no hay pagos nuevos en los últimos 15 días.'}`);
+                    } catch (e) {
+                      setNotice(`Error: ${(e as Error).message}`);
+                    } finally {
+                      setBusy(null);
+                    }
+                  }}
+                  disabled={busy !== null}
+                  className="px-3 py-1.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-app)] text-xs font-semibold flex items-center gap-1.5 hover:bg-[var(--bg-surface-muted)] disabled:opacity-50"
+                >
+                  {busy === 'mp-sync' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                  Buscar pagos de los últimos 15 días
+                </button>
+              </div>
             )}
           </Step>
         </ol>
