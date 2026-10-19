@@ -53,7 +53,7 @@ export const PersonalLineButton: React.FC<{ prospect: Prospect; small?: boolean 
   );
 };
 
-const AddMoreRow: React.FC<{ poolAvailable: number; addMore: (n: number) => void; busy: boolean; message: { kind: 'ok' | 'error'; text: string } | null }> = ({
+export const AddMoreRow: React.FC<{ poolAvailable: number; addMore: (n: number) => void; busy: boolean; message: { kind: 'ok' | 'error'; text: string } | null }> = ({
   poolAvailable,
   addMore: onAddMore,
   busy,

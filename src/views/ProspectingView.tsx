@@ -55,6 +55,8 @@ import { friendlyError, generateVideoScript, markDayStarted, useAddMore, usePool
 import { BurstMode, DayStartFlow, LocalTimeBadge, PersonalLineButton, PersonalizeAllButton } from '../components/ProspectingDayStart';
 import { AwaitingBanner, CallPrep, ConversationLog, ReplyButton } from '../components/ProspectConversation';
 import { ProspectingPulsePanel, usePulse } from '../components/ProspectingVisuals';
+import { ProspectingInbox } from '../components/ProspectingInbox';
+import { AddMoreRow } from '../components/ProspectingDayStart';
 import { deleteProspect, recordProspectAction, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
 import { useProspecting } from '../prospecting/useProspecting';
 import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
@@ -233,23 +235,22 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
       )}
 
       {prospects !== null && tab === 'hoy' && (
-        <TodayPanel
-          poolAvailable={pool.availableCount}
-          onAddMore={more.addMore}
-          addMoreBusy={more.busy}
-          addMoreMessage={more.message}
-          onBurst={() => setBurstOpen(true)}
-          onStartDay={pending.length > 0 ? () => setDayStartOpen(true) : undefined}
-          pendingCount={pending.length}
-          tomorrowCalls={callsOn(list, addDays(today, 1))}
+        <ProspectingInbox
           queue={queue.items}
-          overflow={queue.overflow}
-          toClose={toClose}
-          showClose={hour >= settings.closeHour || toClose.length > 0}
-          settings={settings}
-          onAct={actSafe}
-          onGoLoad={() => setTab(pool.availableCount > 0 ? 'reserva' : 'cargar')}
+          // Lo de hoy y lo de días anteriores sin anotar, todo junto y de a uno
+          toClose={[...toClose, ...pending.filter((p) => !toClose.some((t) => t.id === p.id))]}
           isEvening={hour >= settings.closeHour}
+          settings={settings}
+          today={today}
+          onAct={actSafe}
+          onBurst={() => setBurstOpen(true)}
+          tomorrowCalls={callsOn(list, addDays(today, 1))}
+          renderDetail={(item) => <QueueCard item={item} settings={settings} onAct={actSafe} />}
+          footer={
+            <section className="card-swiss p-4">
+              <AddMoreRow poolAvailable={pool.availableCount} addMore={more.addMore} busy={more.busy} message={more.message} />
+            </section>
+          }
         />
       )}
       {prospects !== null && tab === 'embudo' && <FunnelPanel prospects={list} today={today} settings={settings} onAct={actSafe} initialStep={funnelFrom} />}
