@@ -4173,8 +4173,10 @@ export default function App() {
     );
   }
 
+  // relative: lo posicionado adentro (textos para lectores de pantalla, etiquetas de gráficos) queda
+  // dentro de la app; si no, estira el body y la rueda del mouse desplaza la app entera
   return (
-    <div className="h-screen h-[100dvh] w-full max-w-full flex overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] font-sans">
+    <div className="relative h-screen h-[100dvh] w-full max-w-full flex overflow-hidden bg-[var(--bg-app)] text-[var(--text-primary)] font-sans">
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
       {/* Desktop Sidebar (hidden on mobile) */}
       <DesktopSidebar
@@ -4207,7 +4209,7 @@ export default function App() {
       />
 
       {/* Main Content Area with Dynamic AppTopBar */}
-      <div ref={mainScrollRef} className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto overflow-x-hidden w-full max-w-full overscroll-x-none overscroll-y-contain bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+      <div ref={mainScrollRef} className="relative flex-1 flex flex-col min-w-0 h-full overflow-y-auto overflow-x-hidden w-full max-w-full overscroll-x-none overscroll-y-contain bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
         <AppTopBar
           title={routeMeta.title}
           subtitle={routeMeta.subtitle}
@@ -4241,7 +4243,7 @@ export default function App() {
           id="contenido"
           tabIndex={-1}
           key={currentRoute.path} 
-          className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-28 md:pb-12 min-w-0 overflow-x-hidden max-w-full"
+          className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-28 md:pb-12 min-w-0 overflow-x-clip max-w-full"
         >
           {['agenda', 'hoy', 'dinero', 'finanzas'].includes(currentRoute.name) && (
             <MercadoPagoInbox
