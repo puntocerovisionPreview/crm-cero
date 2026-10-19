@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { getAdminDb } from './automation';
 import { applyAction, callMeetingFor, callMeetingId, normalizeInstagram, phoneKey } from '../src/prospecting/core';
 import { todayLocal } from '../src/utils/dates';
+import { prepDateFor, prepTaskId, suggestedPrepTasks } from '../src/prospecting/callPrep';
 import type { Prospect } from '../src/types';
 
 /**
@@ -118,6 +119,18 @@ async function saveBooking(db: any, inv: any, ev: any, prospects: Prospect[], to
     const payload: Record<string, any> = { updatedAt: nowIso, calendlyEventUri: ev.uri || null, email: p.email || inv.email || null };
     Object.entries(updates).forEach(([k, v]) => (payload[k] = v === undefined ? null : v));
     batch.set(db.collection('prospects').doc(p.id), payload, { merge: true });
+    // Preparación: confirmar y repasar, el día anterior (o hoy)
+    const prepDate = prepDateFor(date, today);
+    suggestedPrepTasks(p)
+      .filter((t) => t.key === 'confirmar' || t.key === 'revisar' || t.key === 'video')
+      .forEach((t) => {
+        const id = prepTaskId(p.id, t.key);
+        batch.set(
+          db.collection('tasks').doc(id),
+          { id, title: t.title, date: prepDate, completed: false, createdAt: today, priority: 'alta', projectName: p.studio || p.name, notes: `Para la llamada del ${date.slice(8, 10)}/${date.slice(5, 7)} a las ${time} (Calendly).` },
+          { merge: true }
+        );
+      });
     if (event) {
       const evId = `pev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
       batch.set(db.collection('prospect_events').doc(evId), { ...event, id: evId, createdAt: nowIso, note: 'Calendly' });

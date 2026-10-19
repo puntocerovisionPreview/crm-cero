@@ -4252,7 +4252,23 @@ export default function App() {
           key={currentRoute.path} 
           className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3.5 sm:py-6 pb-28 md:pb-12 min-w-0 overflow-x-clip max-w-full"
         >
-          {['agenda', 'hoy', 'dinero', 'finanzas'].includes(currentRoute.name) && (
+          {/* En Hoy, Mercado Pago es una línea (se registra en Dinero); en Dinero, la bandeja completa */}
+          {['agenda', 'hoy'].includes(currentRoute.name) && pendingMp.length > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate('/dinero')}
+              className="card-swiss w-full mb-4 px-4 py-3 flex items-center gap-3 text-left cursor-pointer hover:border-[var(--border-strong)] transition-colors"
+            >
+              <span className="w-8 h-8 rounded-full bg-[#009EE3] text-white text-[12px] font-bold flex items-center justify-center shrink-0" aria-hidden>
+                MP
+              </span>
+              <span className="flex-1 min-w-0 text-[14px] text-[var(--text-primary)]">
+                {pendingMp.length} {pendingMp.length === 1 ? 'movimiento de Mercado Pago' : 'movimientos de Mercado Pago'} para registrar
+              </span>
+              <span className="text-[13px] font-semibold text-[var(--accent)] shrink-0">Ver en Dinero</span>
+            </button>
+          )}
+          {['dinero', 'finanzas'].includes(currentRoute.name) && (
             <MercadoPagoInbox
               pending={pendingMp}
               privacyMode={privacyMode}

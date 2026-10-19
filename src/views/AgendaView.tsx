@@ -648,9 +648,7 @@ export const AgendaView: React.FC<Props> = ({
         {/* MOBILE MODE 1: MI DÍA (Focused, High-Spacing, Clean) */}
         {mobileTab === 'dia' && (
           <div className="space-y-3.5">
-            {/* Lo primero en el celular: la rutina diaria y qué hay que hacer hoy */}
-            <DailyRoutineCard />
-                <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
+            {/* Hoy, en orden: el día (lo próximo), la rutina, lo atrasado, todo el día y lo demás */}
             <TodayFocusBanner
               todayStr={today}
               todayTasks={tasks.filter(t => t.date === today)}
@@ -660,78 +658,22 @@ export const AgendaView: React.FC<Props> = ({
               onOpenQuickAdd={onOpenQuickAdd}
               onOpenFocus={() => onNavigate && onNavigate('/foco')}
             />
+            <DailyRoutineCard />
+            <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
 
-            {/* Widget de Cobranzas & Saldos Activos */}
-            <AgendaBillingWidget
-              projects={projects}
-              incomes={incomes}
-              studioSettings={studioSettings}
-              privacyMode={privacyMode}
-              onNavigate={onNavigate}
-              onOpenRegisterPayment={(p) => {
-                setSelectedProjectForPayment(p);
-                setShowRegisterPaymentModal(true);
-              }}
-            />
-
-            {/* Distribución de Jornada (Time Budget Flexible): plegada en el celular */}
-            <DailyTimeBudgetWidget
-              dateStr={today}
-              isToday={true}
-              defaultCollapsed={true}
-            />
-
-            {/* Compact Daily Briefing Banner */}
+            {/* Solo si hay atrasadas: traerlas a hoy */}
             {(() => {
-              const todayTasks = tasks.filter(t => t.date === today);
-              const todayMeetings = meetings.filter(m => m.date === today);
-              const overdueTasks = tasks.filter(t => t.date < today && !t.completed);
-              const pendingToday = todayTasks.filter(t => !t.completed).length;
-
-              return (
-                <div className="p-3 bg-zinc-900/90 border border-zinc-800 rounded-2xl shadow-sm space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)]">
-                        <Sparkles className="w-3.5 h-3.5" />
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-bold text-zinc-100">Foco de la Jornada</h3>
-                        <p className="text-[10px] text-zinc-400">
-                          {todayMeetings.length} {todayMeetings.length === 1 ? 'reunión' : 'reuniones'} · {pendingToday} {pendingToday === 1 ? 'tarea pendiente' : 'tareas pendientes'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {pendingToday > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => handleMoveTodayPendingToTomorrow(today)}
-                        className="px-2.5 py-1 rounded-xl bg-zinc-800 hover:bg-amber-500 hover:text-black text-amber-300 text-[10px] font-bold border border-zinc-700 transition flex items-center gap-1 shrink-0"
-                        title="Postergar pendientes a mañana"
-                      >
-                        <FastForward className="w-3 h-3" />
-                        <span>Pasar a mañana</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Overdue alert pill if any */}
-                  {overdueTasks.length > 0 && (
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
-                      <span className="font-semibold text-[11px]">
-                        ⚠️ {overdueTasks.length} {overdueTasks.length === 1 ? 'tarea vencida' : 'tareas vencidas'} de días anteriores
-                      </span>
-                      <button
-                        onClick={handleMoveOverdueToToday}
-                        className="text-[10px] font-bold underline hover:text-rose-200"
-                      >
-                        Traer a hoy
-                      </button>
-                    </div>
-                  )}
+              const overdueTasks = tasks.filter(t => t.date && t.date < today && !t.completed);
+              return overdueTasks.length > 0 ? (
+                <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[13px]">
+                  <span className="font-semibold">
+                    {overdueTasks.length} {overdueTasks.length === 1 ? 'tarea atrasada' : 'tareas atrasadas'} de días anteriores
+                  </span>
+                  <button type="button" onClick={handleMoveOverdueToToday} className="font-bold underline hover:text-rose-200 shrink-0">
+                    Traer a hoy
+                  </button>
                 </div>
-              );
+              ) : null;
             })()}
 
             {/* Today's Full Day Column in Mobile Mode */}
@@ -767,6 +709,26 @@ export const AgendaView: React.FC<Props> = ({
                 }
               }}
               onMovePendingToTomorrow={() => handleMoveTodayPendingToTomorrow(today)}
+            />
+
+            {/* Widget de Cobranzas & Saldos Activos */}
+            <AgendaBillingWidget
+              projects={projects}
+              incomes={incomes}
+              studioSettings={studioSettings}
+              privacyMode={privacyMode}
+              onNavigate={onNavigate}
+              onOpenRegisterPayment={(p) => {
+                setSelectedProjectForPayment(p);
+                setShowRegisterPaymentModal(true);
+              }}
+            />
+
+            {/* Distribución de Jornada (Time Budget Flexible): plegada en el celular */}
+            <DailyTimeBudgetWidget
+              dateStr={today}
+              isToday={true}
+              defaultCollapsed={true}
             />
           </div>
         )}
@@ -1161,8 +1123,6 @@ export const AgendaView: React.FC<Props> = ({
             {/* VIEW 0: DÍA (Foco del Día + Widgets Bento) */}
             {desktopViewMode === 'dia' && (
               <div className="space-y-4">
-                <DailyRoutineCard />
-                <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
                 <TodayFocusBanner
                   todayStr={today}
                   todayTasks={tasks.filter(t => t.date === today)}
@@ -1172,6 +1132,8 @@ export const AgendaView: React.FC<Props> = ({
                   onOpenQuickAdd={onOpenQuickAdd}
                   onOpenFocus={() => onNavigate && onNavigate('/foco')}
                 />
+                <DailyRoutineCard />
+                <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start w-full">
                   <div className="space-y-4 min-w-0">
@@ -1190,6 +1152,7 @@ export const AgendaView: React.FC<Props> = ({
                     <DailyTimeBudgetWidget
                       dateStr={today}
                       isToday={true}
+                      defaultCollapsed={true}
                     />
                   </div>
 
@@ -1786,14 +1749,12 @@ export const AgendaView: React.FC<Props> = ({
                 <DailyTimeBudgetWidget
                   dateStr={today}
                   isToday={true}
-                  defaultCollapsed={false}
+                  defaultCollapsed={true}
                 />
               </div>
 
               {/* Columna Derecha: Enfoque y Prioridades de Hoy + Accesos */}
               <div className="space-y-4 min-w-0">
-                <DailyRoutineCard />
-                <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
                 <TodayFocusBanner
                   todayStr={today}
                   todayTasks={tasks.filter(t => t.date === today)}
@@ -1809,6 +1770,8 @@ export const AgendaView: React.FC<Props> = ({
                   onOpenQuickAdd={onOpenQuickAdd}
                   onOpenFocus={() => onNavigate && onNavigate('/foco')}
                 />
+                <DailyRoutineCard />
+                <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
 
                 {/* Banner de acceso a la semana completa */}
                 <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-between shadow-xs">

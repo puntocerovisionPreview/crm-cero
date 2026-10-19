@@ -73,9 +73,14 @@ export const TodayFocusBanner: React.FC<Props> = ({
       ? 'Día libre: no hay nada agendado.'
       : pendingTotal === 0
       ? 'Terminaste todo lo de hoy.'
-      : `Te ${pendingTotal === 1 ? 'queda' : 'quedan'} ${plural(pendingTasks.length, 'tarea', 'tareas')}${
-          pendingMeetings.length ? ` y ${plural(pendingMeetings.length, 'reunión', 'reuniones')}` : ''
-        }.`;
+      : (() => {
+          // "Te queda 1 reunión" / "Te quedan 2 tareas y 1 reunión" (sin "0 tareas")
+          const parts = [
+            pendingTasks.length ? plural(pendingTasks.length, 'tarea', 'tareas') : '',
+            pendingMeetings.length ? plural(pendingMeetings.length, 'reunión', 'reuniones') : '',
+          ].filter(Boolean);
+          return `Te ${pendingTotal === 1 ? 'queda' : 'quedan'} ${parts.join(' y ')}.`;
+        })();
 
   // Escala de avance tipo plano: un tramo por cada tarea o reunión del día (máx. 12)
   const segments = Math.min(totalItems, 12);

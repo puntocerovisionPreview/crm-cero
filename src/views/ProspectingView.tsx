@@ -71,7 +71,8 @@ import { formatWhatsAppUrl } from '../utils/contact';
 import { hapticFeedback } from '../utils/haptics';
 import { playTaskDone } from '../utils/sound';
 import { addDays, parseLocalDate, todayLocal } from '../utils/dates';
-import { saveMeetingToFirestore } from '../utils/firestoreService';
+import { saveMeetingToFirestore, saveTaskToFirestore } from '../utils/firestoreService';
+import { PrepTask, prepDateFor, prepDayLabel, prepTaskId, suggestedPrepTasks } from '../prospecting/callPrep';
 import { callMeetingFor } from '../prospecting/core';
 import { prospectToProject } from '../prospecting/convert';
 
@@ -366,190 +367,6 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
 };
 
 // ======================= HOY =======================
-
-export const TodayPanel: React.FC<{
-  queue: QueueItem[];
-  overflow: number;
-  toClose: Prospect[];
-  showClose: boolean;
-  isEvening: boolean;
-  settings: ProspectingSettings;
-  onAct: (p: Prospect, a: ProspectAction, note?: string) => void;
-  onGoLoad?: () => void;
-  compact?: boolean;
-  poolAvailable?: number;
-  onAddMore?: (n: number) => void;
-  addMoreBusy?: boolean;
-  addMoreMessage?: { kind: 'ok' | 'error'; text: string } | null;
-  onBurst?: () => void;
-  onStartDay?: () => void;
-  pendingCount?: number;
-  tomorrowCalls?: Prospect[];
-}> = ({
-  queue,
-  overflow,
-  toClose,
-  showClose,
-  isEvening,
-  settings,
-  onAct,
-  onGoLoad,
-  compact,
-  poolAvailable = 0,
-  onAddMore,
-  addMoreBusy,
-  addMoreMessage,
-  onBurst,
-  onStartDay,
-  pendingCount = 0,
-  tomorrowCalls = [],
-}) => {
-  const toWrite = queue.filter((i) => i.kind === 'primer' || i.kind === 'seguimiento').length;
-  // Hoy por prioridad: llamadas, a quién le toca contestar, lo urgente, seguimientos y primeros mensajes
-  const groups: { title: string; kinds: QueueItem['kind'][] }[] = [
-    { title: 'Llamadas de hoy', kinds: ['llamada_hoy'] },
-    { title: 'Te toca contestar', kinds: ['responder'] },
-    { title: 'Para hacer', kinds: ['video', 'llamada', 'propuesta'] },
-    { title: 'Seguimientos: no respondieron', kinds: ['seguimiento'] },
-    { title: 'Primeros mensajes', kinds: ['primer'] },
-  ];
-  return (
-  <div className="space-y-4">
-    {onStartDay && pendingCount > 0 && (
-      <button type="button" onClick={onStartDay} className={`${card} w-full p-3 text-left flex items-center gap-2 border-amber-500/40`}>
-        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-        <span className="flex-1 text-sm text-[var(--text-primary)]">
-          {pendingCount} {pendingCount === 1 ? 'mensaje de días anteriores sin anotar' : 'mensajes de días anteriores sin anotar'} si respondieron
-        </span>
-        <span className="text-sm font-semibold text-[var(--accent)]">Anotar</span>
-      </button>
-    )}
-    {onBurst && toWrite > 1 && (
-      <button type="button" onClick={onBurst} className={`${btnPrimary} w-full py-3`}>
-        <Zap className="w-4 h-4" /> Modo ráfaga: {toWrite} mensajes uno tras otro
-      </button>
-    )}
-    {showClose && toClose.length > 0 && (
-      <section className={`${card} p-4 space-y-3 ${isEvening ? 'border-[var(--accent)]/50' : ''}`}>
-        <div className="flex items-start gap-2">
-          <Moon className="w-5 h-5 text-[var(--accent)] shrink-0 mt-0.5" />
-          <div>
-            <h2 className="text-base font-semibold text-[var(--text-primary)]">Cierre del día: ¿qué pasó?</h2>
-            <p className="text-xs text-[var(--text-secondary)]">Les escribiste hoy. Un toque por persona y la app agenda lo que sigue.</p>
-          </div>
-        </div>
-        <ul className="space-y-2">
-          {toClose.map((p) => (
-            <li key={p.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-2.5 rounded-[var(--radius-control)] bg-[var(--bg-app)]">
-              <span className="flex-1 min-w-0 text-sm font-medium text-[var(--text-primary)] truncate">
-                {p.name}
-                {p.studio && p.studio !== p.name ? <span className="text-[var(--text-tertiary)]"> — {p.studio}</span> : null}
-              </span>
-              <div className="flex gap-1.5 shrink-0">
-                <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'they_replied')}>
-                  Respondió
-                </button>
-                <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'no_reply')}>
-                  No respondió
-                </button>
-                <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'lost', 'No le interesa')}>
-                  No le interesa
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </section>
-    )}
-
-    {queue.length === 0 ? (
-      <section className={`${card} p-6 text-center space-y-2`}>
-        <p className="text-sm font-semibold text-[var(--text-primary)]">Nada pendiente de prospección por hoy.</p>
-        {onGoLoad && (
-          <>
-            <p className="text-xs text-[var(--text-secondary)]">Cargá la tanda de la semana y la app reparte los primeros mensajes.</p>
-            <button type="button" className={`${btnPrimary} mx-auto`} onClick={onGoLoad}>
-              <Upload className="w-4 h-4" /> Cargar tanda
-            </button>
-          </>
-        )}
-      </section>
-    ) : (
-      <div className="space-y-4">
-        {groups.map((g) => {
-          const items = queue.filter((i) => g.kinds.includes(i.kind));
-          if (!items.length) return null;
-          return (
-            <section key={g.title} className="space-y-2">
-              {!compact && (
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] px-1">
-                  {g.title} <span className="tabular-nums">· {items.length}</span>
-                </h3>
-              )}
-              {!compact && g.kinds.includes('primer') && <PersonalizeAllButton prospects={items.map((i) => i.prospect)} />}
-              <ul className="space-y-2">
-                {items.map((item) => (
-                  <QueueCard key={item.prospect.id} item={item} settings={settings} onAct={onAct} compact={compact} />
-                ))}
-              </ul>
-            </section>
-          );
-        })}
-      </div>
-    )}
-    {!compact && tomorrowCalls.length > 0 && (
-      <section className={`${card} p-3 space-y-1`}>
-        <p className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
-          <Phone className="w-3.5 h-3.5" /> Mañana
-        </p>
-        {tomorrowCalls.map((p) => (
-          <p key={p.id} className="text-sm text-[var(--text-primary)]">
-            <span className="tabular-nums text-[var(--text-secondary)]">{p.callTime || 'sin hora'}</span> · Llamada con {p.studio || p.name}
-          </p>
-        ))}
-      </section>
-    )}
-    {overflow > 0 && (
-      <p className="text-xs text-[var(--text-tertiary)]">
-        {overflow} {overflow === 1 ? 'acción más queda' : 'acciones más quedan'} para mañana (tope diario: {settings.dailyCap}).
-      </p>
-    )}
-
-    {onAddMore && (poolAvailable > 0 || addMoreMessage) && (
-      <section className={`${card} p-4 space-y-2`}>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-[var(--text-primary)]">
-              {queue.some((i) => i.kind === 'primer') ? '¿Querés escribirle a más gente hoy?' : 'Ya no te quedan primeros mensajes para hoy. ¿Sumar más?'}
-            </p>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {poolAvailable > 0
-                ? `Quedan ${poolAvailable.toLocaleString('es-AR')} contactos en la reserva. Se toman los mejores, quedan para hoy y se descuentan de la base.`
-                : 'La reserva está vacía: subí el CSV en la pestaña Reserva.'}
-            </p>
-          </div>
-          {poolAvailable > 0 && (
-            <div className="flex gap-1.5 shrink-0">
-              {[2, 5, 10].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  disabled={addMoreBusy}
-                  className={`${n === 2 ? btnPrimary : btnGhost} py-1.5 text-xs min-w-[3rem] justify-center`}
-                  onClick={() => onAddMore(Math.min(n, poolAvailable))}
-                >
-                  {addMoreBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : `+${n}`}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        {addMoreMessage && <p className={`text-xs ${addMoreMessage.kind === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{addMoreMessage.text}</p>}
-      </section>
-    )}
-  </div>
-  );
-};
 
 const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAct: (p: Prospect, a: ProspectAction, n?: string) => void; compact?: boolean }> = ({
   item,
@@ -1637,6 +1454,10 @@ const CallScheduler: React.FC<{ prospect: Prospect; onAct: (p: Prospect, a: Pros
   const [minutes, setMinutes] = useState(30);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Preparación: tareas para el día anterior (o hoy, si la llamada es mañana u hoy)
+  const [prep, setPrep] = useState<PrepTask[]>(() => suggestedPrepTasks(p));
+  const [extra, setExtra] = useState('');
+  const prepDate = date ? prepDateFor(date, today) : today;
 
   const save = async () => {
     if (!date || !time) return setErr('Elegí el día y la hora.');
@@ -1644,6 +1465,21 @@ const CallScheduler: React.FC<{ prospect: Prospect; onAct: (p: Prospect, a: Pros
     setErr(null);
     try {
       await saveMeetingToFirestore(callMeetingFor(p, date, time, minutes, today) as any);
+      const chosen = [...prep.filter((t) => t.on), ...(extra.trim() ? [{ key: 'propia', title: extra.trim(), on: true }] : [])];
+      await Promise.all(
+        chosen.map((t) =>
+          saveTaskToFirestore({
+            id: prepTaskId(p.id, t.key),
+            title: t.title,
+            date: prepDate,
+            completed: false,
+            createdAt: today,
+            priority: 'alta',
+            projectName: p.studio || p.name,
+            notes: `Para la llamada del ${date.slice(8, 10)}/${date.slice(5, 7)} a las ${time}.`,
+          } as any)
+        )
+      );
       await onAct(p, 'call', `${date} ${time}`);
       onClose();
     } catch (e) {
@@ -1667,16 +1503,36 @@ const CallScheduler: React.FC<{ prospect: Prospect; onAct: (p: Prospect, a: Pros
           ))}
         </select>
       </div>
+      <div className="space-y-1.5 pt-1">
+        <p className="text-xs font-semibold text-[var(--text-primary)]">Para prepararla, ¿qué agendo para {prepDayLabel(prepDate, today)}?</p>
+        <ul className="space-y-1">
+          {prep.map((t, i) => (
+            <li key={t.key}>
+              <label className="flex items-start gap-2 text-xs text-[var(--text-secondary)] cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={t.on}
+                  onChange={(e) => setPrep((arr) => arr.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))}
+                  className="mt-0.5 w-4 h-4 accent-[var(--accent)] shrink-0"
+                />
+                <span className={t.on ? 'text-[var(--text-primary)]' : ''}>{t.title}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        <input value={extra} onChange={(e) => setExtra(e.target.value)} placeholder="Otra tarea (opcional)" aria-label="Otra tarea de preparación" className={`${input} text-xs py-1.5`} />
+      </div>
       {err && <p className="text-xs text-red-400">{err}</p>}
       <div className="flex gap-1.5">
         <button type="button" disabled={busy} className={`${btnPrimary} py-1.5 text-xs`} onClick={save}>
-          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Agendar en mi agenda
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />} Agendar llamada
+          {prep.some((t) => t.on) || extra.trim() ? ` y ${prep.filter((t) => t.on).length + (extra.trim() ? 1 : 0)} tareas` : ''}
         </button>
         <button type="button" disabled={busy} className={`${btnGhost} py-1.5 text-xs`} onClick={onClose}>
           Cancelar
         </button>
       </div>
-      <p className="text-[11px] text-[var(--text-tertiary)]">Queda en Agenda con recordatorio 15 minutos antes. Si tenés Google Calendar conectado, aparece también ahí.</p>
+      <p className="text-[11px] text-[var(--text-tertiary)]">La llamada queda en tu Agenda con aviso 1 hora antes (y en Google Calendar si está conectado). Las tareas aparecen en Hoy ese día.</p>
     </div>
   );
 };
