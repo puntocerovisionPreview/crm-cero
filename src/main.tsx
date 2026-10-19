@@ -2,6 +2,10 @@ import { StrictMode, lazy, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
+import { installGlobalErrorReporting } from './utils/errorReporting';
+
+// Errores de las pantallas: se guardan y te avisan (ver Ajustes → Estado de la app)
+installGlobalErrorReporting();
 
 // El portal del alumno es público: se muestra solo, sin el resto del CRM.
 // Cada uno se descarga por separado: un alumno nunca baja el código del CRM.

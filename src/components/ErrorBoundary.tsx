@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { reportError } from '../utils/errorReporting';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 
 interface Props {
@@ -22,6 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error in CRM:', error, errorInfo);
+    reportError(error, { componentStack: errorInfo?.componentStack || undefined });
   }
 
   public render() {

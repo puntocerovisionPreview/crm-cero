@@ -43,7 +43,8 @@ import { getLeadProbabilities, setLeadProbabilities } from '../utils/monthlyCash
 import { getMissionsConfig, saveMissionsConfig, MissionsConfig } from '../utils/missions';
 import { DEFAULT_USD_RATE, USD_RATE_SOURCE_LABELS, UsdRateSource } from '../utils/currency';
 import { AutomationSettings } from '../components/AutomationSettings';
-import { Zap } from 'lucide-react';
+import { AppHealthPanel } from '../components/AppHealthPanel';
+import { Activity, Zap } from 'lucide-react';
 
 interface Props {
   subSection?: string;
@@ -228,6 +229,12 @@ export const AjustesView: React.FC<Props> = ({
   };
 
   const SECTIONS = [
+    {
+      id: 'estado',
+      title: 'Estado de la app',
+      description: 'Conexiones, automatizaciones, respaldo semanal y errores: todo en verde o rojo',
+      icon: Activity,
+    },
     {
       id: 'automatizaciones',
       title: 'Automatizaciones',
@@ -441,6 +448,7 @@ export const AjustesView: React.FC<Props> = ({
         )}
 
         {/* Sub-section 1: Datos de cobro */}
+        {activeSection === 'estado' && <AppHealthPanel />}
         {activeSection === 'automatizaciones' && <AutomationSettings />}
 
         {activeSection === 'cobro' && (

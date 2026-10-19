@@ -22,6 +22,7 @@ import {
   MercadoPagoIncomingPayment
 } from '../types';
 import { LinkRelation } from '../lib/links';
+import { mirrorChanges } from './cloudMirror';
 
 export const STORAGE_KEYS = {
   AUTH_TOKEN: 'cero_v3_auth_token',
@@ -220,7 +221,10 @@ export function getStoredTimeLogs(): TimeLog[] {
 }
 
 export function saveStoredTimeLogs(logs: TimeLog[]): void {
+  const prev = loadFromStorage<TimeLog[]>(STORAGE_KEYS.TIME_LOGS, []);
   saveToStorage(STORAGE_KEYS.TIME_LOGS, logs);
+  // copia en la nube (antes las horas vivían solo en este navegador)
+  mirrorChanges('time_logs', prev, logs);
 }
 
 export function getStoredNotes(): SecondBrainNote[] {
@@ -449,13 +453,15 @@ export function loadStoredTrash(): TrashItem[] {
   const now = new Date().toISOString();
   const valid = items.filter(i => !i.expiresAt || i.expiresAt > now);
   if (valid.length !== items.length) {
-    saveToStorage(STORAGE_KEYS.TRASH, valid);
+    saveStoredTrash(valid);
   }
   return valid;
 }
 
 export function saveStoredTrash(items: TrashItem[]): void {
+  const prev = loadFromStorage<TrashItem[]>(STORAGE_KEYS.TRASH, []);
   saveToStorage(STORAGE_KEYS.TRASH, items);
+  mirrorChanges('trash', prev, items);
 }
 
 export function addTrashRecord(item: Omit<TrashItem, 'deletedAt' | 'expiresAt'>): TrashItem {
@@ -578,3 +584,12 @@ export function saveStoredStudioFixedExpenses(items: StudioFixedExpense[]): void
 }
 
 
+
+/** Después de combinar con la nube: guarda solo en este navegador (sin volver a subir). */
+export function replaceLocalTimeLogs(logs: TimeLog[]): void {
+  saveToStorage(STORAGE_KEYS.TIME_LOGS, logs);
+}
+
+export function replaceLocalTrash(items: TrashItem[]): void {
+  saveToStorage(STORAGE_KEYS.TRASH, items);
+}

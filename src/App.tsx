@@ -1,4 +1,5 @@
 import React, { ViewTransition, useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { mergeWithCloud } from './utils/cloudMirror';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { ViewTab, AgendaTask, AgendaMeeting, Project, IncomeRecord, ExpenseRecord, SyncStatus, SubTask, SubtareaFoco, WeeklyGoal, WeeklyMission, TimeLog, SecondBrainNote, PersonalAccount, PersonalCategory, PersonalTransaction, PersonalRecurring, PersonalBudget, SavingsGoal, StudyItem, PersonalFinanceSettings, Payment, StudioPaymentSettings, TrashItem, StudioFixedExpense, Client, MercadoPagoIncomingPayment } from './types';
 import { 
@@ -49,7 +50,9 @@ import {
   saveStoredStudioFixedExpenses,
   loadStoredTrash,
   addTrashRecord,
-  purgeTrashRecord
+  purgeTrashRecord,
+  replaceLocalTimeLogs,
+  replaceLocalTrash,
 } from './utils/storage';
 import {
   isSoundEnabled,
@@ -1112,6 +1115,17 @@ export default function App() {
     }).catch(err => {
       console.warn('[Sync Error]', err);
     });
+
+    // 1b. Horas trabajadas y papelera: antes vivían solo en este navegador, ahora también en la nube
+    mergeWithCloud('time_logs', getStoredTimeLogs())
+      .then((logs) => {
+        replaceLocalTimeLogs(logs);
+        setTimeLogs(logs);
+      })
+      .catch((err) => console.warn('[Sync] Horas:', err));
+    mergeWithCloud('trash', loadStoredTrash())
+      .then((items) => replaceLocalTrash(items))
+      .catch((err) => console.warn('[Sync] Papelera:', err));
 
     // 2. Real-time live listeners for all collections
     const unsubTasks = subscribeTasks(

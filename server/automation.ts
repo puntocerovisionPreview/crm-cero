@@ -18,6 +18,7 @@ import { countPushDevices, htmlToPush, PushPayload, registerPushRoutes, sendPush
 import { describeNewPayment, isMercadoPagoConfigured, registerMercadoPagoRoutes, syncRecentPayments } from './mercadopago';
 import { registerDocumentRoutes } from './documents';
 import { registerDocumensoRoutes } from './documenso';
+import { recordError, recordJobRun, registerHealthRoutes, runBackupIfDue } from './health';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 
 /**
@@ -343,16 +344,57 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
     const jobs = job === 'frequent' ? ['reminders', 'calendar-sync', 'mercadopago'] : CRON_JOBS.includes(job) ? [job] : [];
     if (jobs.length === 0) return res.status(404).json({ error: 'Tarea desconocida' });
     const results: JobResult[] = [];
+    const db = getAdminDb();
+    const notify = async (title: string, body: string) => {
+      if (db) await notifyAll(db, title, body, '/ajustes/estado', 'salud');
+    };
     for (const j of jobs) {
       try {
-        results.push(await runJob(j));
+        const r = await runJob(j);
+        results.push(r);
+        if (db) await recordJobRun(db, j, true, r.skipped || (typeof r.detail === 'string' ? r.detail : r.sent !== undefined ? `${r.sent} enviados` : ''));
       } catch (err) {
         console.error(`[automation] ${j} falló:`, err);
         results.push({ job: j, skipped: `Error: ${(err as Error).message}` });
+        if (db) {
+          await recordJobRun(db, j, false, (err as Error).message);
+          await recordError(db, { source: j, message: (err as Error).message, stack: (err as Error).stack }, notify);
+        }
       }
+    }
+    // Respaldo semanal: va solo con la tarea frecuente, cuando pasaron 7 días
+    if (job === 'frequent' && db) {
+      const detail = await runBackupIfDue(db, notify);
+      results.push({ job: 'backup', detail });
+      await recordJobRun(db, 'backup', !detail.startsWith('falló'), detail);
     }
     res.json({ ok: true, results });
   });
+
+  // Estado de la app: integraciones, tareas, respaldo y errores (pantalla Ajustes → Estado)
+  registerHealthRoutes(
+    app,
+    requireOwner,
+    getAdminDb,
+    async () => {
+      const db = getAdminDb();
+      const push = await countPushDevices(db).catch(() => 0);
+      return {
+        base: { configured: !!db && (await checkDbAccess()) === 'ok', label: 'Base de datos del servidor', hint: 'Sin esto no corren las automatizaciones.' },
+        reloj: { configured: (process.env.CRON_SECRET || '').length >= 16, label: 'Reloj de automatizaciones (cron)', hint: 'CRON_SECRET + cron-job.org (ver guía).' },
+        ia: { configured: !!process.env.GEMINI_API_KEY, label: 'Inteligencia artificial (Gemini)', hint: 'GEMINI_API_KEY en Secrets.' },
+        push: { configured: push > 0, label: `Notificaciones en el celular${push ? ` (${push})` : ''}`, hint: 'Activá las notificaciones desde Ajustes en tu celular.' },
+        mercadoPago: { configured: isMercadoPagoConfigured(), label: 'Mercado Pago', hint: 'MP_ACCESS_TOKEN en Secrets.' },
+        documenso: { configured: !!process.env.DOCUMENSO_API_KEY, label: 'Firma digital (Documenso)', hint: 'DOCUMENSO_API_KEY en Secrets.' },
+        calendly: { configured: !!process.env.CALENDLY_TOKEN, label: 'Calendly', hint: 'CALENDLY_TOKEN en Secrets.' },
+        calendar: { configured: isCalendarConfigured(), label: 'Google Calendar', hint: 'GOOGLE_CALENDAR_ID en Secrets.' },
+      };
+    },
+    async (title, body) => {
+      const db = getAdminDb();
+      if (db) await notifyAll(db, title, body, '/ajustes/estado', 'salud');
+    }
+  );
 
   // Estado de la configuración (solo vos)
   app.get('/api/automation/status', requireOwner, async (req, res) => {
