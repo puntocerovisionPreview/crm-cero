@@ -20,7 +20,7 @@ describe('agendar la llamada', () => {
 
   it('la reunión de la agenda tiene hora, duración y datos del prospecto', () => {
     const m = callMeetingFor(P({ studio: 'Estudio LP', whatsapp: '+5493515551234' }), '2026-10-21', '15:30', 30, '2026-10-17');
-    expect(m).toMatchObject({ id: 'call_p1', title: 'Llamada: Estudio LP', date: '2026-10-21', time: '15:30', durationHours: 0.5, reminderMinutesBefore: 15, clientPhone: '+5493515551234' });
+    expect(m).toMatchObject({ id: 'call_p1', title: 'Llamada: Estudio LP', date: '2026-10-21', time: '15:30', durationHours: 0.5, reminderMinutesBefore: 60, clientPhone: '+5493515551234' });
   });
 
   it('el link de Calendly lleva el código del prospecto', () => {

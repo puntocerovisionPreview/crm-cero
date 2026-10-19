@@ -28,7 +28,18 @@ export const DEFAULT_PROSPECTING_SETTINGS: ProspectingSettings = {
   bookingUrl: '',
   templates: {
     first: 'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\n{personal}¿me permites realizarte una consulta?',
+    firstVariants: [
+      '{saludoHora}, {saludo}. Soy Juan, de .Cero.\n{personal}¿me permites hacerte una consulta?',
+      'Hola {saludo}, ¿cómo va? Mi nombre es Juan y trabajo con estudios de {rubro}.\n{personal}¿te puedo hacer una pregunta rápida?',
+      '{saludoHora}, ¿hablo con alguien de {estudio}? Soy Juan, de .Cero.\n{personal}¿les puedo hacer una consulta breve?',
+      'Hola {saludo}. Te escribe Juan, de .Cero.\n{personal}¿tienes un minuto para una consulta sobre el estudio?',
+      '{saludoHora} {saludo}, ¿qué tal? Soy Juan.\n{personal}¿me dejas hacerte una pregunta corta?',
+      'Hola, ¿cómo están en {estudio}? Mi nombre es Juan, de .Cero.\n{personal}¿puedo hacerles una consulta?',
+    ],
     firstB: '',
+    followUpQuestion: '{saludo}, ¿pudiste ver lo que te pregunté? Me sirve mucho saber cómo les llegan hoy los clientes a {estudio}.',
+    followUpAgree: '¿Te pasa algo así en {estudio}, {nombre}? Te pregunto porque tengo algo que te puede servir.',
+    followUpAudit: 'Hola {saludo}, ¿pudiste hacer el diagnóstico? Son 5 minutos y apenas lo completas te grabo un video con lo que veo de {estudio}: {link}',
     secondChance:
       'Hola {saludo}, te escribí hace un tiempo. Soy Juan, de .Cero. Sé que los meses pasan volando: ¿me permites hacerte una consulta rápida sobre cómo les llegan los clientes hoy?',
     booking:
@@ -91,6 +102,7 @@ export function mergeProspectingSettings(saved: Partial<ProspectingSettings> | u
       ...d.templates,
       ...t,
       followUp: t.followUp && t.followUp.length ? t.followUp : d.templates.followUp,
+      firstVariants: t.firstVariants && t.firstVariants.some((x) => x.trim()) ? t.firstVariants : d.templates.firstVariants,
       empathy: { ...d.templates.empathy, ...(t.empathy || {}) },
     },
   };
@@ -313,7 +325,10 @@ export type ProspectAction =
   | 'conv_empathy_sent'
   | 'conv_agreed'
   | 'snooze'
-  | 'do_not_contact';
+  | 'do_not_contact'
+  | 'they_replied' // te escribió (en cualquier etapa): te toca a vos
+  | 'i_replied' // le contestaste (fuera del guion)
+  | 'note'; // solo una nota en el historial
 
 export function applyAction(
   p: Prospect,
@@ -322,19 +337,51 @@ export function applyAction(
   settings: ProspectingSettings = DEFAULT_PROSPECTING_SETTINGS,
   note?: string
 ): { updates: Partial<Prospect>; event: Omit<ProspectEvent, 'id' | 'createdAt'> | null } {
+  const r = applyActionInner(p, action, today, settings, note);
+  // Cualquier mensaje tuyo deja de estar "pendiente de contestar"
+  if (OUTBOUND.includes(action) || action.startsWith('conv_answer:')) r.updates.awaitingMe = false;
+  return r;
+}
+
+const OUTBOUND: ProspectAction[] = [
+  'first_contact', 'follow_up', 'audit_sent', 'video_sent', 'call', 'proposal_sent',
+  'conv_question_sent', 'conv_empathy_sent', 'conv_agreed', 'i_replied', 'won', 'lost', 'do_not_contact',
+];
+
+function applyActionInner(
+  p: Prospect,
+  action: ProspectAction,
+  today: string,
+  settings: ProspectingSettings,
+  note?: string
+): { updates: Partial<Prospect>; event: Omit<ProspectEvent, 'id' | 'createdAt'> | null } {
   const next = addDays(today, settings.followUpDays);
   let updates: Partial<Prospect> = {};
   switch (action) {
     case 'first_contact': {
       const variant = variantFor(p, settings);
-      updates = { stage: 'contactado', followUps: 0, lastContactAt: today, nextActionDate: next, variant, pulledOn: undefined };
-      return { updates, event: { prospectId: p.id, type: 'first_contact', date: today, note, variant } };
+      const firstVariant = p.secondChance || variant === 'B' ? undefined : firstVariantIndex(p, settings);
+      updates = { stage: 'contactado', followUps: 0, lastContactAt: today, nextActionDate: next, variant, firstVariant, pulledOn: undefined };
+      return { updates, event: { prospectId: p.id, type: 'first_contact', date: today, note, variant, firstVariant } };
     }
+    case 'they_replied': {
+      // Primera respuesta al mensaje en frío: cuenta como "respondió" en las métricas
+      if (p.stage === 'contactado' || p.stage === 'nuevo') {
+        updates = { stage: 'respondio', followUps: 0, nextActionDate: today, lastOutcomeAt: today, convStep: 'pregunta', lastReplyAt: today, lastReplyNote: note || undefined, awaitingMe: true };
+        return { updates, event: { prospectId: p.id, type: 'reply', date: today, note } };
+      }
+      updates = { awaitingMe: true, lastReplyAt: today, lastReplyNote: note || undefined, lastOutcomeAt: today, nextActionDate: today };
+      return { updates, event: null };
+    }
+    case 'i_replied':
+      return { updates: { lastContactAt: today, lastOutcomeAt: today, nextActionDate: next, followUps: 0 }, event: null };
+    case 'note':
+      return { updates: {}, event: null };
     case 'follow_up':
       updates = { followUps: (p.followUps || 0) + 1, lastContactAt: today, nextActionDate: next };
       break;
     case 'reply':
-      updates = { stage: 'respondio', followUps: 0, nextActionDate: today, lastOutcomeAt: today, convStep: 'pregunta' };
+      updates = { stage: 'respondio', followUps: 0, nextActionDate: today, lastOutcomeAt: today, convStep: 'pregunta', lastReplyAt: today, awaitingMe: true };
       break;
     case 'no_reply':
       updates = { lastOutcomeAt: today };
@@ -378,9 +425,9 @@ export function applyAction(
       updates = { stage: 'contactado', followUps: 0, lastContactAt: today, lastOutcomeAt: today, nextActionDate: next };
       return { updates, event: null };
     case 'conv_question_sent':
-      return { updates: { convStep: 'esperando_respuesta', lastContactAt: today, lastOutcomeAt: today }, event: null };
+      return { updates: { convStep: 'esperando_respuesta', lastContactAt: today, lastOutcomeAt: today, followUps: 0, nextActionDate: next }, event: null };
     case 'conv_empathy_sent':
-      return { updates: { convStep: 'esperando_acuerdo', lastContactAt: today, lastOutcomeAt: today }, event: null };
+      return { updates: { convStep: 'esperando_acuerdo', lastContactAt: today, lastOutcomeAt: today, followUps: 0, nextActionDate: next }, event: null };
     case 'conv_agreed':
       return { updates: { convStep: 'speech', nextActionDate: today }, event: null };
     case 'snooze':
@@ -392,7 +439,7 @@ export function applyAction(
     default:
       if (action.startsWith('conv_answer:')) {
         const difusion = action.slice('conv_answer:'.length) as DifusionKey;
-        return { updates: { difusion, convStep: 'empatia', nextActionDate: today }, event: null };
+        return { updates: { difusion, convStep: 'empatia', nextActionDate: today, lastReplyAt: today, lastOutcomeAt: today }, event: null };
       }
   }
   return { updates, event: { prospectId: p.id, type: action as ProspectEventType, date: today, note } };
@@ -400,7 +447,7 @@ export function applyAction(
 
 // ---------------- COLA DEL DÍA ----------------
 
-export type QueueKind = 'video' | 'responder' | 'llamada' | 'propuesta' | 'seguimiento' | 'primer';
+export type QueueKind = 'llamada_hoy' | 'video' | 'responder' | 'llamada' | 'propuesta' | 'seguimiento' | 'primer';
 
 export interface QueueItem {
   prospect: Prospect;
@@ -412,6 +459,7 @@ export interface QueueItem {
 }
 
 export const QUEUE_LABELS: Record<QueueKind, string> = {
+  llamada_hoy: 'Llamada de hoy',
   video: 'Mandar video de la auditoría',
   responder: 'Respondió: contestarle',
   llamada: '¿Cómo salió la llamada?',
@@ -420,8 +468,19 @@ export const QUEUE_LABELS: Record<QueueKind, string> = {
   primer: 'Primer mensaje',
 };
 
-const KIND_ORDER: Record<QueueKind, number> = { video: 0, responder: 1, llamada: 2, propuesta: 3, seguimiento: 4, primer: 5 };
-const MUST_DO: QueueKind[] = ['video', 'responder', 'llamada', 'propuesta'];
+const KIND_ORDER: Record<QueueKind, number> = { llamada_hoy: 0, responder: 1, video: 2, llamada: 3, propuesta: 4, seguimiento: 5, primer: 6 };
+const MUST_DO: QueueKind[] = ['llamada_hoy', 'video', 'responder', 'llamada', 'propuesta'];
+const WAITING_STEPS: ConvStep[] = ['esperando_respuesta', 'esperando_acuerdo'];
+
+/** ¿Ya pasó la hora de la llamada? (hora de Argentina) */
+function callPassed(p: Prospect, today: string, now: Date): boolean {
+  if (!p.callDate) return false;
+  if (p.callDate < today) return true;
+  if (p.callDate > today || !p.callTime) return false;
+  const [h, m] = p.callTime.split(':').map(Number);
+  const local = new Date(now.toLocaleString('en-US', { timeZone: 'America/Argentina/Cordoba' }));
+  return local.getHours() * 60 + local.getMinutes() >= h * 60 + m + 30;
+}
 
 // ---------------- HORA EN SU PAÍS ----------------
 
@@ -500,18 +559,29 @@ export function buildDailyQueue(
     if (CLOSED.includes(p.stage)) return;
     let kind: QueueKind | null = null;
     let due = p.nextActionDate || today;
-    if (p.stage === 'llamada') {
+    const dueNow = (p.nextActionDate || today) <= today;
+    if (p.awaitingMe) {
+      // Te escribió: lo primero es contestarle, esté en la etapa que esté
+      kind = 'responder';
+      due = p.lastReplyAt || today;
+    } else if (p.stage === 'llamada') {
       if (p.proposalSentAt) {
-        if ((p.nextActionDate || today) <= today) kind = 'propuesta';
-      } else if (p.callDate && p.callDate <= today) {
+        if (dueNow) kind = 'propuesta';
+      } else if (p.callDate === today && !callPassed(p, today, now)) {
+        kind = 'llamada_hoy';
+      } else if (p.callDate && callPassed(p, today, now)) {
         kind = 'llamada';
         due = p.callDate;
       }
     } else if (p.stage === 'auditoria_completada') {
       kind = 'video';
       due = p.videoDueDate || today;
-    } else if (p.stage === 'respondio' && (p.nextActionDate || today) <= today) kind = 'responder';
-    else if (WAITING.includes(p.stage) && (p.nextActionDate || today) <= today) kind = 'seguimiento';
+    } else if (p.stage === 'respondio') {
+      // Le hiciste la pregunta o empatizaste y no contestó: seguimiento; si no, te toca a vos
+      if (WAITING_STEPS.includes(p.convStep as ConvStep)) {
+        if (dueNow) kind = 'seguimiento';
+      } else if (dueNow) kind = 'responder';
+    } else if (WAITING.includes(p.stage) && dueNow) kind = 'seguimiento';
     else if (p.stage === 'nuevo' && (p.plannedFirstContact || p.createdAt) <= today) {
       kind = 'primer';
       due = p.plannedFirstContact || p.createdAt;
@@ -519,10 +589,11 @@ export function buildDailyQueue(
     if (!kind) return;
     // Lo que ya se hizo hoy no vuelve a aparecer
     if ((kind === 'primer' || kind === 'seguimiento' || kind === 'propuesta') && p.lastContactAt === today) return;
+    const due2 = kind === 'llamada_hoy' ? today : due;
     all.push({
       prospect: p,
       kind,
-      overdueDays: Math.max(0, daysBetween(due, today)),
+      overdueDays: Math.max(0, daysBetween(due2, today)),
       suggestDiscard: kind === 'seguimiento' && (p.followUps || 0) >= settings.maxFollowUps,
       hot: isHot(p),
       localTime: localTimeFor(p.country, now),
@@ -559,7 +630,10 @@ export function pendingOutcomes(prospects: Prospect[], today: string): Prospect[
         !!p.lastContactAt &&
         p.lastContactAt < today &&
         (p.lastOutcomeAt || '') < p.lastContactAt &&
-        ['contactado', 'auditoria_enviada', 'video_enviado'].includes(p.stage)
+        !p.awaitingMe &&
+        (['contactado', 'auditoria_enviada', 'video_enviado'].includes(p.stage) ||
+          (p.stage === 'respondio' && WAITING_STEPS.includes(p.convStep as ConvStep)) ||
+          (p.stage === 'llamada' && !!p.proposalSentAt))
     )
     .sort((a, b) => (a.lastContactAt || '').localeCompare(b.lastContactAt || ''));
 }
@@ -572,7 +646,12 @@ export function recycleDue(prospects: Prospect[], today: string): Prospect[] {
 /** Para el cierre del día: a quiénes les escribiste hoy y todavía no anotaste qué pasó. */
 export function pendingDayClose(prospects: Prospect[], today: string): Prospect[] {
   return prospects.filter(
-    (p) => p.lastContactAt === today && p.lastOutcomeAt !== today && !CLOSED.includes(p.stage) && p.stage !== 'respondio'
+    (p) =>
+      p.lastContactAt === today &&
+      p.lastOutcomeAt !== today &&
+      !p.awaitingMe &&
+      !CLOSED.includes(p.stage) &&
+      (p.stage !== 'respondio' || WAITING_STEPS.includes(p.convStep as ConvStep))
   );
 }
 
@@ -583,10 +662,39 @@ export function auditLinkFor(p: Prospect): string {
 }
 
 /** Cómo saludarlo: su @ de Instagram si lo tenemos; si no, el nombre del estudio o de la persona. */
+const GENERIC_WORDS = new Set([
+  'arquitectura', 'arquitecto', 'arquitecta', 'arquitectos', 'arq', 'estudio', 'diseño', 'diseno', 'construccion', 'construcción',
+  'construcciones', 'topografia', 'topografía', 'bim', 'interiorismo', 'interiores', 'paisajismo', 'obras', 'proyectos', 'reformas',
+  'remodelaciones', 'y', '&', 'de', 'del', 'la', 'el', 'e', 'en', 'sa', 'srl', 'sas', 'spa', 'ltda',
+]);
+const SMALL_WORDS = new Set(['de', 'del', 'la', 'el', 'y', 'e', 'en', 'los', 'las']);
+
+/**
+ * Nombre presentable del estudio: los de Google Maps vienen en MAYÚSCULAS o con
+ * "Nombre - Rubro - Ciudad". Devuelve '' si es solo un rubro ("ARQUITECTURA - DISEÑO"),
+ * para no saludar a "Arquitectura y Construcción" como si fuera una persona.
+ */
+export function cleanStudioName(raw?: string): string {
+  let n = (raw || '').trim().replace(/\s+/g, ' ');
+  const first = n.split(/\s+[-|/•·–—]\s+|,\s+/)[0].trim();
+  if (first.length >= 3) n = first;
+  const letters = n.replace(/[^A-Za-zÁÉÍÓÚÑáéíóúñ]/g, '');
+  if (letters.length > 4 && letters === letters.toUpperCase()) {
+    n = n
+      .toLowerCase()
+      .split(' ')
+      .map((w, i) => (i > 0 && SMALL_WORDS.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(' ');
+  }
+  const words = n.toLowerCase().split(/[\s,.]+/).filter(Boolean);
+  if (!words.length || words.every((w) => GENERIC_WORDS.has(w))) return '';
+  return n;
+}
+
 export function greetingFor(p: Prospect): string {
   const ig = normalizeInstagram(p.instagram);
   if (ig) return `@${ig}`;
-  return (p.studio || p.name || '').trim();
+  return cleanStudioName(p.studio || p.name);
 }
 
 export const DEFAULT_PERSONAL = 'Viendo el enfoque y la trayectoria que tienes en tu estudio, ';
@@ -597,14 +705,58 @@ export function normalizePersonalLine(line?: string): string {
   return t ? `${t}, ` : '';
 }
 
-export function renderTemplate(template: string, p: Prospect, settings?: ProspectingSettings): string {
-  return template
-    .replace(/\{personal\}/g, normalizePersonalLine(p.personalLine) || DEFAULT_PERSONAL)
+export const SEGMENT_WORD: Record<string, string> = {
+  arquitectura: 'arquitectura',
+  interiorismo: 'interiorismo',
+  paisajismo: 'paisajismo',
+  construccion: 'construcción',
+};
+
+/**
+ * Si todavía no tiene frase personalizada (IA), una de varias aperturas distintas que usan
+ * lo que sabemos de él (rubro, ciudad, estudio). Así no le llega a todos la misma frase.
+ */
+export function personalFallback(p: Prospect): string {
+  const rubro = SEGMENT_WORD[p.segment || ''] || 'arquitectura';
+  const city = (p.city || '').split(',')[0].trim();
+  // Sin repetir el nombre del estudio (el saludo ya lo nombra): suena menos automático
+  const options = [
+    city ? `Estuve viendo estudios de ${rubro} en ${city} y me encontré con su trabajo, ` : '',
+    'Vi los proyectos que publican y me gustó mucho cómo los presentan, ',
+    city ? `Me crucé con su trabajo buscando estudios de ${rubro} de ${city}, ` : '',
+    'Estuve mirando lo que vienen haciendo últimamente, ',
+    'Viendo el enfoque y la trayectoria que tienen, ',
+  ].filter(Boolean);
+  return options[hashStr(`${p.id}:apertura`) % options.length];
+}
+
+/** "Buen día" / "Buenas tardes" / "Buenas noches" según la hora en su país. */
+export function timeGreeting(p: Prospect, now: Date = new Date()): string {
+  const h = localTimeFor(p.country || 'AR', now)?.hour ?? now.getHours();
+  return h < 12 ? 'Buen día' : h < 20 ? 'Buenas tardes' : 'Buenas noches';
+}
+
+export function renderTemplate(template: string, p: Prospect, settings?: ProspectingSettings, now: Date = new Date()): string {
+  const rubro = SEGMENT_WORD[p.segment || ''] || 'arquitectura';
+  const greeting = greetingFor(p);
+  const studio = cleanStudioName(p.studio) || cleanStudioName(p.name);
+  let out = template;
+  // Sin nombre presentable: "Hola {saludo}, ¿cómo va?" → "Hola, ¿cómo va?"
+  if (!greeting) out = out.replace(/,?\s*\{saludo\}/g, '');
+  // {nombre} solo si sabemos el nombre de la persona (en los de Google Maps "nombre" es el estudio)
+  const person = p.name && p.studio && cleanStudioName(p.name) !== cleanStudioName(p.studio) ? firstName(p.name) : '';
+  if (!person) out = out.replace(/,?\s*\{nombre\}/g, '');
+  if (!studio) out = out.replace(/alguien de \{estudio\}/g, 'alguien del estudio').replace(/en \{estudio\}/g, 'en el estudio');
+  return out
+    .replace(/\{personal\}/g, normalizePersonalLine(p.personalLine) || personalFallback(p))
+    .replace(/\{saludoHora\}/g, timeGreeting(p, now))
+    .replace(/\{rubro\}/g, rubro)
+    .replace(/\{ciudad\}/g, (p.city || '').split(',')[0].trim() || 'tu ciudad')
     .replace(/\{video\}/g, p.videoUrl || '[pega aquí el link del video]')
     .replace(/\{agenda\}/g, bookingLinkFor(p, settings?.bookingUrl) || '[tu link para agendar]')
     .replace(/\{saludo\}/g, greetingFor(p))
-    .replace(/\{nombre\}/g, firstName(p.name))
-    .replace(/\{estudio\}/g, p.studio || 'tu estudio')
+    .replace(/\{nombre\}/g, person)
+    .replace(/\{estudio\}/g, studio || 'tu estudio')
     .replace(/\{link\}/g, auditLinkFor(p));
 }
 
@@ -613,12 +765,18 @@ export function templateFor(item: QueueItem, settings: ProspectingSettings): str
   const p = item.prospect;
   if (item.kind === 'primer') {
     if (p.secondChance && t.secondChance) return t.secondChance;
-    return variantFor(p, settings) === 'B' ? t.firstB : t.first;
+    if (variantFor(p, settings) === 'B') return t.firstB;
+    const pool = firstVariantPool(settings);
+    return pool[firstVariantIndex(p, settings)] || t.first;
   }
   if (item.kind === 'video') return t.video;
-  if (item.kind === 'llamada') return '';
+  if (item.kind === 'llamada' || item.kind === 'llamada_hoy') return '';
   if (item.kind === 'propuesta') return t.proposal;
   if (item.kind === 'seguimiento' && p.stage === 'video_enviado') return t.booking;
+  if (item.kind === 'seguimiento' && p.stage === 'auditoria_enviada') return t.followUpAudit || t.followUp[0];
+  if (item.kind === 'seguimiento' && p.stage === 'respondio') return p.convStep === 'esperando_acuerdo' ? t.followUpAgree : t.followUpQuestion;
+  // Te escribió fuera del guion: la respuesta la escribes vos
+  if (item.kind === 'responder' && p.awaitingMe && p.stage !== 'respondio') return '';
   if (item.kind === 'responder') {
     const step = item.prospect.convStep || 'pregunta';
     if (step === 'pregunta' || step === 'esperando_respuesta') return t.question;
@@ -865,16 +1023,161 @@ export function callMeetingFor(
     completed: false,
     createdAt: today,
     clientPhone: p.whatsapp,
-    reminderMinutesBefore: 15,
+    reminderMinutesBefore: 60,
     reminderNotified: false,
     notes: [
       `Prospecto de .Cero${p.city ? ` (${p.city})` : ''}.`,
       p.whatsapp ? `WhatsApp: ${p.whatsapp}` : '',
       p.audit ? `Auditoría ${p.audit.total}/30 (${p.audit.nivel}). Dolor: ${p.audit.dolorCaptacion || '—'}.` : '',
+      p.difusion ? `Hoy difunde su trabajo por: ${DIFUSION_LABELS[p.difusion]}.` : '',
+      p.lastReplyNote ? `Lo último que te dijo: ${p.lastReplyNote}` : '',
+      p.notes ? `Tus notas: ${p.notes}` : '',
       p.videoUrl ? `Video: ${p.videoUrl}` : '',
       extra.notes || '',
     ]
       .filter(Boolean)
       .join('\n'),
   };
+}
+
+// ---------------- VARIANTES DEL PRIMER MENSAJE ----------------
+
+const OLD_FIRST_DEFAULTS = [
+  'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\n{personal}¿me permites realizarte una consulta?',
+  'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\nViendo el enfoque y la trayectoria que tienes en tu estudio, ¿me permites realizarte una consulta?',
+];
+
+/** Variantes en uso: las de la configuración + tu primer mensaje si lo escribiste vos. */
+export function firstVariantPool(settings: ProspectingSettings = DEFAULT_PROSPECTING_SETTINGS): string[] {
+  const t = settings.templates;
+  const variants = (t.firstVariants || []).filter((x) => x && x.trim());
+  const custom = t.first && t.first.trim() && !OLD_FIRST_DEFAULTS.includes(t.first) ? [t.first] : [];
+  const pool = [...custom, ...variants];
+  return pool.length ? pool : [t.first];
+}
+
+/** Cada prospecto recibe siempre la misma variante (la elegida al azar por su id). */
+export function firstVariantIndex(p: Prospect, settings: ProspectingSettings = DEFAULT_PROSPECTING_SETTINGS): number {
+  const n = firstVariantPool(settings).length;
+  if (p.firstVariant !== undefined && p.firstVariant < n) return p.firstVariant;
+  return hashStr(`${p.id}:primer`) % n;
+}
+
+// ---------------- A QUIÉN LE TOCA ----------------
+
+export type Turn = 'sin_contactar' | 'mio' | 'suyo' | 'perdido' | 'llamada' | 'cerrado';
+
+export interface TurnInfo {
+  turn: Turn;
+  label: string; // "Te toca", "Esperando hace 3 días"...
+  days: number; // días desde tu último mensaje (si espera)
+}
+
+/** Te toca a vos, le toca a él, o ya hay que darlo por perdido. */
+export function turnOf(p: Prospect, today: string, settings: ProspectingSettings = DEFAULT_PROSPECTING_SETTINGS): TurnInfo {
+  const since = p.lastContactAt ? Math.max(0, daysBetween(p.lastContactAt, today)) : 0;
+  const ago = since === 0 ? 'hoy' : since === 1 ? 'hace 1 día' : `hace ${since} días`;
+  if (CLOSED.includes(p.stage)) return { turn: 'cerrado', label: STAGE_LABELS[p.stage], days: 0 };
+  if (p.stage === 'nuevo') return { turn: 'sin_contactar', label: 'Sin contactar', days: 0 };
+  if (p.awaitingMe) return { turn: 'mio', label: `Te escribió${p.lastReplyAt && p.lastReplyAt !== today ? ` el ${p.lastReplyAt.slice(8, 10)}/${p.lastReplyAt.slice(5, 7)}` : ''}: te toca`, days: 0 };
+  if (p.stage === 'auditoria_completada') return { turn: 'mio', label: 'Te toca: mandar el video', days: 0 };
+  if (p.stage === 'respondio' && !WAITING_STEPS.includes(p.convStep as ConvStep)) return { turn: 'mio', label: 'Te toca seguir la conversación', days: 0 };
+  if (p.stage === 'llamada' && !p.proposalSentAt) {
+    if (p.callDate && p.callDate >= today) return { turn: 'llamada', label: `Llamada ${p.callDate === today ? 'hoy' : `el ${p.callDate.slice(8, 10)}/${p.callDate.slice(5, 7)}`}${p.callTime ? ` a las ${p.callTime}` : ' (sin hora)'}`, days: 0 };
+    return { turn: 'mio', label: 'Te toca: anotar cómo salió la llamada', days: 0 };
+  }
+  if ((p.followUps || 0) >= settings.maxFollowUps) return { turn: 'perdido', label: `Sin respuesta tras ${p.followUps} seguimientos`, days: since };
+  return { turn: 'suyo', label: `Esperando su respuesta (le escribiste ${ago})`, days: since };
+}
+
+// ---------------- EMBUDO ----------------
+
+export const FUNNEL_STEPS = [
+  { id: 'primer', label: 'Primer mensaje enviado' },
+  { id: 'respondio', label: 'Respondió' },
+  { id: 'pregunta', label: 'Le hiciste la pregunta' },
+  { id: 'difusion', label: 'Contó cómo difunde' },
+  { id: 'empatia', label: 'Empatía enviada' },
+  { id: 'speech', label: 'Coincidió: speech' },
+  { id: 'link', label: 'Link de auditoría enviado' },
+  { id: 'auditoria', label: 'Completó la auditoría' },
+  { id: 'video', label: 'Video enviado' },
+  { id: 'llamada', label: 'Llamada agendada' },
+  { id: 'propuesta', label: 'Propuesta enviada' },
+  { id: 'cliente', label: 'Cliente' },
+] as const;
+
+export type FunnelStepId = (typeof FUNNEL_STEPS)[number]['id'];
+
+/** En qué paso del embudo está (null si todavía no se le escribió o está descartado). */
+export function funnelStepOf(p: Prospect): FunnelStepId | null {
+  switch (p.stage) {
+    case 'contactado':
+      return 'primer';
+    case 'respondio':
+      if (p.convStep === 'esperando_respuesta') return 'pregunta';
+      if (p.convStep === 'empatia') return 'difusion';
+      if (p.convStep === 'esperando_acuerdo') return 'empatia';
+      if (p.convStep === 'speech') return 'speech';
+      return 'respondio';
+    case 'auditoria_enviada':
+      return 'link';
+    case 'auditoria_completada':
+      return 'auditoria';
+    case 'video_enviado':
+      return 'video';
+    case 'llamada':
+      return p.proposalSentAt ? 'propuesta' : 'llamada';
+    case 'cliente':
+      return 'cliente';
+    default:
+      return null;
+  }
+}
+
+/** Llamadas agendadas en un día (para "mañana" y el aviso de la noche anterior). */
+export function callsOn(prospects: Prospect[], day: string): Prospect[] {
+  return prospects
+    .filter((p) => p.stage === 'llamada' && !p.proposalSentAt && p.callDate === day)
+    .sort((a, b) => (a.callTime || '99').localeCompare(b.callTime || '99'));
+}
+
+/** Llamadas sin hora cargada (las de antes del cambio, o agendadas sin hora). */
+export function callsWithoutTime(prospects: Prospect[], today: string): Prospect[] {
+  return prospects.filter((p) => p.stage === 'llamada' && !p.proposalSentAt && !p.callTime && (!p.callDate || p.callDate >= today));
+}
+
+/** Texto para el historial según la acción. */
+export const ACTION_LOG: Partial<Record<string, string>> = {
+  first_contact: 'Le mandaste el primer mensaje',
+  follow_up: 'Le mandaste un seguimiento',
+  reply: 'Te respondió',
+  they_replied: 'Te escribió',
+  i_replied: 'Le contestaste',
+  no_reply: 'No respondió',
+  conv_question_sent: 'Le hiciste la pregunta',
+  conv_empathy_sent: 'Le mandaste la empatía',
+  conv_agreed: 'Coincidió con lo que le dijiste',
+  audit_sent: 'Le pasaste el link de la auditoría',
+  audit_completed: 'Completó la auditoría',
+  video_sent: 'Le mandaste el video',
+  call: 'Agendaron la llamada',
+  proposal_sent: 'Le mandaste la propuesta',
+  won: 'Pasó a cliente',
+  lost: 'Lo descartaste',
+  do_not_contact: 'Pidió que no lo contacten',
+  snooze: 'Lo pasaste para mañana',
+};
+
+export function logEntryFor(action: ProspectAction, note?: string): { dir: 'in' | 'out' | 'nota'; text: string } | null {
+  if (action === 'note') return note ? { dir: 'nota', text: note } : null;
+  if (action.startsWith('conv_answer:')) {
+    const k = action.slice('conv_answer:'.length) as DifusionKey;
+    return { dir: 'in', text: `Te contó cómo difunde: ${DIFUSION_LABELS[k] || k}` };
+  }
+  const base = ACTION_LOG[action];
+  if (!base) return null;
+  const dir = action === 'they_replied' || action === 'reply' || action === 'conv_agreed' || action === 'audit_completed' ? 'in' : 'out';
+  const extra = note && !/^\d{4}-\d{2}-\d{2}/.test(note) ? `: ${note}` : action === 'call' && note ? ` (${note})` : '';
+  return { dir, text: `${base}${extra}` };
 }

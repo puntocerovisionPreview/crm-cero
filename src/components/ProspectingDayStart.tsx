@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ClipboardCopy, Instagram, Loader2, MessageCircle, SkipForward, Sparkles, Sun, X, Zap } from 'lucide-react';
 import { Prospect, ProspectingSettings } from '../types';
-import { QUEUE_LABELS, QueueItem, normalizeInstagram, renderTemplate, templateFor, variantFor, ProspectAction } from '../prospecting/core';
+import { FUNNEL_STEPS, QUEUE_LABELS, QueueItem, funnelStepOf, normalizeInstagram, renderTemplate, templateFor, variantFor, ProspectAction } from '../prospecting/core';
 import { COUNTRY_NAMES } from '../prospecting/pool';
 import { generatePersonalLine, friendlyError } from '../prospecting/actions';
 import { formatWhatsAppUrl } from '../utils/contact';
@@ -145,10 +145,12 @@ export const DayStartFlow: React.FC<{
                       <p className="text-sm font-semibold text-[var(--text-primary)] truncate">
                         {p.name}
                         {p.studio && p.studio !== p.name ? <span className="font-normal text-[var(--text-secondary)]"> — {p.studio}</span> : null}
-                        <span className="font-normal text-[var(--text-tertiary)] text-xs"> · le escribiste el {p.lastContactAt?.slice(8, 10)}/{p.lastContactAt?.slice(5, 7)}</span>
+                        <span className="font-normal text-[var(--text-tertiary)] text-xs">
+                          {' '}· {FUNNEL_STEPS.find((s) => s.id === funnelStepOf(p))?.label.toLowerCase() || 'le escribiste'} · último mensaje el {p.lastContactAt?.slice(8, 10)}/{p.lastContactAt?.slice(5, 7)}
+                        </span>
                       </p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-                        <button type="button" disabled={busyId === p.id} className={`${btnPrimary} py-1.5 text-xs`} onClick={() => outcome(p, 'reply')}>
+                        <button type="button" disabled={busyId === p.id} className={`${btnPrimary} py-1.5 text-xs`} onClick={() => outcome(p, 'they_replied')}>
                           Respondió
                         </button>
                         <button type="button" disabled={busyId === p.id} className={`${btnGhost} py-1.5 text-xs`} onClick={() => outcome(p, 'no_reply')}>
@@ -180,7 +182,7 @@ export const DayStartFlow: React.FC<{
                 <ul className="space-y-1">
                   {urgent.map((i) => (
                     <li key={i.prospect.id} className="text-sm text-[var(--text-secondary)] flex gap-2">
-                      <span className="text-[var(--accent)] font-medium shrink-0">{QUEUE_LABELS[i.kind]}:</span>
+                      <span className="text-[var(--accent)] font-medium shrink-0">{i.kind === 'llamada_hoy' ? `Llamada ${i.prospect.callTime ? `a las ${i.prospect.callTime}` : 'hoy (sin hora)'}` : QUEUE_LABELS[i.kind]}:</span>
                       <span className="truncate">{i.prospect.studio || i.prospect.name}</span>
                     </li>
                   ))}
@@ -412,6 +414,42 @@ export const BurstMode: React.FC<{
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+/** Personaliza con IA (lee su web) todos los primeros mensajes pendientes, uno por uno. */
+export const PersonalizeAllButton: React.FC<{ prospects: Prospect[] }> = ({ prospects }) => {
+  const todo = prospects.filter((p) => !p.personalLine && !p.secondChance);
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(0);
+  const [err, setErr] = useState<string | null>(null);
+  if (!todo.length && !busy) return null;
+  const run = async () => {
+    setBusy(true);
+    setErr(null);
+    setDone(0);
+    let fails = 0;
+    for (const p of todo) {
+      try {
+        await generatePersonalLine(p);
+      } catch (e) {
+        fails++;
+        if (fails === 1) setErr(friendlyError(e));
+        if (fails >= 3) break;
+      }
+      setDone((n) => n + 1);
+    }
+    setBusy(false);
+  };
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <button type="button" onClick={run} disabled={busy} className={`${btnGhost} py-1.5 text-xs`}>
+        {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />}
+        {busy ? `Personalizando ${done} de ${todo.length}…` : `Personalizar con IA ${todo.length === 1 ? 'el primer mensaje' : `los ${todo.length} primeros mensajes`}`}
+      </button>
+      <span className="text-[11px] text-[var(--text-tertiary)]">Lee su web y escribe una frase sobre su estudio.</span>
+      {err && <span className="text-[11px] text-red-400 w-full">{err}</span>}
     </div>
   );
 };

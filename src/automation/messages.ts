@@ -4,7 +4,7 @@ import { addDays, parseLocalDate } from '../utils/dates';
 import { RoutineItem, appliesOn } from '../utils/dailyRoutineCore';
 import { sortTasks } from '../utils/taskSort';
 import { Prospect, ProspectingSettings } from '../types';
-import { buildDailyQueue, pendingDayClose, DEFAULT_PROSPECTING_SETTINGS } from '../prospecting/core';
+import { buildDailyQueue, callsWithoutTime, pendingDayClose, pendingOutcomes, DEFAULT_PROSPECTING_SETTINGS } from '../prospecting/core';
 
 /**
  * Textos que manda el motor de automatización (Telegram). Lógica pura:
@@ -246,15 +246,24 @@ export function prospectingSummary(data: AutomationData, today: string): string 
   if (!data.prospects || data.prospects.length === 0) return '';
   const settings = data.prospectingSettings || DEFAULT_PROSPECTING_SETTINGS;
   const { items } = buildDailyQueue(data.prospects, today, settings);
-  if (items.length === 0) return '';
+  const toMark = pendingOutcomes(data.prospects, today).length;
+  const noTime = callsWithoutTime(data.prospects, today);
+  if (items.length === 0 && !toMark && !noTime.length) return '';
   const count = (k: string) => items.filter((i) => i.kind === k).length;
   const parts: string[] = [];
+  const calls = items.filter((i) => i.kind === 'llamada_hoy');
+  const replies = items.filter((i) => i.kind === 'responder');
+  if (calls.length) parts.push(`${calls.length} ${calls.length === 1 ? 'llamada' : 'llamadas'} hoy`);
+  if (replies.length) parts.push(`te toca contestarle a ${replies.length}`);
   const videos = items.filter((i) => i.kind === 'video');
   if (videos.length) parts.push(`${videos.length} ${videos.length === 1 ? 'video de auditoría' : 'videos de auditoría'} para mandar`);
-  if (count('responder')) parts.push(`${count('responder')} ${count('responder') === 1 ? 'respuesta' : 'respuestas'} para contestar`);
   if (count('seguimiento')) parts.push(`${count('seguimiento')} ${count('seguimiento') === 1 ? 'seguimiento' : 'seguimientos'}`);
   if (count('primer')) parts.push(`${count('primer')} ${count('primer') === 1 ? 'primer mensaje' : 'primeros mensajes'}`);
+  if (toMark) parts.push(`${toMark} sin anotar si respondieron`);
   const lines = [`<b>Prospección</b>`, `${parts.join(', ')}.`];
+  calls.forEach((c) => lines.push(`• ${c.prospect.callTime || 'sin hora'} · llamada con ${escapeHtml(c.prospect.studio || c.prospect.name)}`));
+  replies.slice(0, 5).forEach((r) => lines.push(`• Contestale a ${escapeHtml(r.prospect.studio || r.prospect.name)}${r.prospect.lastReplyNote ? `: «${escapeHtml(r.prospect.lastReplyNote.slice(0, 60))}»` : ''}`));
+  if (noTime.length) lines.push(`• ${noTime.length === 1 ? 'Hay una llamada' : `Hay ${noTime.length} llamadas`} sin hora: cargala en Prospección.`);
   videos
     .filter((v) => v.overdueDays > 0 || v.prospect.videoDueDate === today)
     .forEach((v) => lines.push(`• Video para ${escapeHtml(v.prospect.studio || v.prospect.name)}: vence ${v.overdueDays > 0 ? 'ya pasó' : 'hoy'}`));

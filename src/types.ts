@@ -1042,11 +1042,24 @@ export interface Prospect {
   secondChance?: boolean; // volvió de descartados a los 90 días
   recycleAfter?: string; // desde cuándo puede volver a la lista (descartado sin respuesta)
   doNotContact?: boolean; // pidió que no lo contacten más
+  // A quién le toca escribir
+  awaitingMe?: boolean; // te escribió y te toca contestar (en cualquier etapa)
+  lastReplyAt?: string; // última vez que te escribió (YYYY-MM-DD)
+  lastReplyNote?: string; // qué te dijo (opcional)
+  firstVariant?: number; // qué versión del primer mensaje recibió
+  // Historial de la conversación (lo que te dijo y lo que le mandaste)
+  log?: ProspectLogEntry[];
   dealValue?: number; // cuánto vale la oportunidad (tablero de oportunidades)
   dealCurrency?: 'ARS' | 'USD';
 }
 
 // Pasos del guion: pregunta → (su respuesta) → empatía → (acuerdo) → speech + link de auditoría
+export interface ProspectLogEntry {
+  at: string; // ISO
+  dir: 'in' | 'out' | 'nota'; // te escribió / le escribiste / nota tuya
+  text: string;
+}
+
 export type ConvStep = 'pregunta' | 'esperando_respuesta' | 'empatia' | 'esperando_acuerdo' | 'speech';
 
 export type DifusionKey = 'portales' | 'referidos' | 'anuncios' | 'redes' | 'contenido_ig' | 'agencia' | 'otro';
@@ -1071,6 +1084,7 @@ export interface ProspectEvent {
   date: string; // YYYY-MM-DD
   note?: string;
   variant?: 'A' | 'B'; // en el primer mensaje: qué versión se mandó
+  firstVariant?: number; // en el primer mensaje: cuál de las variantes
   createdAt: string; // ISO
 }
 
@@ -1090,7 +1104,11 @@ export interface ProspectingSettings {
   dayStartedOn?: string; // último día en que hiciste el "inicio del día"
   templates: {
     first: string;
+    firstVariants: string[]; // variantes del primer mensaje (se reparten para no sonar a spam)
     followUp: string[]; // seguimiento 1, 2, 3
+    followUpQuestion: string; // no contestó la pregunta
+    followUpAgree: string; // no contestó después de la empatía
+    followUpAudit: string; // le pasaste el link y no completó la auditoría
     question: string; // "¿Cómo haces para difundir tu trabajo...?"
     empathy: Record<DifusionKey, string>; // respuesta según cómo difunde
     speech: string; // caballo de Troya + link de auditoría

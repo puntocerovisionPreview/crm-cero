@@ -72,11 +72,11 @@ describe('etapas y cola del día', () => {
     expect(q.map((i) => i.kind)).toEqual(['video', 'primer']);
   });
 
-  it('respeta el tope diario, pero videos y respuestas siempre entran', () => {
+  it('respeta el tope diario, pero respuestas y videos siempre entran (primero las respuestas)', () => {
     const many = Array.from({ length: 10 }, (_, i) => P({ id: `n${i}`, name: `N${i}`, plannedFirstContact: '2026-10-16' }));
     const urgent = [P({ id: 'r', stage: 'respondio' }), P({ id: 'v', stage: 'auditoria_completada', videoDueDate: '2026-10-17' })];
     const { items, overflow } = buildDailyQueue([...many, ...urgent], '2026-10-16', { ...s, dailyCap: 4 });
-    expect(items.map((i) => i.kind)).toEqual(['video', 'responder', 'primer', 'primer']);
+    expect(items.map((i) => i.kind)).toEqual(['responder', 'video', 'primer', 'primer']);
     expect(overflow).toBe(8);
   });
 

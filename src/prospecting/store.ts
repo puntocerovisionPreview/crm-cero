@@ -1,8 +1,8 @@
-import { collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { arrayUnion, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
 import { Prospect, ProspectEvent, ProspectingSettings } from '../types';
-import { ProspectAction, applyAction, mergeProspectingSettings } from './core';
+import { ProspectAction, applyAction, logEntryFor, mergeProspectingSettings } from './core';
 
 // Firestore de la prospección: prospects, prospect_events y settings/prospecting
 
@@ -69,7 +69,11 @@ export async function recordProspectAction(
   const batch = writeBatch(db);
   const payload: Record<string, any> = { updatedAt: new Date().toISOString() };
   Object.entries(updates).forEach(([k, v]) => (payload[k] = v === undefined ? null : v));
-  batch.set(doc(db, 'prospects', p.id), deepSanitize(payload), { merge: true });
+  const sanitized: Record<string, any> = deepSanitize(payload);
+  // Historial de la conversación: se agrega, nunca se borra lo anterior
+  const entry = logEntryFor(action, note);
+  if (entry) sanitized.log = arrayUnion({ at: new Date().toISOString(), ...entry });
+  batch.set(doc(db, 'prospects', p.id), sanitized, { merge: true });
   if (event) {
     const id = `pev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
     batch.set(doc(db, 'prospect_events', id), deepSanitize({ ...event, id, createdAt: new Date().toISOString() }));

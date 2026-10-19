@@ -37,6 +37,11 @@ import {
   parsePastedProspects,
   pendingDayClose,
   pendingOutcomes,
+  callsOn,
+  turnOf,
+  funnelStepOf,
+  FUNNEL_STEPS,
+  Turn,
   renderTemplate,
   templateFor,
   breakdownBy,
@@ -47,7 +52,8 @@ import {
 } from '../prospecting/core';
 import { COUNTRY_NAMES } from '../prospecting/pool';
 import { friendlyError, generateVideoScript, markDayStarted, useAddMore, usePoolTakeOptions, useRecycle } from '../prospecting/actions';
-import { BurstMode, DayStartFlow, LocalTimeBadge, PersonalLineButton } from '../components/ProspectingDayStart';
+import { BurstMode, DayStartFlow, LocalTimeBadge, PersonalLineButton, PersonalizeAllButton } from '../components/ProspectingDayStart';
+import { AwaitingBanner, CallPrep, ConversationLog, ReplyButton } from '../components/ProspectConversation';
 import { deleteProspect, recordProspectAction, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
 import { useProspecting } from '../prospecting/useProspecting';
 import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
@@ -63,7 +69,7 @@ import { saveMeetingToFirestore } from '../utils/firestoreService';
 import { callMeetingFor } from '../prospecting/core';
 import { prospectToProject } from '../prospecting/convert';
 
-type Tab = 'hoy' | 'prospectos' | 'reserva' | 'cargar' | 'metricas' | 'mensajes';
+type Tab = 'hoy' | 'embudo' | 'prospectos' | 'reserva' | 'cargar' | 'metricas' | 'mensajes';
 
 interface Props {
   projects: Project[];
@@ -73,6 +79,7 @@ interface Props {
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'hoy', label: 'Hoy' },
+  { id: 'embudo', label: 'Embudo' },
   { id: 'prospectos', label: 'Prospectos' },
   { id: 'reserva', label: 'Reserva' },
   { id: 'cargar', label: 'Cargar a mano' },
@@ -235,6 +242,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           onBurst={() => setBurstOpen(true)}
           onStartDay={pending.length > 0 ? () => setDayStartOpen(true) : undefined}
           pendingCount={pending.length}
+          tomorrowCalls={callsOn(list, addDays(today, 1))}
           queue={queue.items}
           overflow={queue.overflow}
           toClose={toClose}
@@ -245,6 +253,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           isEvening={hour >= settings.closeHour}
         />
       )}
+      {prospects !== null && tab === 'embudo' && <FunnelPanel prospects={list} today={today} settings={settings} onAct={actSafe} />}
       {prospects !== null && tab === 'prospectos' && (
         <ProspectList prospects={list} today={today} settings={settings} onAct={actSafe} onAddProject={onAddProject} />
       )}
@@ -288,6 +297,7 @@ export const TodayPanel: React.FC<{
   onBurst?: () => void;
   onStartDay?: () => void;
   pendingCount?: number;
+  tomorrowCalls?: Prospect[];
 }> = ({
   queue,
   overflow,
@@ -305,8 +315,17 @@ export const TodayPanel: React.FC<{
   onBurst,
   onStartDay,
   pendingCount = 0,
+  tomorrowCalls = [],
 }) => {
   const toWrite = queue.filter((i) => i.kind === 'primer' || i.kind === 'seguimiento').length;
+  // Hoy por prioridad: llamadas, a quién le toca contestar, lo urgente, seguimientos y primeros mensajes
+  const groups: { title: string; kinds: QueueItem['kind'][] }[] = [
+    { title: 'Llamadas de hoy', kinds: ['llamada_hoy'] },
+    { title: 'Te toca contestar', kinds: ['responder'] },
+    { title: 'Para hacer', kinds: ['video', 'llamada', 'propuesta'] },
+    { title: 'Seguimientos: no respondieron', kinds: ['seguimiento'] },
+    { title: 'Primeros mensajes', kinds: ['primer'] },
+  ];
   return (
   <div className="space-y-4">
     {onStartDay && pendingCount > 0 && (
@@ -340,7 +359,7 @@ export const TodayPanel: React.FC<{
                 {p.studio && p.studio !== p.name ? <span className="text-[var(--text-tertiary)]"> — {p.studio}</span> : null}
               </span>
               <div className="flex gap-1.5 shrink-0">
-                <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'reply')}>
+                <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'they_replied')}>
                   Respondió
                 </button>
                 <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'no_reply')}>
@@ -369,11 +388,39 @@ export const TodayPanel: React.FC<{
         )}
       </section>
     ) : (
-      <ul className="space-y-2">
-        {queue.map((item) => (
-          <QueueCard key={item.prospect.id} item={item} settings={settings} onAct={onAct} compact={compact} />
+      <div className="space-y-4">
+        {groups.map((g) => {
+          const items = queue.filter((i) => g.kinds.includes(i.kind));
+          if (!items.length) return null;
+          return (
+            <section key={g.title} className="space-y-2">
+              {!compact && (
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--text-tertiary)] px-1">
+                  {g.title} <span className="tabular-nums">· {items.length}</span>
+                </h3>
+              )}
+              {!compact && g.kinds.includes('primer') && <PersonalizeAllButton prospects={items.map((i) => i.prospect)} />}
+              <ul className="space-y-2">
+                {items.map((item) => (
+                  <QueueCard key={item.prospect.id} item={item} settings={settings} onAct={onAct} compact={compact} />
+                ))}
+              </ul>
+            </section>
+          );
+        })}
+      </div>
+    )}
+    {!compact && tomorrowCalls.length > 0 && (
+      <section className={`${card} p-3 space-y-1`}>
+        <p className="text-xs font-semibold text-[var(--text-secondary)] flex items-center gap-1.5">
+          <Phone className="w-3.5 h-3.5" /> Mañana
+        </p>
+        {tomorrowCalls.map((p) => (
+          <p key={p.id} className="text-sm text-[var(--text-primary)]">
+            <span className="tabular-nums text-[var(--text-secondary)]">{p.callTime || 'sin hora'}</span> · Llamada con {p.studio || p.name}
+          </p>
         ))}
-      </ul>
+      </section>
     )}
     {overflow > 0 && (
       <p className="text-xs text-[var(--text-tertiary)]">
@@ -425,7 +472,7 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
 }) => {
   const p = item.prospect;
   const [open, setOpen] = useState(
-    !compact && item.kind !== 'video' && !(item.kind === 'responder' && ['esperando_respuesta', 'esperando_acuerdo'].includes(item.prospect.convStep || ''))
+    !compact && item.kind !== 'video' && item.kind !== 'llamada_hoy' && !(item.kind === 'responder' && !item.prospect.awaitingMe && ['esperando_respuesta', 'esperando_acuerdo'].includes(item.prospect.convStep || ''))
   );
   const [copied, setCopied] = useState(false);
   const [callPicker, setCallPicker] = useState(false);
@@ -458,11 +505,28 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
 
   const step = p.convStep || 'pregunta';
   const waiting = item.kind === 'responder' && (step === 'esperando_respuesta' || step === 'esperando_acuerdo');
+  // Te escribió fuera del guion (después del link, del video o de la propuesta)
+  const offScript = item.kind === 'responder' && !!p.awaitingMe && p.stage !== 'respondio';
+  const nth = `${Math.min((p.followUps || 0) + 1, settings.maxFollowUps)} de ${settings.maxFollowUps}`;
+  const followLabel =
+    p.stage === 'respondio'
+      ? step === 'esperando_acuerdo'
+        ? `No contestó después de la empatía · seguimiento ${nth}`
+        : `No contestó la pregunta · seguimiento ${nth}`
+      : p.stage === 'auditoria_enviada'
+      ? `No completó la auditoría · recordatorio ${nth}`
+      : p.stage === 'video_enviado'
+      ? `Vio el video y no agendó · seguimiento ${nth}`
+      : `Sin respuesta al primer mensaje · seguimiento ${nth}`;
   const label =
     item.kind === 'seguimiento'
-      ? `${QUEUE_LABELS.seguimiento} ${Math.min((p.followUps || 0) + 1, settings.maxFollowUps)} de ${settings.maxFollowUps}`
+      ? followLabel
+      : offScript
+      ? `Te escribió (${STAGE_LABELS[p.stage].toLowerCase()})`
       : item.kind === 'responder'
-      ? `Conversación: ${CONV_STEP_LABELS[step]}`
+      ? `${p.awaitingMe ? 'Te respondió · ' : ''}${CONV_STEP_LABELS[step]}`
+      : item.kind === 'llamada_hoy'
+      ? `Llamada hoy${p.callTime ? ` a las ${p.callTime}` : ' (sin hora)'}`
       : item.kind === 'primer' && p.secondChance
       ? 'Segunda chance (pasaron 90 días)'
       : QUEUE_LABELS[item.kind];
@@ -499,7 +563,9 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
         </button>
       </div>
 
-      {item.kind === 'responder' && <ScriptSteps step={step} difusion={p.difusion} />}
+      <AwaitingBanner prospect={p} />
+      {item.kind === 'llamada_hoy' && <CallPrep prospect={p} />}
+      {item.kind === 'responder' && !offScript && <ScriptSteps step={step} difusion={p.difusion} />}
 
       {open && message && (
         <div className="space-y-1">
@@ -596,6 +662,37 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
             <Check className="w-3.5 h-3.5" /> Mensaje enviado
           </button>
         )}
+        {(item.kind === 'seguimiento' || item.kind === 'propuesta') && <ReplyButton prospect={p} onAct={onAct} />}
+        {item.kind === 'llamada_hoy' && (
+          <button type="button" className={`${p.callTime ? btnGhost : btnPrimary} py-1.5 text-xs`} onClick={() => setCallPicker(true)}>
+            <Phone className="w-3.5 h-3.5" /> {p.callTime ? 'Cambiar horario' : 'Ponerle hora'}
+          </button>
+        )}
+        {offScript && (
+          <>
+            <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'i_replied')}>
+              <Check className="w-3.5 h-3.5" /> Le contesté
+            </button>
+            {p.stage === 'auditoria_enviada' && (
+              <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'audit_completed')}>
+                Completó la auditoría
+              </button>
+            )}
+            {(p.stage === 'video_enviado' || p.stage === 'auditoria_enviada' || p.stage === 'contactado') && (
+              <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setCallPicker(true)}>
+                <Phone className="w-3.5 h-3.5" /> Agendamos llamada
+              </button>
+            )}
+            {p.stage === 'llamada' && (
+              <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'won')}>
+                Aceptó: es cliente
+              </button>
+            )}
+            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'lost', 'No le interesa')}>
+              No le interesa
+            </button>
+          </>
+        )}
         {item.kind === 'seguimiento' &&
           (item.suggestDiscard ? (
             <>
@@ -611,7 +708,7 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
               <Check className="w-3.5 h-3.5" /> Seguimiento enviado
             </button>
           ))}
-        {item.kind === 'responder' && (
+        {item.kind === 'responder' && !offScript && (
           <>
             {step === 'pregunta' && (
               <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'conv_question_sent')}>
@@ -633,7 +730,7 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
                 <Check className="w-3.5 h-3.5" /> Le pasé la auditoría
               </button>
             )}
-            {waiting && (
+            {waiting && !p.awaitingMe && (
               <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'snooze')} title="Ocultarlo hasta mañana">
                 Sigue mañana
               </button>
@@ -668,7 +765,7 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
               Cerrado: es cliente
             </button>
             <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setCallPicker(true)}>
-              Se pasó de día
+              Todavía no fue: cambiar fecha
             </button>
             <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => setLostPicker(true)}>
               No se dio
@@ -689,6 +786,7 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
           </>
         )}
       </div>
+      {!compact && <ConversationLog prospect={p} onAct={onAct} />}
     </li>
   );
 };
@@ -703,8 +801,9 @@ const ProspectList: React.FC<{
   settings: ProspectingSettings;
   onAct: (p: Prospect, a: ProspectAction, n?: string) => void;
   onAddProject?: Props['onAddProject'];
-}> = ({ prospects, today, onAct, onAddProject }) => {
+}> = ({ prospects, today, settings, onAct, onAddProject }) => {
   const [filter, setFilter] = useState<'activos' | ProspectStage>('activos');
+  const [turnFilter, setTurnFilter] = useState<Turn | 'todos'>('todos');
   const [callFor, setCallFor] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [q, setQ] = useState('');
@@ -715,8 +814,10 @@ const ProspectList: React.FC<{
     return c;
   }, [prospects]);
 
+  const turnCount = (t: Turn) => prospects.filter((p) => turnOf(p, today, settings).turn === t).length;
   const shown = prospects
     .filter((p) => (filter === 'activos' ? !['cliente', 'descartado'].includes(p.stage) : p.stage === filter))
+    .filter((p) => turnFilter === 'todos' || turnOf(p, today, settings).turn === turnFilter)
     .filter((p) => !q.trim() || `${p.name} ${p.studio || ''} ${p.city || ''}`.toLowerCase().includes(q.trim().toLowerCase()))
     .sort((a, b) => STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage) || Number(isHot(b)) - Number(isHot(a)) || a.name.localeCompare(b.name));
 
@@ -747,6 +848,33 @@ const ProspectList: React.FC<{
           );
         })}
       </div>
+      <div className="flex flex-wrap gap-1.5" aria-label="A quién le toca">
+        {(
+          [
+            ['todos', 'Todos'],
+            ['mio', 'Te toca'],
+            ['suyo', 'Esperando su respuesta'],
+            ['perdido', 'Sin respuesta'],
+            ['llamada', 'Llamadas agendadas'],
+          ] as [Turn | 'todos', string][]
+        ).map(([k, label]) => {
+          const n = k === 'todos' ? null : turnCount(k as Turn);
+          if (n === 0 && k !== turnFilter) return null;
+          return (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setTurnFilter(k)}
+              aria-pressed={turnFilter === k}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition ${
+                turnFilter === k ? 'bg-[var(--text-primary)] text-[var(--bg-app)] border-transparent' : 'border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+              }`}
+            >
+              {label} {n !== null && <span className="tabular-nums">{n}</span>}
+            </button>
+          );
+        })}
+      </div>
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nombre, estudio o ciudad" className={input} />
 
       {shown.length === 0 && <p className="text-sm text-[var(--text-tertiary)] p-4">No hay prospectos en este filtro.</p>}
@@ -762,8 +890,9 @@ const ProspectList: React.FC<{
                     {p.name}
                     {p.studio && p.studio !== p.name ? <span className="font-normal text-[var(--text-secondary)]"> — {p.studio}</span> : null}
                   </p>
+                  <TurnBadge info={turnOf(p, today, settings)} />
                   <p className="text-xs text-[var(--text-tertiary)]">
-                    {STAGE_LABELS[p.stage]}
+                    {FUNNEL_STEPS.find((s) => s.id === funnelStepOf(p))?.label || STAGE_LABELS[p.stage]}
                     {p.stage === 'nuevo' && p.plannedFirstContact ? ` — primer mensaje el ${shortDate(p.plannedFirstContact)}` : ''}
                     {['contactado', 'auditoria_enviada', 'video_enviado'].includes(p.stage) && p.nextActionDate ? ` — sigue el ${shortDate(p.nextActionDate)}` : ''}
                     {p.audit ? ` — ${p.audit.total}/30` : ''}
@@ -804,6 +933,7 @@ const ProspectList: React.FC<{
                     </div>
                   )}
 
+                  <AwaitingBanner prospect={p} />
                   {callFor === p.id && <CallScheduler prospect={p} onAct={onAct} onClose={() => setCallFor(null)} />}
 
                   <label className="block space-y-1">
@@ -817,9 +947,10 @@ const ProspectList: React.FC<{
                   </label>
 
                   <div className="flex flex-wrap gap-1.5">
-                    {['nuevo', 'contactado', 'auditoria_enviada', 'video_enviado'].includes(p.stage) && (
-                      <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'reply')}>
-                        Respondió
+                    {!['nuevo', 'cliente', 'descartado'].includes(p.stage) && !p.awaitingMe && <ReplyButton prospect={p} onAct={onAct} />}
+                    {p.awaitingMe && (
+                      <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'i_replied')}>
+                        <Check className="w-3.5 h-3.5" /> Le contesté
                       </button>
                     )}
                     {p.stage !== 'auditoria_completada' && !p.audit && !['cliente', 'descartado'].includes(p.stage) && (
@@ -869,6 +1000,7 @@ const ProspectList: React.FC<{
                       <Trash2 className="w-3.5 h-3.5" /> Borrar
                     </button>
                   </div>
+                  <ConversationLog prospect={p} onAct={onAct} />
                 </div>
               )}
             </li>
@@ -1247,11 +1379,55 @@ const SettingsPanel: React.FC<{ settings: ProspectingSettings }> = ({ settings }
             <code>{'{video}'}</code> (link del video) y <code>{'{agenda}'}</code> (tu link para agendar).
           </p>
         </div>
-        {tpl('Primer mensaje (versión A)', draft.templates.first, (v) => setDraft({ ...draft, templates: { ...draft.templates, first: v } }))}
+        <div className="space-y-2 p-3 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)]">
+          <p className="text-sm font-semibold text-[var(--text-primary)]">Primer mensaje: versiones que se reparten</p>
+          <p className="text-xs text-[var(--text-secondary)]">
+            Cada prospecto recibe una de estas versiones (siempre la misma), así no le llega a todos el mismo texto. Usá <code>{'{saludoHora}'}</code> (buen día / buenas tardes según
+            la hora en su país), <code>{'{rubro}'}</code>, <code>{'{ciudad}'}</code> y <code>{'{personal}'}</code> (frase con IA sobre su estudio o, si no hay, una apertura distinta
+            para cada uno).
+          </p>
+          {draft.templates.firstVariants.map((v, i) => (
+            <div key={i} className="flex gap-2 items-start">
+              <span className="text-xs text-[var(--text-tertiary)] tabular-nums pt-2 w-4">{i + 1}</span>
+              <textarea
+                value={v}
+                onChange={(e) => {
+                  const firstVariants = [...draft.templates.firstVariants];
+                  firstVariants[i] = e.target.value;
+                  setDraft({ ...draft, templates: { ...draft.templates, firstVariants } });
+                }}
+                rows={3}
+                className={`${input} resize-y`}
+                aria-label={`Versión ${i + 1} del primer mensaje`}
+              />
+              <button
+                type="button"
+                aria-label="Quitar versión"
+                disabled={draft.templates.firstVariants.length <= 1}
+                onClick={() => setDraft({ ...draft, templates: { ...draft.templates, firstVariants: draft.templates.firstVariants.filter((_, j) => j !== i) } })}
+                className="p-2 text-[var(--text-tertiary)] hover:text-red-400 disabled:opacity-30"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className={`${btnGhost} text-xs`}
+            onClick={() => setDraft({ ...draft, templates: { ...draft.templates, firstVariants: [...draft.templates.firstVariants, ''] } })}
+          >
+            + Agregar versión
+          </button>
+        </div>
+        {tpl('Tu primer mensaje propio (si lo cambiás, entra también en la rotación)', draft.templates.first, (v) => setDraft({ ...draft, templates: { ...draft.templates, first: v } }))}
         {tpl('Primer mensaje versión B (opcional: si lo completás, la mitad recibe esta y en Métricas ves cuál responde más)', draft.templates.firstB, (v) =>
           setDraft({ ...draft, templates: { ...draft.templates, firstB: v } })
         )}
         {tpl('Segunda chance (a los 90 días, a quien nunca respondió)', draft.templates.secondChance, (v) => setDraft({ ...draft, templates: { ...draft.templates, secondChance: v } }))}
+        <h3 className="text-sm font-semibold text-[var(--text-primary)] pt-2">Seguimiento según la etapa</h3>
+        {tpl('No contestó la pregunta', draft.templates.followUpQuestion, (v) => setDraft({ ...draft, templates: { ...draft.templates, followUpQuestion: v } }))}
+        {tpl('No contestó después de la empatía', draft.templates.followUpAgree, (v) => setDraft({ ...draft, templates: { ...draft.templates, followUpAgree: v } }))}
+        {tpl('Le pasaste el link y no completó la auditoría', draft.templates.followUpAudit, (v) => setDraft({ ...draft, templates: { ...draft.templates, followUpAudit: v } }))}
         {draft.templates.followUp.map((f, i) =>
           tpl(`Seguimiento ${i + 1}`, f, (v) => {
             const followUp = [...draft.templates.followUp];
@@ -1512,5 +1688,116 @@ const CalendlyConnect: React.FC<{ onUseLink: (url: string) => void }> = ({ onUse
       )}
       {msg && <p className={`text-xs ${msg.kind === 'ok' ? 'text-emerald-400' : 'text-red-400'}`}>{msg.text}</p>}
     </section>
+  );
+};
+
+// ======================= A QUIÉN LE TOCA =======================
+
+const TURN_STYLE: Record<Turn, string> = {
+  mio: 'bg-emerald-500/15 text-emerald-400',
+  suyo: 'bg-[var(--bg-surface-muted)] text-[var(--text-secondary)]',
+  perdido: 'bg-amber-500/15 text-amber-400',
+  llamada: 'bg-sky-500/15 text-sky-400',
+  sin_contactar: 'bg-[var(--bg-surface-muted)] text-[var(--text-tertiary)]',
+  cerrado: 'bg-[var(--bg-surface-muted)] text-[var(--text-tertiary)]',
+};
+
+const TurnBadge: React.FC<{ info: { turn: Turn; label: string } }> = ({ info }) =>
+  info.turn === 'cerrado' ? null : <span className={`inline-block mt-0.5 mb-0.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${TURN_STYLE[info.turn]}`}>{info.label}</span>;
+
+// ======================= EMBUDO =======================
+
+/**
+ * Cada paso del camino (del primer mensaje a cliente) separado en:
+ * te toca a vos / esperando su respuesta / sin respuesta. Arriba, cuántos llegaron a cada paso.
+ */
+const FunnelPanel: React.FC<{ prospects: Prospect[]; today: string; settings: ProspectingSettings; onAct: (p: Prospect, a: ProspectAction, n?: string) => void }> = ({
+  prospects,
+  today,
+  settings,
+  onAct,
+}) => {
+  const [openStep, setOpenStep] = useState<string | null>(null);
+  const order = FUNNEL_STEPS.map((s) => s.id) as string[];
+  const withStep = prospects.map((p) => ({ p, step: funnelStepOf(p), t: turnOf(p, today, settings) })).filter((x) => x.step);
+  const reached = (i: number) => withStep.filter((x) => order.indexOf(x.step as string) >= i).length;
+  const first = reached(0) || 1;
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-[var(--text-secondary)]">
+        Dónde está cada conversación. La barra muestra cuántos llegaron hasta ese paso (de {reached(0)} a los que les escribiste). Tocá un paso para ver quiénes son.
+      </p>
+      <ul className="space-y-2">
+        {FUNNEL_STEPS.map((s, i) => {
+          const here = withStep.filter((x) => x.step === s.id);
+          const mine = here.filter((x) => x.t.turn === 'mio');
+          const waiting = here.filter((x) => x.t.turn === 'suyo' || x.t.turn === 'llamada');
+          const lost = here.filter((x) => x.t.turn === 'perdido');
+          const n = reached(i);
+          const open = openStep === s.id;
+          return (
+            <li key={s.id} className={card}>
+              <button type="button" onClick={() => setOpenStep(open ? null : s.id)} className="w-full p-3 text-left space-y-1.5" aria-expanded={open}>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] tabular-nums text-[var(--text-tertiary)] w-5">{i + 1}</span>
+                  <span className="flex-1 text-sm font-semibold text-[var(--text-primary)]">{s.label}</span>
+                  {mine.length > 0 && <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-400">Te toca {mine.length}</span>}
+                  {waiting.length > 0 && <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--bg-surface-muted)] text-[var(--text-secondary)]">Esperando {waiting.length}</span>}
+                  {lost.length > 0 && <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-400">Sin resp. {lost.length}</span>}
+                </div>
+                <div className="flex items-center gap-2 pl-7">
+                  <span className="flex-1 h-1.5 rounded-full bg-[var(--bg-surface-muted)] overflow-hidden">
+                    <span className="block h-full bg-[var(--accent)]" style={{ width: `${Math.round((n / first) * 100)}%` }} />
+                  </span>
+                  <span className="text-[11px] tabular-nums text-[var(--text-tertiary)] w-16 text-right">
+                    {n} · {Math.round((n / first) * 100)}%
+                  </span>
+                </div>
+              </button>
+              {open && (
+                <div className="px-3 pb-3 space-y-3 border-t border-[var(--border-subtle)] pt-2">
+                  {here.length === 0 && <p className="text-xs text-[var(--text-tertiary)]">Nadie en este paso ahora.</p>}
+                  {(
+                    [
+                      ['Te toca', mine],
+                      ['Esperando su respuesta', waiting],
+                      ['Sin respuesta', lost],
+                    ] as [string, typeof here][]
+                  ).map(([title, group]) =>
+                    group.length ? (
+                      <div key={title} className="space-y-1.5">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{title}</p>
+                        <ul className="space-y-1.5">
+                          {group
+                            .sort((a, b) => b.t.days - a.t.days)
+                            .map(({ p, t }) => (
+                              <li key={p.id} className="flex flex-wrap items-center gap-2 p-2 rounded-[var(--radius-control)] bg-[var(--bg-app)]">
+                                <span className="flex-1 min-w-[10rem]">
+                                  <span className="block text-sm text-[var(--text-primary)] truncate">{p.studio || p.name}</span>
+                                  <span className="block text-[11px] text-[var(--text-tertiary)]">
+                                    {t.label}
+                                    {p.lastReplyNote && t.turn === 'mio' ? ` · «${p.lastReplyNote.slice(0, 60)}»` : ''}
+                                  </span>
+                                </span>
+                                {t.turn !== 'mio' && <ReplyButton prospect={p} onAct={onAct} />}
+                                {p.whatsapp && (
+                                  <a href={formatWhatsAppUrl(p.whatsapp)} target="_blank" rel="noopener noreferrer" className={`${btnGhost} py-1.5 text-xs`}>
+                                    <MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp
+                                  </a>
+                                )}
+                              </li>
+                            ))}
+                        </ul>
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 };

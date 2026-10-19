@@ -16,6 +16,11 @@ import {
   weeklyReportText,
   DEFAULT_PROSPECTING_SETTINGS,
   mergeProspectingSettings,
+  turnOf,
+  firstVariantIndex,
+  firstVariantPool,
+  logEntryFor,
+  cleanStudioName,
 } from '../src/prospecting/core';
 import { pickBatch } from '../src/prospecting/pool';
 
@@ -81,7 +86,8 @@ describe('mensajes', () => {
   it('frase personalizada con IA o la genérica', () => {
     const t = S.templates.first;
     expect(renderTemplate(t, P({ studio: 'Estudio LP', personalLine: 'Viendo sus casas en Mendoza.' }))).toContain('Viendo sus casas en Mendoza, ¿me permites');
-    expect(renderTemplate(t, P({ studio: 'Estudio LP' }))).toContain('Viendo el enfoque y la trayectoria que tienes en tu estudio, ¿me permites');
+    // sin frase de IA: una apertura que nombra al estudio (varía entre prospectos)
+    expect(renderTemplate(t, P({ studio: 'Estudio LP' }))).toMatch(/[a-z], ¿me permites/);
     expect(normalizePersonalLine('  ')).toBe('');
   });
 
@@ -118,11 +124,12 @@ describe('mensajes', () => {
 });
 
 describe('llamada, propuesta y descartes', () => {
-  it('llamada agendada aparece el día de la llamada para anotar cómo salió', () => {
+  it('la llamada aparece ese día para prepararla y al día siguiente para anotar cómo salió', () => {
     const { updates } = applyAction(P({ stage: 'respondio' }), 'call', '2026-10-16', S, '2026-10-20');
     const p = P({ id: 'c', ...updates });
     expect(buildDailyQueue([p], '2026-10-19', S).items).toHaveLength(0);
-    expect(buildDailyQueue([p], '2026-10-20', S).items[0].kind).toBe('llamada');
+    expect(buildDailyQueue([p], '2026-10-20', S).items[0].kind).toBe('llamada_hoy');
+    expect(buildDailyQueue([p], '2026-10-21', S).items[0].kind).toBe('llamada');
   });
 
   it('propuesta enviada: seguimiento a los 3 días', () => {
@@ -183,5 +190,97 @@ describe('métricas que aprenden', () => {
     const txt = weeklyReportText({ label: 'Semana 3', range: '13/10 – 19/10', conversacionesOut: 40, seguimientos: 20, respuestas: 8, autoAuditorias: 2 } as any, 50);
     expect(txt).toContain('40 de 50');
     expect(txt).toContain('20% de respuesta');
+  });
+});
+
+describe('a quién le toca', () => {
+  const T = '2026-10-19';
+  it('te escribió en cualquier etapa: te toca, y va primero en Hoy', () => {
+    const p = P({ id: 'a', stage: 'auditoria_enviada', lastContactAt: '2026-10-15', nextActionDate: '2026-10-25' });
+    const { updates, event } = applyAction(p, 'they_replied', T, S, 'Me preguntó el precio');
+    expect(updates).toMatchObject({ awaitingMe: true, lastReplyNote: 'Me preguntó el precio' });
+    expect(event).toBeNull(); // no infla la métrica de respuestas
+    const q = buildDailyQueue([P({ id: 'z', plannedFirstContact: T }), { ...p, ...updates }], T, S);
+    expect(q.items[0]).toMatchObject({ kind: 'responder' });
+    expect(turnOf({ ...p, ...updates } as any, T).turn).toBe('mio');
+  });
+
+  it('la primera respuesta al mensaje en frío cuenta como respuesta', () => {
+    const { updates, event } = applyAction(P({ stage: 'contactado' }), 'they_replied', T, S);
+    expect(updates).toMatchObject({ stage: 'respondio', convStep: 'pregunta', awaitingMe: true });
+    expect(event?.type).toBe('reply');
+  });
+
+  it('cualquier mensaje tuyo pasa el turno a él', () => {
+    const p = P({ stage: 'respondio', convStep: 'pregunta', awaitingMe: true });
+    const { updates } = applyAction(p, 'conv_question_sent', T, S);
+    expect(updates).toMatchObject({ awaitingMe: false, convStep: 'esperando_respuesta', nextActionDate: '2026-10-21' });
+    expect(turnOf({ ...p, ...updates, lastContactAt: T } as any, T).turn).toBe('suyo');
+  });
+
+  it('no contestó la pregunta: seguimiento con el mensaje de esa etapa', () => {
+    const p = P({ stage: 'respondio', convStep: 'esperando_respuesta', lastContactAt: '2026-10-16', nextActionDate: '2026-10-18', studio: 'Estudio LP' });
+    const item = buildDailyQueue([p], T, S).items[0];
+    expect(item.kind).toBe('seguimiento');
+    expect(templateFor(item, S)).toBe(S.templates.followUpQuestion);
+  });
+
+  it('link de auditoría sin completar: recordatorio con su link', () => {
+    const p = P({ stage: 'auditoria_enviada', lastContactAt: '2026-10-16', nextActionDate: '2026-10-18' });
+    const item = buildDailyQueue([p], T, S).items[0];
+    expect(renderTemplate(templateFor(item, S), p)).toContain('/auditoria?p=');
+  });
+
+  it('el inicio del día pregunta también por los que están a mitad de la conversación', () => {
+    const list = [
+      P({ id: 'a', stage: 'respondio', convStep: 'esperando_respuesta', lastContactAt: '2026-10-17' }),
+      P({ id: 'b', stage: 'respondio', convStep: 'pregunta', lastContactAt: '2026-10-17' }),
+      P({ id: 'c', stage: 'video_enviado', lastContactAt: '2026-10-17', awaitingMe: true }),
+    ];
+    expect(pendingOutcomes(list, T).map((p) => p.id)).toEqual(['a']);
+  });
+});
+
+describe('primeros mensajes distintos', () => {
+  it('se reparten varias versiones y cada uno siempre recibe la misma', () => {
+    const ids = Array.from({ length: 30 }, (_, i) => `p${i}`);
+    const used = new Set(ids.map((id) => firstVariantIndex(P({ id }), S)));
+    expect(used.size).toBeGreaterThan(3);
+    expect(firstVariantIndex(P({ id: 'p7' }), S)).toBe(firstVariantIndex(P({ id: 'p7' }), S));
+  });
+
+  it('los textos salen completos, sin llaves sueltas', () => {
+    const p = P({ id: 'x', studio: 'Estudio Sur', name: 'Estudio Sur', city: 'Rosario, Santa Fe', segment: 'interiorismo', instagram: 'estudiosur', country: 'AR' });
+    firstVariantPool(S).forEach((t) => {
+      const msg = renderTemplate(t, p);
+      expect(msg).not.toMatch(/[{}]/);
+      expect(msg).toContain('?');
+    });
+  });
+
+  it('si escribiste tu propio primer mensaje, también entra en la rotación', () => {
+    const custom = { ...S, templates: { ...S.templates, first: 'Hola {saludo}, mensaje mío' } };
+    expect(firstVariantPool(custom)[0]).toBe('Hola {saludo}, mensaje mío');
+  });
+
+  it('historial: cada paso deja una línea', () => {
+    expect(logEntryFor('they_replied', 'Quiere precios')).toEqual({ dir: 'in', text: 'Te escribió: Quiere precios' });
+    expect(logEntryFor('audit_sent')).toEqual({ dir: 'out', text: 'Le pasaste el link de la auditoría' });
+  });
+});
+
+describe('nombres de Google Maps', () => {
+  it('limpia mayúsculas y rubros pegados al nombre', () => {
+    expect(cleanStudioName('GOULD ARQUITECTURA')).toBe('Gould Arquitectura');
+    expect(cleanStudioName('ZENIT - ARQUITECTURA')).toBe('Zenit');
+    expect(cleanStudioName('ARQUITECTURA - TOPOGRAFIA - DISEÑO Y CONSTRUCCIÓN')).toBe('');
+    expect(cleanStudioName('Diseño Arquitectura y Construcciones')).toBe('');
+    expect(cleanStudioName('Estudio LP')).toBe('Estudio LP');
+  });
+
+  it('con nombre genérico saluda sin nombrarlo', () => {
+    const p = P({ id: 'g', name: 'ARQUITECTURA - TOPOGRAFIA', studio: 'ARQUITECTURA - TOPOGRAFIA' });
+    expect(renderTemplate('Hola {saludo}, ¿cómo va?', p)).toBe('Hola, ¿cómo va?');
+    expect(renderTemplate('{saludoHora}, ¿hablo con alguien de {estudio}?', p)).toMatch(/alguien del estudio\?$/);
   });
 });

@@ -20,6 +20,7 @@ import { registerDocumentRoutes } from './documents';
 import { registerDocumensoRoutes } from './documenso';
 import { recordError, recordJobRun, registerHealthRoutes, runBackupIfDue } from './health';
 import { documentFollowups } from './contractsServer';
+import { eveningCallsReminder } from './prospectReminders';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 
 /**
@@ -377,6 +378,16 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
         await recordJobRun(db, 'presupuestos', true, docs);
       } catch (err) {
         await recordJobRun(db, 'presupuestos', false, (err as Error).message);
+      }
+      // Desde las 20 hs: las reuniones y llamadas de mañana
+      try {
+        const eve = await eveningCallsReminder(db, async (title, body) => {
+          await notifyAll(db, title, body, '/hoy', 'llamadas');
+        });
+        results.push({ job: 'llamadas-manana', detail: eve });
+        if (!eve.startsWith('todavía')) await recordJobRun(db, 'llamadas-manana', true, eve);
+      } catch (err) {
+        await recordJobRun(db, 'llamadas-manana', false, (err as Error).message);
       }
     }
     res.json({ ok: true, results });
