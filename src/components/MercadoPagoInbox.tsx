@@ -102,7 +102,7 @@ export const MercadoPagoInbox: React.FC<Props> = ({ pending, privacyMode, onRegi
                 <div className="flex-1 min-w-0">
                   <p className="text-[15px] font-semibold text-[var(--semantic-green)] tabular-nums">
                     +{money(p.amount, p.currency, privacyMode)}
-                    <span className="font-normal text-[var(--text-secondary)]"> de {p.payerName || p.payerEmail || 'pagador sin nombre'}</span>
+                    <span className="block truncate text-[13px] font-normal text-[var(--text-secondary)]">de {p.payerName || p.payerEmail || 'pagador sin nombre'}</span>
                   </p>
                   <p className="text-[12px] text-[var(--text-tertiary)] truncate">
                     {when(p)}

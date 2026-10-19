@@ -695,8 +695,8 @@ export const ProjectsSimpleView: React.FC<Props> = ({
           title="Ir a Horizonte: Línea de tiempo de proyectos, ocupación y capacidad mensual"
         >
           <Compass className="w-3.5 h-3.5 text-sky-400 group-hover:rotate-45 transition-transform" />
-          <span>Horizonte (Largo Plazo)</span>
-          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
+          <span>Horizonte<span className="hidden sm:inline"> (Largo Plazo)</span></span>
+          <span className="hidden sm:inline px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-sky-500/15 text-sky-300 border border-sky-500/30">
             Gantt
           </span>
         </button>
@@ -708,7 +708,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
           hapticFeedback.light();
           if (onNavigate) onNavigate('/horizonte');
         }}
-        className="text-xs text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-sky-500/10 transition cursor-pointer shrink-0"
+        className="hidden sm:flex text-xs text-sky-400 hover:text-sky-300 font-semibold items-center gap-1 px-3 py-1.5 rounded-xl hover:bg-sky-500/10 transition cursor-pointer shrink-0"
       >
         <span>Abrir Horizonte</span>
         <ArrowUpRight className="w-3.5 h-3.5" />

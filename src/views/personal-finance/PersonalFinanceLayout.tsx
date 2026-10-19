@@ -187,7 +187,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
   };
 
   return (
-    <div className="w-full flex flex-col md:flex-row gap-6 min-h-[calc(100vh-140px)] pb-24 md:pb-10 max-w-full">
+    <div className="w-full flex flex-col md:flex-row gap-4 md:gap-6 min-h-[calc(100vh-140px)] pb-6 md:pb-10 max-w-full">
       
       {/* Desktop Secondary Sidebar (Swiss Minimalist) */}
       <aside className="hidden md:flex flex-col w-56 shrink-0 space-y-4">
@@ -269,8 +269,8 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
         {children}
       </div>
 
-      {/* Mobile Sub-Navigation Bottom Bar (Fixed 390px iPhone-optimized) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/80 px-2 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))]">
+      {/* Celular: pestañas arriba del contenido (abajo quedaban tapadas por la barra de la app) */}
+      <div className="md:hidden order-first -mt-2 rounded-2xl bg-zinc-950/95 border border-zinc-800/80 px-2 py-1.5">
         <div className="flex items-center justify-around max-w-md mx-auto relative">
           
           {/* Tab 1: Resumen */}
@@ -312,7 +312,7 @@ export const PersonalFinanceLayout: React.FC<Props> = ({
               hapticFeedback.medium();
               onNavigate('/mis-finanzas/nuevo');
             }}
-            className="flex flex-col items-center justify-center -mt-5"
+            className="flex flex-col items-center justify-center"
           >
             <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-[var(--accent)] to-amber-500 text-black flex items-center justify-center shadow-lg shadow-[var(--accent)]/30 border-4 border-zinc-950 active:scale-95 transition">
               <PlusCircle className="w-7 h-7 stroke-[2.2]" />

@@ -88,12 +88,10 @@ export const DocumentsView: React.FC<Props> = ({ documents, today, privacyMode, 
                     {d.clientName}
                     <span className="ml-1.5 font-semibold tabular-nums">{money(docTotal(d.items), d.currency, privacyMode)}</span>
                   </span>
-                  <span className="flex items-center gap-1 text-[12px]">
-                    <span className="text-[var(--text-tertiary)]">{docTitle(d)} · {shortDay(d.issueDate)} ·</span>
-                    <span className={st.cls}>{st.label}</span>
-                  </span>
+                  <span className="block text-[12px] text-[var(--text-tertiary)] truncate">{docTitle(d)} · {shortDay(d.issueDate)}</span>
+                  <span className={`block text-[12px] ${st.cls}`}>{st.label}</span>
                 </button>
-                <button type="button" onClick={() => onShare(d)} aria-label="Compartir" title="Compartir" className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--accent)] hover:bg-[var(--bg-surface-muted)] cursor-pointer">
+                <button type="button" onClick={() => onShare(d)} aria-label="Compartir" title="Compartir" className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-[var(--accent)] hover:bg-[var(--bg-surface-muted)] cursor-pointer">
                   <Share2 className="w-4 h-4" aria-hidden />
                 </button>
                 <button type="button" onClick={() => remove(d)} aria-label="Borrar" title="Borrar" className="w-9 h-9 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--semantic-red)] hover:bg-[var(--bg-surface-muted)] cursor-pointer">

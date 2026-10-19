@@ -1038,3 +1038,22 @@ html:not(.dark) input.ios-search:not([type="submit"]):not([type="button"]):not([
   background: var(--text-primary);
   color: var(--bg-app);
 }
+
+/* Ventanas centradas (modales): si son más altas que la pantalla del celular, se puede
+   desplazar y no se corta la parte de arriba. margin:auto centra solo cuando hay lugar. */
+.fixed.inset-0.flex.items-center {
+  align-items: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.fixed.inset-0.flex.items-center > :not(.absolute):not(.fixed) {
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+/* Filas de pestañas que se desplazan de costado: cada botón en una sola línea, sin achicarse */
+.flex.overflow-x-auto > button,
+.flex.overflow-x-auto > a {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
