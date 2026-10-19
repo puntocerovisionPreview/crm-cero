@@ -23,3 +23,12 @@ describe('preparar la llamada', () => {
     expect(prepDayLabel('2026-10-20', T)).toMatch(/^mañana/);
   });
 });
+
+describe('preparar cualquier reunión', () => {
+  it('usa el cliente o el título, y se lee bien sin título', async () => {
+    const { suggestedMeetingPrep } = await import('../src/prospecting/callPrep');
+    expect(suggestedMeetingPrep('Revisión web', 'Claudio')[0].title).toBe('Confirmar la reunión con Claudio');
+    expect(suggestedMeetingPrep('')[0].title).toBe('Confirmar la reunión');
+    expect(suggestedMeetingPrep('').filter((t) => t.on)).toHaveLength(2);
+  });
+});

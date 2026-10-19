@@ -46,3 +46,14 @@ export function prepDayLabel(date: string, today: string): string {
   if (date === addDays(today, 1)) return `mañana (${short})`;
   return `el ${short}`;
 }
+
+/** Para cualquier reunión de la agenda (clientes, alumnos, llamadas): qué preparar el día anterior. */
+export function suggestedMeetingPrep(title: string, clientName?: string): PrepTask[] {
+  const t = title.trim();
+  const who = (clientName || t).trim();
+  return [
+    { key: 'confirmar', title: who ? `Confirmar la reunión con ${who}` : 'Confirmar la reunión', on: true },
+    { key: 'preparar', title: t ? `Preparar la reunión: ${t} (temas y materiales)` : 'Preparar la reunión (temas y materiales)', on: true },
+    { key: 'repasar', title: who ? `Repasar notas y pendientes de ${who}` : 'Repasar notas y pendientes', on: false },
+  ];
+}

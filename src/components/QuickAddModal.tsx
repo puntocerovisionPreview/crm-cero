@@ -56,6 +56,7 @@ import { generateCalendarICS } from '../utils/calendarIcs';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../utils/notifications';
 import { RECURRENCE_OPTIONS, makeRecurrence } from '../utils/recurrence';
 import type { TaskRecurrencePreset } from '../types';
+import { prepDateFor, prepDayLabel, suggestedMeetingPrep } from '../prospecting/callPrep';
 
 export type QuickAddType = 'tarea' | 'reunion' | 'proyecto' | 'ingreso' | 'gasto' | 'objetivo';
 
@@ -129,6 +130,9 @@ export const QuickAddModal: React.FC<Props> = ({
   const [meetingTime, setMeetingTime] = useState('');
   const [meetingDurationHours, setMeetingDurationHours] = useState<number>(1);
   const [meetingNotes, setMeetingNotes] = useState('');
+  // Tareas para preparar la reunión (el día anterior, o hoy si es mañana/hoy)
+  const [prepOn, setPrepOn] = useState<Record<string, boolean>>({ confirmar: true, preparar: true, repasar: false });
+  const [prepExtra, setPrepExtra] = useState('');
   const [meetingPhone, setMeetingPhone] = useState('');
   const [meetingReminderActive, setMeetingReminderActive] = useState(false);
   const [meetingReminderMinutes, setMeetingReminderMinutes] = useState<number>(15);
@@ -499,6 +503,26 @@ export const QuickAddModal: React.FC<Props> = ({
         selectedProj.projectType === 'paf_base' ||
         selectedProj.pafStage ||
         selectedProj.pafConsultingHoursTotal
+      );
+
+      // Preparación: se agendan como tareas el día anterior (nunca antes de hoy)
+      const realToday = getTodayString();
+      const mDate = meetingDate || today;
+      const prepDate = prepDateFor(mDate, realToday);
+      const prepTasks = [
+        ...suggestedMeetingPrep(finalTitle, pName).filter(t => prepOn[t.key]),
+        ...(prepExtra.trim() ? [{ key: 'propia', title: prepExtra.trim(), on: true }] : []),
+      ];
+      prepTasks.forEach(t =>
+        onAddTask({
+          title: t.title,
+          date: prepDate,
+          completed: false,
+          priority: 'alta',
+          projectId: pId,
+          projectName: pName,
+          notes: `Para la reunión del ${mDate.slice(8, 10)}/${mDate.slice(5, 7)}${meetingTime ? ` a las ${meetingTime}` : ''}.`,
+        } as any)
       );
 
       onAddMeeting({
@@ -1487,6 +1511,32 @@ export const QuickAddModal: React.FC<Props> = ({
                   value={meetingNotes}
                   onChange={e => setMeetingNotes(e.target.value)}
                   className="w-full text-base sm:text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-3 focus:outline-none focus:border-[var(--accent)] resize-none"
+                />
+              </div>
+
+              {/* Preparación: tareas para el día anterior */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3 space-y-2">
+                <p className="text-[12px] font-semibold text-zinc-200">
+                  Para prepararla, ¿qué agendo para {prepDayLabel(prepDateFor(meetingDate || today, getTodayString()), getTodayString())}?
+                </p>
+                {suggestedMeetingPrep(meetingTitle, projects.find(p => p.id === selectedProjectId)?.clientName).map(t => (
+                  <label key={t.key} className="flex items-start gap-2 text-[12px] text-zinc-300 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!prepOn[t.key]}
+                      onChange={e => setPrepOn(prev => ({ ...prev, [t.key]: e.target.checked }))}
+                      className="mt-0.5 w-4 h-4 accent-[var(--accent)] shrink-0"
+                    />
+                    <span className={prepOn[t.key] ? 'text-zinc-100' : ''}>{t.title}</span>
+                  </label>
+                ))}
+                <input
+                  type="text"
+                  value={prepExtra}
+                  onChange={e => setPrepExtra(e.target.value)}
+                  placeholder="Otra tarea (opcional)"
+                  aria-label="Otra tarea de preparación"
+                  className="w-full text-base sm:text-xs text-zinc-100 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 focus:outline-none focus:border-[var(--accent)]"
                 />
               </div>
             </>
