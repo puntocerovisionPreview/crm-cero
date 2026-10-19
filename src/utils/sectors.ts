@@ -80,12 +80,13 @@ export const SECTORS: Sector[] = [
   {
     key: 'clientes',
     label: 'Clientes',
-    description: 'Fichas Web y PAF, cuotas y proyectos',
+    description: 'Fichas Web y PAF, presupuestos y contratos',
     icon: Users,
     tint: '#007AFF',
     featured: false,
     items: [
       { label: 'Clientes', path: '/clientes', icon: Users, match: (p) => starts('/clientes', '/proyectos')(p) && p !== '/clientes/nuevo' },
+      { label: 'Documentos', path: '/documentos', icon: FileText, match: starts('/documentos', '/presupuestos', '/recibos') },
       { label: 'Horizonte', path: '/horizonte', icon: Compass, match: starts('/horizonte', '/horizon', '/gantt') },
       { label: 'Nuevo cliente', path: '/clientes/nuevo', icon: UserPlus, match: is('/clientes/nuevo') },
     ],
@@ -101,7 +102,6 @@ export const SECTORS: Sector[] = [
       { label: 'Dinero', path: '/dinero', icon: DollarSign, match: starts('/dinero', '/finanzas', '/ingresos') },
       { label: 'Gastos fijos', path: '/gastos-fijos', icon: Server, match: starts('/gastos-fijos', '/vencimientos', '/suscripciones', '/dominios', '/hosting', '/ias') },
       { label: 'Mis finanzas', path: '/mis-finanzas', icon: User, match: starts('/mis-finanzas', '/finanzas-personales') },
-      { label: 'Documentos', path: '/documentos', icon: FileText, match: starts('/documentos', '/presupuestos', '/recibos') },
     ],
   },
   {

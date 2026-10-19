@@ -1,5 +1,6 @@
-import React from 'react';
-import { Home, Plus, type LucideIcon } from 'lucide-react';
+import React, { useState } from 'react';
+import { Home, MoreHorizontal, Plus, type LucideIcon } from 'lucide-react';
+import { Sheet } from './Sheet';
 import { hapticFeedback } from '../utils/haptics';
 import { getUiPreferences } from '../utils/uiPreferences';
 import { HOME_PATH, SECTORS, sectorForPath } from '../utils/sectors';
@@ -28,14 +29,25 @@ export const MobileNav: React.FC<Props> = ({ currentPath, onNavigate, onOpenQuic
     currentPath === '/clientes/nuevo' ||
     currentPath.includes('/cobro/nuevo');
 
+  const [moreOpen, setMoreOpen] = useState(false);
   if (isDetailScreen) return null;
 
   const prefs = getUiPreferences();
   const sector = sectorForPath(currentPath);
   const home: Tab = { label: 'Inicio', path: HOME_PATH, icon: Home, active: currentPath === HOME_PATH };
+  // Entran 3 botones al lado de Inicio: si el sector tiene más pantallas, el tercero es "Más"
+  const MORE = '__mas__';
+  const sectorTabs = sector ? sector.items.map(i => ({ label: i.label, path: i.path, icon: i.icon, active: i.match(currentPath) })) : [];
+  const overflow = sectorTabs.length > 3;
+  const hiddenActive = overflow && sectorTabs.slice(2).some(t => t.active);
 
   const tabs: Tab[] = sector
-    ? [home, ...sector.items.slice(0, 3).map(i => ({ label: i.label, path: i.path, icon: i.icon, active: i.match(currentPath) }))]
+    ? [
+        home,
+        ...(overflow
+          ? [...sectorTabs.slice(0, 2), { label: 'Más', path: MORE, icon: MoreHorizontal, active: hiddenActive }]
+          : sectorTabs),
+      ]
     : [
         home,
         ...SECTORS.filter(s => !(s.key === 'cerebro' && prefs.hideCerebro))
@@ -50,7 +62,8 @@ export const MobileNav: React.FC<Props> = ({ currentPath, onNavigate, onOpenQuic
       type="button"
       onClick={() => {
         hapticFeedback.selection();
-        onNavigate(t.path);
+        if (t.path === MORE) setMoreOpen(true);
+        else onNavigate(t.path);
       }}
       aria-current={t.active ? 'page' : undefined}
       className={`flex-1 flex flex-col items-center justify-center min-h-[44px] min-w-[52px] py-1 px-1 transition t-press cursor-pointer ${
@@ -86,6 +99,32 @@ export const MobileNav: React.FC<Props> = ({ currentPath, onNavigate, onOpenQuic
 
         {tabs.slice(plusAt).map(renderTab)}
       </div>
+      {moreOpen && sector && (
+        <Sheet onClose={() => setMoreOpen(false)} label={`Pantallas de ${sector.label}`}>
+          <div className="px-4 pb-6 pt-2">
+            <p className="text-[13px] font-semibold text-[var(--text-secondary)] px-1 pb-2">{sector.label}</p>
+            <ul className="rounded-[12px] bg-[var(--bg-surface-elevated)] divide-y divide-[var(--border-subtle)] overflow-hidden">
+              {sectorTabs.map(t => (
+                <li key={t.path}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      hapticFeedback.selection();
+                      setMoreOpen(false);
+                      onNavigate(t.path);
+                    }}
+                    aria-current={t.active ? 'page' : undefined}
+                    className={`w-full flex items-center gap-3 px-4 min-h-[48px] text-left text-[16px] cursor-pointer ${t.active ? 'text-[var(--accent)] font-semibold' : 'text-[var(--text-primary)]'}`}
+                  >
+                    <t.icon className="w-5 h-5 shrink-0" aria-hidden />
+                    {t.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </Sheet>
+      )}
     </nav>
   );
 };
