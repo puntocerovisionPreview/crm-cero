@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Download, Loader2 } from 'lucide-react';
-import { PublicDocument, acceptPublicDocument, docTitle, loadPublicDocument } from '../utils/documents';
+import { PublicDocument, acceptPublicDocument, docTitle, loadPublicDocument, markPublicDocumentViewed } from '../utils/documents';
+import { planAmounts, stepWhen } from '../utils/contracts';
 
 const money = (n: number, cur: string) => `${cur === 'USD' ? 'US$' : '$'} ${Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 const longDate = (d?: string | null) => (d ? new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' }) : '');
@@ -25,6 +26,8 @@ export const DocumentPublicView: React.FC<{ token: string }> = ({ token }) => {
       .then(d => {
         setDoc(d);
         if (d) document.title = `${docTitle(d)} · ${d.studioName}`;
+        // Aviso de "lo abrió" (solo presupuestos sin aceptar; no bloquea nada)
+        if (d && d.kind === 'presupuesto' && d.status !== 'aceptado') markPublicDocumentViewed(token);
       })
       .catch(() => {
         setLoadFailed(true);
@@ -150,10 +153,42 @@ export const DocumentPublicView: React.FC<{ token: string }> = ({ token }) => {
           </section>
         )}
 
+        {isQuote && doc.paymentPlan && doc.paymentPlan.length > 0 && (
+          <section>
+            <h2 className="text-[13px] font-semibold text-[#6E6E73] mb-2">Forma de pago</h2>
+            <ul className="divide-y divide-[#F2F2F7]">
+              {doc.paymentPlan.map((s, i) => (
+                <li key={i} className="py-2 flex justify-between gap-3 text-[15px]">
+                  <span>
+                    {s.label} <span className="text-[#6E6E73]">· {s.percent}% {stepWhen(s)}</span>
+                  </span>
+                  <span className="tabular-nums font-medium">{money(planAmounts(doc.paymentPlan!, doc.total)[i], doc.currency)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
         {doc.notes && (
           <section>
-            <h2 className="text-[13px] font-semibold text-[#6E6E73] mb-1">{isQuote ? 'Condiciones' : 'Detalle'}</h2>
+            <h2 className="text-[13px] font-semibold text-[#6E6E73] mb-1">{isQuote ? 'Notas' : 'Detalle'}</h2>
             <p className="text-[15px] whitespace-pre-line">{doc.notes}</p>
+          </section>
+        )}
+
+        {isQuote && doc.clauses && doc.clauses.length > 0 && (
+          <section>
+            <h2 className="text-[13px] font-semibold text-[#6E6E73] mb-2">Condiciones del servicio</h2>
+            <ol className="space-y-3 text-[14px] leading-relaxed">
+              {doc.clauses.map((c, i) => (
+                <li key={i}>
+                  <p className="font-semibold">
+                    {i + 1}. {c.title}
+                  </p>
+                  <p className="text-[#3A3A3C] whitespace-pre-line">{c.body}</p>
+                </li>
+              ))}
+            </ol>
           </section>
         )}
 
@@ -199,7 +234,9 @@ export const DocumentPublicView: React.FC<{ token: string }> = ({ token }) => {
         {isQuote && doc.status !== 'aceptado' && !expired && !doc.signingUrl && (
           <form onSubmit={accept} className="no-print rounded-[16px] border border-[#E5E5EA] p-4 space-y-3">
             <p className="text-[17px] font-semibold">¿Avanzamos?</p>
-            <p className="text-[14px] text-[#6E6E73]">Escribí tu nombre y tocá "Acepto". Te vamos a escribir para arrancar.</p>
+            <p className="text-[14px] text-[#6E6E73]">
+              Escribí tu nombre y tocá "Acepto"{doc.clauses?.length ? ' para aceptar el presupuesto y las condiciones del servicio' : ''}. Te vamos a escribir para arrancar.
+            </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 value={name}

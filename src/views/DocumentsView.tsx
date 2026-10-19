@@ -26,9 +26,18 @@ export const DocumentsView: React.FC<Props> = ({ documents, today, privacyMode, 
 
   const status = (d: StudioDocument) => {
     if (d.kind === 'recibo') return { label: 'Recibo', cls: 'text-[var(--text-tertiary)]', icon: Receipt };
-    if (d.status === 'aceptado') return { label: `Aceptado${d.acceptedAt ? ` el ${shortDay(d.acceptedAt)}` : ''}`, cls: 'text-[var(--semantic-green)] font-semibold', icon: CheckCircle2 };
+    if (d.status === 'aceptado')
+      return {
+        label: `${d.signature?.status === 'firmado' ? 'Firmado' : 'Aceptado'}${d.acceptedAt ? ` el ${shortDay(d.acceptedAt)}` : ''}${d.onboardedProjectId ? ' · proyecto creado' : ''}`,
+        cls: 'text-[var(--semantic-green)] font-semibold',
+        icon: CheckCircle2,
+      };
     if (d.validUntil && d.validUntil < today) return { label: 'Vencido', cls: 'text-[var(--semantic-red)]', icon: Clock };
-    return { label: `Esperando respuesta${d.validUntil ? ` · vence ${shortDay(d.validUntil)}` : ''}`, cls: 'text-[var(--semantic-amber)]', icon: Clock };
+    return {
+      label: `${d.viewedAt ? `Lo abrió el ${shortDay(d.viewedAt)}` : 'Sin abrir'} · esperando respuesta${d.validUntil ? ` · vence ${shortDay(d.validUntil)}` : ''}`,
+      cls: 'text-[var(--semantic-amber)]',
+      icon: Clock,
+    };
   };
 
   const remove = async (d: StudioDocument) => {
@@ -83,7 +92,7 @@ export const DocumentsView: React.FC<Props> = ({ documents, today, privacyMode, 
                 <span className={`w-9 h-9 rounded-[10px] flex items-center justify-center text-white shrink-0 ${d.kind === 'presupuesto' ? 'bg-[#007AFF]' : 'bg-[#34C759]'}`} aria-hidden>
                   {d.kind === 'presupuesto' ? <FileText className="w-[18px] h-[18px]" /> : <Receipt className="w-[18px] h-[18px]" />}
                 </span>
-                <button type="button" onClick={() => (d.projectId ? onNavigate(`/clientes/${d.projectId}`) : onShare(d))} className="flex-1 min-w-0 text-left cursor-pointer">
+                <button type="button" onClick={() => (d.projectId || d.onboardedProjectId ? onNavigate(`/clientes/${d.projectId || d.onboardedProjectId}`) : onShare(d))} className="flex-1 min-w-0 text-left cursor-pointer">
                   <span className="block text-[15px] text-[var(--text-primary)] truncate">
                     {d.clientName}
                     <span className="ml-1.5 font-semibold tabular-nums">{money(docTotal(d.items), d.currency, privacyMode)}</span>

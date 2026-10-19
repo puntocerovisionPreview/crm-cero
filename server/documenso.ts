@@ -1,4 +1,6 @@
 import type express from 'express';
+import { onboardAcceptedDocument, saveSignedPdf } from './contractsServer';
+import { recordError } from './health';
 import { timingSafeEqual } from 'crypto';
 import type { Firestore } from 'firebase-admin/firestore';
 import { SIGNATURE_BOX } from '../src/utils/signatureBox';
@@ -30,6 +32,12 @@ async function documenso(path: string, init: RequestInit): Promise<any> {
   });
   if (!r.ok) throw new Error(`Documenso respondió ${r.status}: ${(await r.text()).slice(0, 200)}`);
   return r.json();
+}
+
+async function downloadFile(path: string): Promise<Buffer> {
+  const r = await fetch(`${base()}/api/v2${path}`, { headers: { Authorization: String(process.env.DOCUMENSO_API_KEY) } });
+  if (!r.ok) throw new Error(`Documenso respondió ${r.status} al descargar`);
+  return Buffer.from(await r.arrayBuffer());
 }
 
 const money = (n: number, cur: string) => `${cur === 'USD' ? 'US$' : '$'} ${Math.round(n).toLocaleString('es-AR')}`;
@@ -148,8 +156,33 @@ export function registerDocumensoRoutes(
 
       const total = (d.items || []).reduce((s: number, i: any) => s + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
       await notify(`✍️ ${d.clientName} firmó el presupuesto`, `${acceptedName} firmó ${money(total, d.currency)}.`).catch(() => undefined);
+
+      await onboardAcceptedDocument(db, doc.ref, notify).catch((err) =>
+        recordError(db, { source: 'presupuestos', message: `No se pudo crear el proyecto de ${d.clientName}: ${(err as Error).message}` }, notify)
+      );
+      await saveSignedPdf(db, doc.ref, envelopeId, documenso, downloadFile).catch((err) =>
+        recordError(db, { source: 'documenso', message: `No se pudo guardar el PDF firmado de ${d.clientName}: ${(err as Error).message}` })
+      );
     } catch (err) {
       console.error('[documenso] webhook:', (err as Error).message);
+    }
+  });
+
+  // Link temporal (10 min) al PDF firmado guardado en Storage
+  app.get('/api/documenso/firmado/:docId', requireOwner, async (req, res) => {
+    const db = getDb();
+    if (!db) return res.status(503).json({ error: 'El servidor no tiene acceso a la base de datos' });
+    try {
+      const d = (await db.collection('documents').doc(String(req.params.docId)).get()).data() as any;
+      const path = d?.signature?.signedPdfPath;
+      if (!path) return res.status(404).json({ error: 'Todavía no hay copia del PDF firmado' });
+      const { getStorage } = await import('firebase-admin/storage');
+      const { getApps } = await import('firebase-admin/app');
+      const cfg = (await import('../firebase-applet-config.json')).default as any;
+      const [url] = await getStorage(getApps()[0]).bucket(cfg.storageBucket).file(path).getSignedUrl({ action: 'read', expires: Date.now() + 10 * 60 * 1000 });
+      res.json({ url });
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
     }
   });
 

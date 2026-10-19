@@ -1,5 +1,7 @@
 import type express from 'express';
 import type { Firestore } from 'firebase-admin/firestore';
+import { markDocumentViewed, onboardAcceptedDocument } from './contractsServer';
+import { recordError } from './health';
 
 /**
  * PRESUPUESTOS: el cliente toca "Acepto" en el link y el servidor lo registra.
@@ -10,11 +12,26 @@ import type { Firestore } from 'firebase-admin/firestore';
 const TOKEN_RE = /^[A-Za-z0-9]{16,64}$/;
 const money = (n: number, cur: string) => `${cur === 'USD' ? 'US$' : '$'} ${Math.round(n).toLocaleString('es-AR')}`;
 
+const views = new Map<string, number>();
+
 export function registerDocumentRoutes(
   app: express.Express,
   getDb: () => Firestore | null,
   notify: (title: string, body: string) => Promise<void>
 ) {
+  // El cliente abrió el link (público, sin datos: solo marca la fecha)
+  app.post('/api/documento/:token/visto', async (req, res) => {
+    const token = String(req.params.token || '');
+    res.status(204).end();
+    if (!TOKEN_RE.test(token)) return;
+    const last = views.get(token) || 0;
+    if (Date.now() - last < 10 * 60 * 1000) return;
+    views.set(token, Date.now());
+    if (views.size > 2000) views.clear();
+    const db = getDb();
+    if (db) await markDocumentViewed(db, token, notify).catch(() => undefined);
+  });
+
   app.post('/api/documento/:token/aceptar', async (req, res) => {
     const token = String(req.params.token || '');
     const name = String(req.body?.name || '').trim().slice(0, 80);
@@ -38,6 +55,12 @@ export function registerDocumentRoutes(
 
       await notify(`✅ ${data.clientName} aceptó el presupuesto`, `${name} aceptó ${money(Number(data.total) || 0, data.currency)}.`).catch(() => undefined);
       res.json({ ok: true });
+      // Después de responder: proyecto, cobros y tareas de arranque
+      for (const o of originals.docs) {
+        await onboardAcceptedDocument(db, o.ref, notify).catch((err) =>
+          recordError(db, { source: 'presupuestos', message: `No se pudo crear el proyecto de ${data.clientName}: ${(err as Error).message}` }, notify)
+        );
+      }
     } catch (err) {
       console.error('[documentos] aceptar:', (err as Error).message);
       res.status(500).json({ error: 'No se pudo registrar. Probá de nuevo o avisá por WhatsApp.' });

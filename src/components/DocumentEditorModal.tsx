@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { Project, StudioPaymentSettings } from '../types';
 import { DocItem, DocumentKind, STUDIO_NAME, StudioDocument, docTotal, newToken, nextNumber, paymentInfoFrom, saveDocument } from '../utils/documents';
 import { addDays } from '../utils/dates';
+import { ContractClause, ContractService, PAYMENT_PRESETS, SERVICE_LABELS, buildClauses, planAmounts, stepWhen } from '../utils/contracts';
 import { hapticFeedback } from '../utils/haptics';
 
 export type DocumentPrefill = Partial<Pick<StudioDocument, 'kind' | 'projectId' | 'prospectId' | 'clientName' | 'contactName' | 'phone' | 'email' | 'items' | 'currency' | 'paymentDate' | 'paymentMethod' | 'paymentId' | 'notes'>>;
@@ -18,7 +19,7 @@ interface Props {
   onSaved: (doc: StudioDocument) => void;
 }
 
-const DEFAULT_NOTES = 'Seña del 50% para comenzar y 50% contra entrega.\nIncluye una ronda de ajustes.';
+const DEFAULT_NOTES = '';
 const field =
   'w-full h-10 rounded-[10px] bg-[var(--bg-surface-muted)]/70 border-0 px-3 text-[15px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40';
 
@@ -37,6 +38,15 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
   const [paymentMethod, setPaymentMethod] = useState('transferencia');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Contrato
+  const [service, setService] = useState<ContractService>('web');
+  const [planId, setPlanId] = useState(PAYMENT_PRESETS[0].id);
+  const [withContract, setWithContract] = useState(true);
+  const [deliveryDays, setDeliveryDays] = useState(30);
+  const [revisions, setRevisions] = useState(2);
+  const [clauses, setClauses] = useState<ContractClause[]>([]);
+  const [clausesEdited, setClausesEdited] = useState(false);
+  const [showClauses, setShowClauses] = useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -53,9 +63,24 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
     setPaymentMethod(prefill?.paymentMethod || 'transferencia');
     setValidDays(15);
     setError(null);
+    const proj = projects.find(p => p.id === prefill?.projectId);
+    const svc: ContractService = proj?.serviceType === 'paf' || proj?.projectType?.startsWith('paf') ? 'paf' : proj?.serviceType === 'otro' ? 'otro' : 'web';
+    setService(svc);
+    setDeliveryDays(svc === 'paf' ? 90 : 30);
+    setPlanId(svc === 'paf' ? '3-cuotas' : PAYMENT_PRESETS[0].id);
+    setWithContract(true);
+    setClausesEdited(false);
+    setShowClauses(false);
   }, [isOpen, prefill, today]);
 
+  // Las cláusulas se arman solas hasta que las edites a mano
+  useEffect(() => {
+    if (!clausesEdited) setClauses(buildClauses(service, { deliveryDays, revisions, currency }));
+  }, [service, deliveryDays, revisions, currency, clausesEdited]);
+
   const total = useMemo(() => docTotal(items), [items]);
+  const plan = PAYMENT_PRESETS.find(p => p.id === planId) || PAYMENT_PRESETS[0];
+  const planMoney = planAmounts(plan.steps, total);
   const clientOptions = useMemo(() => projects.filter(p => !p.archived).sort((a, b) => a.clientName.localeCompare(b.clientName)), [projects]);
 
   if (!isOpen) return null;
@@ -68,6 +93,8 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
       setContactName(p.ownerName || '');
       if (p.clientEmail) setEmail(p.clientEmail);
       if (p.estimatedCurrency) setCurrency(p.estimatedCurrency);
+      const svc: ContractService = p.serviceType === 'paf' || p.projectType?.startsWith('paf') ? 'paf' : p.serviceType === 'otro' ? 'otro' : 'web';
+      setService(svc);
     }
   };
 
@@ -102,6 +129,14 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
       paymentInfo: kind === 'presupuesto' ? paymentInfoFrom(settings, currency) : undefined,
       status: 'enviado',
       createdAt: new Date().toISOString(),
+      ...(kind === 'presupuesto'
+        ? {
+            service,
+            deliveryDays,
+            paymentPlan: plan.steps,
+            clauses: withContract ? clauses.filter(c => c.title.trim() && c.body.trim()) : undefined,
+          }
+        : {}),
     };
     try {
       await saveDocument(doc);
@@ -217,13 +252,111 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
         </div>
 
         {kind === 'presupuesto' ? (
-          <div className="flex items-center gap-2">
-            <label htmlFor="validez" className="text-[14px] text-[var(--text-secondary)]">Válido por</label>
-            <select id="validez" value={validDays} onChange={e => setValidDays(Number(e.target.value))} className="h-9 rounded-[8px] bg-[var(--bg-surface-muted)]/70 border-0 px-2 text-[14px]">
-              {[7, 15, 30].map(d => (
-                <option key={d} value={d}>{d} días</option>
-              ))}
-            </select>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <label className="space-y-1">
+                <span className="block text-[13px] font-semibold text-[var(--text-secondary)]">Servicio</span>
+                <select value={service} onChange={e => { const s = e.target.value as ContractService; setService(s); setDeliveryDays(s === 'paf' ? 90 : 30); }} className={field}>
+                  {(Object.keys(SERVICE_LABELS) as ContractService[]).map(s => (
+                    <option key={s} value={s}>{SERVICE_LABELS[s]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="block text-[13px] font-semibold text-[var(--text-secondary)]">Válido por</span>
+                <select id="validez" value={validDays} onChange={e => setValidDays(Number(e.target.value))} className={field}>
+                  {[7, 15, 30].map(d => (
+                    <option key={d} value={d}>{d} días</option>
+                  ))}
+                </select>
+              </label>
+              <label className="space-y-1">
+                <span className="block text-[13px] font-semibold text-[var(--text-secondary)]">{service === 'paf' ? 'Duración (días)' : 'Plazo (días)'}</span>
+                <input inputMode="numeric" value={deliveryDays} onChange={e => setDeliveryDays(Math.max(1, Number(e.target.value.replace(/\D/g, '')) || 1))} className={field} />
+              </label>
+              {service === 'web' && (
+                <label className="space-y-1">
+                  <span className="block text-[13px] font-semibold text-[var(--text-secondary)]">Rondas de ajustes</span>
+                  <select value={revisions} onChange={e => setRevisions(Number(e.target.value))} className={field}>
+                    {[1, 2, 3].map(n => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="block text-[13px] font-semibold text-[var(--text-secondary)]">Forma de pago</span>
+              <select value={planId} onChange={e => setPlanId(e.target.value)} aria-label="Forma de pago" className={field}>
+                {PAYMENT_PRESETS.map(p => (
+                  <option key={p.id} value={p.id}>{p.label}</option>
+                ))}
+              </select>
+              {total > 0 && (
+                <ul className="text-[13px] text-[var(--text-secondary)] space-y-0.5 px-1">
+                  {plan.steps.map((s, i) => (
+                    <li key={i} className="flex justify-between gap-2">
+                      <span>{s.label} {stepWhen(s)}</span>
+                      <span className="tabular-nums text-[var(--text-primary)]">{currency === 'USD' ? 'US$' : '$'} {planMoney[i].toLocaleString('es-AR')}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="rounded-[12px] bg-[var(--bg-surface-muted)]/50 p-3 space-y-2">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={withContract} onChange={e => setWithContract(e.target.checked)} className="mt-1 w-4 h-4 accent-[var(--accent)]" />
+                <span className="text-[14px] text-[var(--text-primary)]">
+                  Incluir condiciones del servicio (contrato)
+                  <span className="block text-[12px] text-[var(--text-tertiary)]">Alcance, plazos, pagos, cancelación y propiedad. El cliente las acepta o firma junto con el presupuesto.</span>
+                </span>
+              </label>
+              {withContract && (
+                <>
+                  <button type="button" onClick={() => setShowClauses(v => !v)} className="text-[13px] text-[var(--accent)] font-medium flex items-center gap-1 cursor-pointer">
+                    {showClauses ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />} {showClauses ? 'Ocultar' : 'Ver y editar'} las {clauses.length} cláusulas
+                  </button>
+                  {showClauses && (
+                    <div className="space-y-2">
+                      {clauses.map((c, i) => (
+                        <div key={i} className="space-y-1">
+                          <div className="flex gap-2">
+                            <input
+                              value={c.title}
+                              onChange={e => { setClausesEdited(true); setClauses(arr => arr.map((x, j) => (j === i ? { ...x, title: e.target.value } : x))); }}
+                              aria-label={`Título de la cláusula ${i + 1}`}
+                              className={`${field} h-9 text-[14px] font-semibold`}
+                            />
+                            <button type="button" onClick={() => { setClausesEdited(true); setClauses(arr => arr.filter((_, j) => j !== i)); }} aria-label="Quitar cláusula" className="w-9 h-9 shrink-0 rounded-full flex items-center justify-center text-[var(--text-tertiary)] hover:text-[var(--semantic-red)] cursor-pointer">
+                              <Trash2 className="w-4 h-4" aria-hidden />
+                            </button>
+                          </div>
+                          <textarea
+                            value={c.body}
+                            onChange={e => { setClausesEdited(true); setClauses(arr => arr.map((x, j) => (j === i ? { ...x, body: e.target.value } : x))); }}
+                            rows={3}
+                            aria-label={`Texto de la cláusula ${i + 1}`}
+                            className={`${field} h-auto py-2 text-[13px] resize-y`}
+                          />
+                        </div>
+                      ))}
+                      <div className="flex justify-between">
+                        <button type="button" onClick={() => { setClausesEdited(true); setClauses(arr => [...arr, { title: 'Nueva cláusula', body: '' }]); }} className="text-[13px] text-[var(--accent)] font-medium flex items-center gap-1 cursor-pointer">
+                          <Plus className="w-4 h-4" aria-hidden /> Agregar cláusula
+                        </button>
+                        {clausesEdited && (
+                          <button type="button" onClick={() => setClausesEdited(false)} className="text-[13px] text-[var(--text-tertiary)] underline cursor-pointer">
+                            Volver a la plantilla
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-2">
@@ -240,8 +373,8 @@ export const DocumentEditorModal: React.FC<Props> = ({ isOpen, prefill, projects
         )}
 
         <div className="space-y-1">
-          <label htmlFor="doc-notes" className="block text-[13px] font-semibold text-[var(--text-secondary)]">{kind === 'presupuesto' ? 'Condiciones' : 'Nota (opcional)'}</label>
-          <textarea id="doc-notes" value={notes} onChange={e => setNotes(e.target.value)} rows={3} className={`${field} h-auto py-2 resize-none`} />
+          <label htmlFor="doc-notes" className="block text-[13px] font-semibold text-[var(--text-secondary)]">{kind === 'presupuesto' ? 'Notas para el cliente (opcional)' : 'Nota (opcional)'}</label>
+          <textarea id="doc-notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} className={`${field} h-auto py-2 resize-none`} />
           {kind === 'presupuesto' && <p className="text-[12px] text-[var(--text-tertiary)]">Se agregan solos tus datos de cobro (alias, CBU, link) de Ajustes.</p>}
         </div>
 

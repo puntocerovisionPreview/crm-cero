@@ -2,6 +2,7 @@ import { collection, deleteDoc, doc, getDoc, onSnapshot, setDoc } from 'firebase
 import { db } from '../firebase';
 import { deepSanitize } from './sanitize';
 import type { Payment, Project, StudioPaymentSettings } from '../types';
+import type { ContractClause, ContractService, PaymentStep } from './contracts';
 
 /**
  * PRESUPUESTOS Y RECIBOS CON LINK
@@ -47,6 +48,16 @@ export interface StudioDocument {
   // Firma digital con Documenso (la escribe el servidor)
   signature?: DocumentSignature;
   createdAt: string;
+  // Contrato dentro del presupuesto
+  service?: ContractService;
+  deliveryDays?: number;
+  paymentPlan?: PaymentStep[];
+  clauses?: ContractClause[];
+  // Seguimiento (lo escribe el servidor)
+  viewedAt?: string; // primera vez que el cliente lo abrió
+  lastViewedAt?: string;
+  viewCount?: number;
+  onboardedProjectId?: string; // proyecto creado solo al aceptar
 }
 
 export interface DocumentSignature {
@@ -56,6 +67,7 @@ export interface DocumentSignature {
   signingUrl?: string;
   sentAt: string;
   signedAt?: string;
+  signedPdfPath?: string; // copia del PDF firmado en Storage
 }
 
 export const PUBLIC_PREFIX = 'doc_';
@@ -110,6 +122,10 @@ export function publicCopy(d: StudioDocument) {
     acceptedName: d.acceptedName || null,
     signatureStatus: d.signature?.status || null,
     signingUrl: d.signature?.status === 'pendiente' ? d.signature.signingUrl || null : null,
+    service: d.service || null,
+    deliveryDays: d.deliveryDays || null,
+    paymentPlan: d.kind === 'presupuesto' ? d.paymentPlan || null : null,
+    clauses: d.kind === 'presupuesto' ? d.clauses || null : null,
   };
 }
 export type PublicDocument = ReturnType<typeof publicCopy>;
@@ -144,7 +160,7 @@ export function receiptFromPayment(project: Project, payment: Payment, number: n
 export function shareMessage(d: StudioDocument, url: string): string {
   const name = (d.contactName || d.clientName).split(' ')[0];
   return d.kind === 'presupuesto'
-    ? `¡Hola ${name}! Te paso el presupuesto: ${url}\n\nAhí podés verlo, descargarlo en PDF y aceptarlo con un toque. Cualquier duda me escribís.`
+    ? `¡Hola ${name}! Te paso el presupuesto${d.clauses?.length ? ' con las condiciones del trabajo' : ''}: ${url}\n\nAhí podés verlo, descargarlo en PDF y aceptarlo con un toque. Cualquier duda me escribís.`
     : `¡Hola ${name}! Gracias por el pago. Te dejo el recibo: ${url}`;
 }
 
@@ -171,6 +187,18 @@ export function subscribeDocuments(onChanged: (docs: StudioDocument[]) => void) 
 export async function loadPublicDocument(token: string): Promise<PublicDocument | null> {
   const snap = await getDoc(doc(db, 'student_portals', `${PUBLIC_PREFIX}${token}`));
   return snap.exists() ? (snap.data() as PublicDocument) : null;
+}
+
+/** El cliente abrió el link (lo registra el servidor; si falla, no pasa nada). */
+export function markPublicDocumentViewed(token: string): void {
+  try {
+    const key = `cero_doc_visto_${token}`;
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+  } catch {
+    /* sin almacenamiento: igual se avisa */
+  }
+  fetch(`/api/documento/${encodeURIComponent(token)}/visto`, { method: 'POST', keepalive: true }).catch(() => undefined);
 }
 
 export async function acceptPublicDocument(token: string, name: string): Promise<void> {

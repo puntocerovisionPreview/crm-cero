@@ -2,6 +2,7 @@ import React from 'react';
 import { Document, Page, StyleSheet, Text, View, pdf } from '@react-pdf/renderer';
 import { PublicDocument, docTitle } from '../utils/documents';
 import { SIGNATURE_POINTS } from '../utils/signatureBox';
+import { planAmounts, stepWhen } from '../utils/contracts';
 
 /**
  * PDF del presupuesto o recibo, armado con @react-pdf/renderer: sale igual en
@@ -91,10 +92,39 @@ export const DocumentPdf: React.FC<{ doc: PublicDocument }> = ({ doc }) => {
           </View>
         )}
 
+        {isQuote && doc.paymentPlan && doc.paymentPlan.length ? (
+          <View style={{ marginTop: 18 }} wrap={false}>
+            <Text style={s.label}>FORMA DE PAGO</Text>
+            {doc.paymentPlan.map((st, i) => (
+              <View key={i} style={[s.between, { paddingVertical: 3 }]}>
+                <Text>
+                  {st.label} · {st.percent}% {stepWhen(st)}
+                </Text>
+                <Text>{money(planAmounts(doc.paymentPlan!, doc.total)[i], doc.currency)}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
         {doc.notes ? (
           <View style={{ marginTop: 18 }}>
-            <Text style={s.label}>{isQuote ? 'CONDICIONES' : 'DETALLE'}</Text>
+            <Text style={s.label}>{isQuote ? 'NOTAS' : 'DETALLE'}</Text>
             <Text>{doc.notes}</Text>
+          </View>
+        ) : null}
+
+        {isQuote && doc.clauses && doc.clauses.length ? (
+          <View style={{ marginTop: 18 }}>
+            <Text style={s.label}>CONDICIONES DEL SERVICIO</Text>
+            {doc.clauses.map((c, i) => (
+              <View key={i} style={{ marginTop: 6 }} wrap={false}>
+                <Text style={{ fontFamily: 'Helvetica-Bold' }}>
+                  {i + 1}. {c.title}
+                </Text>
+                <Text style={{ color: '#3A3A3C', lineHeight: 1.35 }}>{c.body}</Text>
+              </View>
+            ))}
+            <Text style={[s.small, { marginTop: 8 }]}>Al firmar o aceptar este presupuesto, el cliente acepta estas condiciones.</Text>
           </View>
         ) : null}
 

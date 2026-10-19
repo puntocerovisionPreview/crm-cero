@@ -117,6 +117,24 @@ export const DocumentShareSheet: React.FC<Props> = ({ doc, title, onClose }) => 
                   </span>
                 </span>
               </button>
+              {doc.signature?.signedPdfPath && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const r = await fetch(`/api/documenso/firmado/${encodeURIComponent(doc.id)}`, { headers: await getAuthHeaders() });
+                      const data = await r.json();
+                      if (!r.ok) throw new Error(data?.error || `Error ${r.status}`);
+                      window.open(data.url, '_blank', 'noopener');
+                    } catch (e) {
+                      setSignError((e as Error).message);
+                    }
+                  }}
+                  className="mx-4 mb-3 text-[13px] font-semibold text-[var(--accent)] cursor-pointer"
+                >
+                  Descargar el PDF firmado
+                </button>
+              )}
               {askEmail && !signStatus && (
                 <form
                   className="px-4 pb-3 flex gap-2"

@@ -19,6 +19,7 @@ import { describeNewPayment, isMercadoPagoConfigured, registerMercadoPagoRoutes,
 import { registerDocumentRoutes } from './documents';
 import { registerDocumensoRoutes } from './documenso';
 import { recordError, recordJobRun, registerHealthRoutes, runBackupIfDue } from './health';
+import { documentFollowups } from './contractsServer';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 
 /**
@@ -367,6 +368,16 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
       const detail = await runBackupIfDue(db, notify);
       results.push({ job: 'backup', detail });
       await recordJobRun(db, 'backup', !detail.startsWith('falló'), detail);
+      // Presupuestos sin abrir, sin respuesta o por vencer (una vez por día)
+      try {
+        const docs = await documentFollowups(db, async (title, body) => {
+          await notifyAll(db, title, body, '/documentos', 'doc');
+        });
+        results.push({ job: 'presupuestos', detail: docs });
+        await recordJobRun(db, 'presupuestos', true, docs);
+      } catch (err) {
+        await recordJobRun(db, 'presupuestos', false, (err as Error).message);
+      }
     }
     res.json({ ok: true, results });
   });
