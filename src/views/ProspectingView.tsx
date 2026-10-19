@@ -5,7 +5,7 @@ import {
   Loader2,
   Phone,
   Sparkles,
-  Target,
+
   Zap,
   Check,
   ChevronDown,
@@ -54,6 +54,7 @@ import { COUNTRY_NAMES } from '../prospecting/pool';
 import { friendlyError, generateVideoScript, markDayStarted, useAddMore, usePoolTakeOptions, useRecycle } from '../prospecting/actions';
 import { BurstMode, DayStartFlow, LocalTimeBadge, PersonalLineButton, PersonalizeAllButton } from '../components/ProspectingDayStart';
 import { AwaitingBanner, CallPrep, ConversationLog, ReplyButton } from '../components/ProspectConversation';
+import { ProspectingPulsePanel, usePulse } from '../components/ProspectingVisuals';
 import { deleteProspect, recordProspectAction, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
 import { useProspecting } from '../prospecting/useProspecting';
 import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
@@ -102,6 +103,7 @@ function shortDate(d?: string): string {
 export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initialTab = 'hoy' }) => {
   const { prospects, events, settings, settingsLoaded, today, hour, loadError } = useProspecting();
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [funnelFrom, setFunnelFrom] = useState<string | null>(null);
   const list = prospects || [];
   const pool = usePool();
   const [poolNotice, setPoolNotice] = useState<string | null>(null);
@@ -156,27 +158,24 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
   };
   const actSafe = (p: Prospect, action: ProspectAction, note?: string) => act(p, action, note).catch(() => undefined);
   const goal = settings.weeklyGoal || 0;
-  const goalPct = goal > 0 && thisWeek ? Math.min(100, Math.round((thisWeek.conversacionesOut / goal) * 100)) : 0;
+  const pulse = usePulse(list, events, today, settings);
 
   return (
     <div className="space-y-4 pb-24 max-w-4xl">
-      <header className="space-y-1">
+      <header className="space-y-3">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Prospección</h1>
-        <p className="text-sm text-[var(--text-secondary)]">
-          {thisWeek
-            ? `Esta semana: ${thisWeek.conversacionesOut} conversaciones, ${thisWeek.seguimientos} seguimientos, ${thisWeek.respuestas} respuestas y ${thisWeek.autoAuditorias} auditorías.`
-            : 'Tu lista de contactos en frío, día por día.'}
-        </p>
-        {goal > 0 && thisWeek && (
-          <div className="flex items-center gap-2 pt-1" title="Meta semanal de conversaciones nuevas">
-            <Target className="w-4 h-4 text-[var(--accent)] shrink-0" />
-            <div className="flex-1 h-2 rounded-full bg-[var(--bg-surface-muted)] overflow-hidden">
-              <div className={`h-full transition-[color,background-color,border-color,opacity,box-shadow,transform,width,stroke-dashoffset] ${goalPct >= 100 ? 'bg-emerald-500' : 'bg-[var(--accent)]'}`} style={{ width: `${goalPct}%` }} />
-            </div>
-            <span className="text-xs tabular-nums text-[var(--text-secondary)] shrink-0">
-              {thisWeek.conversacionesOut} de {goal}
-            </span>
-          </div>
+        {prospects !== null && (
+          <ProspectingPulsePanel
+            pulse={pulse}
+            today={today}
+            weekDone={thisWeek?.conversacionesOut || 0}
+            goal={goal}
+            onStation={(from) => {
+              setFunnelFrom(from);
+              setTab('embudo');
+            }}
+            onCall={() => setTab('hoy')}
+          />
         )}
       </header>
 
@@ -253,7 +252,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           isEvening={hour >= settings.closeHour}
         />
       )}
-      {prospects !== null && tab === 'embudo' && <FunnelPanel prospects={list} today={today} settings={settings} onAct={actSafe} />}
+      {prospects !== null && tab === 'embudo' && <FunnelPanel prospects={list} today={today} settings={settings} onAct={actSafe} initialStep={funnelFrom} />}
       {prospects !== null && tab === 'prospectos' && (
         <ProspectList prospects={list} today={today} settings={settings} onAct={actSafe} onAddProject={onAddProject} />
       )}
@@ -1711,13 +1710,19 @@ const TurnBadge: React.FC<{ info: { turn: Turn; label: string } }> = ({ info }) 
  * Cada paso del camino (del primer mensaje a cliente) separado en:
  * te toca a vos / esperando su respuesta / sin respuesta. Arriba, cuántos llegaron a cada paso.
  */
-const FunnelPanel: React.FC<{ prospects: Prospect[]; today: string; settings: ProspectingSettings; onAct: (p: Prospect, a: ProspectAction, n?: string) => void }> = ({
-  prospects,
-  today,
-  settings,
-  onAct,
-}) => {
-  const [openStep, setOpenStep] = useState<string | null>(null);
+const FunnelPanel: React.FC<{
+  prospects: Prospect[];
+  today: string;
+  settings: ProspectingSettings;
+  onAct: (p: Prospect, a: ProspectAction, n?: string) => void;
+  initialStep?: string | null;
+}> = ({ prospects, today, settings, onAct, initialStep }) => {
+  const [openStep, setOpenStep] = useState<string | null>(initialStep || null);
+  useEffect(() => {
+    if (!initialStep) return;
+    setOpenStep(initialStep);
+    requestAnimationFrame(() => document.getElementById(`paso-${initialStep}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+  }, [initialStep]);
   const order = FUNNEL_STEPS.map((s) => s.id) as string[];
   const withStep = prospects.map((p) => ({ p, step: funnelStepOf(p), t: turnOf(p, today, settings) })).filter((x) => x.step);
   const reached = (i: number) => withStep.filter((x) => order.indexOf(x.step as string) >= i).length;
@@ -1737,7 +1742,7 @@ const FunnelPanel: React.FC<{ prospects: Prospect[]; today: string; settings: Pr
           const n = reached(i);
           const open = openStep === s.id;
           return (
-            <li key={s.id} className={card}>
+            <li key={s.id} id={`paso-${s.id}`} className={`${card} ${open ? 'border-[var(--border-strong)]' : ''}`}>
               <button type="button" onClick={() => setOpenStep(open ? null : s.id)} className="w-full p-3 text-left space-y-1.5" aria-expanded={open}>
                 <div className="flex items-center gap-2">
                   <span className="text-[11px] tabular-nums text-[var(--text-tertiary)] w-5">{i + 1}</span>

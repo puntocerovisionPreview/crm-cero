@@ -14,6 +14,7 @@ import { ActivityHeatmap } from '../components/ActivityHeatmap';
 import { ColdClientsCard } from '../components/ColdClientsCard';
 import { coldClients } from '../utils/coldClients';
 import { hapticFeedback } from '../utils/haptics';
+import { DayRing, NextCallChip, RouteLine, usePulse } from '../components/ProspectingVisuals';
 
 interface Props {
   tasks: AgendaTask[];
@@ -102,6 +103,7 @@ export const HomeView: React.FC<Props> = ({
     if (!prospects) return null;
     return { queue: buildDailyQueue(prospects, today, settings).items.length, pending: pendingOutcomes(prospects, today).length };
   }, [prospects, settings, today]);
+  const pulse = usePulse(prospects || [], events, today, settings);
 
   const stats: Record<SectorKey, Stat[]> = {
     dia: [
@@ -111,8 +113,9 @@ export const HomeView: React.FC<Props> = ({
     ],
     prospeccion: prospecting
       ? [
-          { value: String(prospecting.queue), label: 'para contactar hoy' },
-          ...(prospecting.pending ? [{ value: String(prospecting.pending), label: 'sin resultado cargado', tone: 'warn' as const }] : []),
+          ...(pulse.mine ? [{ value: String(pulse.mine), label: pulse.mine === 1 ? 'espera tu respuesta' : 'esperan tu respuesta', tone: 'good' as const }] : []),
+          { value: String(prospecting.queue), label: 'para hacer hoy' },
+          ...(prospecting.pending ? [{ value: String(prospecting.pending), label: 'sin anotar si respondieron', tone: 'warn' as const }] : []),
         ]
       : [{ value: loadError ? '—' : '…', label: loadError ? 'abrí la sección para ver tu cola' : 'cargando' }],
     clientes: [
@@ -216,7 +219,24 @@ export const HomeView: React.FC<Props> = ({
               <ChevronRight className="w-5 h-5 text-[var(--text-tertiary)] group-hover:translate-x-0.5 transition-transform" aria-hidden />
             </button>
 
-            <StatsRow items={stats[sector.key]} big />
+            {sector.key === 'prospeccion' && prospects ? (
+              <div className="flex items-center gap-4">
+                <DayRing done={pulse.doneToday} planned={pulse.planned} size={64} />
+                <StatsRow items={stats[sector.key]} big />
+              </div>
+            ) : (
+              <StatsRow items={stats[sector.key]} big />
+            )}
+
+            {/* Prospección: la ruta y la próxima llamada */}
+            {sector.key === 'prospeccion' && prospects && (
+              <div className="space-y-3">
+                <div className="rounded-[12px] bg-[var(--bg-surface-elevated)] px-2 py-3">
+                  <RouteLine stations={pulse.stations} compact onStation={() => go('/prospeccion')} />
+                </div>
+                {pulse.nextCall && <NextCallChip prospect={pulse.nextCall} today={today} onClick={() => go('/prospeccion')} />}
+              </div>
+            )}
 
             {/* Mi día: las próximas tareas a la vista */}
             {sector.key === 'dia' && (
