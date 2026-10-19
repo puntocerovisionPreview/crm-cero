@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef } from 'react';
-import { Flame, Phone } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Flame, Phone } from 'lucide-react';
 import { Prospect, ProspectEvent, ProspectingSettings } from '../types';
 import { FUNNEL_STEPS, FunnelStepId, buildDailyQueue, funnelStepOf, turnOf } from '../prospecting/core';
 import { addDays, parseLocalDate } from '../utils/dates';
@@ -130,8 +130,12 @@ export const DayRing: React.FC<{ done: number; planned: number; size?: number }>
         />
       </svg>
       <span className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-        <span className="text-[20px] font-bold tabular-nums text-[var(--text-primary)]">{complete ? '✓' : done}</span>
-        <span className="text-[10px] text-[var(--text-tertiary)] mt-0.5 tabular-nums">{complete ? 'listo' : `de ${planned}`}</span>
+        <span className="font-bold tabular-nums text-[var(--text-primary)]" style={{ fontSize: Math.round(size * 0.26) }}>
+          {complete ? '✓' : done}
+        </span>
+        <span className="text-[var(--text-tertiary)] mt-0.5 tabular-nums" style={{ fontSize: Math.max(9, Math.round(size * 0.13)) }}>
+          {complete ? 'listo' : `de ${planned}`}
+        </span>
       </span>
     </div>
   );
@@ -180,7 +184,7 @@ export const NextCallChip: React.FC<{ prospect: Prospect; today: string; onClick
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-2.5 px-3 py-2 rounded-[12px] text-left cursor-pointer min-w-0 transition-colors"
+      className="w-full sm:w-auto flex items-center gap-2.5 px-3 py-2 rounded-[12px] text-left cursor-pointer min-w-0 transition-colors"
       style={{ backgroundColor: `${CALL}14`, border: `1px solid ${CALL}33` }}
     >
       <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-white" style={{ backgroundColor: CALL }} aria-hidden>
@@ -289,23 +293,46 @@ export const ProspectingPulsePanel: React.FC<{
   }, [complete, today]);
 
   const goalPct = goal > 0 ? Math.min(100, Math.round((weekDone / goal) * 100)) : 0;
+  // En el celular, la ruta y la semana se abren a pedido: así "Ahora" queda a la vista
+  const [more, setMore] = useState(false);
   return (
-    <section className="card-swiss p-4 sm:p-5 space-y-4" aria-label="Tu prospección hoy">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-        <div className="flex items-center gap-3">
-          <DayRing done={pulse.doneToday} planned={pulse.planned} />
-          <div className="leading-tight">
+    <section className="card-swiss p-3.5 sm:p-5 space-y-3 sm:space-y-4" aria-label="Tu prospección hoy">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex items-center gap-3 min-w-0 flex-1 sm:flex-none">
+          <span className="sm:hidden">
+            <DayRing done={pulse.doneToday} planned={pulse.planned} size={56} />
+          </span>
+          <span className="hidden sm:block">
+            <DayRing done={pulse.doneToday} planned={pulse.planned} />
+          </span>
+          <div className="leading-tight min-w-0">
             <p className="text-[15px] font-semibold text-[var(--text-primary)]">
               {complete ? 'Día completo' : pulse.leftToday ? `Te faltan ${pulse.leftToday}` : 'Sin pendientes'}
             </p>
             <p className="text-[12px] text-[var(--text-secondary)]">
               {pulse.mine ? `${pulse.mine} ${pulse.mine === 1 ? 'espera' : 'esperan'} tu respuesta` : 'Nadie esperando tu respuesta'}
             </p>
-            <p className="text-[12px] text-[var(--text-tertiary)]">{pulse.waiting} esperando la suya</p>
+            <p className="text-[12px] text-[var(--text-tertiary)]">
+              {pulse.waiting} esperando la suya
+              {pulse.streak > 0 && (
+                <span className="sm:hidden">
+                  {' '}· <Flame className="inline w-3 h-3 -mt-0.5" style={{ color: '#FF9500' }} aria-hidden /> {pulse.streak} {pulse.streak === 1 ? 'día' : 'días'}
+                </span>
+              )}
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setMore((v) => !v)}
+          className="sm:hidden h-8 px-2.5 rounded-full text-[12px] font-medium text-[var(--text-secondary)] border border-[var(--border-subtle)] flex items-center gap-1 shrink-0 cursor-pointer"
+          aria-expanded={more}
+        >
+          {more ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />} Recorrido
+        </button>
+
+        <div className={`${more ? 'flex' : 'hidden'} sm:flex items-center gap-3`}>
           <WeekBars week={pulse.week} today={today} />
           <div className="leading-tight">
             <p className="text-[15px] font-semibold text-[var(--text-primary)] flex items-center gap-1">
@@ -326,13 +353,13 @@ export const ProspectingPulsePanel: React.FC<{
         </div>
 
         {pulse.nextCall && (
-          <div className="min-w-0 sm:ml-auto">
+          <div className="min-w-0 w-full sm:w-auto sm:ml-auto">
             <NextCallChip prospect={pulse.nextCall} today={today} onClick={onCall} />
           </div>
         )}
       </div>
 
-      <div className="pt-3 border-t border-[var(--border-subtle)]">
+      <div className={`${more ? 'block' : 'hidden'} sm:block pt-3 border-t border-[var(--border-subtle)]`}>
         <RouteLine stations={pulse.stations} onStation={onStation} />
       </div>
     </section>

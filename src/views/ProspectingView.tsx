@@ -205,7 +205,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
   const pulse = usePulse(list, events, today, settings);
 
   return (
-    <div className="space-y-4 pb-24 max-w-4xl">
+    <div className={`space-y-4 pb-24 ${tab === 'embudo' ? 'max-w-none' : 'max-w-4xl'}`}>
       <header className="space-y-3">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Prospección</h1>
         {prospects !== null && (

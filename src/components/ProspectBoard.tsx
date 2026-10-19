@@ -79,7 +79,7 @@ export const ProspectCard: React.FC<{
         target="_blank"
         rel="noopener noreferrer"
         onClick={() => onSend(p, move.send!)}
-        className={`${btn} ${big ? 'h-12 text-[15px] px-5' : 'h-9 text-[13px] px-3'} text-white`}
+        className={`${btn} ${big ? 'h-12 text-[15px] px-5 w-full sm:w-auto' : 'h-9 text-[13px] px-3'} text-white`}
         style={{ backgroundColor: TINT }}
       >
         <MessageCircle className={big ? 'w-5 h-5' : 'w-4 h-4'} /> {move.sendLabel}
@@ -235,7 +235,9 @@ export const ProspectBoard: React.FC<{
     return m;
   }, [prospects, today, settings]);
 
-  const mineIn = (c: BoardColumn) => (byCol[c] || []).filter((p) => turnTone(p, nextMove(p, today, settings), settings) === 'mio').length;
+  // "Te toca" de cada columna (en Por escribir, solo los de hoy)
+  const mineIn = (c: BoardColumn) =>
+    (byCol[c] || []).filter((p) => (c !== 'por_escribir' || (p.plannedFirstContact || p.createdAt) <= today) && turnTone(p, nextMove(p, today, settings), settings) === 'mio').length;
 
   const renderColumn = (id: BoardColumn) => {
     const all = byCol[id] || [];
@@ -316,8 +318,10 @@ export const ProspectBoard: React.FC<{
       </div>
 
       {/* Compu: las 5 columnas, arrastrás para mover */}
-      <div className="hidden md:grid grid-cols-5 gap-2 items-start">
+      <div className="hidden md:block overflow-x-auto pb-2 -mx-1 px-1">
+        <div className="grid gap-2 items-start" style={{ gridTemplateColumns: 'repeat(5, minmax(250px, 1fr))' }}>
         {BOARD_COLUMNS.map((c) => renderColumn(c.id))}
+        </div>
       </div>
 
       <p className="text-[12px] text-[var(--text-tertiary)] px-1">

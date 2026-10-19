@@ -4209,7 +4209,14 @@ export default function App() {
       />
 
       {/* Main Content Area with Dynamic AppTopBar */}
-      <div ref={mainScrollRef} className="relative flex-1 flex flex-col min-w-0 h-full overflow-y-auto overflow-x-hidden w-full max-w-full overscroll-x-none overscroll-y-contain bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
+      <div
+        ref={mainScrollRef}
+        // Nunca se desplaza de costado: si algo lo corría (saltar a un elemento ancho), el contenido
+        // parecía meterse debajo de la barra lateral
+        onScroll={(e) => {
+          if (e.currentTarget.scrollLeft) e.currentTarget.scrollLeft = 0;
+        }}
+        className="relative flex-1 flex flex-col min-w-0 h-full overflow-y-auto overflow-x-hidden w-full max-w-full overscroll-x-none overscroll-y-contain bg-[var(--bg-app)] text-[var(--text-primary)] transition-colors">
         <AppTopBar
           title={routeMeta.title}
           subtitle={routeMeta.subtitle}
