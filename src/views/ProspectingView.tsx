@@ -57,7 +57,10 @@ import { AwaitingBanner, CallPrep, ConversationLog, ReplyButton } from '../compo
 import { ProspectingPulsePanel, usePulse } from '../components/ProspectingVisuals';
 import { ProspectingInbox } from '../components/ProspectingInbox';
 import { AddMoreRow } from '../components/ProspectingDayStart';
-import { deleteProspect, recordProspectAction, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
+import { deleteProspect, moveProspect, recordProspectAction, recordWithUndo, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
+import { BOARD_COLUMNS, BoardColumn, ClosedColumn, moveUpdates } from '../prospecting/board';
+import { ProspectBoard, UndoToast, sendLabel } from '../components/ProspectBoard';
+import { Sheet } from '../components/Sheet';
 import { useProspecting } from '../prospecting/useProspecting';
 import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
 import { ReservaPanel } from '../components/ReservaPanel';
@@ -82,7 +85,7 @@ interface Props {
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'hoy', label: 'Hoy' },
-  { id: 'embudo', label: 'Embudo' },
+  { id: 'embudo', label: 'Tablero' },
   { id: 'prospectos', label: 'Prospectos' },
   { id: 'reserva', label: 'Reserva' },
   { id: 'cargar', label: 'Cargar a mano' },
@@ -159,6 +162,45 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
     }
   };
   const actSafe = (p: Prospect, action: ProspectAction, note?: string) => act(p, action, note).catch(() => undefined);
+
+  // Enviar = marcar: se registra al tocar "Enviar por WhatsApp", con "Deshacer" unos segundos
+  const [undo, setUndo] = useState<{ text: string; run: () => Promise<void> } | null>(null);
+  const [callFor, setCallFor] = useState<Prospect | null>(null);
+  const [detailFor, setDetailFor] = useState<Prospect | null>(null);
+  const send = async (p: Prospect, action: ProspectAction, note?: string) => {
+    hapticFeedback.medium();
+    if (!['no_reply', 'lost', 'do_not_contact', 'snooze', 'they_replied'].includes(action)) playTaskDone();
+    try {
+      const run = await recordWithUndo(p, action, today, settings, note);
+      const what =
+        action === 'they_replied' ? 'respondió' : action === 'lost' ? 'descartado' : action === 'do_not_contact' ? 'no contactar' : action === 'no_reply' ? 'no respondió' : sendLabel(action);
+      setUndo({ text: `${p.studio || p.name}: ${what}`, run });
+      setActError(null);
+    } catch (err) {
+      setActError(`No se guardó lo de ${p.studio || p.name}: ${friendlyError(err)}`);
+    }
+  };
+  const moveTo = async (p: Prospect, to: BoardColumn | ClosedColumn) => {
+    const updates = moveUpdates(p, to, today, settings);
+    const label = BOARD_COLUMNS.find((c) => c.id === to)?.label || (to === 'cliente' ? 'Cliente' : 'Perdido');
+    const before: Partial<Prospect> = {};
+    (Object.keys(updates) as (keyof Prospect)[]).forEach((k) => ((before as any)[k] = p[k]));
+    try {
+      await moveProspect(p, updates, label);
+      setUndo({ text: `${p.studio || p.name} → ${label}`, run: () => updateProspect(p.id, before) });
+    } catch (err) {
+      setActError(`No se pudo mover: ${friendlyError(err)}`);
+    }
+  };
+  // De la ruta de arriba a la columna del tablero
+  const stepToColumn = (step: string | null): BoardColumn | null => {
+    if (!step) return null;
+    if (step === 'primer') return 'esperando';
+    if (['respondio', 'pregunta', 'difusion', 'empatia', 'speech'].includes(step)) return 'conversando';
+    if (['link', 'auditoria', 'video'].includes(step)) return 'auditoria';
+    if (['llamada', 'propuesta', 'cliente'].includes(step)) return 'llamada';
+    return null;
+  };
   const goal = settings.weeklyGoal || 0;
   const pulse = usePulse(list, events, today, settings);
 
@@ -242,10 +284,12 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           isEvening={hour >= settings.closeHour}
           settings={settings}
           today={today}
-          onAct={actSafe}
+          onSend={send}
+          onMove={moveTo}
+          onCall={setCallFor}
+          onDetail={setDetailFor}
           onBurst={() => setBurstOpen(true)}
           tomorrowCalls={callsOn(list, addDays(today, 1))}
-          renderDetail={(item) => <QueueCard item={item} settings={settings} onAct={actSafe} />}
           footer={
             <section className="card-swiss p-4">
               <AddMoreRow poolAvailable={pool.availableCount} addMore={more.addMore} busy={more.busy} message={more.message} />
@@ -253,7 +297,50 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           }
         />
       )}
-      {prospects !== null && tab === 'embudo' && <FunnelPanel prospects={list} today={today} settings={settings} onAct={actSafe} initialStep={funnelFrom} />}
+      {prospects !== null && tab === 'embudo' && (
+        <ProspectBoard
+          prospects={list.filter((p) => !p.doNotContact)}
+          settings={settings}
+          today={today}
+          onSend={send}
+          onMove={moveTo}
+          onCall={setCallFor}
+          onDetail={setDetailFor}
+          initialColumn={stepToColumn(funnelFrom)}
+        />
+      )}
+      {undo && <UndoToast text={undo.text} onUndo={() => { undo.run().catch(() => undefined); setUndo(null); }} onDone={() => setUndo(null)} />}
+      {callFor && (
+        <Sheet onClose={() => setCallFor(null)} label={`Llamada con ${callFor.studio || callFor.name}`}>
+          <div className="p-4">
+            <CallScheduler prospect={callFor} onAct={(p, a, n) => send(p, a, n)} onClose={() => setCallFor(null)} />
+          </div>
+        </Sheet>
+      )}
+      {detailFor && (() => {
+        const live = list.find((x) => x.id === detailFor.id) || detailFor;
+        const kindGuess: QueueItem['kind'] =
+          live.stage === 'nuevo' ? 'primer' : live.stage === 'respondio' ? 'responder' : live.stage === 'auditoria_completada' ? 'video' : live.stage === 'llamada' ? (live.proposalSentAt ? 'propuesta' : live.callDate === today ? 'llamada_hoy' : 'llamada') : 'seguimiento';
+        const item = queue.items.find((i) => i.prospect.id === live.id) || { prospect: live, kind: kindGuess, overdueDays: 0, suggestDiscard: false, hot: isHot(live) };
+        return (
+          <Sheet onClose={() => setDetailFor(null)} label={`Detalle de ${live.studio || live.name}`}>
+            <div className="p-3 sm:p-4 space-y-3">
+              <ul>
+                <QueueCard item={{ ...item, prospect: live }} settings={settings} onAct={actSafe} />
+              </ul>
+              <label className="block space-y-1 px-1">
+                <span className="text-xs font-semibold text-[var(--text-secondary)]">Notas</span>
+                <textarea
+                  defaultValue={live.notes || ''}
+                  rows={2}
+                  onBlur={(e) => e.target.value !== (live.notes || '') && updateProspect(live.id, { notes: e.target.value })}
+                  className={`${input} resize-none`}
+                />
+              </label>
+            </div>
+          </Sheet>
+        );
+      })()}
       {prospects !== null && tab === 'prospectos' && (
         <ProspectList prospects={list} today={today} settings={settings} onAct={actSafe} onAddProject={onAddProject} />
       )}
@@ -1704,106 +1791,3 @@ const TURN_STYLE: Record<Turn, string> = {
 
 const TurnBadge: React.FC<{ info: { turn: Turn; label: string } }> = ({ info }) =>
   info.turn === 'cerrado' ? null : <span className={`inline-block mt-0.5 mb-0.5 px-2 py-0.5 rounded-full text-[11px] font-medium ${TURN_STYLE[info.turn]}`}>{info.label}</span>;
-
-// ======================= EMBUDO =======================
-
-/**
- * Cada paso del camino (del primer mensaje a cliente) separado en:
- * te toca a vos / esperando su respuesta / sin respuesta. Arriba, cuántos llegaron a cada paso.
- */
-const FunnelPanel: React.FC<{
-  prospects: Prospect[];
-  today: string;
-  settings: ProspectingSettings;
-  onAct: (p: Prospect, a: ProspectAction, n?: string) => void;
-  initialStep?: string | null;
-}> = ({ prospects, today, settings, onAct, initialStep }) => {
-  const [openStep, setOpenStep] = useState<string | null>(initialStep || null);
-  useEffect(() => {
-    if (!initialStep) return;
-    setOpenStep(initialStep);
-    requestAnimationFrame(() => document.getElementById(`paso-${initialStep}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-  }, [initialStep]);
-  const order = FUNNEL_STEPS.map((s) => s.id) as string[];
-  const withStep = prospects.map((p) => ({ p, step: funnelStepOf(p), t: turnOf(p, today, settings) })).filter((x) => x.step);
-  const reached = (i: number) => withStep.filter((x) => order.indexOf(x.step as string) >= i).length;
-  const first = reached(0) || 1;
-
-  return (
-    <div className="space-y-3">
-      <p className="text-xs text-[var(--text-secondary)]">
-        Dónde está cada conversación. La barra muestra cuántos llegaron hasta ese paso (de {reached(0)} a los que les escribiste). Tocá un paso para ver quiénes son.
-      </p>
-      <ul className="space-y-2">
-        {FUNNEL_STEPS.map((s, i) => {
-          const here = withStep.filter((x) => x.step === s.id);
-          const mine = here.filter((x) => x.t.turn === 'mio');
-          const waiting = here.filter((x) => x.t.turn === 'suyo' || x.t.turn === 'llamada');
-          const lost = here.filter((x) => x.t.turn === 'perdido');
-          const n = reached(i);
-          const open = openStep === s.id;
-          return (
-            <li key={s.id} id={`paso-${s.id}`} className={`${card} ${open ? 'border-[var(--border-strong)]' : ''}`}>
-              <button type="button" onClick={() => setOpenStep(open ? null : s.id)} className="w-full p-3 text-left space-y-1.5" aria-expanded={open}>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] tabular-nums text-[var(--text-tertiary)] w-5">{i + 1}</span>
-                  <span className="flex-1 text-sm font-semibold text-[var(--text-primary)]">{s.label}</span>
-                  {mine.length > 0 && <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/15 text-emerald-400">Te toca {mine.length}</span>}
-                  {waiting.length > 0 && <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--bg-surface-muted)] text-[var(--text-secondary)]">Esperando {waiting.length}</span>}
-                  {lost.length > 0 && <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/15 text-amber-400">Sin resp. {lost.length}</span>}
-                </div>
-                <div className="flex items-center gap-2 pl-7">
-                  <span className="flex-1 h-1.5 rounded-full bg-[var(--bg-surface-muted)] overflow-hidden">
-                    <span className="block h-full bg-[var(--accent)]" style={{ width: `${Math.round((n / first) * 100)}%` }} />
-                  </span>
-                  <span className="text-[11px] tabular-nums text-[var(--text-tertiary)] w-16 text-right">
-                    {n} · {Math.round((n / first) * 100)}%
-                  </span>
-                </div>
-              </button>
-              {open && (
-                <div className="px-3 pb-3 space-y-3 border-t border-[var(--border-subtle)] pt-2">
-                  {here.length === 0 && <p className="text-xs text-[var(--text-tertiary)]">Nadie en este paso ahora.</p>}
-                  {(
-                    [
-                      ['Te toca', mine],
-                      ['Esperando su respuesta', waiting],
-                      ['Sin respuesta', lost],
-                    ] as [string, typeof here][]
-                  ).map(([title, group]) =>
-                    group.length ? (
-                      <div key={title} className="space-y-1.5">
-                        <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">{title}</p>
-                        <ul className="space-y-1.5">
-                          {group
-                            .sort((a, b) => b.t.days - a.t.days)
-                            .map(({ p, t }) => (
-                              <li key={p.id} className="flex flex-wrap items-center gap-2 p-2 rounded-[var(--radius-control)] bg-[var(--bg-app)]">
-                                <span className="flex-1 min-w-[10rem]">
-                                  <span className="block text-sm text-[var(--text-primary)] truncate">{p.studio || p.name}</span>
-                                  <span className="block text-[11px] text-[var(--text-tertiary)]">
-                                    {t.label}
-                                    {p.lastReplyNote && t.turn === 'mio' ? ` · «${p.lastReplyNote.slice(0, 60)}»` : ''}
-                                  </span>
-                                </span>
-                                {t.turn !== 'mio' && <ReplyButton prospect={p} onAct={onAct} />}
-                                {p.whatsapp && (
-                                  <a href={formatWhatsAppUrl(p.whatsapp)} target="_blank" rel="noopener noreferrer" className={`${btnGhost} py-1.5 text-xs`}>
-                                    <MessageCircle className="w-3.5 h-3.5 text-emerald-400" /> WhatsApp
-                                  </a>
-                                )}
-                              </li>
-                            ))}
-                        </ul>
-                      </div>
-                    ) : null
-                  )}
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-};

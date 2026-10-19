@@ -1,4 +1,4 @@
-import { arrayUnion, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { arrayRemove, arrayUnion, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
 import { Prospect, ProspectEvent, ProspectingSettings } from '../types';
@@ -80,4 +80,57 @@ export async function recordProspectAction(
   }
   await batch.commit();
   return updates;
+}
+
+/**
+ * Registra la acción y devuelve cómo deshacerla (para el "Deshacer" de 5 segundos después de
+ * "Enviar por WhatsApp"): vuelve los campos a como estaban, borra el evento y la línea del historial.
+ */
+export async function recordWithUndo(
+  p: Prospect,
+  action: ProspectAction,
+  today: string,
+  settings: ProspectingSettings,
+  note?: string
+): Promise<() => Promise<void>> {
+  const { updates, event } = applyAction(p, action, today, settings, note);
+  const nowIso = new Date().toISOString();
+  const batch = writeBatch(db);
+  const payload: Record<string, any> = { updatedAt: nowIso };
+  Object.entries(updates).forEach(([k, v]) => (payload[k] = v === undefined ? null : v));
+  const sanitized: Record<string, any> = deepSanitize(payload);
+  const entry = logEntryFor(action, note);
+  const logItem = entry ? { at: nowIso, ...entry } : null;
+  if (logItem) sanitized.log = arrayUnion(logItem);
+  batch.set(doc(db, 'prospects', p.id), sanitized, { merge: true });
+  let eventId: string | null = null;
+  if (event) {
+    eventId = `pev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+    batch.set(doc(db, 'prospect_events', eventId), deepSanitize({ ...event, id: eventId, createdAt: nowIso }));
+  }
+  await batch.commit();
+
+  // Lo de antes, para volver atrás
+  const before: Record<string, any> = {};
+  Object.keys(updates).forEach((k) => {
+    const v = (p as any)[k];
+    before[k] = v === undefined ? null : v;
+  });
+  return async () => {
+    const undo = writeBatch(db);
+    const restore: Record<string, any> = { ...before, updatedAt: new Date().toISOString() };
+    if (logItem) restore.log = arrayRemove(logItem);
+    undo.set(doc(db, 'prospects', p.id), restore, { merge: true });
+    if (eventId) undo.delete(doc(db, 'prospect_events', eventId));
+    await undo.commit();
+  };
+}
+
+/** Mover a mano de columna (para corregir). Queda anotado en el historial. */
+export async function moveProspect(p: Prospect, updates: Partial<Prospect>, label: string): Promise<void> {
+  const payload: Record<string, any> = { updatedAt: new Date().toISOString() };
+  Object.entries(updates).forEach(([k, v]) => (payload[k] = v === undefined ? null : v));
+  const sanitized: Record<string, any> = deepSanitize(payload);
+  sanitized.log = arrayUnion({ at: new Date().toISOString(), dir: 'nota', text: `Lo moviste a ${label}` });
+  await setDoc(doc(db, 'prospects', p.id), sanitized, { merge: true });
 }
