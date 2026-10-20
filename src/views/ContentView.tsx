@@ -106,7 +106,14 @@ export const ContentView: React.FC = () => {
       /* sin almacenamiento */
     }
   };
-  const [openId, setOpenId] = useState<string | null>(null);
+  // Desde Hoy/Inicio se puede abrir una pieza directo: /contenido?pieza=<id>
+  const [openId, setOpenId] = useState<string | null>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('pieza');
+    } catch {
+      return null;
+    }
+  });
   const [viewer, setViewer] = useState<{ id: string; index: number } | null>(null);
   const [importing, setImporting] = useState(false);
   const thisWeekRef = useRef<HTMLDivElement | null>(null);

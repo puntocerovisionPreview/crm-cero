@@ -48,6 +48,7 @@ import {
 import { TodayFocusBanner } from '../components/TodayFocusBanner';
 import { DailyRoutineCard } from '../components/DailyRoutineCard';
 import { ProspectingTodayCard } from '../components/ProspectingTodayCard';
+import { ContentTodayCard } from '../components/ContentTodayCard';
 import { WeeklyGoalsWidget } from '../components/WeeklyGoalsWidget';
 import { ItemDetailModal } from '../components/ItemDetailModal';
 import { MorningBriefingCard } from '../components/MorningBriefingCard';
@@ -659,6 +660,7 @@ export const AgendaView: React.FC<Props> = ({
               onOpenFocus={() => onNavigate && onNavigate('/foco')}
             />
             <DailyRoutineCard />
+            <ContentTodayCard onNavigate={onNavigate} />
             <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
 
             {/* Solo si hay atrasadas: traerlas a hoy */}
@@ -1133,6 +1135,7 @@ export const AgendaView: React.FC<Props> = ({
                   onOpenFocus={() => onNavigate && onNavigate('/foco')}
                 />
                 <DailyRoutineCard />
+                <ContentTodayCard onNavigate={onNavigate} />
                 <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start w-full">
@@ -1771,6 +1774,7 @@ export const AgendaView: React.FC<Props> = ({
                   onOpenFocus={() => onNavigate && onNavigate('/foco')}
                 />
                 <DailyRoutineCard />
+                <ContentTodayCard onNavigate={onNavigate} />
                 <ProspectingTodayCard onOpen={() => onNavigate?.('/prospeccion')} />
 
                 {/* Banner de acceso a la semana completa */}

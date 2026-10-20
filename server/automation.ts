@@ -21,6 +21,7 @@ import { registerDocumensoRoutes } from './documenso';
 import { recordError, recordJobRun, registerHealthRoutes, runBackupIfDue } from './health';
 import { documentFollowups } from './contractsServer';
 import { eveningCallsReminder } from './prospectReminders';
+import { contentReminders } from './contentReminders';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 
 /**
@@ -388,6 +389,16 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
         if (!eve.startsWith('todavía')) await recordJobRun(db, 'llamadas-manana', true, eve);
       } catch (err) {
         await recordJobRun(db, 'llamadas-manana', false, (err as Error).message);
+      }
+      // Contenido: desde las 8 "hoy se publica", desde las 18 "mañana toca"
+      try {
+        const c = await contentReminders(db, async (title, body) => {
+          await notifyAll(db, title, body, '/contenido', 'contenido');
+        });
+        results.push({ job: 'contenido', detail: c });
+        if (!c.startsWith('todavía') && c !== 'ya avisado') await recordJobRun(db, 'contenido', true, c);
+      } catch (err) {
+        await recordJobRun(db, 'contenido', false, (err as Error).message);
       }
     }
     res.json({ ok: true, results });

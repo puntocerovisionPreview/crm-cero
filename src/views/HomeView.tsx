@@ -16,6 +16,7 @@ import { coldClients } from '../utils/coldClients';
 import { hapticFeedback } from '../utils/haptics';
 import { DayRing, NextCallChip, RouteLine, usePulse } from '../components/ProspectingVisuals';
 import { useContent } from '../content/useContent';
+import { ContentTodayCard } from '../components/ContentTodayCard';
 import { addDays } from '../utils/dates';
 import { isLate, nextToPublish, statusStage } from '../content/model';
 
@@ -228,6 +229,9 @@ export const HomeView: React.FC<Props> = ({
 
       {/* Tus 3 del día */}
       <Top3Card tasks={tasks} today={today} onToggleTask={onToggleTask} onOpenTask={id => go(`/agenda/tarea/${id}`)} />
+
+      {/* Contenido: hoy se publica / mañana toca */}
+      <ContentTodayCard onNavigate={go} />
 
       {/* Sectores principales */}
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-label="Sectores principales">
