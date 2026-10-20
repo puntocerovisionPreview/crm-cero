@@ -2,7 +2,7 @@ import { collection, doc, getDocs, onSnapshot, setDoc, writeBatch } from 'fireba
 import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
 import { putAsset } from './assets';
-import { ContentPiece, ImportAsset, mergeImported, planImport } from './model';
+import { ContentPiece, ImportAsset, findCalendarJson, mergeImported, planImport } from './model';
 
 // Firestore del contenido: content_pieces (una pieza por documento)
 
@@ -75,23 +75,29 @@ export interface ImportResult {
   failed: string[];
 }
 
-export async function importCalendar(jsonText: string, zip: File | null, onProgress: (p: ImportProgress) => void): Promise<ImportResult> {
-  let data: any;
-  try {
-    data = JSON.parse(jsonText);
-  } catch {
-    throw new Error('El archivo .json no se pudo leer. ¿Es el calendario exportado?');
-  }
-
+export async function importCalendar(jsonText: string | null, zip: File | null, onProgress: (p: ImportProgress) => void): Promise<ImportResult> {
   onProgress({ done: 0, total: 1, label: zip ? 'Abriendo el .zip…' : 'Leyendo el calendario…' });
   let files: Record<string, Uint8Array> = {};
   if (zip) {
     const { unzipSync } = await import('fflate');
-    // Solo imágenes y PDF; se ignoran carpetas del sistema (__MACOSX, .DS_Store)
+    // Imágenes, PDF y el .json; se ignoran carpetas del sistema (__MACOSX, .DS_Store)
     files = unzipSync(new Uint8Array(await zip.arrayBuffer()), {
-      filter: (f) => !f.name.includes('__MACOSX') && /\.(png|jpe?g|webp|pdf)$/i.test(f.name),
+      filter: (f) => !f.name.includes('__MACOSX') && /\.(png|jpe?g|webp|pdf|json)$/i.test(f.name),
     });
   }
+  // Todo en un solo .zip: el calendario viene adentro
+  if (!jsonText) {
+    const inside = findCalendarJson(Object.keys(files));
+    if (!inside) throw new Error('No encontré el calendario (.json) dentro del .zip. Elegilo aparte o agregalo al .zip.');
+    jsonText = new TextDecoder().decode(files[inside]);
+  }
+  let data: any;
+  try {
+    data = JSON.parse(jsonText);
+  } catch {
+    throw new Error('El calendario (.json) no se pudo leer. Revisá que sea el archivo que armó Claude con la plantilla.');
+  }
+  Object.keys(files).forEach((k) => /\.json$/i.test(k) && delete files[k]);
   const zipPaths = new Set(Object.keys(files));
   const first = planImport(data, zipPaths);
   if (first.pieces.length === 0) throw new Error('No encontré piezas con fecha en el calendario.');

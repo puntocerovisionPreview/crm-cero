@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { groupByWeek, isLate, mergeImported, nextToPublish, planImport, resolveZipPath, statusStage, supportOf } from '../src/content/model';
+import { findCalendarJson, groupByWeek, isLate, mergeImported, monthGrid, nextToPublish, planImport, resolveZipPath, shiftMonth, slidesInFolder, statusStage, supportOf } from '../src/content/model';
+import { CLAUDE_INSTRUCTIONS, EXAMPLE_CALENDAR } from '../src/content/template';
 import { assetDocId } from '../src/content/assets';
 
 const calendar = {
@@ -159,5 +160,73 @@ describe('contenido: archivos en Firestore', () => {
   it('cada ruta da un id de documento válido y estable', () => {
     expect(assetDocId('contenido/2026-10-26-bingo/01-1080.jpg')).toBe('contenido__2026-10-26-bingo__01-1080.jpg');
     expect(assetDocId('contenido/recursos/bingo.pdf')).toBe('contenido__recursos__bingo.pdf');
+  });
+});
+
+describe('contenido: plantilla simple (carpeta por pieza, todo en un .zip)', () => {
+  const simple = {
+    titulo: 'Noviembre 2026',
+    piezas: [
+      { iso: '2026-11-03', slug: '2026-11-03-bingo', soporte: 'carrusel', titulo: 'Bingo', estado: 'idea' },
+      { iso: '2026-11-05', slug: '2026-11-05-lista', soporte: 'carrusel', titulo: 'Lista', slides: ['c/2026-11-05-lista/02.png', 'c/2026-11-05-lista/01.png'] },
+    ],
+  };
+  const files = new Set([
+    'calendario.json',
+    'c/2026-11-03-bingo/10.png',
+    'c/2026-11-03-bingo/02.png',
+    'c/2026-11-03-bingo/01.png',
+    'm/2026-11-03-bingo/01.jpg',
+    'c/2026-11-05-lista/01.png',
+    'c/2026-11-05-lista/02.png',
+  ]);
+
+  it('sin "slides", toma las imágenes de c/<slug>/ en orden numérico', () => {
+    expect(slidesInFolder('2026-11-03-bingo', files).map((s) => s.full)).toEqual([
+      'c/2026-11-03-bingo/01.png',
+      'c/2026-11-03-bingo/02.png',
+      'c/2026-11-03-bingo/10.png',
+    ]);
+    const plan = planImport(simple, files);
+    expect(plan.pieces[0].slides).toHaveLength(3);
+  });
+
+  it('usa la miniatura de m/ si está, y si no la genera de la slide', () => {
+    const plan = planImport(simple, files);
+    const thumbs = plan.assets.filter((a) => a.kind === 'thumb' && a.storagePath.includes('bingo'));
+    expect(thumbs.map((t) => t.zipPath)).toEqual(['m/2026-11-03-bingo/01.jpg', 'c/2026-11-03-bingo/02.png', 'c/2026-11-03-bingo/10.png']);
+  });
+
+  it('respeta el orden si la pieza lista las slides como texto', () => {
+    const plan = planImport(simple, files, (p) => p);
+    expect(plan.pieces[1].slides).toHaveLength(2);
+    expect(plan.assets.find((a) => a.storagePath === 'contenido/2026-11-05-lista/01-1080.jpg')?.zipPath).toBe('c/2026-11-05-lista/02.png');
+  });
+
+  it('encuentra el calendario dentro del zip', () => {
+    expect(findCalendarJson(['c/x/01.png', 'otra/cosa.json', 'calendario.json'])).toBe('calendario.json');
+    expect(findCalendarJson(['carpeta/datos.json'])).toBe('carpeta/datos.json');
+    expect(findCalendarJson(['c/x/01.png'])).toBeNull();
+  });
+
+  it('la plantilla para Claude se importa tal cual', () => {
+    const plan = planImport(EXAMPLE_CALENDAR, new Set());
+    expect(plan.pieces.map((p) => p.support)).toEqual(['carrusel', 'reel']);
+    expect(plan.pieces[1].script?.text).toContain('GUION');
+    expect(CLAUDE_INSTRUCTIONS).toContain('c/<slug>/01.png');
+  });
+});
+
+describe('contenido: calendario mensual', () => {
+  it('arma semanas completas de lunes a domingo', () => {
+    const g = monthGrid('2026-11'); // 1/11/2026 es domingo
+    expect(g[0]).toBe('2026-10-26');
+    expect(g[g.length - 1]).toBe('2026-12-06');
+    expect(g.length % 7).toBe(0);
+  });
+
+  it('pasa de mes y de año', () => {
+    expect(shiftMonth('2026-12', 1)).toBe('2027-01');
+    expect(shiftMonth('2026-01', -1)).toBe('2025-12');
   });
 });

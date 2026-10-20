@@ -31,7 +31,9 @@ import {
 } from '../content/model';
 import { ImportProgress, ImportResult, importCalendar, setContentStatus } from '../content/store';
 import { useContent } from '../content/useContent';
-import { downloadAsset, openAsset, preloadAsset, useAssetUrl } from '../content/assets';
+import { downloadAsset, preloadAsset } from '../content/assets';
+import { AssetImg } from '../content/AssetImg';
+import { ContentCalendar } from '../components/ContentCalendar';
 import { startOfWeekMonday, todayLocal } from '../utils/dates';
 
 /**
@@ -79,11 +81,9 @@ function useCopy() {
   return { copied, copy };
 }
 
-/** Imagen guardada en Firestore (o una dirección común) */
-const AssetImg: React.FC<{ src: string; alt?: string; className?: string }> = ({ src, alt = '', className }) => {
-  const url = useAssetUrl(src);
-  return url ? <img src={url} alt={alt} className={className} /> : <span className={`block animate-pulse bg-white/5 ${className || ''}`} aria-hidden />;
-};
+/** "Cartón del bingo para imprimir" → "carton-del-bingo-para-imprimir.pdf" */
+const pdfName = (s: string) =>
+  `${s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'recurso'}.pdf`;
 
 // ---------------- Pantalla ----------------
 
@@ -91,6 +91,21 @@ export const ContentView: React.FC = () => {
   const { pieces, error } = useContent();
   const today = todayLocal();
   const [filter, setFilter] = useState<Filter>('todo');
+  const [mode, setModeState] = useState<'calendario' | 'semanas'>(() => {
+    try {
+      return localStorage.getItem('contenido-vista') === 'semanas' ? 'semanas' : 'calendario';
+    } catch {
+      return 'calendario';
+    }
+  });
+  const setMode = (m: 'calendario' | 'semanas') => {
+    setModeState(m);
+    try {
+      localStorage.setItem('contenido-vista', m);
+    } catch {
+      /* sin almacenamiento */
+    }
+  };
   const [openId, setOpenId] = useState<string | null>(null);
   const [viewer, setViewer] = useState<{ id: string; index: number } | null>(null);
   const [importing, setImporting] = useState(false);
@@ -112,10 +127,10 @@ export const ContentView: React.FC = () => {
   // Al entrar, la semana actual a la vista
   const scrolled = useRef(false);
   useEffect(() => {
-    if (scrolled.current || !pieces?.length) return;
+    if (scrolled.current || !pieces?.length || mode !== 'semanas') return;
     scrolled.current = true;
     requestAnimationFrame(() => thisWeekRef.current?.scrollIntoView({ block: 'start' }));
-  }, [pieces]);
+  }, [pieces, mode]);
 
   if (pieces === null && !error) {
     return (
@@ -175,8 +190,29 @@ export const ContentView: React.FC = () => {
             </div>
           )}
 
-          {/* Filtros */}
+          {/* Vista y filtros */}
           <div className="flex flex-wrap items-center gap-2">
+            <div className="flex gap-1 p-1 rounded-full bg-[var(--bg-surface-muted)]" role="tablist" aria-label="Vista">
+              {(
+                [
+                  ['calendario', 'Calendario'],
+                  ['semanas', 'Semanas'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={mode === id}
+                  onClick={() => setMode(id)}
+                  className={`px-3 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap transition ${
+                    mode === id ? 'bg-[var(--accent)] text-[var(--on-accent)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <div className="flex gap-1 p-1 rounded-full bg-[var(--bg-surface-muted)] overflow-x-auto max-w-full">
               {FILTERS.map((f) => {
                 const n = f.id === 'todo' ? all.length : all.filter((p) => p.support === f.id).length;
@@ -196,17 +232,21 @@ export const ContentView: React.FC = () => {
               })}
             </div>
             <div className="flex gap-2 ml-auto">
-              <button type="button" className={btnGhost} onClick={() => thisWeekRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
-                Ir a hoy
-              </button>
+              {mode === 'semanas' && (
+                <button type="button" className={btnGhost} onClick={() => thisWeekRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>
+                  Ir a hoy
+                </button>
+              )}
               <button type="button" className={btnGhost} onClick={() => setImporting(true)}>
                 <Upload className="w-4 h-4" /> Importar
               </button>
             </div>
           </div>
 
+          {mode === 'calendario' && <ContentCalendar pieces={shown} today={today} onOpen={setOpenId} />}
+
           {/* Semanas */}
-          {weeks.map((w) => {
+          {mode === 'semanas' && weeks.map((w) => {
             const current = w.start === thisWeek;
             return (
               <section key={w.start} ref={w.start === anchorWeek ? thisWeekRef : undefined} className="scroll-mt-4 space-y-2">
@@ -226,7 +266,7 @@ export const ContentView: React.FC = () => {
               </section>
             );
           })}
-          {weeks.length === 0 && <p className="text-sm text-[var(--text-secondary)] px-1">No hay piezas de este tipo.</p>}
+          {mode === 'semanas' && weeks.length === 0 && <p className="text-sm text-[var(--text-secondary)] px-1">No hay piezas de este tipo.</p>}
         </>
       )}
 
@@ -442,7 +482,7 @@ const PieceSheet: React.FC<{ p: ContentPiece; today: string; onClose: () => void
                 <button
                   type="button"
                   key={r.word}
-                  onClick={() => openAsset(r.url)}
+                  onClick={() => downloadAsset(r.url, pdfName(r.name || r.word))}
                   className={`${card} w-full text-left p-3 flex items-center gap-3 hover:border-[var(--accent)] transition`}
                 >
                   <FileText className="w-5 h-5 text-[var(--accent)] shrink-0" aria-hidden />
@@ -450,7 +490,7 @@ const PieceSheet: React.FC<{ p: ContentPiece; today: string; onClose: () => void
                     <span className="block text-[12px] font-bold text-[var(--text-primary)]">Si comentan {r.word}</span>
                     <span className="block text-[12px] text-[var(--text-secondary)] truncate">{r.name}</span>
                   </span>
-                  <span className="text-[12px] font-semibold text-[var(--accent)]">Abrir PDF</span>
+                  <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--accent)] shrink-0"><Download className="w-3.5 h-3.5" /> Descargar PDF</span>
                 </button>
                 ) : (
                   <div key={r.word} className={`${card} p-3 flex items-center gap-3`}>
@@ -597,6 +637,36 @@ const EmptyState: React.FC<{ onImport: () => void }> = ({ onImport }) => (
 
 // ---------------- Importar ----------------
 
+/** La plantilla para que Claude arme los archivos */
+const TemplateBox: React.FC = () => {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-3 space-y-2">
+      <p className="text-[13px] text-[var(--text-primary)]">
+        <b>¿Calendario nuevo?</b> Pasale a Claude estas instrucciones y te devuelve un .zip listo para importar: cada carrusel en su carpeta, con las slides numeradas en orden.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={`${btnGhost} py-1.5 text-xs`}
+          onClick={async () => {
+            const { copyInstructions } = await import('../content/template');
+            if (await copyInstructions()) {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            }
+          }}
+        >
+          {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />} {copied ? 'Copiadas' : 'Copiar instrucciones'}
+        </button>
+        <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={async () => (await import('../content/template')).downloadTemplate()}>
+          <Download className="w-3.5 h-3.5" /> Descargar plantilla
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const ImportPanel: React.FC<{ onClose: () => void; hasData: boolean }> = ({ onClose, hasData }) => {
   const [json, setJson] = useState<File | null>(null);
   const [zip, setZip] = useState<File | null>(null);
@@ -606,12 +676,12 @@ const ImportPanel: React.FC<{ onClose: () => void; hasData: boolean }> = ({ onCl
   const running = !!progress && !result && !err;
 
   const start = async () => {
-    if (!json) return setErr('Elegí el archivo .json del calendario.');
+    if (!json && !zip) return setErr('Elegí el .zip del calendario (o el .json solo, para importar únicamente los textos).');
     setErr(null);
     setResult(null);
     setProgress({ done: 0, total: 1, label: 'Empezando…' });
     try {
-      const text = await json.text();
+      const text = json ? await json.text() : null;
       setResult(await importCalendar(text, zip, setProgress));
     } catch (e) {
       setErr((e as Error).message);
@@ -635,20 +705,23 @@ const ImportPanel: React.FC<{ onClose: () => void; hasData: boolean }> = ({ onCl
 
         {!result && (
           <>
+            <TemplateBox />
             <p className="text-[13px] text-[var(--text-secondary)]">
-              El <b>.json</b> trae las piezas (fechas, captions, guiones). El <b>.zip</b> trae las imágenes y los PDF, en carpetas <code>c/</code> (slides en alta),{' '}
-              <code>m/</code> (miniaturas) y <code>r/</code> (recursos). Sin el .zip se importan solo los textos.
-              {hasData && ' Las piezas que ya tenés se actualizan; el estado que cambiaste acá se respeta.'}
+              Subí el <b>.zip</b> que te armó Claude: adentro van el <code>calendario.json</code>, las slides en <code>c/&lt;pieza&gt;/01.png, 02.png…</code> y los PDF en{' '}
+              <code>r/</code>.{hasData && ' Las piezas que ya tenés se actualizan; el estado que cambiaste acá se respeta.'}
             </p>
             <label className="block space-y-1">
-              <span className="text-[13px] font-semibold text-[var(--text-primary)]">Calendario (.json)</span>
-              <input type="file" accept=".json,application/json" disabled={running} onChange={(e) => setJson(e.target.files?.[0] || null)} className={fileBox} />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-[13px] font-semibold text-[var(--text-primary)]">Imágenes y PDF (.zip, opcional)</span>
+              <span className="text-[13px] font-semibold text-[var(--text-primary)]">Calendario completo (.zip)</span>
               <input type="file" accept=".zip,application/zip" disabled={running} onChange={(e) => setZip(e.target.files?.[0] || null)} className={fileBox} />
               {zip && <span className="block text-[12px] text-[var(--text-tertiary)]">{(zip.size / 1024 / 1024).toFixed(0)} MB</span>}
             </label>
+            <details className="text-[13px]">
+              <summary className="cursor-pointer text-[var(--text-secondary)]">¿El .json vino aparte, o querés importar solo los textos?</summary>
+              <label className="block space-y-1 mt-2">
+                <span className="text-[13px] font-semibold text-[var(--text-primary)]">Calendario (.json)</span>
+                <input type="file" accept=".json,application/json" disabled={running} onChange={(e) => setJson(e.target.files?.[0] || null)} className={fileBox} />
+              </label>
+            </details>
           </>
         )}
 
@@ -693,7 +766,7 @@ const ImportPanel: React.FC<{ onClose: () => void; hasData: boolean }> = ({ onCl
               Ver mi contenido
             </button>
           ) : (
-            <button type="button" className={btnPrimary} disabled={running || !json} onClick={start}>
+            <button type="button" className={btnPrimary} disabled={running || (!json && !zip)} onClick={start}>
               {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />} {running ? 'Importando…' : 'Importar'}
             </button>
           )}

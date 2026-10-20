@@ -93,15 +93,3 @@ export async function downloadAsset(ref: string, name: string) {
     if (!isAssetRef(ref)) window.open(ref, '_blank', 'noopener');
   }
 }
-
-/** PDF: se abre en otra pestaña (los navegadores no abren data URLs directo) */
-export async function openAsset(ref: string) {
-  const w = window.open('', '_blank');
-  try {
-    const url = URL.createObjectURL(await toBlob(ref));
-    if (w) w.location.href = url;
-    else window.location.href = url;
-  } catch {
-    w?.close();
-  }
-}

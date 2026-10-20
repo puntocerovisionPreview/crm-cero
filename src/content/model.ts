@@ -215,6 +215,26 @@ export function resolveZipPath(path: string, zipPaths: Set<string>): string | nu
   return null;
 }
 
+const IMG = /\.(png|jpe?g|webp)$/i;
+
+/** Las imágenes de c/<carpeta>/ en orden de nombre (01.png, 02.png…), con su miniatura de m/<carpeta>/ si está */
+export function slidesInFolder(folder: string, zipPaths: Set<string>): { full: string | null; mini: string | null; px?: string }[] {
+  if (!folder) return [];
+  const inDir = (dir: string) =>
+    [...zipPaths].filter((p) => IMG.test(p) && (p.startsWith(`${dir}/${folder}/`) || p.includes(`/${dir}/${folder}/`)));
+  const minis = inDir('m');
+  const baseName = (p: string) => p.split('/').pop()!.replace(IMG, '');
+  return inDir('c')
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    .map((full) => ({ full, mini: minis.find((m) => baseName(m) === baseName(full)) || null }));
+}
+
+/** El .json del calendario dentro del zip (si vino todo junto) */
+export function findCalendarJson(paths: string[]): string | null {
+  const jsons = paths.filter((p) => /\.json$/i.test(p) && !p.includes('__MACOSX'));
+  return jsons.find((p) => /calendario/i.test(p.split('/').pop()!)) || jsons.sort((a, b) => a.split('/').length - b.split('/').length)[0] || null;
+}
+
 /**
  * Convierte el JSON del calendario en piezas + la lista de archivos a subir.
  * `zipPaths`: lo que trae el .zip (si un archivo falta, la pieza se importa igual sin él).
@@ -245,23 +265,26 @@ export function planImport(data: any, zipPaths: Set<string>, url: (storagePath: 
     while (usedIds.has(id)) id = `${id}-${num}`;
     usedIds.add(id);
 
+    // Slides: las que lista la pieza, o (si no lista ninguna) las que estén en c/<slug>/ del zip, en orden
+    const listed: { full: string | null; mini: string | null; px?: string }[] = (Array.isArray(raw?.slides) ? raw.slides : []).map((s: any) => ({
+      full: resolveZipPath(str(typeof s === 'string' ? s : s?.alta || s?.full), zipPaths),
+      mini: typeof s === 'string' ? null : resolveZipPath(str(s?.mini || s?.thumb), zipPaths),
+      px: typeof s === 'string' ? undefined : str(s?.px) || undefined,
+    }));
+    const folder = pick(raw, 'slug') || id;
+    const found = listed.length ? listed : slidesInFolder(folder, zipPaths);
+
     const slides: ContentSlide[] = [];
-    (Array.isArray(raw?.slides) ? raw.slides : []).forEach((s: any, j: number) => {
+    found.forEach(({ full, mini, px }, j) => {
       const nn = String(j + 1).padStart(2, '0');
-      const full = resolveZipPath(str(s?.alta || s?.full), zipPaths);
-      const mini = resolveZipPath(str(s?.mini || s?.thumb), zipPaths);
       if (!full && !mini) return;
       // Se guarda a 1080 px de ancho (1080×1350 en 4:5, lo que usa Instagram) y una miniatura
       const base = `contenido/${id}/${nn}`;
       if (full) add({ zipPath: full, storagePath: `${base}-1080.jpg`, kind: 'display', from: full });
-      if (mini) add({ zipPath: mini, storagePath: `${base}-mini.jpg`, kind: 'thumb' });
+      // Sin miniatura en el zip: se genera achicando la slide
+      add({ zipPath: (mini || full)!, storagePath: `${base}-mini.jpg`, kind: 'thumb' });
       const display = full ? url(`${base}-1080.jpg`) : url(`${base}-mini.jpg`);
-      slides.push({
-        full: display,
-        display,
-        thumb: mini ? url(`${base}-mini.jpg`) : display,
-        px: str(s?.px) || undefined,
-      });
+      slides.push({ full: display, display, thumb: url(`${base}-mini.jpg`), px });
     });
 
     const resources: ContentResource[] = [];
@@ -353,4 +376,30 @@ export function sanitizeScriptHtml(html: string): string {
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ---------- Calendario mensual ----------
+
+/** Días de la grilla del mes ("2026-11"): de lunes a domingo, semanas completas */
+export function monthGrid(month: string): string[] {
+  const first = `${month}-01`;
+  const start = startOfWeekMonday(first);
+  const [y, m] = month.split('-').map(Number);
+  const last = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+  const end = addDays(startOfWeekMonday(last), 6);
+  const days: string[] = [];
+  for (let d = start; d <= end; d = addDays(d, 1)) days.push(d);
+  return days;
+}
+
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function monthLabel(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  const s = new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
