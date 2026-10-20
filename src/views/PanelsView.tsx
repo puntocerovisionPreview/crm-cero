@@ -29,6 +29,9 @@ import {
 } from '../panels/model';
 import { createPanel, deletePanel, ensurePafPanel, panelLink, renewPanelLink, savePanel, slideRefs, subscribePanels, uploadPanelSlides } from '../panels/store';
 import { isActivePafStudent, pafWithoutPanel } from '../panels/paf';
+import { WEB_STAGES, emptyWeb, stageIndex } from '../panels/web';
+import { PanelWebEditor } from '../components/PanelWebEditor';
+import { getServiceType } from '../types';
 import { deletePublicAssets } from '../content/assets';
 import { ImageDrop } from '../components/ImageDrop';
 import { AssetImg } from '../content/AssetImg';
@@ -164,6 +167,10 @@ export const PanelsView: React.FC<{ projects: Project[]; onUpdateProject: Update
                   {s.tasksOpen} {s.tasksOpen === 1 ? 'tarea pendiente' : 'tareas pendientes'}
                 </span>
                 {s.toApprove > 0 && <span className={`px-2 py-0.5 rounded-full border ${STATE_TONE.para_aprobar}`}>{s.toApprove} para aprobar</span>}
+                {p.web && (
+                  <span className="px-2 py-0.5 rounded-full bg-[var(--accent)]/15 text-[var(--accent)]">Web: {WEB_STAGES[stageIndex(p.web.stage)].label}</span>
+                )}
+                {s.webPending > 0 && <span className={`px-2 py-0.5 rounded-full border ${STATE_TONE.cambios}`}>{s.webPending} cambios web</span>}
                 {s.changes > 0 && <span className={`px-2 py-0.5 rounded-full border ${STATE_TONE.cambios}`}>{s.changes} con cambios</span>}
               </div>
               {p.lastClientAction && (
@@ -206,7 +213,17 @@ const NewPanelForm: React.FC<{
       const p =
         project && isActivePafStudent(project)
           ? await ensurePafPanel(project, undefined, setToken(project.id))
-          : await createPanel(finalName, project ? { projectId: project.id, phone: project.clientPhone } : {});
+          : await createPanel(
+              finalName,
+              project
+                ? {
+                    projectId: project.id,
+                    phone: project.clientPhone,
+                    // Cliente de desarrollo web: el panel arranca con su parte web
+                    ...(getServiceType(project.projectType) === 'web' ? { web: emptyWeb() } : {}),
+                  }
+                : {}
+            );
       onCreated(p.id);
     } finally {
       setBusy(false);
@@ -327,6 +344,14 @@ const PanelEditor: React.FC<{ panel: ClientPanel; projects: Project[]; onBack: (
           />
         </label>
       </section>
+
+      {panel.web ? (
+        <PanelWebEditor panel={panel} save={save} />
+      ) : (
+        <button type="button" className={`${btnGhost} w-full`} onClick={() => save({ ...panel, web: emptyWeb() })}>
+          <Plus className="w-4 h-4" /> Agregar seguimiento de desarrollo web
+        </button>
+      )}
 
       <GoalsSection panel={panel} save={save} thisWeek={thisWeek} />
       <TasksSection panel={panel} save={save} />
