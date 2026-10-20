@@ -349,6 +349,8 @@ export function mergeImported(incoming: ContentPiece, existing?: ContentPiece | 
   }
   if (out.slides.length === 0 && existing.slides?.length) out.slides = existing.slides;
   if (out.resources.length === 0 && existing.resources?.length) out.resources = existing.resources;
+  // Un recurso que esta vez vino sin PDF conserva el que ya estaba subido (misma palabra clave)
+  out.resources = out.resources.map((r) => (r.url ? r : { ...r, url: existing.resources?.find((x) => x.word === r.word && x.url)?.url || '' }));
   return out;
 }
 

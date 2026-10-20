@@ -118,6 +118,11 @@ describe('contenido: reimportar no borra nada', () => {
     expect(mergeImported(bingo, { ...bingo, status: 'idea' }).status).toBe(bingo.status);
   });
 
+  it('un recurso sin PDF en este .zip conserva el que ya estaba', () => {
+    const sinPdf = { ...bingo, slides: [], resources: [{ word: 'BINGO', name: 'Cartón', url: '' }] };
+    expect(mergeImported(sinPdf, bingo).resources.find((r) => r.word === 'BINGO')?.url).toBe(bingo.resources[0].url);
+  });
+
   it('importar solo el .json conserva las slides ya subidas', () => {
     const textOnly = { ...bingo, slides: [], resources: [] };
     const merged = mergeImported(textOnly, bingo);
