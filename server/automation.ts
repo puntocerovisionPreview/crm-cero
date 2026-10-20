@@ -21,7 +21,6 @@ import { registerDocumensoRoutes } from './documenso';
 import { recordError, recordJobRun, registerHealthRoutes, runBackupIfDue } from './health';
 import { documentFollowups } from './contractsServer';
 import { eveningCallsReminder } from './prospectReminders';
-import { registerContentRoutes } from './content';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 
 /**
@@ -393,9 +392,6 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
     }
     res.json({ ok: true, results });
   });
-
-  // Contenido: slides y PDF del calendario a Storage
-  registerContentRoutes(app, requireOwner, getAdminDb);
 
   // Estado de la app: integraciones, tareas, respaldo y errores (pantalla Ajustes → Estado)
   registerHealthRoutes(

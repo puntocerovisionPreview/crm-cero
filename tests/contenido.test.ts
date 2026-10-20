@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { groupByWeek, isLate, mergeImported, nextToPublish, planImport, resolveZipPath, statusStage, supportOf } from '../src/content/model';
-import { isSafeContentPath } from '../server/content';
+import { assetDocId } from '../src/content/assets';
 
 const calendar = {
   titulo: 'Calendario · del lun 19/10 al dom 22/11/2026',
@@ -66,16 +66,16 @@ describe('contenido: importar el calendario', () => {
     expect(bingo.id).toBe('2026-10-26-bingo-del-estudio');
     expect(bingo.slides).toHaveLength(2);
     expect(bingo.slides[0]).toEqual({
-      full: 'https://x/contenido/2026-10-26-bingo-del-estudio/01.png',
+      full: 'https://x/contenido/2026-10-26-bingo-del-estudio/01-1080.jpg',
       display: 'https://x/contenido/2026-10-26-bingo-del-estudio/01-1080.jpg',
       thumb: 'https://x/contenido/2026-10-26-bingo-del-estudio/01-mini.jpg',
       px: '2160×2700',
     });
     const kinds = plan.assets.map((a) => a.kind);
-    expect(kinds.filter((k) => k === 'full')).toHaveLength(2);
+    expect(kinds.filter((k) => k === 'full')).toHaveLength(0);
     expect(kinds.filter((k) => k === 'display')).toHaveLength(2);
     expect(kinds.filter((k) => k === 'pdf')).toHaveLength(1);
-    plan.assets.forEach((a) => expect(isSafeContentPath(a.storagePath)).toBe(true));
+    plan.assets.forEach((a) => expect(assetDocId(a.storagePath)).toMatch(/^[a-z0-9._-]+$/));
   });
 
   it('los recursos por palabra clave quedan con su PDF', () => {
@@ -155,11 +155,9 @@ describe('contenido: semanas y estados', () => {
   });
 });
 
-describe('contenido: rutas de Storage', () => {
-  it('solo deja subir dentro de contenido/', () => {
-    expect(isSafeContentPath('contenido/abc/01.png')).toBe(true);
-    expect(isSafeContentPath('contenido/../secretos.json')).toBe(false);
-    expect(isSafeContentPath('documentos-firmados/x.pdf')).toBe(false);
-    expect(isSafeContentPath('contenido/A/01.png')).toBe(false);
+describe('contenido: archivos en Firestore', () => {
+  it('cada ruta da un id de documento válido y estable', () => {
+    expect(assetDocId('contenido/2026-10-26-bingo/01-1080.jpg')).toBe('contenido__2026-10-26-bingo__01-1080.jpg');
+    expect(assetDocId('contenido/recursos/bingo.pdf')).toBe('contenido__recursos__bingo.pdf');
   });
 });

@@ -1,7 +1,7 @@
 import { collection, doc, getDocs, onSnapshot, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
-import { getAuthHeaders } from '../utils/authAccess';
+import { putAsset } from './assets';
 import { ContentPiece, ImportAsset, mergeImported, planImport } from './model';
 
 // Firestore del contenido: content_pieces (una pieza por documento)
@@ -37,8 +37,8 @@ export interface ImportProgress {
 const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', pdf: 'application/pdf' };
 const mimeOf = (path: string) => MIME[path.split('.').pop()!.toLowerCase()] || 'application/octet-stream';
 
-/** Achica una imagen a `width` px de ancho y la devuelve en JPEG */
-async function toJpeg(bytes: Uint8Array, type: string, width: number): Promise<Blob> {
+/** Achica una imagen a `width` px de ancho y la pasa a JPEG; baja la calidad si no entra en un documento */
+async function toJpeg(bytes: Uint8Array, type: string, width: number, maxBytes = 700_000): Promise<Blob> {
   const bmp = await createImageBitmap(new Blob([bytes], { type }));
   const scale = Math.min(1, width / bmp.width);
   const canvas = document.createElement('canvas');
@@ -47,27 +47,16 @@ async function toJpeg(bytes: Uint8Array, type: string, width: number): Promise<B
   const ctx = canvas.getContext('2d')!;
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
   bmp.close?.();
-  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('No se pudo achicar la imagen'))), 'image/jpeg', 0.86));
-}
-
-async function upload(storagePath: string, body: Blob): Promise<string> {
-  const headers = { ...(await getAuthHeaders()), 'Content-Type': body.type };
-  let lastErr = '';
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      const r = await fetch(`/api/content/upload?path=${encodeURIComponent(storagePath)}`, { method: 'POST', headers, body });
-      const data = await r.json().catch(() => ({}));
-      if (r.ok && data.url) return data.url as string;
-      lastErr = data.error || `Error ${r.status}`;
-      if (r.status < 500) break; // ruta, permiso o tipo: no tiene sentido reintentar
-    } catch (err) {
-      lastErr = (err as Error).message;
-    }
-    await new Promise((res) => setTimeout(res, 800 * (attempt + 1)));
+  let out: Blob | null = null;
+  for (const q of [0.9, 0.84, 0.76, 0.66]) {
+    out = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', q));
+    if (out && out.size <= maxBytes) return out;
   }
-  throw new Error(`${storagePath}: ${lastErr}`);
+  if (!out) throw new Error('No se pudo achicar la imagen');
+  return out;
 }
 
 /** Pool simple: N subidas a la vez */
@@ -121,8 +110,10 @@ export async function importCalendar(jsonText: string, zip: File | null, onProgr
       const blob =
         a.kind === 'display'
           ? await toJpeg(bytes, mimeOf(a.zipPath), 1080)
-          : new Blob([bytes], { type: mimeOf(a.storagePath) });
-      urls.set(a.storagePath, await upload(a.storagePath, blob));
+          : a.kind === 'thumb' && bytes.length > 120_000
+            ? await toJpeg(bytes, mimeOf(a.zipPath), 360, 120_000)
+            : new Blob([bytes], { type: mimeOf(a.storagePath) });
+      urls.set(a.storagePath, await putAsset(a.storagePath, blob));
     } catch (err) {
       failed.push((err as Error).message);
     }

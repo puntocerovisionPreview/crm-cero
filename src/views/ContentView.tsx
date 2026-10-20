@@ -31,6 +31,7 @@ import {
 } from '../content/model';
 import { ImportProgress, ImportResult, importCalendar, setContentStatus } from '../content/store';
 import { useContent } from '../content/useContent';
+import { downloadAsset, openAsset, preloadAsset, useAssetUrl } from '../content/assets';
 import { startOfWeekMonday, todayLocal } from '../utils/dates';
 
 /**
@@ -78,22 +79,11 @@ function useCopy() {
   return { copied, copy };
 }
 
-async function downloadFile(url: string, name: string) {
-  try {
-    const r = await fetch(url);
-    if (!r.ok) throw new Error();
-    const blob = await r.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-  } catch {
-    window.open(url, '_blank', 'noopener');
-  }
-}
+/** Imagen guardada en Firestore (o una dirección común) */
+const AssetImg: React.FC<{ src: string; alt?: string; className?: string }> = ({ src, alt = '', className }) => {
+  const url = useAssetUrl(src);
+  return url ? <img src={url} alt={alt} className={className} /> : <span className={`block animate-pulse bg-white/5 ${className || ''}`} aria-hidden />;
+};
 
 // ---------------- Pantalla ----------------
 
@@ -281,7 +271,7 @@ const PieceCard: React.FC<{ p: ContentPiece; today: string; onOpen: () => void; 
               className="relative shrink-0 snap-start w-14 aspect-[4/5] rounded-md overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-muted)] hover:border-[var(--accent)] transition"
               aria-label={`Ver slide ${i + 1}`}
             >
-              <img src={s.thumb} alt="" loading="lazy" className="w-full h-full object-cover" />
+              <AssetImg src={s.thumb} className="w-full h-full object-cover" />
               {i === MAX - 1 && p.slides.length > MAX && (
                 <span className="absolute inset-0 bg-black/60 text-white text-xs font-bold flex items-center justify-center">+{p.slides.length - MAX}</span>
               )}
@@ -396,7 +386,7 @@ const PieceSheet: React.FC<{ p: ContentPiece; today: string; onClose: () => void
                     className="relative aspect-[4/5] rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-surface-muted)] hover:border-[var(--accent)] transition"
                     aria-label={`Ver slide ${i + 1}`}
                   >
-                    <img src={s.thumb} alt="" loading="lazy" className="w-full h-full object-cover" />
+                    <AssetImg src={s.thumb} className="w-full h-full object-cover" />
                     <span className="absolute bottom-1 left-1 text-[10px] font-bold px-1.5 rounded bg-black/60 text-white">{i + 1}</span>
                   </button>
                 ))}
@@ -449,12 +439,11 @@ const PieceSheet: React.FC<{ p: ContentPiece; today: string; onClose: () => void
               <h3 className="text-sm font-bold text-[var(--text-primary)]">Recursos por palabra clave</h3>
               {p.resources.map((r) =>
                 r.url ? (
-                <a
+                <button
+                  type="button"
                   key={r.word}
-                  href={r.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`${card} p-3 flex items-center gap-3 hover:border-[var(--accent)] transition`}
+                  onClick={() => openAsset(r.url)}
+                  className={`${card} w-full text-left p-3 flex items-center gap-3 hover:border-[var(--accent)] transition`}
                 >
                   <FileText className="w-5 h-5 text-[var(--accent)] shrink-0" aria-hidden />
                   <span className="flex-1 min-w-0">
@@ -462,7 +451,7 @@ const PieceSheet: React.FC<{ p: ContentPiece; today: string; onClose: () => void
                     <span className="block text-[12px] text-[var(--text-secondary)] truncate">{r.name}</span>
                   </span>
                   <span className="text-[12px] font-semibold text-[var(--accent)]">Abrir PDF</span>
-                </a>
+                </button>
                 ) : (
                   <div key={r.word} className={`${card} p-3 flex items-center gap-3`}>
                     <FileText className="w-5 h-5 text-[var(--text-tertiary)] shrink-0" aria-hidden />
@@ -505,22 +494,23 @@ const SlideViewer: React.FC<{ p: ContentPiece; start: number; onClose: () => voi
 
   // La siguiente ya cargada, para pasar sin espera
   useEffect(() => {
-    const nx = p.slides[i + 1];
-    if (nx) new Image().src = nx.display;
+    preloadAsset(p.slides[i + 1]?.display);
+    preloadAsset(p.slides[i - 1]?.display);
   }, [i, p.slides]);
 
   if (!slide) return null;
   const nn = (k: number) => String(k + 1).padStart(2, '0');
   const ext = (u: string) => (u.includes('.png') ? 'png' : 'jpg');
+  const name = (k: number) => `${p.id}-${nn(k)}.${ext(p.slides[k].full)}`;
 
   const downloadAll = async () => {
     setBusy(true);
-    for (let k = 0; k < n; k++) await downloadFile(p.slides[k].full, `${p.id}-${nn(k)}.${ext(p.slides[k].full)}`);
+    for (let k = 0; k < n; k++) await downloadAsset(p.slides[k].full, name(k));
     setBusy(false);
   };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/95 flex flex-col" role="dialog" aria-modal="true" aria-label={`Slides de ${pieceTitle(p)}`}>
+    <div className="fixed inset-0 z-[90] bg-black flex flex-col" role="dialog" aria-modal="true" aria-label={`Slides de ${pieceTitle(p)}`}>
       <header className="flex items-center gap-2 px-3 py-2 text-white">
         <span className="text-sm font-semibold truncate flex-1 min-w-0">{pieceTitle(p)}</span>
         <span className="text-sm tabular-nums text-white/70">
@@ -528,10 +518,10 @@ const SlideViewer: React.FC<{ p: ContentPiece; start: number; onClose: () => voi
         </span>
         <button
           type="button"
-          onClick={() => downloadFile(slide.full, `${p.id}-${nn(i)}.${ext(slide.full)}`)}
+          onClick={() => downloadAsset(slide.full, name(i))}
           className="p-2 rounded-full hover:bg-white/10"
-          aria-label="Descargar esta slide en alta"
-          title="Descargar esta en alta"
+          aria-label="Descargar esta slide"
+          title="Descargar (1080×1350, lista para Instagram)"
         >
           <Download className="w-5 h-5" />
         </button>
@@ -551,7 +541,7 @@ const SlideViewer: React.FC<{ p: ContentPiece; start: number; onClose: () => voi
         }}
         onClick={(e) => e.target === e.currentTarget && onClose()}
       >
-        <img key={slide.display} src={slide.display} alt={`Slide ${i + 1}`} className="max-h-full max-w-full object-contain rounded-md shadow-2xl" />
+        <AssetImg key={slide.display} src={slide.display} alt={`Slide ${i + 1}`} className="max-h-full max-w-full object-contain rounded-md shadow-2xl aspect-[4/5] h-full" />
         {i > 0 && (
           <button type="button" onClick={() => go(-1)} className="absolute left-2 md:left-6 p-2.5 rounded-full bg-white/10 hover:bg-white/20 text-white" aria-label="Anterior">
             <ChevronLeft className="w-6 h-6" />
@@ -574,7 +564,7 @@ const SlideViewer: React.FC<{ p: ContentPiece; start: number; onClose: () => voi
               className={`shrink-0 w-10 aspect-[4/5] rounded overflow-hidden border-2 transition ${k === i ? 'border-white' : 'border-transparent opacity-60 hover:opacity-100'}`}
               aria-label={`Ir a la slide ${k + 1}`}
             >
-              <img src={s.thumb} alt="" className="w-full h-full object-cover" />
+              <AssetImg src={s.thumb} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>

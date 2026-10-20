@@ -10,7 +10,7 @@ import { addDays, startOfWeekMonday } from '../utils/dates';
 export type ContentSupport = 'reel' | 'carrusel' | 'estatico' | 'otro';
 
 export interface ContentSlide {
-  /** Original en alta (PNG para publicar) */
+  /** Para descargar y publicar (hoy es la misma de 1080 px) */
   full: string;
   /** 1080 px para verla en la app */
   display: string;
@@ -251,16 +251,15 @@ export function planImport(data: any, zipPaths: Set<string>, url: (storagePath: 
       const full = resolveZipPath(str(s?.alta || s?.full), zipPaths);
       const mini = resolveZipPath(str(s?.mini || s?.thumb), zipPaths);
       if (!full && !mini) return;
+      // Se guarda a 1080 px de ancho (1080×1350 en 4:5, lo que usa Instagram) y una miniatura
       const base = `contenido/${id}/${nn}`;
-      const fullExt = full ? (full.toLowerCase().endsWith('.jpg') || full.toLowerCase().endsWith('.jpeg') ? 'jpg' : 'png') : 'jpg';
-      if (full) add({ zipPath: full, storagePath: `${base}.${fullExt}`, kind: 'full' });
       if (full) add({ zipPath: full, storagePath: `${base}-1080.jpg`, kind: 'display', from: full });
       if (mini) add({ zipPath: mini, storagePath: `${base}-mini.jpg`, kind: 'thumb' });
-      const fullUrl = full ? url(`${base}.${fullExt}`) : url(`${base}-mini.jpg`);
+      const display = full ? url(`${base}-1080.jpg`) : url(`${base}-mini.jpg`);
       slides.push({
-        full: fullUrl,
-        display: full ? url(`${base}-1080.jpg`) : fullUrl,
-        thumb: mini ? url(`${base}-mini.jpg`) : full ? url(`${base}-1080.jpg`) : fullUrl,
+        full: display,
+        display,
+        thumb: mini ? url(`${base}-mini.jpg`) : display,
         px: str(s?.px) || undefined,
       });
     });
