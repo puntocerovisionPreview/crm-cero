@@ -230,6 +230,7 @@ const PersonalFinanceStudyView = React.lazy(() => import('./views/personal-finan
 const PersonalFinanceRecurringView = React.lazy(() => import('./views/personal-finance/PersonalFinanceRecurringView').then((m) => ({ default: m.PersonalFinanceRecurringView })));
 const PersonalFinanceSettingsView = React.lazy(() => import('./views/personal-finance/PersonalFinanceSettingsView').then((m) => ({ default: m.PersonalFinanceSettingsView })));
 const ProspectingView = React.lazy(() => import('./views/ProspectingView').then((m) => ({ default: m.ProspectingView })));
+const ContentView = React.lazy(() => import('./views/ContentView').then((m) => ({ default: m.ContentView })));
 const GeminiCopilotDrawer = React.lazy(() => import('./components/GeminiCopilotDrawer').then((m) => ({ default: m.GeminiCopilotDrawer })));
 const IosWidgetsModal = React.lazy(() => import('./components/IosWidgetsModal').then((m) => ({ default: m.IosWidgetsModal })));
 
@@ -2851,6 +2852,15 @@ export default function App() {
       };
     }
 
+    if (path === '/contenido') {
+      return {
+        title: 'Contenido',
+        subtitle: 'Calendario de publicaciones: carruseles, reels, guiones y captions',
+        breadcrumbs: [{ label: 'Contenido' }],
+        showBackButton: false,
+      };
+    }
+
     if (path === '/prospeccion') {
       return {
         title: 'Prospección',
@@ -3506,6 +3516,10 @@ export default function App() {
 
     if (path === '/prospeccion') {
       return <ProspectingView projects={projects} onAddProject={handleAddProject} />;
+    }
+
+    if (path === '/contenido') {
+      return <ContentView />;
     }
 
     if (path === '/documentos') {

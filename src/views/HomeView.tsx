@@ -15,6 +15,9 @@ import { ColdClientsCard } from '../components/ColdClientsCard';
 import { coldClients } from '../utils/coldClients';
 import { hapticFeedback } from '../utils/haptics';
 import { DayRing, NextCallChip, RouteLine, usePulse } from '../components/ProspectingVisuals';
+import { useContent } from '../content/useContent';
+import { addDays } from '../utils/dates';
+import { isLate, nextToPublish, statusStage } from '../content/model';
 
 interface Props {
   tasks: AgendaTask[];
@@ -104,6 +107,17 @@ export const HomeView: React.FC<Props> = ({
     return { queue: buildDailyQueue(prospects, today, settings).items.length, pending: pendingOutcomes(prospects, today).length };
   }, [prospects, settings, today]);
   const pulse = usePulse(prospects || [], events, today, settings);
+  const { pieces: content } = useContent();
+  const contentStats = useMemo(() => {
+    if (!content) return null;
+    const next = nextToPublish(content, today);
+    return {
+      next,
+      thisWeek: content.filter(p => p.date >= today && p.date <= addDays(today, 6) && statusStage(p.status) !== 'publicado').length,
+      late: content.filter(p => isLate(p, today)).length,
+      total: content.length,
+    };
+  }, [content, today]);
 
   const stats: Record<SectorKey, Stat[]> = {
     dia: [
@@ -129,6 +143,15 @@ export const HomeView: React.FC<Props> = ({
       ...(data.collected.USD ? [{ value: money(data.collected.USD, 'USD', privacyMode), label: 'en dólares', tone: 'good' as const }] : []),
       ...(pendingPayments ? [{ value: String(pendingPayments), label: 'pagos por registrar', tone: 'warn' as const }] : []),
     ],
+    contenido: !contentStats
+      ? [{ value: '…', label: 'cargando' }]
+      : contentStats.total === 0
+        ? [{ value: '—', label: 'importá tu calendario' }]
+        : [
+            { value: String(contentStats.thisWeek), label: 'por publicar en 7 días' },
+            ...(contentStats.next ? [{ value: contentStats.next.date === today ? 'Hoy' : `${contentStats.next.date.slice(8, 10)}/${contentStats.next.date.slice(5, 7)}`, label: 'la próxima' }] : []),
+            ...(contentStats.late ? [{ value: String(contentStats.late), label: 'sin marcar publicada', tone: 'warn' as const }] : []),
+          ],
     cerebro: [{ value: String(notes.length), label: notes.length === 1 ? 'nota' : 'notas' }],
   };
 
@@ -310,7 +333,7 @@ export const HomeView: React.FC<Props> = ({
       <ActivityHeatmap tasks={tasks} meetings={meetings} prospectEvents={events} today={today} />
 
       {/* Los demás sectores */}
-      <section className="grid grid-cols-1 sm:grid-cols-3 gap-4" aria-label="Otros sectores">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Otros sectores">
         {others.map(sector => (
           <button
             key={sector.key}

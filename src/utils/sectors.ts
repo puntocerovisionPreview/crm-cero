@@ -3,6 +3,7 @@ import {
   Brain,
   Calendar,
   CalendarDays,
+  Clapperboard,
   Compass,
   KanbanSquare,
   DollarSign,
@@ -25,7 +26,7 @@ import {
  * Ninguna pantalla se quitó: cada una vive en su sector.
  */
 
-export type SectorKey = 'dia' | 'prospeccion' | 'clientes' | 'finanzas' | 'cerebro';
+export type SectorKey = 'dia' | 'prospeccion' | 'contenido' | 'clientes' | 'finanzas' | 'cerebro';
 
 export interface SectorItem {
   label: string;
@@ -76,6 +77,15 @@ export const SECTORS: Sector[] = [
       { label: 'Prospección', path: '/prospeccion', icon: Send, match: starts('/prospeccion', '/prospectos') },
       { label: 'Oportunidades', path: '/oportunidades', icon: KanbanSquare, match: starts('/oportunidades', '/pipeline') },
     ],
+  },
+  {
+    key: 'contenido',
+    label: 'Contenido',
+    description: 'Calendario de reels y carruseles, guiones y captions',
+    icon: Clapperboard,
+    tint: '#FF2D55',
+    featured: false,
+    items: [{ label: 'Contenido', path: '/contenido', icon: Clapperboard, match: starts('/contenido', '/calendario-contenido') }],
   },
   {
     key: 'clientes',
