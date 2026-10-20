@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
@@ -10,12 +10,14 @@ import { db } from '../firebase';
  */
 
 export const ASSET_PREFIX = 'fs:';
+/** Copias públicas (paneles de clientes): se leen sin sesión, por id */
+export const PUBLIC_PREFIX = 'pub:';
 const MAX_DOC_CHARS = 1_000_000;
 
 /** "contenido/abc/01-1080.jpg" → "contenido__abc__01-1080.jpg" */
 export const assetDocId = (path: string) => path.replace(/\//g, '__');
 
-export const isAssetRef = (ref?: string) => !!ref && ref.startsWith(ASSET_PREFIX);
+export const isAssetRef = (ref?: string) => !!ref && (ref.startsWith(ASSET_PREFIX) || ref.startsWith(PUBLIC_PREFIX));
 
 function blobToDataUrl(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -37,12 +39,39 @@ export async function putAsset(path: string, blob: Blob): Promise<string> {
 
 const cache = new Map<string, Promise<string>>();
 
+/** Borra imágenes públicas que ya no se usan (al quitar una pieza o un panel) */
+export async function deletePublicAssets(refs: string[]): Promise<void> {
+  await Promise.all(
+    refs
+      .filter((r) => r?.startsWith(PUBLIC_PREFIX))
+      .map((r) => {
+        cache.delete(r);
+        return deleteDoc(doc(db, 'student_portals', r.slice(PUBLIC_PREFIX.length))).catch(() => undefined);
+      })
+  );
+}
+
+/** Guarda una imagen en la parte pública (para el panel del cliente); el id es aleatorio y largo */
+export async function putPublicAsset(blob: Blob): Promise<string> {
+  const data = await blobToDataUrl(blob);
+  if (data.length > MAX_DOC_CHARS) throw new Error(`La imagen pesa demasiado (${Math.round(blob.size / 1024)} KB)`);
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  const id = `pa_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+  await setDoc(doc(db, 'student_portals', id), { kind: 'asset', type: blob.type, data, createdAt: new Date().toISOString() });
+  cache.set(`${PUBLIC_PREFIX}${id}`, Promise.resolve(data));
+  return `${PUBLIC_PREFIX}${id}`;
+}
+
 /** Devuelve algo que se puede poner en <img src> o abrir ("" si no existe) */
 export function loadAsset(ref: string): Promise<string> {
   if (!isAssetRef(ref)) return Promise.resolve(ref || '');
   let p = cache.get(ref);
   if (!p) {
-    p = getDoc(doc(db, 'content_assets', ref.slice(ASSET_PREFIX.length)))
+    const ref_ = ref.startsWith(PUBLIC_PREFIX)
+      ? doc(db, 'student_portals', ref.slice(PUBLIC_PREFIX.length))
+      : doc(db, 'content_assets', ref.slice(ASSET_PREFIX.length));
+    p = getDoc(ref_)
       .then((snap) => (snap.exists() ? String(snap.data().data || '') : ''))
       .catch(() => {
         cache.delete(ref);

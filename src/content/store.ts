@@ -1,8 +1,8 @@
-import { collection, doc, getDocs, onSnapshot, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, onSnapshot, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
 import { putAsset } from './assets';
-import { ContentPiece, ImportAsset, findCalendarJson, mergeImported, planImport } from './model';
+import { ContentPiece, ContentSlide, ImportAsset, findCalendarJson, mergeImported, planImport } from './model';
 
 // Firestore del contenido: content_pieces (una pieza por documento)
 
@@ -38,7 +38,7 @@ const MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg
 const mimeOf = (path: string) => MIME[path.split('.').pop()!.toLowerCase()] || 'application/octet-stream';
 
 /** Achica una imagen a `width` px de ancho y la pasa a JPEG; baja la calidad si no entra en un documento */
-async function toJpeg(bytes: Uint8Array, type: string, width: number, maxBytes = 700_000): Promise<Blob> {
+export async function toJpeg(bytes: Uint8Array, type: string, width: number, maxBytes = 700_000): Promise<Blob> {
   const bmp = await createImageBitmap(new Blob([bytes], { type }));
   const scale = Math.min(1, width / bmp.width);
   const canvas = document.createElement('canvas');
@@ -149,4 +149,36 @@ export async function importCalendar(jsonText: string | null, zip: File | null, 
     await batch.commit();
   }
   return { pieces: pieces.length, files: urls.size, failed };
+}
+
+// ---------- Cargar a mano: elegís las imágenes y listo ----------
+
+/**
+ * Sube imágenes como slides de una pieza (en el orden que vienen).
+ * Cada una se guarda a 1080 px (lista para Instagram) y con su miniatura.
+ */
+export async function uploadSlides(pieceId: string, files: File[], onProgress?: (done: number, total: number) => void): Promise<ContentSlide[]> {
+  const batch = Date.now().toString(36);
+  const slides: ContentSlide[] = [];
+  for (let i = 0; i < files.length; i++) {
+    onProgress?.(i, files.length);
+    const f = files[i];
+    const bytes = new Uint8Array(await f.arrayBuffer());
+    const type = f.type || mimeOf(f.name);
+    const base = `contenido/${pieceId}/${batch}-${String(i + 1).padStart(2, '0')}`;
+    const display = await putAsset(`${base}-1080.jpg`, await toJpeg(bytes, type, 1080));
+    const thumb = await putAsset(`${base}-mini.jpg`, await toJpeg(bytes, type, 360, 120_000));
+    slides.push({ full: display, display, thumb });
+  }
+  onProgress?.(files.length, files.length);
+  return slides;
+}
+
+export async function savePiece(p: ContentPiece): Promise<void> {
+  const now = new Date().toISOString();
+  await setDoc(doc(db, 'content_pieces', p.id), deepSanitize({ ...p, updatedAt: now }));
+}
+
+export async function deletePiece(id: string): Promise<void> {
+  await deleteDoc(doc(db, 'content_pieces', id));
 }

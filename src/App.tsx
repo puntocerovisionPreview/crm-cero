@@ -231,6 +231,7 @@ const PersonalFinanceRecurringView = React.lazy(() => import('./views/personal-f
 const PersonalFinanceSettingsView = React.lazy(() => import('./views/personal-finance/PersonalFinanceSettingsView').then((m) => ({ default: m.PersonalFinanceSettingsView })));
 const ProspectingView = React.lazy(() => import('./views/ProspectingView').then((m) => ({ default: m.ProspectingView })));
 const ContentView = React.lazy(() => import('./views/ContentView').then((m) => ({ default: m.ContentView })));
+const PanelsView = React.lazy(() => import('./views/PanelsView').then((m) => ({ default: m.PanelsView })));
 const GeminiCopilotDrawer = React.lazy(() => import('./components/GeminiCopilotDrawer').then((m) => ({ default: m.GeminiCopilotDrawer })));
 const IosWidgetsModal = React.lazy(() => import('./components/IosWidgetsModal').then((m) => ({ default: m.IosWidgetsModal })));
 
@@ -2852,6 +2853,15 @@ export default function App() {
       };
     }
 
+    if (path === '/paneles') {
+      return {
+        title: 'Paneles de clientes',
+        subtitle: 'Objetivos, tareas y contenido para aprobar, con un link para cada cliente',
+        breadcrumbs: [{ label: 'Clientes', path: '/clientes' }, { label: 'Paneles' }],
+        showBackButton: false,
+      };
+    }
+
     if (path === '/contenido') {
       return {
         title: 'Contenido',
@@ -3520,6 +3530,10 @@ export default function App() {
 
     if (path === '/contenido') {
       return <ContentView />;
+    }
+
+    if (path === '/paneles') {
+      return <PanelsView projects={projects} />;
     }
 
     if (path === '/documentos') {

@@ -33,6 +33,7 @@ export type RouteName =
   | 'hoy'
   | 'prospeccion'
   | 'contenido'
+  | 'paneles'
   | 'oportunidades'
   | 'reportes'
   | 'documentos'
@@ -198,6 +199,10 @@ export function parseRoute(rawPathname: string, searchStr: string = ''): RouteMa
 
   if (path === '/prospeccion' || path === '/prospectos') {
     return { name: 'prospeccion', path: '/prospeccion', params: {}, query };
+  }
+
+  if (path === '/paneles') {
+    return { name: 'paneles', path: '/paneles', params: {}, query };
   }
 
   if (path === '/contenido' || path === '/calendario-contenido') {

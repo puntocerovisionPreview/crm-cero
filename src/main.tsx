@@ -12,6 +12,7 @@ installGlobalErrorReporting();
 const App = lazy(() => import('./App.tsx'));
 const StudentPortalView = lazy(() => import('./views/StudentPortalView').then((m) => ({ default: m.StudentPortalView })));
 const DocumentPublicView = lazy(() => import('./views/DocumentPublicView'));
+const ClientPanelView = lazy(() => import('./views/ClientPanelView').then((m) => ({ default: m.ClientPanelView })));
 
 // Red de seguridad para las animaciones entre pantallas: si el navegador no está dibujando
 // (pestaña o app en segundo plano), la animación esperaría para siempre y la pantalla quedaría
@@ -35,12 +36,22 @@ if (typeof document !== 'undefined' && typeof document.startViewTransition === '
 const portalMatch = window.location.pathname.match(/^\/alumno\/([^/?#]+)/);
 // Presupuestos y recibos con link: también públicos y sin el resto del CRM
 const docMatch = window.location.pathname.match(/^\/doc\/([^/?#]+)/);
+// Panel del cliente: objetivos, tareas y contenido para aprobar (público, por link)
+const panelMatch = window.location.pathname.match(/^\/panel\/([^/?#]+)/);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <Suspense fallback={<div className="fixed inset-0 bg-[var(--bg-app)]" />}>
-        {portalMatch ? <StudentPortalView token={portalMatch[1]} /> : docMatch ? <DocumentPublicView token={docMatch[1]} /> : <App />}
+        {portalMatch ? (
+          <StudentPortalView token={portalMatch[1]} />
+        ) : docMatch ? (
+          <DocumentPublicView token={docMatch[1]} />
+        ) : panelMatch ? (
+          <ClientPanelView token={panelMatch[1]} />
+        ) : (
+          <App />
+        )}
       </Suspense>
     </ErrorBoundary>
   </StrictMode>,

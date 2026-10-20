@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Clapperboard,
   Compass,
+  LayoutPanelTop,
   KanbanSquare,
   DollarSign,
   FileText,
@@ -96,6 +97,7 @@ export const SECTORS: Sector[] = [
     featured: false,
     items: [
       { label: 'Clientes', path: '/clientes', icon: Users, match: (p) => starts('/clientes', '/proyectos')(p) && p !== '/clientes/nuevo' },
+      { label: 'Paneles', path: '/paneles', icon: LayoutPanelTop, match: starts('/paneles') },
       { label: 'Documentos', path: '/documentos', icon: FileText, match: starts('/documentos', '/presupuestos', '/recibos') },
       { label: 'Horizonte', path: '/horizonte', icon: Compass, match: starts('/horizonte', '/horizon', '/gantt') },
       { label: 'Nuevo cliente', path: '/clientes/nuevo', icon: UserPlus, match: is('/clientes/nuevo') },

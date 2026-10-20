@@ -182,7 +182,7 @@ export interface ImportPlan {
   assets: ImportAsset[];
 }
 
-const slugify = (s: string) =>
+export const slugify = (s: string) =>
   s
     .toLowerCase()
     .normalize('NFD')
@@ -404,4 +404,19 @@ export function monthLabel(month: string): string {
   const [y, m] = month.split('-').map(Number);
   const s = new Date(y, m - 1, 1).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' });
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// ---------- Cargar a mano (sin .zip) ----------
+
+/** Id de una pieza nueva: fecha + título, sin repetir */
+export function newPieceId(date: string, title: string, taken: Set<string>): string {
+  const base = `${date}-${slugify(title) || 'pieza'}`;
+  let id = base;
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+  return id;
+}
+
+/** Orden de las slides por nombre de archivo, con números en orden natural (2 antes que 10) */
+export function sortByFileName<T extends { name: string }>(files: T[]): T[] {
+  return [...files].sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 }
