@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ArrowLeft,
+  GraduationCap,
   Check,
   Clapperboard,
   Copy,
@@ -26,7 +27,8 @@ import {
   panelSummary,
   startNewWeek,
 } from '../panels/model';
-import { createPanel, deletePanel, panelUrl, renewPanelLink, savePanel, slideRefs, subscribePanels, uploadPanelSlides } from '../panels/store';
+import { createPanel, deletePanel, ensurePafPanel, panelLink, renewPanelLink, savePanel, slideRefs, subscribePanels, uploadPanelSlides } from '../panels/store';
+import { isActivePafStudent, pafWithoutPanel } from '../panels/paf';
 import { deletePublicAssets } from '../content/assets';
 import { ImageDrop } from '../components/ImageDrop';
 import { AssetImg } from '../content/AssetImg';
@@ -62,7 +64,9 @@ const SUPPORTS: { id: PanelSupport; label: string; icon: React.ReactNode }[] = [
 
 const dm = (d?: string) => (d ? `${d.slice(8, 10)}/${d.slice(5, 7)}` : '');
 
-export const PanelsView: React.FC<{ projects: Project[] }> = ({ projects }) => {
+type UpdateProject = (id: string, updates: Partial<Project>) => void;
+
+export const PanelsView: React.FC<{ projects: Project[]; onUpdateProject: UpdateProject }> = ({ projects, onUpdateProject }) => {
   const [panels, setPanels] = useState<ClientPanel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(() => {
@@ -73,6 +77,17 @@ export const PanelsView: React.FC<{ projects: Project[] }> = ({ projects }) => {
     }
   });
   const [creating, setCreating] = useState(false);
+  const [creatingPaf, setCreatingPaf] = useState<string | null>(null);
+  const setToken = (projectId: string) => (token: string) => onUpdateProject(projectId, { studentPortalToken: token });
+  const createForPaf = async (p: Project) => {
+    setCreatingPaf(p.id);
+    try {
+      const panel = await ensurePafPanel(p, undefined, setToken(p.id));
+      setOpenId(panel.id);
+    } finally {
+      setCreatingPaf(null);
+    }
+  };
 
   useEffect(() => subscribePanels(setPanels, (e) => setError(e.message)), []);
 
@@ -85,6 +100,7 @@ export const PanelsView: React.FC<{ projects: Project[] }> = ({ projects }) => {
     );
   }
   if (open) return <PanelEditor panel={open} projects={projects} onBack={() => setOpenId(null)} />;
+  const pafPending = pafWithoutPanel(projects, panels || []);
 
   const list = [...(panels || [])].sort((a, b) => (b.lastClientAction?.at || b.updatedAt || '').localeCompare(a.lastClientAction?.at || a.updatedAt || ''));
   return (
@@ -99,7 +115,34 @@ export const PanelsView: React.FC<{ projects: Project[] }> = ({ projects }) => {
         </button>
       </section>
 
-      {creating && <NewPanelForm projects={projects} taken={new Set((panels || []).map((p) => p.projectId).filter(Boolean) as string[])} onClose={() => setCreating(false)} onCreated={(id) => (setCreating(false), setOpenId(id))} />}
+      {creating && (
+        <NewPanelForm
+          projects={projects}
+          taken={new Set((panels || []).map((p) => p.projectId).filter(Boolean) as string[])}
+          onClose={() => setCreating(false)}
+          onCreated={(id) => (setCreating(false), setOpenId(id))}
+          setToken={setToken}
+        />
+      )}
+
+      {pafPending.length > 0 && (
+        <section className={`${card} p-4 space-y-2`}>
+          <h2 className="flex items-center gap-2 text-[14px] font-bold text-[var(--text-primary)]">
+            <GraduationCap className="w-4 h-4 text-amber-400" /> Alumnos PAF activos sin panel
+          </h2>
+          <p className="text-[12px] text-[var(--text-secondary)]">Su panel usa el mismo link de su portal: ve su avance, sus objetivos, sus tareas y el contenido, todo junto.</p>
+          <ul className="divide-y divide-[var(--border-subtle)]">
+            {pafPending.map((p) => (
+              <li key={p.id} className="flex items-center gap-2 py-2">
+                <span className="flex-1 min-w-0 text-sm text-[var(--text-primary)] truncate">{p.clientName}</span>
+                <button type="button" className={`${btnGhost} py-1.5 text-xs`} disabled={creatingPaf === p.id} onClick={() => createForPaf(p)}>
+                  {creatingPaf === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />} Crear panel
+                </button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {list.length === 0 && !creating && <p className="text-sm text-[var(--text-secondary)] px-1">Todavía no tenés paneles. Creá el primero con "Nuevo panel".</p>}
 
@@ -110,6 +153,7 @@ export const PanelsView: React.FC<{ projects: Project[] }> = ({ projects }) => {
             <button key={p.id} type="button" onClick={() => setOpenId(p.id)} className={`${card} p-4 text-left space-y-2 hover:border-[var(--border-strong)] transition`}>
               <div className="flex items-center gap-2">
                 <span className="flex-1 min-w-0 text-[16px] font-bold text-[var(--text-primary)] truncate">{p.clientName}</span>
+                {p.portal && <span className="text-[11px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300">PAF</span>}
                 {!p.active && <span className="text-[11px] px-2 py-0.5 rounded-full bg-zinc-500/20 text-zinc-300">Link apagado</span>}
               </div>
               <div className="flex flex-wrap gap-1.5 text-[12px]">
@@ -137,7 +181,13 @@ export const PanelsView: React.FC<{ projects: Project[] }> = ({ projects }) => {
 
 // ---------------- Crear ----------------
 
-const NewPanelForm: React.FC<{ projects: Project[]; taken: Set<string>; onClose: () => void; onCreated: (id: string) => void }> = ({ projects, taken, onClose, onCreated }) => {
+const NewPanelForm: React.FC<{
+  projects: Project[];
+  taken: Set<string>;
+  onClose: () => void;
+  onCreated: (id: string) => void;
+  setToken: (projectId: string) => (token: string) => void;
+}> = ({ projects, taken, onClose, onCreated, setToken }) => {
   const [projectId, setProjectId] = useState('');
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
@@ -152,7 +202,11 @@ const NewPanelForm: React.FC<{ projects: Project[]; taken: Set<string>; onClose:
     if (!finalName) return;
     setBusy(true);
     try {
-      const p = await createPanel(finalName, project ? { projectId: project.id, phone: project.clientPhone } : {});
+      // Alumno PAF activo: mismo link que su portal
+      const p =
+        project && isActivePafStudent(project)
+          ? await ensurePafPanel(project, undefined, setToken(project.id))
+          : await createPanel(finalName, project ? { projectId: project.id, phone: project.clientPhone } : {});
       onCreated(p.id);
     } finally {
       setBusy(false);
@@ -201,7 +255,7 @@ const PanelEditor: React.FC<{ panel: ClientPanel; projects: Project[]; onBack: (
       setSaving(false);
     }
   };
-  const link = panelUrl(panel.token);
+  const link = panelLink(panel);
   const phone = panel.phone || projects.find((p) => p.id === panel.projectId)?.clientPhone;
   const thisWeek = startOfWeekMonday(todayLocal());
 
@@ -218,7 +272,7 @@ const PanelEditor: React.FC<{ panel: ClientPanel; projects: Project[]; onBack: (
       {/* Link */}
       <section className={`${card} p-4 space-y-3`}>
         <div className="flex items-center gap-2">
-          <h2 className="flex-1 text-[15px] font-bold text-[var(--text-primary)]">Link del cliente</h2>
+          <h2 className="flex-1 text-[15px] font-bold text-[var(--text-primary)]">{panel.portal ? 'Link del alumno (su portal PAF)' : 'Link del cliente'}</h2>
           <label className="inline-flex items-center gap-2 text-[13px] text-[var(--text-secondary)] cursor-pointer">
             <input type="checkbox" checked={panel.active} onChange={(e) => save({ ...panel, active: e.target.checked })} className="w-4 h-4 accent-[var(--accent)]" />
             {panel.active ? 'Activo' : 'Apagado'}
@@ -246,7 +300,12 @@ const PanelEditor: React.FC<{ panel: ClientPanel; projects: Project[]; onBack: (
           {phone && (
             <a
               className={btnGhost}
-              href={formatWhatsAppUrl(phone, `Hola! Te dejo tu panel: ahí vas a ver los objetivos de la semana, lo que te toca hacer y el contenido para aprobar.\n${link}`)}
+              href={formatWhatsAppUrl(
+                phone,
+                panel.portal
+                  ? `Hola! En tu portal ahora también vas a ver los objetivos de la semana, lo que te toca hacer y el contenido para aprobar. Es el mismo link de siempre:\n${link}`
+                  : `Hola! Te dejo tu panel: ahí vas a ver los objetivos de la semana, lo que te toca hacer y el contenido para aprobar.\n${link}`
+              )}
               target="_blank"
               rel="noopener noreferrer"
             >
@@ -274,13 +333,16 @@ const PanelEditor: React.FC<{ panel: ClientPanel; projects: Project[]; onBack: (
       <ContentSection panel={panel} save={save} />
 
       <section className="flex flex-wrap gap-2 justify-end pt-2">
-        <button
-          type="button"
-          className={`${btnGhost} text-xs`}
-          onClick={async () => window.confirm('¿Generar un link nuevo? El que tiene el cliente deja de funcionar.') && (await renewPanelLink(panel))}
-        >
-          <RefreshCw className="w-3.5 h-3.5" /> Link nuevo
-        </button>
+        {/* El link de un alumno PAF se maneja desde su ficha (es el de su portal) */}
+        {!panel.portal && (
+          <button
+            type="button"
+            className={`${btnGhost} text-xs`}
+            onClick={async () => window.confirm('¿Generar un link nuevo? El que tiene el cliente deja de funcionar.') && (await renewPanelLink(panel))}
+          >
+            <RefreshCw className="w-3.5 h-3.5" /> Link nuevo
+          </button>
+        )}
         <button
           type="button"
           className={`${btnGhost} text-xs text-rose-300`}

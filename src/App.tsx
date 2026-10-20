@@ -3533,7 +3533,7 @@ export default function App() {
     }
 
     if (path === '/paneles') {
-      return <PanelsView projects={projects} />;
+      return <PanelsView projects={projects} onUpdateProject={handleUpdateProject} />;
     }
 
     if (path === '/documentos') {

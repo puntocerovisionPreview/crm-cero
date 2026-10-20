@@ -62,6 +62,7 @@ import { DeliveriesRoadmap } from '../components/DeliveriesRoadmap';
 import { PafDashboard } from '../components/PafDashboard';
 import { InCallDrawer } from '../components/InCallDrawer';
 import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
+import { PafPanelButton } from '../components/PafPanelButton';
 import { ProjectTimelineBadge } from '../components/ProjectTimelineBadge';
 import { ProjectHealthBadge } from '../components/ProjectHealthBadge';
 import { taskBelongsToProject } from '../utils/taskProject';
@@ -2348,6 +2349,7 @@ export const ProjectsSimpleView: React.FC<Props> = ({
                       </div>
 
                       <StudentPortalLinkButton project={project} phone={phone || undefined} onUpdateProject={onUpdateProject} />
+                      <PafPanelButton project={project} onUpdateProject={onUpdateProject} />
 
                       {/* WhatsApp with Smart PAF Template */}
                       {phone && (

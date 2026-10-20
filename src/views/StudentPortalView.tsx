@@ -3,6 +3,9 @@ import { CheckCircle2, Circle, Clock, CalendarDays, PlayCircle, GraduationCap, L
 import { BrandLogo } from '../components/BrandLogo';
 import { StudentPortalSnapshot, subscribeStudentPortal } from '../utils/studentPortal';
 import { formatDisplayDate } from '../utils/projectTimeline';
+import { PanelSnapshot } from '../panels/model';
+import { subscribePanelSnapshot } from '../panels/store';
+import { PanelSections } from './ClientPanelView';
 
 interface Props {
   token: string;
@@ -13,6 +16,9 @@ interface Props {
 export const StudentPortalView: React.FC<Props> = ({ token }) => {
   const [data, setData] = useState<StudentPortalSnapshot | null>(null);
   const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
+  // Panel del alumno (objetivos, tareas, contenido): mismo link, se ve acá adentro
+  const [panel, setPanel] = useState<PanelSnapshot | null>(null);
+  useEffect(() => subscribePanelSnapshot(token, setPanel, () => setPanel(null)), [token]);
 
   useEffect(() => {
     document.title = 'Mi avance · Método PAF';
@@ -80,6 +86,8 @@ export const StudentPortalView: React.FC<Props> = ({ token }) => {
           <p className="text-sm text-emerald-200 font-medium">¡Completaste el programa! Felicitaciones.</p>
         </div>
       )}
+
+      {panel && <PanelSections token={token} data={panel} showNote />}
 
       {/* Etapas */}
       <Card title="Tu etapa">

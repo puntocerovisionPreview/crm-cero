@@ -78,3 +78,24 @@ describe('panel del cliente: semanas', () => {
     expect(panelSummary(panel)).toEqual({ tasksOpen: 1, tasksDone: 1, toApprove: 1, changes: 0, goalsDone: 1, goals: 2 });
   });
 });
+
+import { isActivePafStudent, pafWithoutPanel } from '../src/panels/paf';
+
+describe('paneles: alumnos PAF', () => {
+  const base = { clientName: 'X', status: 'Activo' } as any;
+  const cursando = { ...base, id: 'a', clientName: 'Ana', projectType: 'paf_pro', pafStage: 'Mes 1: Infra & Web' };
+  const graduado = { ...base, id: 'b', projectType: 'paf_pro', pafStage: 'Graduados' };
+  const archivado = { ...base, id: 'c', projectType: 'paf_base', archived: true };
+  const noConcretado = { ...base, id: 'd', projectType: 'paf_base', status: 'No concretado' };
+  const web = { ...base, id: 'e', projectType: 'web' };
+  const conPanel = { ...base, id: 'f', clientName: 'Beto', projectType: 'paf_base' };
+
+  it('activo = PAF cursando (no graduado, archivado ni "No concretado")', () => {
+    expect([cursando, graduado, archivado, noConcretado, web].map(isActivePafStudent)).toEqual([true, false, false, false, false]);
+  });
+
+  it('lista los que todavía no tienen panel', () => {
+    const panels = [{ ...panel, projectId: 'f' }];
+    expect(pafWithoutPanel([conPanel, cursando, web] as any, panels).map((p) => p.id)).toEqual(['a']);
+  });
+});

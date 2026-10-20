@@ -4,6 +4,7 @@ import { Project } from '../types';
 import { hapticFeedback } from '../utils/haptics';
 import { formatWhatsAppUrl } from '../utils/contact';
 import { generatePortalToken, getStudentPortalUrl, unpublishStudentPortal } from '../utils/studentPortal';
+import { relinkPortalPanel } from '../panels/store';
 
 interface Props {
   project: Project;
@@ -33,6 +34,8 @@ export const StudentPortalLinkButton: React.FC<Props> = ({ project, phone, onUpd
     const newToken = generatePortalToken();
     // App publica la foto del alumno automáticamente al ver el token nuevo
     onUpdateProject(project.id, { studentPortalToken: newToken });
+    // Si tiene panel (objetivos, tareas, contenido), pasa al link nuevo
+    relinkPortalPanel(project.id, newToken).catch((err) => console.warn(err));
     copy(getStudentPortalUrl(newToken));
   };
 
@@ -41,6 +44,7 @@ export const StudentPortalLinkButton: React.FC<Props> = ({ project, phone, onUpd
     hapticFeedback.medium();
     unpublishStudentPortal(token).catch((err) => console.warn(err));
     onUpdateProject(project.id, { studentPortalToken: '' });
+    relinkPortalPanel(project.id, '').catch((err) => console.warn(err));
     setConfirmDisable(false);
   };
 

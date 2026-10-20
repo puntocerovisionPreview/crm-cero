@@ -59,6 +59,8 @@ export interface ClientPanel {
   active: boolean;
   clientName: string;
   projectId?: string;
+  /** Alumno PAF: usa el mismo link que su portal (/alumno/{token}) y se ve ahí adentro */
+  portal?: boolean;
   phone?: string;
   /** Mensaje corto arriba de todo ("Esta semana arrancamos con…") */
   note?: string;

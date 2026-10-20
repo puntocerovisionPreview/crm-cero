@@ -1,4 +1,6 @@
-import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { Project } from '../types';
+import { getStudentPortalUrl } from '../utils/studentPortal';
 import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
 import { deletePublicAssets, putPublicAsset } from '../content/assets';
@@ -17,6 +19,18 @@ export function subscribePanels(onChanged: (items: ClientPanel[]) => void, onErr
       console.warn('subscribePanels error:', err);
       onError?.(err);
     }
+  );
+}
+
+/** El panel de un cliente/alumno (o null) */
+export function subscribePanelOfProject(projectId: string, onChanged: (p: ClientPanel | null) => void) {
+  return onSnapshot(
+    query(collection(db, 'client_panels'), where('projectId', '==', projectId)),
+    (snap) => {
+      const d = snap.docs[0];
+      onChanged(d ? { goals: [], tasks: [], pieces: [], ...(d.data() as ClientPanel), id: d.id } : null);
+    },
+    () => onChanged(null)
   );
 }
 
@@ -65,6 +79,40 @@ export async function deletePanel(p: ClientPanel): Promise<void> {
 }
 
 export const panelUrl = (token: string) => `${window.location.origin}/panel/${token}`;
+
+/** El link que se le manda: el del portal PAF si es alumno, si no el del panel */
+export const panelLink = (p: ClientPanel) => (p.portal ? getStudentPortalUrl(p.token) : panelUrl(p.token));
+
+/**
+ * Panel de un alumno PAF: mismo token que su portal, así ve todo en un solo link.
+ * Si el alumno todavía no tiene link, se crea (y se guarda en su ficha con setPortalToken).
+ */
+export async function ensurePafPanel(project: Project, existing: ClientPanel | undefined, setPortalToken: (token: string) => void): Promise<ClientPanel> {
+  let token = project.studentPortalToken;
+  if (!token) {
+    token = newToken();
+    setPortalToken(token);
+  }
+  if (existing) {
+    if (existing.token === token && existing.portal && existing.active) return existing;
+    if (existing.token !== token) await deleteDoc(doc(db, 'student_portals', panelDocId(existing.token))).catch(() => undefined);
+    const next = { ...existing, token, portal: true, active: true };
+    await savePanel(next);
+    return next;
+  }
+  return createPanel(project.clientName, { projectId: project.id, phone: project.clientPhone, token, portal: true });
+}
+
+/** Cuando cambia o se desactiva el link del portal PAF, el panel lo sigue */
+export async function relinkPortalPanel(projectId: string, token: string): Promise<void> {
+  const snap = await getDocs(query(collection(db, 'client_panels'), where('projectId', '==', projectId)));
+  for (const d of snap.docs) {
+    const p = { goals: [], tasks: [], pieces: [], ...(d.data() as ClientPanel), id: d.id };
+    if (!p.portal) continue;
+    await deleteDoc(doc(db, 'student_portals', panelDocId(p.token))).catch(() => undefined);
+    await savePanel(token ? { ...p, token, active: true } : { ...p, active: false });
+  }
+}
 
 /**
  * Imágenes del cliente: en el orden del nombre de archivo (01, 02…), a 1080 px y con miniatura.

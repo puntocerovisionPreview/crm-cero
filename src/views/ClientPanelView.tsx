@@ -54,10 +54,6 @@ export const ClientPanelView: React.FC<{ token: string }> = ({ token }) => {
     );
   }
 
-  const goalsDone = data.goals.filter((g) => g.done).length;
-  const pending = data.pieces.filter((p) => p.state === 'para_aprobar');
-  const reviewed = data.pieces.filter((p) => p.state !== 'para_aprobar');
-
   return (
     <Shell>
       <header className="space-y-1">
@@ -66,6 +62,28 @@ export const ClientPanelView: React.FC<{ token: string }> = ({ token }) => {
         {data.note && <p className="text-[15px] text-zinc-300 bg-zinc-900/70 border border-zinc-800 rounded-2xl px-4 py-3 mt-2 whitespace-pre-line">{data.note}</p>}
       </header>
 
+      <PanelSections token={token} data={data} />
+
+      {!data.goals.length && !data.tasks.length && !data.pieces.length && (
+        <p className="text-center text-zinc-500 py-10">Todavía no hay nada cargado. Pronto vas a ver acá tus objetivos, tareas y contenido.</p>
+      )}
+
+      <p className="text-center text-[12px] text-zinc-600 pt-4">Actualizado el {dm(data.updatedAt.slice(0, 10))}</p>
+    </Shell>
+  );
+};
+
+/**
+ * Objetivos, tareas y contenido para aprobar. Se usa en /panel/{token} y, para los alumnos PAF,
+ * adentro de su portal (/alumno/{token}): un solo link para todo.
+ */
+export const PanelSections: React.FC<{ token: string; data: PanelSnapshot; showNote?: boolean }> = ({ token, data, showNote }) => {
+  const goalsDone = data.goals.filter((g) => g.done).length;
+  const pending = data.pieces.filter((p) => p.state === 'para_aprobar');
+  const reviewed = data.pieces.filter((p) => p.state !== 'para_aprobar');
+  return (
+    <>
+      {showNote && data.note && <p className="text-[15px] text-zinc-300 bg-zinc-900/70 border border-zinc-800 rounded-2xl px-4 py-3 whitespace-pre-line">{data.note}</p>}
       {data.goals.length > 0 && (
         <Card title={`Objetivos de la semana del ${dm(data.weekStart)}`}>
           <div className="flex items-center gap-3 mb-3">
@@ -116,13 +134,7 @@ export const ClientPanelView: React.FC<{ token: string }> = ({ token }) => {
           </div>
         </Card>
       )}
-
-      {!data.goals.length && !data.tasks.length && !data.pieces.length && (
-        <p className="text-center text-zinc-500 py-10">Todavía no hay nada cargado. Pronto vas a ver acá tus objetivos, tareas y contenido.</p>
-      )}
-
-      <p className="text-center text-[12px] text-zinc-600 pt-4">Actualizado el {dm(data.updatedAt.slice(0, 10))}</p>
-    </Shell>
+    </>
   );
 };
 
