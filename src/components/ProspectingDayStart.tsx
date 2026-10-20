@@ -5,6 +5,7 @@ import { FUNNEL_STEPS, QUEUE_LABELS, QueueItem, funnelStepOf, normalizeInstagram
 import { COUNTRY_NAMES } from '../prospecting/pool';
 import { generatePersonalLine, friendlyError } from '../prospecting/actions';
 import { formatWhatsAppUrl } from '../utils/contact';
+import { ProspectChatLinks } from './ProspectChatLinks';
 
 const btn = 'px-3 py-2 rounded-[var(--radius-control)] text-sm font-semibold flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-40';
 const btnPrimary = `${btn} bg-[var(--accent)] text-[var(--on-accent)] hover:bg-[var(--accent-strong)]`;
@@ -149,6 +150,7 @@ export const DayStartFlow: React.FC<{
                           {' '}· {FUNNEL_STEPS.find((s) => s.id === funnelStepOf(p))?.label.toLowerCase() || 'le escribiste'} · último mensaje el {p.lastContactAt?.slice(8, 10)}/{p.lastContactAt?.slice(5, 7)}
                         </span>
                       </p>
+                      <ProspectChatLinks p={p} />
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                         <button type="button" disabled={busyId === p.id} className={`${btnPrimary} py-1.5 text-xs`} onClick={() => outcome(p, 'they_replied')}>
                           Respondió

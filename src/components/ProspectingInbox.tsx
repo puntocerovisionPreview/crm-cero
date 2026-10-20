@@ -5,6 +5,7 @@ import { ProspectAction, QueueItem } from '../prospecting/core';
 import { BoardColumn, ClosedColumn, nextMove } from '../prospecting/board';
 import { Sheet } from './Sheet';
 import { ProspectCard, Send } from './ProspectBoard';
+import { ProspectChatLinks } from './ProspectChatLinks';
 
 /**
  * HOY EN PROSPECCIÓN, DE A UNA COSA
@@ -64,8 +65,10 @@ const AnswerOneByOne: React.FC<{ people: Prospect[]; today: string; onAct: Act; 
             <div>
               <p className="text-[15px] text-[var(--text-secondary)]">Le escribiste {p.lastContactAt ? ago(p.lastContactAt, today) : 'hace poco'} a</p>
               <p className="text-[22px] font-bold tracking-tight text-[var(--text-primary)]">{p.studio || p.name}</p>
-              <p className="text-[17px] text-[var(--text-primary)] mt-2">¿Te respondió?</p>
+              {p.whatsapp && <p className="text-[13px] text-[var(--text-tertiary)] tabular-nums">{p.whatsapp}</p>}
             </div>
+            <ProspectChatLinks p={p} size="lg" />
+            <p className="text-[17px] text-[var(--text-primary)]">¿Te respondió?</p>
             <div className="grid gap-2">
               <button type="button" disabled={busy} onClick={() => run('they_replied')} className={`${btnBase} h-12 text-[15px] text-white`} style={{ backgroundColor: TINT }}>
                 Sí, me respondió
