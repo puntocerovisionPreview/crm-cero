@@ -4,6 +4,7 @@ import type { Firestore, DocumentReference } from 'firebase-admin/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { AcceptedDoc, docTotalOf, onboardingFromDoc, agreementFromDoc } from '../src/utils/contracts';
 import { todayLocal, addDays } from '../src/utils/dates';
+import { isWebProject } from '../src/automation/webRecipe';
 
 /**
  * DEL "ACEPTO" AL PROYECTO EN MARCHA
@@ -17,24 +18,29 @@ type Notify = (title: string, body: string) => Promise<void>;
 const num = (n: number) => String(n).padStart(4, '0');
 
 export async function onboardAcceptedDocument(db: Firestore, ref: DocumentReference, notify?: Notify): Promise<string | null> {
-  const snap = await ref.get();
+  const outcome = await db.runTransaction(async batch => {
+  const snap = await batch.get(ref);
   if (!snap.exists) return null;
   const d = { ...(snap.data() as any), id: snap.id } as AcceptedDoc & { kind: string; onboardedProjectId?: string; status: string };
-  if (d.kind !== 'presupuesto' || d.onboardedProjectId) return d.onboardedProjectId || null;
+  if (d.kind !== 'presupuesto' || d.status !== 'aceptado') return null;
+  if (d.onboardedProjectId) return { projectId: d.onboardedProjectId, notice: null };
 
   const today = todayLocal();
   const nowIso = new Date().toISOString();
-  const batch = db.batch();
   let projectId: string;
   let created = false;
   let installments = 0;
+  let webRecipe = false;
 
   if (d.projectId) {
     // Ya era un proyecto/posible cliente: se activa y, si no tenía plan de cobro, se le crea
     projectId = d.projectId;
     const pref = db.collection('projects').doc(projectId);
-    const p = (await pref.get()).data() as any;
+    const p = (await batch.get(pref)).data() as any;
+    if (!p) throw new Error('El proyecto del presupuesto ya no existe.');
+    webRecipe = isWebProject(p);
     const update: Record<string, any> = { isLead: false, updatedAt: today, lastContactDate: today };
+    if (!p.clientEmail && d.email) update.clientEmail = d.email;
     if (!p?.billingAgreement?.installments?.length) {
       const agreement = agreementFromDoc(d, today);
       update.billingAgreement = agreement;
@@ -47,6 +53,7 @@ export async function onboardAcceptedDocument(db: Firestore, ref: DocumentRefere
     batch.set(pref, update, { merge: true });
   } else {
     const { project, agreement } = onboardingFromDoc(d, today, nowIso);
+    webRecipe = isWebProject(project);
     projectId = project.id;
     created = true;
     installments = agreement.installments.length;
@@ -54,20 +61,17 @@ export async function onboardAcceptedDocument(db: Firestore, ref: DocumentRefere
   }
 
   const { tasks } = onboardingFromDoc(d, today, nowIso);
-  tasks.forEach((t) => batch.set(db.collection('tasks').doc(t.id), { ...t, projectId }, { merge: true }));
+  // Web tiene una única plantilla compartida con el alta manual, evitando dos kick-offs.
+  if (!webRecipe) tasks.forEach((t) => batch.set(db.collection('tasks').doc(t.id), { ...t, projectId }, { merge: true }));
+  if (webRecipe) batch.set(db.collection('projects').doc(projectId), { webAutomationRequested: true }, { merge: true });
   if (d.prospectId) {
     batch.set(db.collection('prospects').doc(d.prospectId), { stage: 'cliente', nextActionDate: null, updatedAt: nowIso }, { merge: true });
   }
   batch.set(ref, { onboardedProjectId: projectId }, { merge: true });
-  await batch.commit();
-
-  if (notify) {
-    await notify(
-      `🚀 ${d.clientName}: proyecto en marcha`,
-      `${created ? 'Se creó el proyecto' : 'Se activó el proyecto'}${installments ? ` con ${installments} ${installments === 1 ? 'cobro' : 'cobros'} agendados` : ''} y ${tasks.length} tareas de arranque.`
-    ).catch(() => undefined);
-  }
-  return projectId;
+  return { projectId, notice: { title: `🚀 ${d.clientName}: proyecto en marcha`, body: `${created ? 'Se creó el proyecto' : 'Se activó el proyecto'}${installments ? ` con ${installments} ${installments === 1 ? 'cobro' : 'cobros'} agendados` : ''}${webRecipe ? '. La preparación Web quedó en cola.' : ` y ${tasks.length} tareas de arranque.`}` } };
+  });
+  if (notify && outcome?.notice) await notify(outcome.notice.title, outcome.notice.body).catch(() => undefined);
+  return outcome?.projectId || null;
 }
 
 /** El cliente abrió el link. La primera vez te avisa. */

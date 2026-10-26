@@ -1,4 +1,5 @@
 import { WebClientAction, WebSection, applyWebAction, parseWebAction } from './web';
+import type { ClientDriveFolder } from '../automation/webRecipe';
 
 /**
  * PANEL DEL CLIENTE
@@ -56,6 +57,7 @@ export interface PanelWeek {
 }
 
 export interface ClientPanel {
+  driveFolders?: ClientDriveFolder[];
   id: string;
   token: string;
   active: boolean;
@@ -81,6 +83,7 @@ export interface ClientPanel {
 
 /** Lo que ve el cliente: sin ids internos ni teléfono */
 export interface PanelSnapshot {
+  driveFolders?: ClientDriveFolder[];
   kind: 'panel';
   token: string;
   clientName: string;
@@ -122,6 +125,7 @@ export const newItemId = () => `${Date.now().toString(36)}${Math.random().toStri
 
 export function snapshotOf(p: ClientPanel, now = new Date().toISOString()): PanelSnapshot {
   return {
+    driveFolders: p.driveFolders,
     kind: 'panel',
     token: p.token,
     clientName: p.clientName,

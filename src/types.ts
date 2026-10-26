@@ -55,6 +55,7 @@ export interface AgendaTask {
 }
 
 export interface AgendaMeeting {
+  proposed?: boolean; // Sin hora confirmada: no se envía a Google Calendar.
   id: string;
   title: string; // Título o Nombre del cliente
   date: string; // YYYY-MM-DD
@@ -346,6 +347,7 @@ export interface Project {
   onboardingApplied?: boolean; // ya se usó (o se descartó) la plantilla de arranque
   clientPhone?: string; // WhatsApp comercial
   clientEmail?: string; // Mail del cliente (presupuestos y firma digital)
+  webAutomationRequested?: boolean; // Cola de alta Web; el servidor la consume.
   instagramUrl?: string; // Perfil de Instagram institucional
   googleMapsUrl?: string; // Ficha de Google Business Profile (Maps)
   websiteUrl?: string; // Sitio web oficial o URL de staging / desarrollo

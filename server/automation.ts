@@ -24,6 +24,9 @@ import { documentFollowups } from './contractsServer';
 import { eveningCallsReminder } from './prospectReminders';
 import { contentReminders } from './contentReminders';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
+import { registerDriveOAuth, driveConfigured, integrationRef } from './driveOAuth';
+import { registerWebAutomationRoutes } from './webAutomationRoutes';
+import { processWebQueue } from './webAutomation';
 
 /**
  * MOTOR DE AUTOMATIZACIÓN
@@ -322,6 +325,12 @@ function cronSecretOk(req: express.Request): boolean {
 const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prospecting-close', 'mercadopago', 'weekly-collections', 'paf-report', 'month-close', 'day-close'];
 
 export function registerAutomationRoutes(app: express.Express, requireOwner: express.RequestHandler) {
+  const automationNotice = async (title: string, body: string) => {
+    const db = getAdminDb();
+    if (db) await notifyAll(db, title, body, '/ajustes/estado', 'receta-web');
+  };
+  registerDriveOAuth(app, requireOwner, getAdminDb);
+  registerWebAutomationRoutes(app, requireOwner, getAdminDb, automationNotice);
   // Notificaciones push nativas (activar en cada dispositivo, prueba)
   registerPushRoutes(app, requireOwner, getAdminDb);
   // Mercado Pago: webhook, "Buscar pagos" y estado
@@ -373,6 +382,8 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
     }
     // Respaldo semanal: va solo con la tarea frecuente, cuando pasaron 7 días
     if (job === 'frequent' && db) {
+      try { await processWebQueue(db, automationNotice); }
+      catch (e: any) { await recordError(db, { source: 'automatizacion-web', message: e.message }, automationNotice); }
       const detail = await runBackupIfDue(db, notify);
       results.push({ job: 'backup', detail });
       await recordJobRun(db, 'backup', !detail.startsWith('falló'), detail);
@@ -418,6 +429,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
     async () => {
       const db = getAdminDb();
       const push = await countPushDevices(db).catch(() => 0);
+      const drive = db ? (await integrationRef(db).get()).data()?.drive : null;
       return {
         base: { configured: !!db && (await checkDbAccess()) === 'ok', label: 'Base de datos del servidor', hint: 'Sin esto no corren las automatizaciones.' },
         reloj: { configured: (process.env.CRON_SECRET || '').length >= 16, label: 'Reloj de automatizaciones (cron)', hint: 'CRON_SECRET + cron-job.org (ver guía).' },
@@ -427,6 +439,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
         documenso: { configured: !!process.env.DOCUMENSO_API_KEY, label: 'Firma digital (Documenso)', hint: 'DOCUMENSO_API_KEY en Secrets.' },
         calendly: { configured: !!process.env.CALENDLY_TOKEN, label: 'Calendly', hint: 'CALENDLY_TOKEN en Secrets.' },
         calendar: { configured: isCalendarConfigured(), label: 'Google Calendar', hint: 'GOOGLE_CALENDAR_ID en Secrets.' },
+        drive: { configured: driveConfigured() && !!drive?.refresh && !drive?.error, label: 'Google Drive', hint: drive?.error || 'Conectá tu cuenta desde Automatizaciones.' },
       };
     },
     async (title, body) => {

@@ -20,6 +20,7 @@ export const WEB_STAGES: { id: WebStage; label: string; client: string }[] = [
 export const stageIndex = (s: WebStage) => Math.max(0, WEB_STAGES.findIndex((x) => x.id === s));
 
 export interface WebMaterial {
+  driveFolderUrl?: string;
   id: string;
   title: string;
   date?: string;
