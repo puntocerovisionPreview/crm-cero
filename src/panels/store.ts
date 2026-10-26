@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, onSnapshot, query, where, runTransaction } from 'firebase/firestore';
 import { Project } from '../types';
 import { getStudentPortalUrl } from '../utils/studentPortal';
 import { db } from '../firebase';
@@ -37,11 +37,16 @@ export function subscribePanelOfProject(projectId: string, onChanged: (p: Client
 /** Guarda el panel y publica lo que ve el cliente (si está activo) */
 export async function savePanel(p: ClientPanel): Promise<void> {
   const now = new Date().toISOString();
-  const next = { ...p, updatedAt: now };
-  await setDoc(doc(db, 'client_panels', p.id), deepSanitize(next));
-  const pub = doc(db, 'student_portals', panelDocId(p.token));
-  if (p.active) await setDoc(pub, deepSanitize(snapshotOf(next, now)));
-  else await deleteDoc(pub).catch(() => undefined);
+  await runTransaction(db, async tx => {
+    const ref = doc(db, 'client_panels', p.id);
+    const current = (await tx.get(ref)).data() as ClientPanel | undefined;
+    const next = { ...p, updatedAt: now, driveFolders: current?.driveFolders ?? p.driveFolders };
+    if (next.web) next.web = { ...next.web, materials: next.web.materials.map(m => ({ ...m, driveFolderUrl: current?.web?.materials.find(x => x.id === m.id)?.driveFolderUrl ?? m.driveFolderUrl })) };
+    tx.set(ref, deepSanitize(next));
+    const pub = doc(db, 'student_portals', panelDocId(p.token));
+    if (p.active) tx.set(pub, deepSanitize(snapshotOf(next, now)));
+    else tx.delete(pub);
+  });
 }
 
 export async function createPanel(clientName: string, extra: Partial<ClientPanel> = {}): Promise<ClientPanel> {

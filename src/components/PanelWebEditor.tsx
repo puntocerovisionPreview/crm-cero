@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, ExternalLink, Globe, Plus, Send, X } from 'lucide-react';
 import { ClientPanel, newItemId } from '../panels/model';
+import { driveApi } from '../automation/driveApi';
 import { WEB_STAGES, WebSection, money, requestsByPage, sendPreview, stageIndex } from '../panels/web';
 
 /**
@@ -20,10 +21,20 @@ const on = (iso: string | undefined, before: string, after = '') => (iso && /^\d
 
 export const PanelWebEditor: React.FC<{ panel: ClientPanel; save: (p: ClientPanel) => Promise<void> }> = ({ panel, save }) => {
   const w = panel.web!;
-  const set = (next: WebSection) => save({ ...panel, web: next });
+  const [automationNotice, setAutomationNotice] = useState('');
+  const set = async (next: WebSection) => {
+    await save({ ...panel, web: next });
+    if (next.stage === 'publicada' && w.stage !== 'publicada' && panel.projectId) {
+      try {
+        await driveApi(`/api/web-automation/${panel.projectId}/published`, {});
+        setAutomationNotice('Revisá la ficha del proyecto para elegir y confirmar los archivos finales de Entregables.');
+      } catch { setAutomationNotice('La web quedó publicada. El seguimiento se retomará en la próxima ejecución automática.'); }
+    }
+  };
 
   return (
     <section className={`${card} p-4 space-y-5`}>
+      {automationNotice && <p role="status" className="text-sm text-[var(--accent)]">{automationNotice}</p>}
       <div className="flex items-center gap-2">
         <h2 className="flex-1 flex items-center gap-2 text-[15px] font-bold text-[var(--text-primary)]">
           <Globe className="w-4 h-4 text-[var(--accent)]" /> Desarrollo web

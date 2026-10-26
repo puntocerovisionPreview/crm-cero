@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Check, CheckCircle2, Circle, Clapperboard, Copy, Image as ImageIcon, Images, Loader2, Pencil, ThumbsUp } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { ClientWebSections } from '../components/ClientWebSections';
+import { ClientDriveFolders } from '../components/ClientDriveFolders';
 import { AssetImg } from '../content/AssetImg';
 import { PANEL_STATE_LABEL, PanelPiece, PanelSnapshot, PanelTask, byTask } from '../panels/model';
 import { sendClientAction, subscribePanelSnapshot } from '../panels/store';
@@ -86,6 +87,7 @@ export const PanelSections: React.FC<{ token: string; data: PanelSnapshot; showN
     <>
       {showNote && data.note && <p className="text-[15px] text-zinc-300 bg-zinc-900/70 border border-zinc-800 rounded-2xl px-4 py-3 whitespace-pre-line">{data.note}</p>}
       {data.web && <ClientWebSections token={token} web={data.web} />}
+      <ClientDriveFolders folders={data.driveFolders} />
       {data.goals.length > 0 && (
         <Card title={`Objetivos de la semana del ${dm(data.weekStart)}`}>
           <div className="flex items-center gap-3 mb-3">

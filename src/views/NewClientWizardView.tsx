@@ -35,6 +35,7 @@ import {
   BillingAgreementType
 } from '../types';
 import { hapticFeedback } from '../utils/haptics';
+import { validClientEmail } from '../automation/webRecipe';
 import { getTodayString, addDays } from '../utils/storage';
 import { addMonths } from '../utils/projectTimeline';
 import { 
@@ -70,6 +71,8 @@ export const NewClientWizardView: React.FC<Props> = ({
   const [ownerName, setOwnerName] = useState('');
   const [rubro, setRubro] = useState('Arquitectura');
   const [clientPhone, setClientPhone] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
   const [instagramUrl, setInstagramUrl] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
 
@@ -200,6 +203,9 @@ export const NewClientWizardView: React.FC<Props> = ({
   // Handle Finish Wizard
   const handleFinish = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (clientEmail.trim() && !validClientEmail(clientEmail)) {
+      setEmailError('Revisá el correo del cliente.'); setCurrentStep(2); return;
+    }
     if (!clientName.trim()) {
       setCurrentStep(2);
       return;
@@ -315,6 +321,7 @@ export const NewClientWizardView: React.FC<Props> = ({
       }.`,
       archived: false,
       clientPhone: clientPhone.trim() || undefined,
+      clientEmail: clientEmail.trim().toLowerCase() || undefined,
       instagramUrl: instagramUrl.trim() || undefined,
       websiteUrl: websiteUrl.trim() || undefined,
       // Financial Flexibility:
@@ -326,7 +333,7 @@ export const NewClientWizardView: React.FC<Props> = ({
       paymentCommitments,
       installments: legacyInstallments.length > 0 ? legacyInstallments : undefined,
       serviceType,
-      projectType: serviceType === 'paf' ? pafPlanType : 'web',
+      projectType: serviceType === 'paf' ? pafPlanType : serviceType,
       pafStage: serviceType === 'paf' ? 'Kick-Off & Diagnóstico' : undefined,
       pafConsultingHoursTotal: serviceType === 'paf' ? (pafPlanType === 'paf_pro' ? 26 : 14) : undefined,
       pafConsultingHoursDone: 0,
@@ -596,6 +603,12 @@ export const NewClientWizardView: React.FC<Props> = ({
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-zinc-300 mb-1.5">Correo del cliente</label>
+                <input type="email" value={clientEmail} onChange={e => { setClientEmail(e.target.value); setEmailError(''); }} placeholder="cliente@gmail.com" className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-sm text-zinc-100" />
+                <p className="text-xs text-zinc-500 mt-1">Para compartir las carpetas de Drive. Si lo dejás vacío, el acceso queda pendiente.</p>
+                {emailError && <p role="alert" className="text-xs text-red-400">{emailError}</p>}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-zinc-300 mb-1.5">

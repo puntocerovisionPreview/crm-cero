@@ -248,6 +248,7 @@ const MaterialItem: React.FC<{ token: string; m: WebMaterial }> = ({ token, m })
               Ya lo mandé
             </button>
           )}
+          {m.driveFolderUrl && <a href={m.driveFolderUrl} target="_blank" rel="noopener noreferrer" className="block mt-2 text-sm text-orange-300 underline">Abrir carpeta y subir archivos</a>}
           {open && !done && (
             <div className="mt-2 space-y-2">
               <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="Link de Drive o Dropbox (opcional)" className={field} />

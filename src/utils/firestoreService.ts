@@ -1065,6 +1065,8 @@ export async function getDailyBudgetFromFirestore(dateStr: string): Promise<Dail
 // Todas las colecciones que guarda la app. Si se agrega una colección nueva,
 // sumala acá para que entre en el backup, la restauración y el reseteo.
 export const ALL_CRM_COLLECTIONS = [
+  'automation_runs',
+  'automation_resources',
   'tasks',
   'meetings',
   'projects',
@@ -1145,6 +1147,7 @@ export async function exportCompleteCrmBackup(): Promise<CrmCompleteBackup> {
   ALL_CRM_COLLECTIONS.forEach((name, idx) => {
     const docs: Record<string, any> = {};
     snaps[idx].forEach((d) => {
+      if (name === 'settings' && (d.id === 'integrations_private' || d.id.startsWith('drive_oauth_'))) return;
       docs[d.id] = toPlainJson(d.data());
     });
     collections[name] = docs;
@@ -1168,6 +1171,7 @@ export async function importCompleteCrmBackup(backup: CrmCompleteBackup): Promis
       const docs = backup.collections[name];
       if (!docs || typeof docs !== 'object') continue;
       for (const [id, data] of Object.entries(docs)) {
+        if (name === 'settings' && (id === 'integrations_private' || id.startsWith('drive_oauth_'))) continue;
         if (!id || !data || typeof data !== 'object') continue;
         ops.push((batch) => batch.set(doc(db, name, id), deepSanitize(data), { merge: true }));
       }

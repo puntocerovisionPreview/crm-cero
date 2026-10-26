@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { CheckCircle2, Circle, Loader2, Send, Eye, RefreshCw, Copy, Check } from 'lucide-react';
 import { getAuthHeaders } from '../utils/authAccess';
 import { PushSettingsCard } from './PushSettingsCard';
+import { DriveSettings } from './DriveSettings';
 
 interface Status {
   serviceAccount: boolean;
@@ -151,6 +152,7 @@ export const AutomationSettings: React.FC = () => {
       </div>
 
       <PushSettingsCard />
+      <DriveSettings />
 
       {error && <p className="text-sm text-red-400">No se pudo leer el estado: {error}</p>}
       {!status && !error && <Loader2 className="w-5 h-5 animate-spin text-[var(--text-tertiary)]" />}

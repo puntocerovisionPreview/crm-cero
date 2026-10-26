@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { taskBelongsToProject } from '../utils/taskProject';
+import { ProjectDriveCard } from '../components/ProjectDriveCard';
 import { 
   Project, 
   AgendaTask, 
@@ -733,6 +734,7 @@ export const ClientDetailView: React.FC<Props> = ({
               </div>
             </div>
 
+            <ProjectDriveCard project={project} />
             {/* 2. Direct Quick Contacts (WhatsApp, Call, Web, Instagram) */}
             <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-800/60">
               {project.clientPhone ? (
