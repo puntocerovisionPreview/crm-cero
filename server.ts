@@ -746,6 +746,20 @@ async function start() {
     Boolean(process.argv[1] && process.argv[1].endsWith('.cjs'));
 
   if (!isProduction) {
+    // Una PWA usada antes en localhost puede seguir sirviendo el build anterior.
+    // Reemplaza solo su worker de producción por uno sin caché y conserva la sesión.
+    app.get('/sw.js', (_req, res) => {
+      res.setHeader('Cache-Control', 'no-store');
+      res.type('application/javascript').send(`
+        self.addEventListener('install', () => self.skipWaiting());
+        self.addEventListener('activate', event => event.waitUntil((async () => {
+          await self.clients.claim();
+          await self.registration.unregister();
+          const tabs = await self.clients.matchAll({ type: 'window' });
+          await Promise.all(tabs.map(tab => tab.navigate(tab.url).catch(() => undefined)));
+        })()));
+      `);
+    });
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
