@@ -9,7 +9,7 @@ import { ProspectChatLinks } from './ProspectChatLinks';
 
 /**
  * HOY EN PROSPECCIÓN, DE A UNA COSA
- * - "Ahora": la próxima tarjeta en grande (un botón: Enviar por WhatsApp, que ya la marca).
+ * - "Ahora": la próxima tarjeta en grande (abrir el chat y confirmar el mensaje enviado).
  * - Listas cortas: Te toca · Seguimientos · Nuevos (y Llamadas si hay hoy).
  * - "¿Quién te respondió?": de a uno, con un toque por persona.
  */
@@ -98,6 +98,7 @@ const LANES: { id: Lane; label: string; empty: string }[] = [
 export const ProspectingInbox: React.FC<{
   queue: QueueItem[];
   toClose: Prospect[];
+  previousPending?: Prospect[];
   isEvening: boolean;
   settings: ProspectingSettings;
   today: string;
@@ -108,10 +109,11 @@ export const ProspectingInbox: React.FC<{
   onBurst?: () => void;
   tomorrowCalls: Prospect[];
   footer?: React.ReactNode;
-}> = ({ queue, toClose, isEvening, settings, today, onSend, onMove, onCall, onDetail, onBurst, tomorrowCalls, footer }) => {
+}> = ({ queue, toClose, previousPending = [], isEvening, settings, today, onSend, onMove, onCall, onDetail, onBurst, tomorrowCalls, footer }) => {
   const [later, setLater] = useState<string[]>([]);
   const [lane, setLane] = useState<Lane | null>(null);
   const [answering, setAnswering] = useState(false);
+  const [reviewPrevious, setReviewPrevious] = useState(false);
 
   // Cada uno de hoy con lo que hay que hacer, en el orden de prioridad de la cola
   const items = useMemo(
@@ -124,16 +126,21 @@ export const ProspectingInbox: React.FC<{
     [queue, today, settings]
   );
   const actionable = items.filter((x) => x.lane !== 'llamadas');
-  const ordered = [...actionable.filter((x) => !later.includes(x.p.id)), ...actionable.filter((x) => later.includes(x.p.id))];
-  const now = ordered[0];
   const counts = Object.fromEntries(LANES.map((l) => [l.id, items.filter((x) => x.lane === l.id).length])) as Record<Lane, number>;
   const activeLane = lane || (LANES.find((l) => l.id !== 'llamadas' && counts[l.id] > 0)?.id ?? 'toca');
+  const selected = actionable.filter(x => x.lane === activeLane);
+  const ordered = [...selected.filter(x => !later.includes(x.p.id)), ...selected.filter(x => later.includes(x.p.id))];
+  const now = ordered[0];
   // La de "Ahora" ya está arriba: no se repite en la lista
   const laneItems = items.filter((x) => x.lane === activeLane && x.p.id !== now?.p.id);
   const calls = items.filter((x) => x.lane === 'llamadas');
 
   return (
     <div className="space-y-4">
+      {previousPending.length > 0 && <button type="button" onClick={() => setReviewPrevious(true)} className="card-swiss w-full p-3 text-left text-sm text-[var(--text-secondary)]">
+        Días anteriores: {previousPending.length} contactos sin revisar · Revisar aparte
+      </button>}
+      {reviewPrevious && <AnswerOneByOne people={previousPending} today={today} onAct={onSend} onClose={() => setReviewPrevious(false)} />}
       {toClose.length > 0 && (
         <button
           type="button"
@@ -144,7 +151,7 @@ export const ProspectingInbox: React.FC<{
             <Moon className="w-5 h-5" />
           </span>
           <span className="flex-1 min-w-0">
-            <span className="block text-[15px] font-semibold text-[var(--text-primary)]">¿Quién te respondió? {toClose.length} sin anotar</span>
+            <span className="block text-[15px] font-semibold text-[var(--text-primary)]">Mensajes de hoy: {toClose.length} sin revisar</span>
             <span className="block text-[13px] text-[var(--text-secondary)]">Te pregunto de a uno, un toque por persona.</span>
           </span>
           <ChevronRight className="w-5 h-5 text-[var(--text-tertiary)]" />
@@ -170,7 +177,7 @@ export const ProspectingInbox: React.FC<{
             <span className="font-semibold" style={{ color: TINT }}>
               Ahora
             </span>
-            <span className="tabular-nums">1 de {actionable.length} para hoy</span>
+            <span className="tabular-nums">1 de {selected.length} en esta lista</span>
             <span className="flex-1" />
             <button type="button" onClick={() => setLater((l) => [...l.filter((x) => x !== now.p.id), now.p.id])} className="font-medium hover:text-[var(--text-primary)] cursor-pointer">
               Pasar al siguiente
@@ -186,12 +193,12 @@ export const ProspectingInbox: React.FC<{
       ) : (
         <section className="card-swiss p-6 text-center space-y-1">
           <Check className="w-8 h-8 mx-auto" style={{ color: TINT }} />
-          <p className="text-[17px] font-semibold text-[var(--text-primary)]">Terminaste lo de hoy.</p>
-          <p className="text-[14px] text-[var(--text-secondary)]">Si querés seguir, sumá contactos nuevos abajo.</p>
+          <p className="text-[17px] font-semibold text-[var(--text-primary)]">{actionable.length > 0 ? 'Esta lista está al día.' : 'Terminaste lo pendiente de hoy.'}</p>
+          <p className="text-[14px] text-[var(--text-secondary)]">{actionable.length > 0 ? 'Elegí otra categoría para continuar.' : 'Los mensajes que confirmaste están en Enviados hoy.'}</p>
         </section>
       )}
 
-      {actionable.length > 1 && (
+      {(actionable.length > 1 || (actionable.length > 0 && selected.length === 0)) && (
         <section className="space-y-3" aria-label="Todo lo de hoy">
           <div role="tablist" className="flex gap-1 p-1 rounded-[12px] bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-x-auto no-scrollbar">
             {LANES.filter((l) => l.id !== 'llamadas').map((l) => (

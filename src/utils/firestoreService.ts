@@ -1067,6 +1067,9 @@ export async function getDailyBudgetFromFirestore(dateStr: string): Promise<Dail
 export const ALL_CRM_COLLECTIONS = [
   'automation_runs',
   'automation_resources',
+  'content_pieces',
+  'content_assets',
+  'client_panels',
   'tasks',
   'meetings',
   'projects',

@@ -1057,6 +1057,7 @@ export interface Prospect {
 
 // Pasos del guion: pregunta → (su respuesta) → empatía → (acuerdo) → speech + link de auditoría
 export interface ProspectLogEntry {
+  action?: string;
   at: string; // ISO
   dir: 'in' | 'out' | 'nota'; // te escribió / le escribiste / nota tuya
   text: string;
@@ -1067,6 +1068,11 @@ export type ConvStep = 'pregunta' | 'esperando_respuesta' | 'empatia' | 'esperan
 export type DifusionKey = 'portales' | 'referidos' | 'anuncios' | 'redes' | 'contenido_ig' | 'agencia' | 'otro';
 
 export type ProspectEventType =
+  | 'conversation_sent'
+  | 'conversation_reply'
+  | 'deferred'
+  | 'call_rescheduled'
+  | 'note'
   | 'proposal_sent'
   | 'first_contact'
   | 'follow_up'
@@ -1080,6 +1086,8 @@ export type ProspectEventType =
   | 'lost';
 
 export interface ProspectEvent {
+  prospectName?: string;
+  action?: string;
   id: string;
   prospectId: string;
   type: ProspectEventType;

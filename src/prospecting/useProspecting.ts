@@ -8,6 +8,8 @@ import { todayLocal } from '../utils/dates';
 export function useProspecting() {
   const [prospects, setProspects] = useState<Prospect[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [eventsLoaded, setEventsLoaded] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
   const [events, setEvents] = useState<ProspectEvent[]>([]);
   const [settings, setSettings] = useState<ProspectingSettings>(DEFAULT_PROSPECTING_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -25,7 +27,7 @@ export function useProspecting() {
       ),
     []
   );
-  useEffect(() => subscribeProspectEvents(setEvents), []);
+  useEffect(() => subscribeProspectEvents(items => { setEvents(items); setEventsLoaded(true); setEventsError(null); }, err => { setEventsError(err.message); setEventsLoaded(true); }), []);
   useEffect(
     () =>
       subscribeProspectingSettings((s) => {
@@ -42,5 +44,5 @@ export function useProspecting() {
     return () => clearInterval(id);
   }, []);
 
-  return { prospects, setProspects, events, settings, settingsLoaded, today, hour, loadError };
+  return { prospects, setProspects, events, eventsLoaded, eventsError, settings, settingsLoaded, today, hour, loadError };
 }

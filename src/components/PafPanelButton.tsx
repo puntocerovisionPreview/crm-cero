@@ -13,14 +13,18 @@ import { hapticFeedback } from '../utils/haptics';
 export const PafPanelButton: React.FC<{ project: Project; onUpdateProject: (id: string, updates: Partial<Project>) => void }> = ({ project, onUpdateProject }) => {
   const [panel, setPanel] = useState<ClientPanel | null | undefined>(undefined);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   useEffect(() => subscribePanelOfProject(project.id, setPanel), [project.id]);
 
   const open = async () => {
     hapticFeedback.light();
     setBusy(true);
+    setError('');
     try {
       const p = await ensurePafPanel(project, panel || undefined, (token) => onUpdateProject(project.id, { studentPortalToken: token }));
       navigateTo(`/paneles?panel=${encodeURIComponent(p.id)}`);
+    } catch {
+      setError('No pudimos abrir el panel. Revisá la conexión y reintentá.');
     } finally {
       setBusy(false);
     }
@@ -42,8 +46,9 @@ export const PafPanelButton: React.FC<{ project: Project; onUpdateProject: (id: 
         <span className="block text-[10px] font-medium text-zinc-400 truncate">
           {s
             ? `Objetivos ${s.goalsDone}/${s.goals} · ${s.tasksOpen} tareas · ${s.toApprove} para aprobar${s.changes ? ` · ${s.changes} con cambios` : ''}`
-            : 'Objetivos, tareas y contenido en su mismo link'}
+            : 'Plan de tres meses, tareas, contenido y sesiones'}
         </span>
+        {error && <span role="alert" className="block text-[10px] font-medium text-rose-300 whitespace-normal mt-1">{error}</span>}
       </span>
       <ChevronRight className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
     </button>

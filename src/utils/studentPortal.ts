@@ -4,6 +4,7 @@ import { AgendaMeeting, PAF_STAGES, Project } from '../types';
 import { DEFAULT_PAF_STAGE_EXIT_MILESTONES } from './pafTemplates';
 import { addDays, todayLocal, toSafeDateString } from './dates';
 import { deepSanitize } from './sanitize';
+import { publicMilestones, type PafPlanItem } from '../panels/pafPlan';
 
 /**
  * Portal del alumno (Método PAF)
@@ -19,6 +20,7 @@ import { deepSanitize } from './sanitize';
 export const STUDENT_PORTALS_COLLECTION = 'student_portals';
 
 export interface StudentPortalSnapshot {
+  roadmap?: PafPlanItem[];
   token: string;
   studentName: string;
   programName: string;
@@ -80,8 +82,8 @@ export function buildStudentPortalSnapshot(
   const deliverables = (saved || (DEFAULT_PAF_STAGE_EXIT_MILESTONES[currentStage] || []).map((m) => ({ ...m, done: false })))
     .map((m) => ({ text: m.text, done: Boolean(m.done) }));
 
-  const hoursTotal = project.pafConsultingHoursTotal || 26;
-  const hoursDone = project.pafConsultingHoursDone || 0;
+  const hoursTotal = Math.max(0, project.pafConsultingHoursTotal ?? 26);
+  const hoursDone = Math.max(0, project.pafConsultingHoursDone ?? 0);
 
   const startDate = toSafeDateString(project.pafStartDate || project.startDate) || undefined;
   const totalWeeks = 12;
@@ -109,6 +111,7 @@ export function buildStudentPortalSnapshot(
     .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))[0];
 
   return {
+    roadmap: publicMilestones(project.pafMilestones || []),
     token,
     studentName: project.clientName,
     programName: project.projectType === 'paf_base' ? 'Método PAF Base' : 'Método PAF Pro',

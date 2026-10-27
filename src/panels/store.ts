@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDocs, onSnapshot, query, where, runTransaction } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, onSnapshot, query, where, writeBatch, runTransaction } from 'firebase/firestore';
 import { Project } from '../types';
 import { getStudentPortalUrl } from '../utils/studentPortal';
 import { db } from '../firebase';
@@ -8,6 +8,7 @@ import { toJpeg } from '../content/store';
 import { sortByFileName } from '../content/model';
 import { ClientPanel, PanelSlide, PanelSnapshot, TOKEN_RE, newToken, panelDocId, snapshotOf } from './model';
 import { startOfWeekMonday, todayLocal } from '../utils/dates';
+import { createPafPlan } from './pafPlan';
 
 // Paneles de clientes: client_panels/{id} (tuyo) y student_portals/panel_{token} (lo que ve el cliente)
 
@@ -105,7 +106,7 @@ export async function ensurePafPanel(project: Project, existing: ClientPanel | u
     await savePanel(next);
     return next;
   }
-  return createPanel(project.clientName, { projectId: project.id, phone: project.clientPhone, token, portal: true });
+  return createPanel(project.clientName, { projectId: project.id, phone: project.clientPhone, token, portal: true, paf: createPafPlan(project) });
 }
 
 /** Cuando cambia o se desactiva el link del portal PAF, el panel lo sigue */

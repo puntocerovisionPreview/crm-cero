@@ -25,6 +25,8 @@ const dayMonth = (iso?: string) => (iso ? `${iso.slice(8, 10)}/${iso.slice(5, 7)
 export const ReplyButton: React.FC<{ prospect: Prospect; onAct: Act; label?: string }> = ({ prospect: p, onAct, label = 'Me respondió' }) => {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   if (!open) {
     return (
       <button type="button" className={ghost} onClick={() => setOpen(true)} title="Te escribió: pasa a 'Te toca'">
@@ -32,26 +34,32 @@ export const ReplyButton: React.FC<{ prospect: Prospect; onAct: Act; label?: str
       </button>
     );
   }
-  const save = () => {
-    onAct(p, 'they_replied', text.trim() || undefined);
-    setOpen(false);
-    setText('');
+  const save = async () => {
+    if (busy) return;
+    setBusy(true); setError(null);
+    try {
+      const result = await onAct(p, 'they_replied', text.trim() || undefined);
+      if (result === false) { setError('No se guardó. Volvé a intentar.'); return; }
+      setOpen(false); setText('');
+    } catch { setError('No se guardó. Volvé a intentar.'); }
+    finally { setBusy(false); }
   };
   return (
     <form
-      className="w-full flex gap-1.5"
+      className="w-full flex flex-wrap gap-1.5"
       onSubmit={(e) => {
         e.preventDefault();
         save();
       }}
     >
       <input autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="¿Qué te dijo? (opcional)" aria-label="Qué te dijo" className={input} />
-      <button type="submit" className={primary}>
-        Guardar
+      <button type="submit" disabled={busy} className={primary}>
+        {busy ? 'Guardando…' : 'Guardar'}
       </button>
       <button type="button" className={ghost} onClick={() => setOpen(false)}>
         ✕
       </button>
+      {error && <p role="alert" className="w-full text-xs text-red-400">{error}</p>}
     </form>
   );
 };

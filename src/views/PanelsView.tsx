@@ -31,6 +31,7 @@ import { createPanel, deletePanel, ensurePafPanel, panelLink, renewPanelLink, sa
 import { isActivePafStudent, pafWithoutPanel } from '../panels/paf';
 import { WEB_STAGES, emptyWeb, stageIndex } from '../panels/web';
 import { PanelWebEditor } from '../components/PanelWebEditor';
+import { PafPlanEditor } from '../components/PafPlanEditor';
 import { getServiceType } from '../types';
 import { deletePublicAssets } from '../content/assets';
 import { ImageDrop } from '../components/ImageDrop';
@@ -87,6 +88,8 @@ export const PanelsView: React.FC<{ projects: Project[]; onUpdateProject: Update
     try {
       const panel = await ensurePafPanel(p, undefined, setToken(p.id));
       setOpenId(panel.id);
+    } catch {
+      setError('No pudimos crear el panel. Revisá la conexión y volvé a intentarlo.');
     } finally {
       setCreatingPaf(null);
     }
@@ -282,7 +285,7 @@ const PanelEditor: React.FC<{ panel: ClientPanel; projects: Project[]; onBack: (
         <button type="button" onClick={onBack} className={btnGhost}>
           <ArrowLeft className="w-4 h-4" /> Paneles
         </button>
-        <h1 className="flex-1 min-w-0 text-[20px] font-bold text-[var(--text-primary)] truncate">{panel.clientName}</h1>
+      <h1 className="flex-1 min-w-0 text-[20px] font-bold text-[var(--text-primary)] truncate">{panel.clientName}</h1>
         {saving && <Loader2 className="w-4 h-4 animate-spin text-[var(--text-secondary)]" aria-label="Guardando" />}
       </div>
 
@@ -353,6 +356,7 @@ const PanelEditor: React.FC<{ panel: ClientPanel; projects: Project[]; onBack: (
         </button>
       )}
 
+      {(panel.portal || panel.paf) && <PafPlanEditor key={panel.id} panel={panel} project={projects.find((p) => p.id === panel.projectId)} save={save} />}
       <GoalsSection panel={panel} save={save} thisWeek={thisWeek} />
       <TasksSection panel={panel} save={save} />
       <ContentSection panel={panel} save={save} />

@@ -404,7 +404,7 @@ function applyActionInner(
       return { updates, event: rescheduled ? null : { prospectId: p.id, type: 'call', date: today } };
     }
     case 'proposal_sent':
-      updates = { stage: 'llamada', proposalSentAt: today, callDate: undefined, nextActionDate: addDays(today, 3) };
+      updates = { stage: 'llamada', proposalSentAt: today, lastContactAt: today, callDate: undefined, nextActionDate: addDays(today, 3) };
       break;
     case 'won':
       updates = { stage: 'cliente', nextActionDate: undefined };

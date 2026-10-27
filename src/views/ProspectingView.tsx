@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   Ban,
@@ -55,6 +55,7 @@ import { friendlyError, generateVideoScript, markDayStarted, useAddMore, usePool
 import { BurstMode, DayStartFlow, LocalTimeBadge, PersonalLineButton, PersonalizeAllButton } from '../components/ProspectingDayStart';
 import { AwaitingBanner, CallPrep, ConversationLog, ReplyButton } from '../components/ProspectConversation';
 import { ProspectingPulsePanel, usePulse } from '../components/ProspectingVisuals';
+import { ProspectingDailyDesk } from '../components/ProspectingDailyDesk';
 import { ProspectingInbox } from '../components/ProspectingInbox';
 import { AddMoreRow } from '../components/ProspectingDayStart';
 import { deleteProspect, moveProspect, recordProspectAction, recordWithUndo, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
@@ -107,7 +108,7 @@ function shortDate(d?: string): string {
 }
 
 export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initialTab = 'hoy' }) => {
-  const { prospects, events, settings, settingsLoaded, today, hour, loadError } = useProspecting();
+  const { prospects, events, eventsLoaded, eventsError, settings, settingsLoaded, today, hour, loadError } = useProspecting();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [funnelFrom, setFunnelFrom] = useState<string | null>(null);
   const list = prospects || [];
@@ -132,21 +133,10 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
   const weeks = useMemo(() => computeMonthMetrics(events, monthKey), [events, monthKey]);
   const thisWeek = weeks.find((w) => today >= w.start && today <= w.end);
 
-  // Inicio del día: lo primero al abrir Prospección (una vez por día)
+  // El inicio guiado es opcional: no tapa el seguimiento diario al entrar.
   const [dayStartOpen, setDayStartOpen] = useState(false);
   const [burstOpen, setBurstOpen] = useState(false);
-  const [dayHandled, setDayHandled] = useState<string | null>(null);
-  const needsDayStart =
-    settingsLoaded &&
-    prospects !== null &&
-    settings.dayStartedOn !== today &&
-    dayHandled !== today &&
-    (pending.length > 0 || queue.items.length > 0 || pool.availableCount > 0);
-  useEffect(() => {
-    if (needsDayStart) setDayStartOpen(true);
-  }, [needsDayStart]);
   const finishDayStart = () => {
-    setDayHandled(today);
     setDayStartOpen(false);
     markDayStarted(today).catch((err) => console.warn('Inicio del día:', err));
   };
@@ -164,11 +154,14 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
   };
   const actSafe = (p: Prospect, action: ProspectAction, note?: string) => act(p, action, note).catch(() => undefined);
 
-  // Enviar = marcar: se registra al tocar "Enviar por WhatsApp", con "Deshacer" unos segundos
+  // El operador confirma el envío al volver del chat; se ofrece Deshacer.
   const [undo, setUndo] = useState<{ text: string; run: () => Promise<void> } | null>(null);
   const [callFor, setCallFor] = useState<Prospect | null>(null);
   const [detailFor, setDetailFor] = useState<Prospect | null>(null);
+  const sendLocks = useRef(new Set<string>());
   const send = async (p: Prospect, action: ProspectAction, note?: string) => {
+    if (sendLocks.current.has(p.id)) return false;
+    sendLocks.current.add(p.id);
     hapticFeedback.medium();
     if (!['no_reply', 'lost', 'do_not_contact', 'snooze', 'they_replied'].includes(action)) playTaskDone();
     try {
@@ -177,9 +170,11 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
         action === 'they_replied' ? 'respondió' : action === 'lost' ? 'descartado' : action === 'do_not_contact' ? 'no contactar' : action === 'no_reply' ? 'no respondió' : sendLabel(action);
       setUndo({ text: `${p.studio || p.name}: ${what}`, run });
       setActError(null);
+      return true;
     } catch (err) {
       setActError(`No se guardó lo de ${p.studio || p.name}: ${friendlyError(err)}`);
-    }
+      return false;
+    } finally { sendLocks.current.delete(p.id); }
   };
   const moveTo = async (p: Prospect, to: BoardColumn | ClosedColumn) => {
     const updates = moveUpdates(p, to, today, settings);
@@ -209,7 +204,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
     <div className={`space-y-4 pb-24 ${tab === 'embudo' ? 'max-w-none' : 'max-w-4xl'}`}>
       <header className="space-y-3">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Prospección</h1>
-        {prospects !== null && (
+        {prospects !== null && tab !== 'hoy' && (
           <ProspectingPulsePanel
             pulse={pulse}
             today={today}
@@ -278,10 +273,12 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
       )}
 
       {prospects !== null && tab === 'hoy' && (
+        <ProspectingDailyDesk prospects={list} events={events} today={today} pendingCount={queue.items.length} overflow={queue.overflow} loading={!eventsLoaded} error={eventsError} onAct={act} onDetail={setDetailFor}>
         <ProspectingInbox
           queue={queue.items}
-          // Lo de hoy y lo de días anteriores sin anotar, todo junto y de a uno
-          toClose={[...toClose, ...pending.filter((p) => !toClose.some((t) => t.id === p.id))]}
+          // Hoy y días anteriores se revisan en listas distintas.
+          toClose={toClose}
+          previousPending={pending}
           isEvening={hour >= settings.closeHour}
           settings={settings}
           today={today}
@@ -294,9 +291,11 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           footer={
             <section className="card-swiss p-4">
               <AddMoreRow poolAvailable={pool.availableCount} addMore={more.addMore} busy={more.busy} message={more.message} />
+              <button type="button" className="mt-3 text-xs text-[var(--text-secondary)] underline" onClick={() => setDayStartOpen(true)}>Abrir inicio guiado</button>
             </section>
           }
         />
+        </ProspectingDailyDesk>
       )}
       {prospects !== null && tab === 'embudo' && (
         <ProspectBoard
