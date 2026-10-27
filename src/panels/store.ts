@@ -9,6 +9,8 @@ import { sortByFileName } from '../content/model';
 import { ClientPanel, PanelSlide, PanelSnapshot, TOKEN_RE, newToken, panelDocId, snapshotOf } from './model';
 import { startOfWeekMonday, todayLocal } from '../utils/dates';
 import { createPafPlan } from './pafPlan';
+import { emptyWeb } from './web';
+import { isWebProject } from '../automation/webRecipe';
 
 // Paneles de clientes: client_panels/{id} (tuyo) y student_portals/panel_{token} (lo que ve el cliente)
 
@@ -88,6 +90,26 @@ export const panelUrl = (token: string) => `${window.location.origin}/panel/${to
 
 /** El link que se le manda: el del portal PAF si es alumno, si no el del panel */
 export const panelLink = (p: ClientPanel) => (p.portal ? getStudentPortalUrl(p.token) : panelUrl(p.token));
+
+/** Alta manual desde la ficha, con el mismo ID que usa la preparación Web del servidor. */
+export async function ensureProjectPanel(project: Project): Promise<ClientPanel> {
+  const matches = await getDocs(query(collection(db, 'client_panels'), where('projectId', '==', project.id)));
+  const ref = matches.docs[0]?.ref || doc(db, 'client_panels', `web_${project.id}`);
+  return runTransaction(db, async tx => {
+    const existing = await tx.get(ref);
+    if (existing.exists()) return { ...existing.data(), id: ref.id } as ClientPanel;
+    const now = new Date().toISOString();
+    const panel: ClientPanel = {
+      id: ref.id, projectId: project.id, clientName: project.clientName,
+      phone: project.clientPhone, token: newToken(), active: true,
+      weekStart: startOfWeekMonday(todayLocal()), goals: [], tasks: [], pieces: [], createdAt: now,
+      ...(isWebProject(project) ? { web: emptyWeb() } : {}),
+    };
+    tx.set(ref, deepSanitize(panel));
+    tx.set(doc(db, 'student_portals', panelDocId(panel.token)), deepSanitize(snapshotOf(panel, now)));
+    return panel;
+  });
+}
 
 /**
  * Panel de un alumno PAF: mismo token que su portal, así ve todo en un solo link.

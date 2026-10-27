@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { taskBelongsToProject } from '../utils/taskProject';
 import { ProjectDriveCard } from '../components/ProjectDriveCard';
+import { ProjectPanelCard } from '../components/ProjectPanelCard';
 import { 
   Project, 
   AgendaTask, 
@@ -703,6 +704,9 @@ export const ClientDetailView: React.FC<Props> = ({
       </div>
 
       {/* Main Container: 2-Column on Desktop (30% Left Sticky / 70% Right) */}
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
+        <ProjectPanelCard project={project} onUpdateProject={onUpdateProject} />
+      </div>
       <div className="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:flex lg:gap-6 items-start">
         
         {/* ================= COLUMNA IZQUIERDA (30% Sticky en Desktop) ================= */}
