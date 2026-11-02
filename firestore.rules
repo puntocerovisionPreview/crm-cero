@@ -16,6 +16,15 @@ service cloud.firestore {
       allow get: if true;
     }
 
+    // Portal del cliente PAF: solo lo lee un correo de emailsAutorizados, entrando con
+    // su propia cuenta de Google. Saber el ID (PAF-002) no alcanza. Para listar, la
+    // consulta tiene que filtrar por su correo (array-contains). Escribe solo el dueño.
+    match /paf_portal/{clienteId} {
+      allow get, list: if request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in resource.data.emailsAutorizados;
+    }
+
     match /{document=**} {
       allow read, write: if isOwner();
     }

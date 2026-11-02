@@ -378,6 +378,8 @@ export interface Project {
   pafInstallmentDates?: { number: number; dueDate: string; amount: number; paid: boolean; paidAt?: string; note?: string }[]; // Compatibilidad
   installments?: ProjectInstallment[]; // Plan de cuotas exactas
   pafStageChecklist?: Record<string, { id: string; text: string; done: boolean }[]>; // Hitos de salida por etapa
+  pafClienteId?: string; // ID del alta PAF (PAF-002, PAF-PRUEBA-001); no se reutiliza nunca
+  pafPortal?: import('./portal/model').PafPortalDraft; // Lo que Juan decide publicar en paf_portal/{pafClienteId}
   studentPortalToken?: string; // Link de solo lectura para el alumno (/alumno/{token})
   statusOverride?: 'not_started' | 'in_progress' | 'waiting_client' | 'overdue_payment' | 'completed'; // Override manual del sistema de estado visual
   // Horizonte (Línea de tiempo & Capacidad de largo plazo)

@@ -60,6 +60,7 @@ import { PaymentPlanManager } from '../components/PaymentPlanManager';
 import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
 import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
 import { PafPanelButton } from '../components/PafPanelButton';
+import { PafPortalCard } from '../components/PafPortalCard';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { 
   formatProjectPrice, 
@@ -879,6 +880,7 @@ export const ClientDetailView: React.FC<Props> = ({
             <p className="text-xs text-zinc-400">Su plan de tres meses, tareas, contenido y sesiones. Entra con su enlace, sin contraseña.</p>
             <StudentPortalLinkButton project={project} phone={project.clientPhone} onUpdateProject={onUpdateProject} />
             <PafPanelButton project={project} onUpdateProject={onUpdateProject} />
+            <PafPortalCard project={project} onUpdateProject={onUpdateProject} />
           </div>}
           {/* Key Links Card */}
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-md">
