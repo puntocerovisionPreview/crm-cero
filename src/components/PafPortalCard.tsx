@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Copy, Loader2, ShieldCheck } from 'lucide-react';
-import { Project } from '../types';
+import { AgendaMeeting, Project } from '../types';
 import {
   CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS,
-  buildPafPortal, emptyPortalDraft, normalizeEmails, type PafPortalDoc, type PafPortalDraft,
+  emptyPortalDraft, nextMeeting, normalizeEmails, portalFromProject, type PafPortalDoc, type PafPortalDraft,
 } from '../portal/model';
 import { publishPafPortal, subscribePafPortal, unpublishPafPortal } from '../portal/store';
 import { hapticFeedback } from '../utils/haptics';
@@ -15,7 +15,7 @@ const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.
  * El borrador queda en el proyecto; "Publicar" copia solo eso a paf_portal/{ID}.
  * No manda nada al cliente: el enlace lo pasa Juan por su canal.
  */
-export const PafPortalCard: React.FC<{ project: Project; onUpdateProject: (id: string, updates: Partial<Project>) => void }> = ({ project, onUpdateProject }) => {
+export const PafPortalCard: React.FC<{ project: Project; meetings: AgendaMeeting[]; onUpdateProject: (id: string, updates: Partial<Project>) => void }> = ({ project, meetings, onUpdateProject }) => {
   const [clienteId, setClienteId] = useState(project.pafClienteId || '');
   const [draft, setDraft] = useState<PafPortalDraft>(project.pafPortal || emptyPortalDraft(project.clientEmail));
   const [emailsText, setEmailsText] = useState((project.pafPortal?.emails || draft.emails).join(', '));
@@ -30,13 +30,28 @@ export const PafPortalCard: React.FC<{ project: Project; onUpdateProject: (id: s
     return subscribePafPortal(savedId, setPublished);
   }, [savedId]);
 
+  // El ID que asigna el alta llega después: si todavía no se publicó, lo toma
+  useEffect(() => {
+    if (project.pafClienteId && !published) setClienteId(project.pafClienteId);
+  }, [project.pafClienteId, published]);
+
+  // Si cambia la próxima reunión en la agenda, el portal publicado se actualiza solo
+  const today = new Date().toLocaleDateString('en-CA');
+  const nextKey = JSON.stringify(nextMeeting(meetings, project.id, today));
+  useEffect(() => {
+    if (!published || !project.pafPortal?.publishedAt || JSON.stringify(published.proximaReunion ?? null) === nextKey) return;
+    const r = portalFromProject(project, meetings);
+    if ('doc' in r) publishPafPortal(r.doc).catch(() => undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nextKey, published?.proximaReunion]);
+
   const set = (patch: Partial<PafPortalDraft>) => setDraft((d) => ({ ...d, ...patch }));
   const portalUrl = `${window.location.origin}/portal`;
 
   const publish = async () => {
     hapticFeedback.light();
     const nextDraft = { ...draft, emails: normalizeEmails(emailsText) };
-    const result = buildPafPortal({ clienteId, estudio: project.clientName, draft: nextDraft });
+    const result = portalFromProject(project, meetings, nextDraft, clienteId);
     if ('errors' in result) { setErrors(result.errors); return; }
     setBusy(true); setErrors([]); setNotice('');
     try {
@@ -55,6 +70,8 @@ export const PafPortalCard: React.FC<{ project: Project; onUpdateProject: (id: s
     setBusy(true); setErrors([]); setNotice('');
     try {
       await unpublishPafPortal(savedId);
+      // Sin fecha de publicación: los cambios de tareas ya no lo vuelven a publicar
+      onUpdateProject(project.id, { pafPortal: { ...draft, emails: normalizeEmails(emailsText), publishedAt: undefined } });
       setNotice('Portal despublicado.');
     } catch {
       setErrors(['No se pudo despublicar. Reintentá.']);

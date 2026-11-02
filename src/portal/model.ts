@@ -44,13 +44,46 @@ export interface PafPortalDraft {
   publishedAt?: string;
 }
 
-/** Tareas y entregas publicadas (se completan en el paso 4) */
+/**
+ * Tarea del estudio (privada, en el proyecto). El cliente la ve solo cuando Juan la habilita.
+ * "Terminé" del cliente la pasa a "enviada"; la aprobación la confirma Juan con fecha y canal.
+ */
+export type PafTaskState = 'borrador' | 'habilitada' | 'enviada' | 'aprobada';
+export const PAF_TASK_STATE_LABEL: Record<PafTaskState, string> = {
+  borrador: 'Sin habilitar',
+  habilitada: 'Habilitada',
+  enviada: 'Avisó que terminó',
+  aprobada: 'Aprobada',
+};
+export interface PafTask {
+  id: string;
+  titulo: string;
+  detalle?: string;
+  fecha?: string; // YYYY-MM-DD
+  estado: PafTaskState;
+  habilitadaEn?: string;
+  avisoEn?: string;
+  aprobacion?: { fecha: string; canal: string };
+}
+
+/** Entrega de Juan al estudio: archivo en Drive, se publica cuando él decide */
+export interface PafDelivery {
+  id: string;
+  titulo: string;
+  fecha?: string;
+  enlace?: string;
+  publicada: boolean;
+}
+
+/** Tarea tal como la ve el cliente */
 export interface PafPortalTask {
   id: string;
   titulo: string;
   detalle?: string;
   fecha?: string; // YYYY-MM-DD
   estado: 'habilitada' | 'enviada' | 'aprobada';
+  aprobadaEl?: string; // YYYY-MM-DD
+  habilitadaEn?: string; // para no mostrar como avisada una tarea que se volvió a habilitar
 }
 export interface PafPortalDelivery {
   id: string;
@@ -129,9 +162,158 @@ export function buildPafPortal(
       hitoVisible: hito,
       resumenVisible: input.draft.resumen.trim().slice(0, 2000),
       enlaces,
-      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}) })),
+      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}) })),
       entregas: (input.entregas || []).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, ...(fecha ? { fecha } : {}), ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
       proximaReunion: input.proximaReunion || null,
+      actualizadoEn: now,
+    },
+  };
+}
+
+// ---------- De la ficha al portal ----------
+
+/** Solo lo habilitado: los borradores no salen nunca */
+export function publicTasks(tasks: PafTask[] = []): PafPortalTask[] {
+  return tasks
+    .filter((t) => t.estado !== 'borrador')
+    .map((t) => ({
+      id: t.id,
+      titulo: t.titulo,
+      estado: t.estado as PafPortalTask['estado'],
+      ...(t.detalle ? { detalle: t.detalle } : {}),
+      ...(t.fecha ? { fecha: t.fecha } : {}),
+      ...(t.habilitadaEn ? { habilitadaEn: t.habilitadaEn } : {}),
+      ...(t.estado === 'aprobada' && t.aprobacion ? { aprobadaEl: t.aprobacion.fecha.slice(0, 10) } : {}),
+    }));
+}
+
+export function publicDeliveries(items: PafDelivery[] = []): PafPortalDelivery[] {
+  return items.filter((d) => d.publicada).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, fecha, enlace }));
+}
+
+/** Próxima reunión confirmada del proyecto (sin las propuestas sin hora) */
+export function nextMeeting(
+  meetings: { projectId?: string; date: string; time?: string; completed: boolean; proposed?: boolean }[],
+  projectId: string,
+  today: string
+): PafPortalDoc['proximaReunion'] {
+  const next = meetings
+    .filter((m) => m.projectId === projectId && !m.completed && !m.proposed && m.date >= today)
+    .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))[0];
+  return next ? { fecha: next.date, ...(next.time ? { hora: next.time } : {}) } : null;
+}
+
+export function portalFromProject(
+  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[] },
+  meetings: Parameters<typeof nextMeeting>[0],
+  draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
+  clienteId = project.pafClienteId,
+  now = new Date()
+) {
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return buildPafPortal(
+    {
+      clienteId,
+      estudio: project.clientName,
+      draft,
+      tareas: publicTasks(project.pafTareas),
+      entregas: publicDeliveries(project.pafEntregas),
+      proximaReunion: nextMeeting(meetings, project.id, today),
+    },
+    now.toISOString()
+  );
+}
+
+// ---------- "Terminé" del cliente ----------
+
+/** paf_portal/{clienteId}/avisos/{id}: lo único que el cliente puede escribir */
+export interface PafAviso {
+  id: string;
+  tareaId: string;
+  email: string;
+  creadoEn: string; // ISO
+}
+
+/**
+ * Pasa a "enviada" las tareas habilitadas que el cliente avisó que terminó.
+ * Solo cuenta avisos posteriores a la habilitación (si Juan la volvió a habilitar).
+ * Devuelve null si no cambia nada.
+ */
+export function applyAvisos(tasks: PafTask[], avisos: PafAviso[]): PafTask[] | null {
+  let changed = false;
+  const next = tasks.map((t) => {
+    if (t.estado !== 'habilitada') return t;
+    const aviso = avisos
+      .filter((a) => a.tareaId === t.id && (!t.habilitadaEn || a.creadoEn > t.habilitadaEn))
+      .sort((a, b) => a.creadoEn.localeCompare(b.creadoEn))[0];
+    if (!aviso) return t;
+    changed = true;
+    return { ...t, estado: 'enviada' as const, avisoEn: aviso.creadoEn };
+  });
+  return changed ? next : null;
+}
+
+export const APPROVAL_CHANNELS = ['WhatsApp', 'Reunión', 'Correo', 'Portal', 'Otro'] as const;
+
+/** Aprobación de Juan: queda registrada con fecha y canal */
+export function approveTask(task: PafTask, canal: string, now = new Date().toISOString()): PafTask {
+  return { ...task, estado: 'aprobada', aprobacion: { fecha: now, canal: canal.trim() || 'Otro' } };
+}
+
+// ---------- Alta (CRM → Apps Script) ----------
+
+export const PAF_PEDIDOS_COLLECTION = 'paf_pedidos_alta';
+
+/**
+ * paf_pedidos_alta/{autoId}. Lo crea el CRM con estado "pendiente"; el Apps Script lo
+ * registra en la Sheet y escribe en ESTE MISMO documento clienteId, enlaceFormulario y el
+ * bloque alta (carpetas, ficha, respuesta). El script no toca ninguna otra colección.
+ */
+export interface PafPedidoAlta {
+  id: string;
+  projectId: string;
+  estudio: string;
+  contacto: string;
+  email: string;
+  zonaHoraria: string;
+  prueba: boolean;
+  estado: 'pendiente' | 'registrado' | 'error';
+  clienteId?: string;
+  enlaceFormulario?: string;
+  error?: string;
+  alta?: {
+    estado?: string;
+    carpetaInterna?: string;
+    carpetaCompartida?: string;
+    ficha?: string;
+    fechaRespuesta?: string;
+    error?: string;
+  };
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
+export function buildPedidoAlta(
+  input: { projectId: string; estudio: string; contacto: string; email: string; zonaHoraria: string; prueba: boolean },
+  now = new Date().toISOString()
+): { pedido: Omit<PafPedidoAlta, 'id'> } | { errors: string[] } {
+  const errors: string[] = [];
+  const email = input.email.trim().toLowerCase();
+  if (!input.estudio.trim()) errors.push('Falta el nombre del estudio.');
+  if (!input.contacto.trim()) errors.push('Falta el contacto.');
+  if (!EMAIL_RE.test(email)) errors.push('El correo no es válido.');
+  if (!input.zonaHoraria.trim()) errors.push('Falta la zona horaria.');
+  if (errors.length) return { errors };
+  return {
+    pedido: {
+      projectId: input.projectId,
+      estudio: input.estudio.trim(),
+      contacto: input.contacto.trim(),
+      email,
+      zonaHoraria: input.zonaHoraria.trim(),
+      prueba: input.prueba,
+      estado: 'pendiente',
+      creadoEn: now,
       actualizadoEn: now,
     },
   };

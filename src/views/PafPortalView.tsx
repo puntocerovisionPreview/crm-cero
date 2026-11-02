@@ -5,7 +5,52 @@ import { BrandLogo } from '../components/BrandLogo';
 import { auth } from '../firebaseAuth';
 import { signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, type PafPortalDoc } from '../portal/model';
-import { subscribeMyPafPortals } from '../portal/store';
+import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals } from '../portal/store';
+import type { PafAviso } from '../portal/model';
+
+/**
+ * Tareas habilitadas. "Terminé" solo le avisa a Juan: la tarea queda "en revisión"
+ * hasta que él la apruebe.
+ */
+const PortalTasks: React.FC<{ portal: PafPortalDoc; email: string }> = ({ portal, email }) => {
+  const [avisos, setAvisos] = useState<PafAviso[]>([]);
+  const [sending, setSending] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => subscribeAvisos(portal.clienteId, setAvisos), [portal.clienteId]);
+
+  const done = async (tareaId: string) => {
+    setSending(tareaId); setError('');
+    try { await sendTaskDone(portal.clienteId, tareaId, email); } catch { setError('No se pudo enviar el aviso. Probá de nuevo.'); }
+    finally { setSending(null); }
+  };
+
+  return (
+    <section className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-3">
+      <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Tus tareas</h2>
+      {portal.tareas.map((t) => {
+        const avisada = t.estado === 'enviada' || (t.estado === 'habilitada' && avisos.some((a) => a.tareaId === t.id && (!t.habilitadaEn || a.creadoEn > t.habilitadaEn)));
+        return (
+          <div key={t.id} className="text-sm space-y-1">
+            <div className="flex items-start gap-2">
+              <span className="flex-1"><span className="font-medium">{t.titulo}</span>{t.fecha && <span className="text-zinc-500"> · {t.fecha}</span>}</span>
+              {t.estado === 'aprobada' ? (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400"><Check className="w-3.5 h-3.5" />Aprobada</span>
+              ) : avisada ? (
+                <span className="text-xs font-semibold text-amber-300">En revisión</span>
+              ) : (
+                <button type="button" onClick={() => done(t.id)} disabled={sending === t.id} className="rounded-lg bg-amber-400 text-zinc-950 px-2.5 py-1 text-xs font-semibold disabled:opacity-60">
+                  {sending === t.id ? 'Enviando…' : 'Terminé'}
+                </button>
+              )}
+            </div>
+            {t.detalle && <p className="text-zinc-400">{t.detalle}</p>}
+          </div>
+        );
+      })}
+      {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
+    </section>
+  );
+};
 
 /**
  * /portal: el estudio entra con su cuenta de Google (el mismo correo con el que se
@@ -108,14 +153,7 @@ export const PafPortalView: React.FC = () => {
         </section>
       )}
 
-      {p.tareas?.length > 0 && (
-        <section className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-2">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Tus tareas</h2>
-          {p.tareas.map((t) => (
-            <div key={t.id} className="text-sm"><span className="font-medium">{t.titulo}</span>{t.fecha && <span className="text-zinc-500"> · {t.fecha}</span>}{t.detalle && <p className="text-zinc-400">{t.detalle}</p>}</div>
-          ))}
-        </section>
-      )}
+      {p.tareas?.length > 0 && <PortalTasks portal={p} email={user.email!} />}
 
       {p.entregas?.length > 0 && (
         <section className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-2">

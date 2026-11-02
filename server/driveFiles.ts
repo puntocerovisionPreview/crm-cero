@@ -45,7 +45,8 @@ export async function shareFolder(db: Firestore, folder: DriveFolder, rawEmail: 
   if (existing) {
     if (existing.role !== role) await driveRequest(db, `files/${folder.id}/permissions/${existing.id}`, 'PATCH', { role });
   } else {
-    await driveRequest(db, `files/${folder.id}/permissions?sendNotificationEmail=true`, 'POST', { type: 'user', role, emailAddress: email });
+    // Sin correo automático de Google: el enlace a la carpeta se lo pasás vos
+    await driveRequest(db, `files/${folder.id}/permissions?sendNotificationEmail=false`, 'POST', { type: 'user', role, emailAddress: email });
   }
 }
 

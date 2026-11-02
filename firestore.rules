@@ -25,6 +25,25 @@ service cloud.firestore {
         && request.auth.token.email in resource.data.emailsAutorizados;
     }
 
+    // "Terminé" del estudio: lo único que el cliente puede escribir. Solo crea un aviso
+    // con su propio correo y la hora del servidor; no aprueba nada (eso lo hace Juan).
+    function isPortalReader(clienteId) {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in get(/databases/$(database)/documents/paf_portal/$(clienteId)).data.emailsAutorizados;
+    }
+
+    match /paf_portal/{clienteId}/avisos/{avisoId} {
+      allow read: if isPortalReader(clienteId);
+      allow create: if isPortalReader(clienteId)
+        && request.resource.data.keys().hasOnly(['tareaId', 'email', 'creadoEn'])
+        && request.resource.data.tareaId is string
+        && request.resource.data.tareaId.size() > 0
+        && request.resource.data.tareaId.size() <= 60
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.creadoEn == request.time;
+    }
+
     match /{document=**} {
       allow read, write: if isOwner();
     }
