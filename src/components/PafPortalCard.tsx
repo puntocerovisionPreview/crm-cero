@@ -30,6 +30,12 @@ export const PafPortalCard: React.FC<{ project: Project; meetings: AgendaMeeting
     return subscribePafPortal(savedId, setPublished);
   }, [savedId]);
 
+  // La carpeta del estudio que pegaste en el alta va a "Tu carpeta" si está vacía
+  const sharedFolder = project.pafDrive?.carpetaCompartida;
+  useEffect(() => {
+    if (sharedFolder) setDraft((d) => (d.enlaces.carpeta ? d : { ...d, enlaces: { ...d.enlaces, carpeta: sharedFolder } }));
+  }, [sharedFolder]);
+
   // El ID que asigna el alta llega después: si todavía no se publicó, lo toma
   useEffect(() => {
     if (project.pafClienteId && !published) setClienteId(project.pafClienteId);

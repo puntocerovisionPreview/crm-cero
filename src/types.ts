@@ -380,6 +380,7 @@ export interface Project {
   pafStageChecklist?: Record<string, { id: string; text: string; done: boolean }[]>; // Hitos de salida por etapa
   pafClienteId?: string; // ID del alta PAF (PAF-002, PAF-PRUEBA-001); no se reutiliza nunca
   pafPortal?: import('./portal/model').PafPortalDraft; // Lo que Juan decide publicar en paf_portal/{pafClienteId}
+  pafDrive?: import('./portal/model').PafDriveLinks; // Carpetas pegadas a mano (si el script todavía no las devolvió)
   pafTareas?: import('./portal/model').PafTask[]; // Tareas del estudio: el cliente ve solo las habilitadas
   pafEntregas?: import('./portal/model').PafDelivery[]; // Entregas (enlaces a Drive), visibles si están publicadas
   studentPortalToken?: string; // Link de solo lectura para el alumno (/alumno/{token})

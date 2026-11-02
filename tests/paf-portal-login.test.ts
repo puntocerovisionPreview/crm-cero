@@ -125,11 +125,11 @@ describe('tareas, avisos y aprobaciones', () => {
 
 describe('pedido de alta', () => {
   it('arma el pedido pendiente con el correo normalizado', () => {
-    const r = buildPedidoAlta({ projectId: 'p1', estudio: ' Estudio ', contacto: 'Ana', email: 'Ana@Gmail.com', zonaHoraria: 'America/Argentina/Buenos_Aires', prueba: true }, '2026-11-02T10:00:00.000Z');
-    expect(r).toEqual({ pedido: { projectId: 'p1', estudio: 'Estudio', contacto: 'Ana', email: 'ana@gmail.com', zonaHoraria: 'America/Argentina/Buenos_Aires', prueba: true, estado: 'pendiente', creadoEn: '2026-11-02T10:00:00.000Z', actualizadoEn: '2026-11-02T10:00:00.000Z' } });
+    const r = buildPedidoAlta({ projectId: 'p1', clienteId: 'paf-prueba-002', estudio: ' Estudio ', contacto: 'Ana', email: 'Ana@Gmail.com', zonaHoraria: 'America/Argentina/Buenos_Aires', prueba: true }, '2026-11-02T10:00:00.000Z');
+    expect(r).toEqual({ pedido: { projectId: 'p1', estudio: 'Estudio', contacto: 'Ana', email: 'ana@gmail.com', zonaHoraria: 'America/Argentina/Buenos_Aires', prueba: true, estado: 'pendiente', clienteId: 'PAF-PRUEBA-002', enlaceFormulario: 'https://tally.so/r/2jXEVg?cliente_id=PAF-PRUEBA-002', creadoEn: '2026-11-02T10:00:00.000Z', actualizadoEn: '2026-11-02T10:00:00.000Z' } });
   });
-  it('no deja pedir sin correo válido ni contacto', () => {
-    const r = buildPedidoAlta({ projectId: 'p1', estudio: 'E', contacto: '', email: 'no', zonaHoraria: 'X', prueba: false });
+  it('no deja pedir sin correo válido ni con un ID de otro tipo', () => {
+    const r = buildPedidoAlta({ projectId: 'p1', clienteId: 'PAF-PRUEBA-003', estudio: 'E', contacto: '', email: 'no', zonaHoraria: 'X', prueba: false });
     expect('errors' in r && r.errors).toHaveLength(2);
   });
 });
@@ -142,5 +142,32 @@ describe('reglas de avisos', () => {
     expect(block).toContain('request.resource.data.email == request.auth.token.email');
     expect(block).toContain('request.resource.data.creadoEn == request.time');
     expect(block).not.toMatch(/allow (update|delete|write)/);
+  });
+});
+
+import { suggestClienteId, tallyLink } from '../src/portal/model';
+import { googleCalendarLink } from '../src/components/PafReunionCard';
+
+describe('link de Tally e ID', () => {
+  it('el link lleva el ID en el campo oculto cliente_id', () => {
+    expect(tallyLink('PAF-002')).toBe('https://tally.so/r/2jXEVg?cliente_id=PAF-002');
+  });
+  it('el primer real es PAF-002 y después sigue el mayor usado', () => {
+    expect(suggestClienteId([], false)).toBe('PAF-002');
+    expect(suggestClienteId(['PAF-002', 'PAF-007', 'PAF-PRUEBA-009'], false)).toBe('PAF-008');
+    expect(suggestClienteId(['PAF-PRUEBA-001', 'PAF-010'], true)).toBe('PAF-PRUEBA-002');
+  });
+  it('el contador evita reutilizar un ID borrado', () => {
+    expect(suggestClienteId(['PAF-002'], false, 5)).toBe('PAF-006');
+  });
+});
+
+describe('reunión en Google Calendar', () => {
+  it('arma el evento con hora y duración, sin invitados', () => {
+    const url = new URL(googleCalendarLink({ title: 'Reunión PAF · Estudio', date: '2026-11-10', time: '10:30', durationHours: 1.5 }));
+    expect(url.searchParams.get('action')).toBe('TEMPLATE');
+    expect(url.searchParams.get('dates')).toBe('20261110T103000/20261110T120000');
+    expect(url.searchParams.get('text')).toBe('Reunión PAF · Estudio');
+    expect(url.searchParams.has('add')).toBe(false);
   });
 });

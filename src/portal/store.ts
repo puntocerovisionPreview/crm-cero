@@ -1,6 +1,6 @@
-import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
-import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, portalFromProject, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
+import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, clienteIdNumber, portalFromProject, suggestClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
 
 // Portal PAF: paf_portal/{clienteId}. Escribe solo Juan (CRM); el cliente solo lee el suyo
 // y deja avisos de "terminé" en paf_portal/{clienteId}/avisos.
@@ -72,11 +72,45 @@ export function subscribeAvisos(clienteId: string, onChanged: (items: PafAviso[]
 
 // ---------- Pedidos de alta (los procesa el Apps Script) ----------
 
-export async function createPedidoAlta(pedido: Omit<PafPedidoAlta, 'id'>): Promise<string> {
-  const ref = await addDoc(collection(db, PAF_PEDIDOS_COLLECTION), pedido);
-  return ref.id;
+// El contador evita repetir un ID aunque se borre un pedido o una ficha
+const counterRef = () => doc(db, 'settings', 'paf_ids');
+
+/** Próximo ID libre (real o de prueba), mirando pedidos, fichas y el contador */
+export async function suggestNextClienteId(prueba: boolean): Promise<string> {
+  const [pedidos, fichas, counter, portales] = await Promise.all([
+    getDocs(collection(db, PAF_PEDIDOS_COLLECTION)),
+    getDocs(query(collection(db, 'projects'), where('pafClienteId', '>=', 'PAF-'))),
+    getDoc(counterRef()),
+    getDocs(collection(db, PAF_PORTAL_COLLECTION)),
+  ]);
+  const used = [
+    ...pedidos.docs.map((d) => String(d.data().clienteId || d.id)),
+    ...fichas.docs.map((d) => String(d.data().pafClienteId || '')),
+    ...portales.docs.map((d) => d.id),
+  ];
+  const last = Number(counter.data()?.[prueba ? 'ultimoPrueba' : 'ultimoReal'] || 0);
+  return suggestClienteId(used, prueba, last);
 }
 
+/**
+ * Guarda el pedido en paf_pedidos_alta/{clienteId}: el ID es la clave, así no se puede
+ * usar dos veces. Solo se reescribe si el pedido anterior con ese ID quedó en error.
+ */
+export async function createPedidoAlta(pedido: Omit<PafPedidoAlta, 'id'>, replacesId?: string): Promise<string> {
+  const id = pedido.clienteId!;
+  const ref = doc(db, PAF_PEDIDOS_COLLECTION, id);
+  await runTransaction(db, async (tx) => {
+    const [prev, counter] = await Promise.all([tx.get(ref), tx.get(counterRef())]);
+    if (prev.exists() && prev.data().estado !== 'error') throw new Error(`El ID ${id} ya se usó. Elegí otro.`);
+    const key = pedido.prueba ? 'ultimoPrueba' : 'ultimoReal';
+    const n = clienteIdNumber(id, pedido.prueba) || 0;
+    tx.set(ref, pedido);
+    // Pedido viejo sin ID del mismo estudio: se reemplaza por este
+    if (replacesId && replacesId !== id) tx.delete(doc(db, PAF_PEDIDOS_COLLECTION, replacesId));
+    if (n > Number(counter.data()?.[key] || 0)) tx.set(counterRef(), { [key]: n }, { merge: true });
+  });
+  return id;
+}
 /** El último pedido de alta del proyecto (o null) */
 export function subscribePedidoDeProyecto(projectId: string, onChanged: (p: PafPedidoAlta | null) => void) {
   return onSnapshot(

@@ -33,23 +33,26 @@ Las dos partes se comunican **solo a través de Firestore**, con colecciones aco
 
 **Cambio respecto de la propuesta:** el script escribe **solo** en `paf_pedidos_alta`. No toca la ficha del cliente: el CRM ya tiene sus fichas en `projects` y lee el resultado desde el pedido. Así el script toca una sola colección.
 
-**1. `paf_pedidos_alta/{autoId}`.** Lo crea el CRM; lo procesa y lo completa el script.
+**1. `paf_pedidos_alta/{clienteId}`.** Lo crea el CRM; el script lo registra y lo completa.
+
+**Cambio (02/11/2026, a pedido de Juan): el ID y el link de Tally los asigna el CRM al instante**, para que Juan mande el formulario sin esperar al script. El ID del documento es el `clienteId`, así no se puede repetir. El CRM lleva un contador en `settings/paf_ids` (`ultimoReal`, `ultimoPrueba`).
 ```
 Lo escribe el CRM:
-{ projectId, estudio, contacto, email, zonaHoraria, prueba: bool,
+{ projectId, clienteId,          // PAF-002… o PAF-PRUEBA-00N si prueba == true
+  enlaceFormulario,              // https://tally.so/r/2jXEVg?cliente_id=<clienteId>
+  estudio, contacto, email, zonaHoraria, prueba: bool,
   estado: "pendiente", creadoEn, actualizadoEn }      // fechas en ISO 8601
 
 Lo completa el script, en el MISMO documento:
 { estado: "registrado" | "error",
-  clienteId,              // PAF-002 o PAF-PRUEBA-00N si prueba == true
-  enlaceFormulario,       // Tally con cliente_id
-  error?,                 // texto corto si estado == "error"
+  error?,                        // texto corto si estado == "error"
   alta: { estado, carpetaInterna, carpetaCompartida, ficha, fechaRespuesta, error },
   actualizadoEn }
 ```
-- El script toma los pedidos con `estado == "pendiente"`, registra al estudio en la Sheet y escribe `estado`, `clienteId` y `enlaceFormulario`.
+- El script toma los pedidos con `estado == "pendiente"` y agrega la fila en la pestaña `Clientes` **con ese mismo `clienteId`** (no genera uno nuevo) y `ENLACE_FORMULARIO` = `enlaceFormulario`. Después escribe `estado: "registrado"`.
 - Cuando el estudio responde Tally y se crean las carpetas, actualiza el bloque `alta` del mismo pedido (URLs completas de Drive).
-- Si un pedido falla, `estado: "error"` y `error`. Si Juan lo corrige, el CRM crea **otro** pedido; no se reescribe el viejo.
+- Si el ID ya existe en la Sheet con otro estudio: `estado: "error"` y `error`. Juan corrige y el CRM reescribe ese pedido o crea otro con un ID nuevo.
+- Para no chocar: desde ahora los IDs se crean solo desde el CRM, no desde el menú PAF de la Sheet.
 - Nunca reutilizar un `clienteId`. Juan envía el enlace por su canal; nadie manda mensajes automáticos.
 
 **2. Ficha privada del cliente:** es `projects/{projectId}` en el CRM (ya existía). El CRM guarda ahí `pafClienteId`, tareas, entregas y el borrador del portal. **El script no la toca.**

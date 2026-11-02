@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     include: ['tests/**/*.test.ts'],
     environment: 'node',
+    setupFiles: ['./server/nodeCrypto.ts'],
     env: { TZ: 'America/Argentina/Cordoba' },
   },
 });

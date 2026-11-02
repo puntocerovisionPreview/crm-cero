@@ -63,6 +63,7 @@ import { PafPanelButton } from '../components/PafPanelButton';
 import { PafPortalCard } from '../components/PafPortalCard';
 import { PafAltaCard } from '../components/PafAltaCard';
 import { PafTareasCard } from '../components/PafTareasCard';
+import { PafReunionCard } from '../components/PafReunionCard';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { 
   formatProjectPrice, 
@@ -884,6 +885,7 @@ export const ClientDetailView: React.FC<Props> = ({
             <PafPanelButton project={project} onUpdateProject={onUpdateProject} />
             <PafAltaCard project={project} onUpdateProject={onUpdateProject} />
             <PafPortalCard project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
+            <PafReunionCard project={project} meetings={meetings} onAddMeeting={onAddMeeting} />
             <PafTareasCard project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
           </div>}
           {/* Key Links Card */}

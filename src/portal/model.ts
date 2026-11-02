@@ -265,9 +265,10 @@ export function approveTask(task: PafTask, canal: string, now = new Date().toISO
 export const PAF_PEDIDOS_COLLECTION = 'paf_pedidos_alta';
 
 /**
- * paf_pedidos_alta/{autoId}. Lo crea el CRM con estado "pendiente"; el Apps Script lo
- * registra en la Sheet y escribe en ESTE MISMO documento clienteId, enlaceFormulario y el
- * bloque alta (carpetas, ficha, respuesta). El script no toca ninguna otra colección.
+ * paf_pedidos_alta/{autoId}. Lo crea el CRM con estado "pendiente" y ya con clienteId y
+ * enlaceFormulario (Juan manda el link al instante). El Apps Script lo registra en la Sheet
+ * con ESE ID y escribe en este mismo documento el estado y el bloque alta (carpetas, ficha,
+ * respuesta). El script no toca ninguna otra colección.
  */
 export interface PafPedidoAlta {
   id: string;
@@ -294,13 +295,14 @@ export interface PafPedidoAlta {
 }
 
 export function buildPedidoAlta(
-  input: { projectId: string; estudio: string; contacto: string; email: string; zonaHoraria: string; prueba: boolean },
+  input: { projectId: string; clienteId: string; estudio: string; contacto: string; email: string; zonaHoraria: string; prueba: boolean },
   now = new Date().toISOString()
 ): { pedido: Omit<PafPedidoAlta, 'id'> } | { errors: string[] } {
   const errors: string[] = [];
   const email = input.email.trim().toLowerCase();
   if (!input.estudio.trim()) errors.push('Falta el nombre del estudio.');
-  if (!input.contacto.trim()) errors.push('Falta el contacto.');
+  const clienteId = input.clienteId.trim().toUpperCase();
+  if (clienteIdNumber(clienteId, input.prueba) === null) errors.push(input.prueba ? 'El ID de prueba tiene que ser PAF-PRUEBA-00N.' : 'El ID tiene que ser PAF-00N (ej. PAF-002).');
   if (!EMAIL_RE.test(email)) errors.push('El correo no es válido.');
   if (!input.zonaHoraria.trim()) errors.push('Falta la zona horaria.');
   if (errors.length) return { errors };
@@ -313,8 +315,45 @@ export function buildPedidoAlta(
       zonaHoraria: input.zonaHoraria.trim(),
       prueba: input.prueba,
       estado: 'pendiente',
+      clienteId,
+      enlaceFormulario: tallyLink(clienteId),
       creadoEn: now,
       actualizadoEn: now,
     },
   };
+}
+
+// ---------- ID y link de Tally (los da el CRM al instante) ----------
+
+/** Formulario de arranque. El ID viaja en el campo oculto cliente_id. */
+export const TALLY_FORM_URL = 'https://tally.so/r/2jXEVg';
+
+export function tallyLink(clienteId: string): string {
+  return `${TALLY_FORM_URL}?cliente_id=${encodeURIComponent(clienteId)}`;
+}
+
+export function formatClienteId(n: number, prueba: boolean): string {
+  return `PAF-${prueba ? 'PRUEBA-' : ''}${String(n).padStart(3, '0')}`;
+}
+
+/** Número del ID si es del tipo pedido (real o prueba); null si no */
+export function clienteIdNumber(id: string, prueba: boolean): number | null {
+  const m = id.trim().toUpperCase().match(prueba ? /^PAF-PRUEBA-(\d{3,})$/ : /^PAF-(\d{3,})$/);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Próximo ID libre: uno más que el mayor usado (en la ficha, en pedidos o en el contador).
+ * PAF-001 fue una prueba, así que el primer real es PAF-002. Un ID no se reutiliza nunca.
+ */
+export function suggestClienteId(usedIds: string[], prueba: boolean, lastCounter = 0): string {
+  const max = Math.max(prueba ? 0 : 1, lastCounter, ...usedIds.map((id) => clienteIdNumber(id, prueba) ?? 0));
+  return formatClienteId(max + 1, prueba);
+}
+
+/** Carpetas de Drive que Juan pega a mano mientras el script no las devuelve */
+export interface PafDriveLinks {
+  carpetaCompartida?: string;
+  carpetaInterna?: string;
+  ficha?: string;
 }
