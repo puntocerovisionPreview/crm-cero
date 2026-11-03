@@ -49,6 +49,7 @@ const DEMO: PafPortalDoc = {
     { id: 'd3', titulo: 'Elegir 3 proyectos que te representen', detalle: 'Los que te gustaría hacer más seguido.', fecha: '2026-11-08', estado: 'habilitada' },
     { id: 'd4', titulo: 'Revisar la propuesta de foco', estado: 'enviada' },
   ],
+  tareasHabilitadas: ['d2', 'd3'],
   entregas: [
     { id: 'e1', titulo: 'Diagnóstico inicial del estudio', fecha: '2026-10-30', enlace: 'https://drive.google.com/' },
     { id: 'e2', titulo: 'Propuesta de foco', fecha: '2026-11-04', enlace: 'https://drive.google.com/' },

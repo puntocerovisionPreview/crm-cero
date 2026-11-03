@@ -1,12 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { BellRing, Check, ListChecks, Package, Trash2 } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
-  APPROVAL_CHANNELS, PAF_TASK_STATE_LABEL, applyAvisos, approveTask, safeHttpsUrl,
+  APPROVAL_CHANNELS, PAF_TASK_STATE_LABEL, approveTask, safeHttpsUrl,
   type PafDelivery, type PafTask, type PafTaskState,
 } from '../portal/model';
-import { republishIfPublished, subscribeAvisos } from '../portal/store';
+import { republishIfPublished } from '../portal/store';
 import { hapticFeedback } from '../utils/haptics';
 
 const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
@@ -43,16 +43,8 @@ export const PafTareasCard: React.FC<{
   const saveTasks = (pafTareas: PafTask[]) => save({ pafTareas });
   const saveDeliveries = (pafEntregas: PafDelivery[]) => save({ pafEntregas });
 
-  // Avisos de "terminé" del estudio
+  // Los "Terminé" del estudio los aplica el CRM en segundo plano (usePafAvisos en App)
   const clienteId = project.pafClienteId;
-  useEffect(() => {
-    if (!clienteId) return;
-    return subscribeAvisos(clienteId, (avisos) => {
-      const next = applyAvisos(project.pafTareas || [], avisos);
-      if (next) saveTasks(next);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clienteId, project.pafTareas]);
 
   const setState = (id: string, estado: PafTaskState) => {
     const now = new Date().toISOString();

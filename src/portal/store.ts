@@ -1,5 +1,6 @@
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
+import { getAuthHeaders } from '../utils/authAccess';
 import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, clienteIdNumber, portalFromProject, suggestClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
 
 // Portal PAF: paf_portal/{clienteId}. Escribe solo Juan (CRM); el cliente solo lee el suyo
@@ -59,6 +60,29 @@ function toAviso(id: string, data: any): PafAviso {
 /** El cliente avisa que terminó una tarea (las reglas solo dejan estos tres campos) */
 export async function sendTaskDone(clienteId: string, tareaId: string, email: string): Promise<void> {
   await addDoc(avisosOf(clienteId), { tareaId, email: email.toLowerCase(), creadoEn: serverTimestamp() });
+  // Aviso a Juan por push/Telegram aunque el CRM esté cerrado. Si falla, el aviso igual quedó guardado.
+  getAuthHeaders()
+    .then((headers) => fetch('/api/paf/terminado', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId, tareaId }) }))
+    .catch(() => undefined);
+}
+
+/** Para el CRM: los avisos de todos los portales, agrupados por clienteId */
+export function subscribeAllAvisos(onChanged: (byCliente: Map<string, PafAviso[]>) => void) {
+  return onSnapshot(
+    collectionGroup(db, 'avisos'),
+    (snap) => {
+      const byCliente = new Map<string, PafAviso[]>();
+      snap.docs.forEach((d) => {
+        const clienteId = d.ref.parent.parent?.id;
+        if (!clienteId || d.ref.parent.parent?.parent.id !== PAF_PORTAL_COLLECTION) return;
+        const aviso = toAviso(d.id, d.data());
+        if (!aviso.creadoEn) return;
+        byCliente.set(clienteId, [...(byCliente.get(clienteId) || []), aviso]);
+      });
+      onChanged(byCliente);
+    },
+    (err) => console.warn('Avisos PAF:', err.message)
+  );
 }
 
 /** Juan o el cliente: los avisos del portal (los sin hora todavía se están guardando) */

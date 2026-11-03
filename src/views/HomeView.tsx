@@ -12,6 +12,7 @@ import { useProspecting } from '../prospecting/useProspecting';
 import { buildDailyQueue, pendingOutcomes } from '../prospecting/core';
 import { ActivityHeatmap } from '../components/ActivityHeatmap';
 import { ColdClientsCard } from '../components/ColdClientsCard';
+import { PafReviewCard } from '../components/PafReviewCard';
 import { coldClients } from '../utils/coldClients';
 import { hapticFeedback } from '../utils/haptics';
 import { DayRing, NextCallChip, RouteLine, usePulse } from '../components/ProspectingVisuals';
@@ -229,6 +230,9 @@ export const HomeView: React.FC<Props> = ({
 
       {/* Tus 3 del día */}
       <Top3Card tasks={tasks} today={today} onToggleTask={onToggleTask} onOpenTask={id => go(`/agenda/tarea/${id}`)} />
+
+      {/* Portal PAF: tareas que los estudios marcaron como terminadas */}
+      <PafReviewCard projects={projects} onOpen={go} />
 
       {/* Contenido: hoy se publica / mañana toca */}
       <ContentTodayCard onNavigate={go} />

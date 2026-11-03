@@ -26,6 +26,7 @@ describe('portal PAF con login', () => {
       resumenVisible: 'Cerramos el foco.',
       enlaces: { carpeta: 'https://drive.google.com/drive/folders/abc', asana: 'https://app.asana.com/0/1' },
       tareas: [],
+      tareasHabilitadas: [],
       entregas: [],
       proximaReunion: null,
       actualizadoEn: '2026-11-02T10:00:00.000Z',
@@ -56,7 +57,7 @@ describe('portal PAF con login', () => {
   it('las reglas no dejan leer paf_portal por ID: piden el correo en emailsAutorizados', () => {
     const rules = readFileSync('firestore.rules', 'utf8');
     const block = rules.slice(rules.indexOf('match /paf_portal/{clienteId} {'), rules.indexOf('// "Terminé" del estudio'));
-    expect(block).toContain('request.auth.token.email in resource.data.emailsAutorizados');
+    expect(block).toContain('request.auth.token.email.lower() in resource.data.emailsAutorizados');
     expect(block).toContain('email_verified == true');
     expect(block).not.toMatch(/allow (create|update|delete|write)/);
     expect(block).not.toContain('if true');
@@ -139,7 +140,8 @@ describe('reglas de avisos', () => {
     const rules = readFileSync('firestore.rules', 'utf8');
     const block = rules.slice(rules.indexOf('match /paf_portal/{clienteId}/avisos'), rules.indexOf('match /{document=**}'));
     expect(block).toContain("hasOnly(['tareaId', 'email', 'creadoEn'])");
-    expect(block).toContain('request.resource.data.email == request.auth.token.email');
+    expect(block).toContain('request.resource.data.email == request.auth.token.email.lower()');
+    expect(block).toContain("request.resource.data.tareaId in portalOf(clienteId).get('tareasHabilitadas', [])");
     expect(block).toContain('request.resource.data.creadoEn == request.time');
     expect(block).not.toMatch(/allow (update|delete|write)/);
   });
@@ -169,5 +171,48 @@ describe('reunión en Google Calendar', () => {
     expect(url.searchParams.get('dates')).toBe('20261110T103000/20261110T120000');
     expect(url.searchParams.get('text')).toBe('Reunión PAF · Estudio');
     expect(url.searchParams.has('add')).toBe(false);
+  });
+});
+import { checkTerminado, pafToReview } from '../src/portal/model';
+
+describe('fase 1: circuito del "Terminé"', () => {
+  const portal = {
+    emailsAutorizados: ['estudio@gmail.com'],
+    tareas: [{ id: 't1', titulo: 'Fotos', estado: 'habilitada' as const }, { id: 't2', titulo: 'Oculta no', estado: 'aprobada' as const }],
+    tareasHabilitadas: ['t1'],
+  };
+
+  it('el portal publica solo los IDs de tareas habilitadas', () => {
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft, tareas: [
+      { id: 'a', titulo: 'A', estado: 'habilitada' }, { id: 'b', titulo: 'B', estado: 'enviada' }, { id: 'c', titulo: 'C', estado: 'aprobada' },
+    ] });
+    expect('doc' in r && r.doc.tareasHabilitadas).toEqual(['a']);
+  });
+
+  it('el aviso solo vale para un correo autorizado y una tarea habilitada', () => {
+    expect(checkTerminado(portal, ' Estudio@Gmail.com ', 't1')).toEqual({ titulo: 'Fotos' });
+    expect(checkTerminado(portal, 'otro@gmail.com', 't1')).toEqual({ error: 'Correo no autorizado' });
+    expect(checkTerminado(portal, 'estudio@gmail.com', 't2')).toEqual({ error: 'Tarea no habilitada' });
+    expect(checkTerminado(null, 'estudio@gmail.com', 't1')).toEqual({ error: 'Portal inexistente' });
+  });
+
+  it('los correos con mayúsculas o espacios se guardan normalizados', () => {
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, emails: ['  Ana@Estudio.COM ', 'ana@estudio.com'] } });
+    expect('doc' in r && r.doc.emailsAutorizados).toEqual(['ana@estudio.com']);
+  });
+
+  it('"PAF para revisar" cuenta solo tareas avisadas de estudios activos', () => {
+    const list = pafToReview([
+      { id: 'p1', clientName: 'B', pafTareas: [{ id: '1', titulo: 'x', estado: 'enviada' }] },
+      { id: 'p2', clientName: 'A', pafTareas: [{ id: '1', titulo: 'x', estado: 'enviada' }, { id: '2', titulo: 'y', estado: 'enviada' }] },
+      { id: 'p3', clientName: 'C', archived: true, pafTareas: [{ id: '1', titulo: 'x', estado: 'enviada' }] },
+      { id: 'p4', clientName: 'D', pafTareas: [{ id: '1', titulo: 'x', estado: 'habilitada' }] },
+    ]);
+    expect(list.map((x) => [x.project.id, x.count])).toEqual([['p2', 2], ['p1', 1]]);
+  });
+
+  it('el CRM puede leer los avisos de todos los estudios (solo el dueño)', () => {
+    const rules = readFileSync('firestore.rules', 'utf8');
+    expect(rules).toMatch(/match \/\{path=\*\*\}\/avisos\/\{avisoId\} \{\s*allow read: if isOwner\(\);/);
   });
 });

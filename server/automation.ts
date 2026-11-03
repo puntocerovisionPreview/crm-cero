@@ -18,6 +18,7 @@ import { countPushDevices, htmlToPush, PushPayload, registerPushRoutes, sendPush
 import { describeNewPayment, isMercadoPagoConfigured, registerMercadoPagoRoutes, syncRecentPayments } from './mercadopago';
 import { registerDocumentRoutes } from './documents';
 import { registerPanelRoutes } from './panels';
+import { registerPafPortalRoutes } from './pafPortal';
 import { registerDocumensoRoutes } from './documenso';
 import { recordError, recordJobRun, registerHealthRoutes, runBackupIfDue } from './health';
 import { documentFollowups } from './contractsServer';
@@ -347,6 +348,11 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
   registerPanelRoutes(app, getAdminDb, async (title, body) => {
     const db = getAdminDb();
     if (db) await notifyAll(db, title, body, '/paneles', 'panel');
+  });
+  // Portal PAF: el estudio avisa "Terminé" en una tarea
+  registerPafPortalRoutes(app, getAdminDb, async (title, body, url) => {
+    const db = getAdminDb();
+    if (db) await notifyAll(db, title, body, url, 'paf-terminado');
   });
   // Presupuestos: firma digital con Documenso
   registerDocumensoRoutes(app, requireOwner, getAdminDb, async (title, body) => {

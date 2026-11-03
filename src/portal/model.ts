@@ -101,6 +101,8 @@ export interface PafPortalDoc {
   resumenVisible: string;
   enlaces: Partial<Record<PafPortalLinkKey, string>>;
   tareas: PafPortalTask[];
+  /** IDs de las tareas habilitadas: las reglas solo dejan avisar "Terminé" en estas */
+  tareasHabilitadas: string[];
   entregas: PafPortalDelivery[];
   proximaReunion: { fecha: string; hora?: string } | null;
   actualizadoEn: string;
@@ -163,6 +165,7 @@ export function buildPafPortal(
       resumenVisible: input.draft.resumen.trim().slice(0, 2000),
       enlaces,
       tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}) })),
+      tareasHabilitadas: (input.tareas || []).filter((t) => t.estado === 'habilitada').map((t) => t.id),
       entregas: (input.entregas || []).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, ...(fecha ? { fecha } : {}), ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
       proximaReunion: input.proximaReunion || null,
       actualizadoEn: now,
@@ -356,4 +359,31 @@ export interface PafDriveLinks {
   carpetaCompartida?: string;
   carpetaInterna?: string;
   ficha?: string;
+}
+
+// ---------- Aviso a Juan cuando el estudio toca "Terminé" (lo usa el servidor) ----------
+
+/**
+ * Verifica que el correo pueda avisar esa tarea en ese portal.
+ * Devuelve el título de la tarea para el aviso, o el motivo del rechazo.
+ */
+export function checkTerminado(
+  portal: Pick<PafPortalDoc, 'emailsAutorizados' | 'tareas'> & { tareasHabilitadas?: string[] } | null | undefined,
+  email: string,
+  tareaId: string
+): { titulo: string } | { error: string } {
+  if (!portal) return { error: 'Portal inexistente' };
+  if (!portal.emailsAutorizados?.includes(email.trim().toLowerCase())) return { error: 'Correo no autorizado' };
+  if (!(portal.tareasHabilitadas || []).includes(tareaId)) return { error: 'Tarea no habilitada' };
+  const tarea = (portal.tareas || []).find((t) => t.id === tareaId);
+  return tarea ? { titulo: tarea.titulo } : { error: 'Tarea inexistente' };
+}
+
+/** Estudios con tareas que avisaron "Terminé" y esperan la aprobación de Juan */
+export function pafToReview<P extends { id: string; clientName: string; archived?: boolean; pafTareas?: PafTask[] }>(projects: P[]) {
+  return projects
+    .filter((p) => !p.archived)
+    .map((p) => ({ project: p, count: (p.pafTareas || []).filter((t) => t.estado === 'enviada').length }))
+    .filter((x) => x.count > 0)
+    .sort((a, b) => b.count - a.count || a.project.clientName.localeCompare(b.project.clientName));
 }
