@@ -20,3 +20,13 @@ describe('invitar al cliente a la reunión', () => {
     expect(ev.extendedProperties.private.ceroMeetingId).toBe('m1');
   });
 });
+
+import { buildGoogleCalendarEventPayload } from '../src/utils/googleCalendarBrowser';
+
+describe('Calendar desde el navegador', () => {
+  it('marca el evento con la reunión del CRM (así el servidor no lo duplica)', () => {
+    const ev = buildGoogleCalendarEventPayload({ id: 'm1', title: 'Seguimiento', date: '2026-11-10', time: '10:30', invitados: ['A@x.com'] } as any);
+    expect(ev.extendedProperties).toEqual({ private: { ceroMeetingId: 'm1' } });
+    expect(ev.attendees).toEqual([{ email: 'a@x.com' }]);
+  });
+});

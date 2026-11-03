@@ -223,6 +223,28 @@ export async function runCalendarSync(db: Firestore, opts: { dryRun?: boolean } 
     }
   }
 
+  // 1b) Un mismo encuentro con más de un evento (lo crearon el navegador y el servidor a la vez):
+  // la reunión se queda con uno y los demás se borran. Si todavía no tenía evento, toma el que ya existe.
+  const byCero = new Map<string, any[]>();
+  for (const ev of events) {
+    const ceroId = ev.extendedProperties?.private?.ceroMeetingId;
+    if (ceroId && ev.status !== 'cancelled') byCero.set(ceroId, [...(byCero.get(ceroId) || []), ev]);
+  }
+  for (const [ceroId, list] of byCero) {
+    const m = meetings.get(ceroId);
+    if (!m) continue;
+    const keep = list.find((ev) => ev.id === m.googleEventId) || list[0];
+    if (m.googleEventId !== keep.id) {
+      m.googleEventId = keep.id;
+      if (!opts.dryRun) await db.collection('meetings').doc(m.id).set({ googleEventId: keep.id }, { merge: true });
+    }
+    for (const dup of list.filter((ev) => ev.id !== keep.id)) {
+      stats.deletedInGoogle++;
+      dup.status = 'cancelled';
+      if (!opts.dryRun) await gcal(`/calendars/${calendarId}/events/${encodeURIComponent(dup.id)}`, { method: 'DELETE' }).catch(() => undefined);
+    }
+  }
+
   // 2) CRM → Google
   for (const m of meetings.values()) {
     if (m.proposed && !m.time) continue;

@@ -20,7 +20,7 @@ export const GoogleCalendarSettingsCard: React.FC<{
       hapticFeedback.success();
       onConnected?.();
     } else {
-      hapticFeedback.error();
+      hapticFeedback.warning();
     }
   };
 
@@ -146,7 +146,7 @@ export const GoogleCalendarReconnectBanner: React.FC<{
       hapticFeedback.success();
       onReconnected?.();
     } else {
-      hapticFeedback.error();
+      hapticFeedback.warning();
     }
   };
 

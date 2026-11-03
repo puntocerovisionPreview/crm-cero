@@ -11,6 +11,8 @@ import type { AgendaMeeting } from '../types';
 
 export const GOOGLE_CALENDAR_EVENTS_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 export const GOOGLE_CALENDAR_EVENTS_ENDPOINT = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+/** Que Google mande a los invitados la invitación, los cambios y la cancelación (sin invitados no hace nada) */
+const NOTIFY = '?sendUpdates=all';
 const DEFAULT_TIMEZONE = 'America/Argentina/Buenos_Aires';
 
 export type GoogleCalendarErrorKind =
@@ -257,7 +259,9 @@ function addDaysToDateStr(date: string, days: number): string {
 export function buildGoogleCalendarEventPayload(meeting: Pick<
   AgendaMeeting,
   'title' | 'date' | 'time' | 'notes' | 'projectName' | 'clientPhone' | 'durationHours' | 'invitados'
->) {
+> & { id?: string }) {
+  // La misma marca que usa la sincronización del servidor: así no se duplica el evento
+  const marca = meeting.id ? { extendedProperties: { private: { ceroMeetingId: meeting.id } } } : {};
   const descriptionParts = [
     meeting.projectName ? `Cliente / Proyecto: ${meeting.projectName}` : '',
     meeting.clientPhone ? `Tel: ${meeting.clientPhone}` : '',
@@ -289,6 +293,7 @@ export function buildGoogleCalendarEventPayload(meeting: Pick<
         timeZone: DEFAULT_TIMEZONE,
       },
       ...(attendees ? { attendees } : {}),
+      ...marca,
     };
   }
 
@@ -298,6 +303,7 @@ export function buildGoogleCalendarEventPayload(meeting: Pick<
     start: { date: meeting.date },
     end: { date: addDaysToDateStr(meeting.date, 1) },
     ...(attendees ? { attendees } : {}),
+    ...marca,
   };
 }
 
@@ -400,7 +406,7 @@ export async function createGoogleCalendarEventInBrowser(
   if (meeting.proposed) return { ok: true };
 
   const runCreate = async () => {
-    const res = await calendarFetch(GOOGLE_CALENDAR_EVENTS_ENDPOINT, {
+    const res = await calendarFetch(GOOGLE_CALENDAR_EVENTS_ENDPOINT + NOTIFY, {
       method: 'POST',
       body: JSON.stringify(buildGoogleCalendarEventPayload(meeting)),
     });
@@ -410,7 +416,7 @@ export async function createGoogleCalendarEventInBrowser(
   };
 
   const res = await calendarFetch(
-    GOOGLE_CALENDAR_EVENTS_ENDPOINT,
+    GOOGLE_CALENDAR_EVENTS_ENDPOINT + NOTIFY,
     {
       method: 'POST',
       body: JSON.stringify(buildGoogleCalendarEventPayload(meeting)),
@@ -441,7 +447,7 @@ export async function updateGoogleCalendarEventInBrowser(
     return createGoogleCalendarEventInBrowser(meeting, onCreatedId);
   }
 
-  const eventUrl = `${GOOGLE_CALENDAR_EVENTS_ENDPOINT}/${encodeURIComponent(meeting.googleEventId)}`;
+  const eventUrl = `${GOOGLE_CALENDAR_EVENTS_ENDPOINT}/${encodeURIComponent(meeting.googleEventId)}${NOTIFY}`;
   const runUpdate = async () => {
     await calendarFetch(eventUrl, {
       method: 'PATCH',
@@ -474,7 +480,7 @@ export async function deleteGoogleCalendarEventInBrowser(
 ): Promise<{ ok: boolean; error?: GoogleCalendarErrorInfo }> {
   if (!googleEventId) return { ok: true };
 
-  const eventUrl = `${GOOGLE_CALENDAR_EVENTS_ENDPOINT}/${encodeURIComponent(googleEventId)}`;
+  const eventUrl = `${GOOGLE_CALENDAR_EVENTS_ENDPOINT}/${encodeURIComponent(googleEventId)}${NOTIFY}`;
   const runDelete = async () => {
     await calendarFetch(eventUrl, { method: 'DELETE' });
   };
