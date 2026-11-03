@@ -25,7 +25,7 @@ export const PafAnnouncements: React.FC<{
   const save = (next: PafAnnouncement[]) => {
     setError('');
     onUpdateProject(project.id, { pafAnuncios: next });
-    republishIfPublished({ ...project, pafAnuncios: next }, meetings).catch(() => setError('Se guardó en la ficha, pero no se pudo actualizar el portal. Reintentá.'));
+    republishIfPublished({ ...project, pafAnuncios: next }, meetings).catch((e: Error) => setError(e.message));
   };
   const update = (id: string, patch: Partial<PafAnnouncement>) => save((project.pafAnuncios || []).map((a) => (a.id === id ? { ...a, ...patch } : a)));
 

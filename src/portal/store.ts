@@ -1,7 +1,7 @@
 import { addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAuthHeaders } from '../utils/authAccess';
-import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, PORTAL_SEPARATE_FIELDS, clienteIdNumber, portalFromProject, suggestClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
+import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, PORTAL_SEPARATE_FIELDS, clienteIdNumber, portalFromProject, suggestClienteId, suggestWebClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
 
 // Portal PAF: paf_portal/{clienteId}. Escribe solo Juan (CRM); el cliente solo lee el suyo
 // y deja avisos de "terminé" en paf_portal/{clienteId}/avisos.
@@ -38,7 +38,13 @@ export async function republishIfPublished(
 ): Promise<void> {
   if (!project.pafClienteId || !project.pafPortal?.publishedAt) return;
   const r = portalFromProject(project, meetings);
-  if ('doc' in r) await publishPafPortal(r.doc);
+  // Antes fallaba en silencio: ahora el error llega a la ficha
+  if ('errors' in r) throw new Error(`Se guardó en la ficha, pero el portal no se actualizó: ${r.errors.join(' ')}`);
+  try {
+    await publishPafPortal(r.doc);
+  } catch {
+    throw new Error('Se guardó en la ficha, pero no se pudo actualizar el portal. Revisá la conexión y reintentá.');
+  }
 }
 
 export async function unpublishPafPortal(clienteId: string): Promise<void> {
@@ -132,6 +138,15 @@ export async function suggestNextClienteId(prueba: boolean): Promise<string> {
   ];
   const last = Number(counter.data()?.[prueba ? 'ultimoPrueba' : 'ultimoReal'] || 0);
   return suggestClienteId(used, prueba, last);
+}
+
+/** Próximo WEB-### libre (clientes Web: no pasan por el alta de Tally) */
+export async function suggestNextWebClienteId(): Promise<string> {
+  const [fichas, portales] = await Promise.all([
+    getDocs(query(collection(db, 'projects'), where('pafClienteId', '>=', 'WEB-'))),
+    getDocs(collection(db, PAF_PORTAL_COLLECTION)),
+  ]);
+  return suggestWebClienteId([...fichas.docs.map((d) => String(d.data().pafClienteId || '')), ...portales.docs.map((d) => d.id)]);
 }
 
 /**

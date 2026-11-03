@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildPafPortal, emptyPortalDraft, normalizeEmails, type PafPortalDraft } from '../src/portal/model';
+import { CLIENTE_ID_RE, accessHost, accessIcon, accessIssue, suggestWebClienteId } from '../src/portal/model';
 
 const draft: PafPortalDraft = {
   emails: ['Estudio@Gmail.com', 'estudio@gmail.com', 'socia@gmail.com'],
@@ -403,10 +404,35 @@ describe('portal libre (fase 2): anuncios, tareas simples y accesos', () => {
     expect('doc' in ok && ok.doc.accesos?.map((a) => a.nombre)).toEqual(['Contenido en Asana', 'Carpeta']);
     expect('doc' in ok && ok.doc.enlaces).toEqual({});
     const privado = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: libres, privados: ['https://drive.google.com/drive/u/0/folders/1AbCdEfGhIjK?usp=sharing'] });
-    expect('errors' in privado && privado.errors[0]).toContain('carpeta interna');
-    const http = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, accesos: [{ id: '1', nombre: 'Web', url: 'http://x.com' }] } });
-    expect('errors' in http && http.errors[0]).toContain('https');
+    // Lo privado o mal cargado no se publica, pero no frena el resto del portal
+    expect('doc' in privado && privado.doc.accesos?.map((a) => a.nombre)).toEqual(['Contenido en Asana']);
+    expect(accessIssue(libres.accesos[1], ['https://drive.google.com/drive/u/0/folders/1AbCdEfGhIjK?usp=sharing'])).toContain('carpeta interna');
+    const http = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, accesos: [{ id: '1', nombre: 'Web', url: 'http://x.com' }, { id: '2', nombre: '', url: '' }] } });
+    expect('doc' in http && http.doc.accesos).toEqual([]);
+    expect(accessIssue({ nombre: 'Web', url: 'http://x.com' })).toContain('https');
+    expect(accessIssue({ nombre: '', url: 'https://x.com' })).toContain('nombre');
+    expect(accessIssue({ nombre: '', url: '' })).toBeNull();
     expect(draftAccesos({ enlaces: {}, accesos: [] })).toEqual([]);
+  });
+
+  it('accesos: el ícono sale del link o del nombre', () => {
+    expect(accessIcon('Contenido', 'https://app.asana.com/0/1')).toBe('calendar');
+    expect(accessIcon('Tu carpeta', 'https://drive.google.com/drive/folders/x')).toBe('drive');
+    expect(accessIcon('Métricas', 'https://docs.google.com/spreadsheets/d/x')).toBe('sheet');
+    expect(accessIcon('Brief', 'https://docs.google.com/document/d/x')).toBe('doc');
+    expect(accessIcon('Perfil', 'https://www.instagram.com/estudio')).toBe('instagram');
+    expect(accessIcon('Diseño de marca', 'https://www.figma.com/file/x')).toBe('design');
+    expect(accessIcon('Resultados del mes', 'https://lookerstudio.google.com/x')).toBe('chart');
+    expect(accessIcon('Tu web', 'https://estudio.com.ar')).toBe('web');
+    expect(accessIcon('Algo', '')).toBe('link');
+    expect(accessHost('https://www.figma.com/file/x')).toBe('figma.com');
+  });
+
+  it('clientes Web: ID WEB-### válido y el siguiente libre', () => {
+    expect(CLIENTE_ID_RE.test('WEB-001')).toBe(true);
+    expect(CLIENTE_ID_RE.test('WEB-PRUEBA-001')).toBe(false);
+    expect(suggestWebClienteId(['PAF-004', 'WEB-001', 'WEB-007'])).toBe('WEB-008');
+    expect(suggestWebClienteId([])).toBe('WEB-001');
   });
 
   it('tareas simples: link opcional (solo https) y sin fecha no vencen', () => {

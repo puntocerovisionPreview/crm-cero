@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BellRing, Check, Copy, ExternalLink, Eye, Loader2, Package, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Copy, ExternalLink, Eye, Loader2, Package, Radio, Trash2, Undo2 } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
-  approveTask, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
+  accessHost, accessIssue, approveTask, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
   missingTemplateTasks, PAF_STAGE_TEMPLATES, suggestedChannel, type PafDelivery, type PafPedidoAlta, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
 } from '../portal/model';
-import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, unpublishPafPortal } from '../portal/store';
+import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
+import { AccessIcon } from './AccessIcon';
 import { subscribePanelOfProject } from '../panels/store';
 import type { ClientPanel } from '../panels/model';
 import { SegmentedControl } from '../ui';
@@ -62,7 +63,7 @@ const ADD_OPTIONS: { id: Exclude<Adding, null | 'acuerdo'>; label: string }[] = 
 export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, showAlta = true }) => {
   const [adding, setAdding] = useState<Adding>(null);
   const [editWeek, setEditWeek] = useState(false);
-  const portal = usePortalDraft(project, meetings, onUpdateProject);
+  const portal = usePortalDraft(project, meetings, onUpdateProject, !showAlta);
   const work = usePafWork(project, meetings, onUpdateProject);
   const toReview = work.tasks.filter((t) => t.estado === 'enviada');
   const accesos = draftAccesos(portal.draft);
@@ -141,8 +142,8 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
       {(work.deliveries.length > 0 || adding === 'entrega') && <Deliveries work={work} showForm={adding === 'entrega'} onDone={done} />}
 
       {(accesos.length > 0 || adding === 'acceso') && (
-        <Block title="Archivos" hint="Accesos directos: nombre y link (solo https). La carpeta interna y la ficha se bloquean solas.">
-          <AccessEditor items={accesos} startAdding={adding === 'acceso'} onChange={(list) => { portal.set({ accesos: list }); }} />
+        <Block title="Archivos" hint="Accesos directos: nombre y link. El ícono sale solo según lo que es. La carpeta interna y la ficha nunca se publican.">
+          <AccessEditor items={accesos} privados={portal.privados} startAdding={adding === 'acceso'} onChange={(list) => { portal.set({ accesos: list }); }} />
         </Block>
       )}
 
@@ -177,22 +178,45 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 
 function PanelHeader({ portal, studio }: { portal: ReturnType<typeof usePortalDraft>; studio: string }) {
   const { published } = portal;
-  const status = !published ? { text: 'Sin publicar', dot: 'bg-zinc-500' }
-    : { text: `Publicado · ${new Date(published.actualizadoEn).toLocaleDateString('es-AR')}`, dot: 'bg-emerald-500' };
   const viewUrl = published ? `/portal?ver=${encodeURIComponent(published.clienteId)}` : '';
+  const updated = published ? new Date(published.actualizadoEn) : null;
+  const when = updated ? (Date.now() - updated.getTime() < 60000 ? 'recién' : updated.toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : '';
+
+  if (published === undefined) return <div className="h-16 rounded-xl border border-zinc-800 animate-pulse" aria-hidden />;
 
   return (
-    <div className="rounded-xl border border-zinc-800 p-3 space-y-3">
-      <div className="flex items-center gap-2">
-        <span className={`w-2 h-2 rounded-full ${status.dot}`} aria-hidden />
-        <span className="flex-1 text-xs font-semibold text-zinc-100">{status.text}</span>
-        {published && <span className="text-[10px] font-mono text-zinc-500">{published.clienteId}</span>}
-      </div>
+    <div className={`rounded-xl border p-3 space-y-3 ${published ? 'border-emerald-500/25 bg-emerald-500/[0.04]' : 'border-amber-400/40 bg-amber-400/[0.06]'}`}>
+      {published ? (
+        <div className="flex items-start gap-2.5">
+          <span className="relative mt-1 flex w-2 h-2" aria-hidden>
+            <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+            <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500" />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-zinc-100">En vivo: lo que cargues acá le llega solo</p>
+            <p className="text-[11px] text-zinc-400">Última actualización {when} · {published.emailsAutorizados.length} {published.emailsAutorizados.length === 1 ? 'correo puede' : 'correos pueden'} entrar</p>
+          </div>
+          <span className="text-[10px] font-mono text-zinc-500">{published.clienteId}</span>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2.5">
+          <Radio className="mt-0.5 w-4 h-4 shrink-0 text-amber-300" aria-hidden />
+          <div className="flex-1 min-w-0 space-y-2">
+            <div>
+              <p className="text-xs font-semibold text-zinc-100">{studio} todavía no ve nada de esto</p>
+              <p className="text-[11px] text-zinc-400">Publicá el portal una vez. Desde ahí, cada anuncio, tarea, acceso, entrega o reunión que cargues le aparece solo.</p>
+            </div>
+            <label className="block text-[11px] text-zinc-400">Correos que pueden entrar (cuenta de Google)
+              <input className={input} value={portal.emailsText} placeholder="estudio@gmail.com, socia@gmail.com" onChange={(e) => portal.setEmailsText(e.target.value)} />
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {!published && (
           <button type="button" onClick={portal.publish} disabled={portal.busy} className="btn-solid-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs">
-            {portal.busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Publicar portal
+            {portal.busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Publicar portal ahora
           </button>
         )}
         {published && (
@@ -224,7 +248,7 @@ function Block({ title, hint, badge, children }: { title: string; hint?: string;
 
 // ---------- Borrador del portal (se guarda solo) ----------
 
-function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdateProject: Props['onUpdateProject']) {
+function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdateProject: Props['onUpdateProject'], webId = false) {
   const [clienteId, setClienteId] = useState(project.pafClienteId || '');
   const [draft, setDraft] = useState<PafPortalDraft>(() => project.pafPortal || emptyPortalDraft(project.clientEmail));
   const [emailsText, setEmailsText] = useState((project.pafPortal?.emails || draft.emails).join(', '));
@@ -300,10 +324,13 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
 
   const publish = async () => {
     hapticFeedback.light();
-    const result = portalFromProject(project, meetings, current, clienteId, new Date(), privados);
-    if ('errors' in result) { setErrors(result.errors); return; }
     setBusy(true); setErrors([]); setNotice('');
     try {
+      // Cliente Web sin ID: se le da el próximo WEB-### (no pasa por el alta de Tally)
+      let id = clienteId.trim().toUpperCase();
+      if (webId && !CLIENTE_ID_RE.test(id)) { id = await suggestNextWebClienteId(); setClienteId(id); }
+      const result = portalFromProject(project, meetings, current, id, new Date(), privados);
+      if ('errors' in result) { setErrors(result.errors); return; }
       await publishPafPortal(result.doc);
       await publishPortalExtras(result.doc.clienteId, { objetivos: portalGoals(panel?.goals), contacto: { whatsapp: config.whatsapp || '' } });
       onUpdateProject(project.id, { pafClienteId: result.doc.clienteId, pafPortal: { ...current, publishedAt: result.doc.actualizadoEn } });
@@ -337,7 +364,7 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
 
   return {
     draft, set, emailsText, setEmailsText, clienteId, setClienteId, published,
-    pedido, dirty: portalDirty(current, published), busy, errors, notice, publish, unpublish, copyLink,
+    pedido, privados, dirty: portalDirty(current, published), busy, errors, notice, publish, unpublish, copyLink,
     whatsapp: config.whatsapp || '',
     saveWhatsapp: async (raw: string) => {
       const whatsapp = whatsappDigits(raw);
@@ -360,7 +387,7 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
   const save = (updates: Pick<Project, 'pafTareas'> | Pick<Project, 'pafEntregas'>) => {
     setError('');
     onUpdateProject(project.id, updates);
-    republishIfPublished({ ...project, ...updates }, meetings).catch(() => setError('Se guardó en la ficha, pero no se pudo actualizar el portal. Reintentá.'));
+    republishIfPublished({ ...project, ...updates }, meetings).catch((e: Error) => setError(e.message));
   };
   const saveTasks = (pafTareas: PafTask[]) => save({ pafTareas });
   const saveDeliveries = (pafEntregas: PafDelivery[]) => save({ pafEntregas });
@@ -574,11 +601,12 @@ function StageTemplate({ project, hito, work, onMeeting, always }: { project: Pr
     </section>
   );
 }
-/** Editor de accesos directos: nombre y link, ordenar, sumar y borrar */
-function AccessEditor({ items, onChange, startAdding }: { items: { id: string; nombre: string; url: string }[]; onChange: (items: { id: string; nombre: string; url: string }[]) => void; startAdding?: boolean }) {
-  // Al tocar "+ Acceso" arriba aparece una fila vacía para completar
+/** Editor de accesos directos: tarjeta con ícono, nombre y link; ordenar, sumar y borrar */
+type AccessRow = { id: string; nombre: string; url: string };
+function AccessEditor({ items, onChange, startAdding, privados }: { items: AccessRow[]; onChange: (items: AccessRow[]) => void; startAdding?: boolean; privados: (string | undefined)[] }) {
+  // Al tocar "+ Acceso" arriba aparece una tarjeta vacía para completar
   useEffect(() => { if (startAdding && !items.some((a) => !a.nombre && !a.url)) onChange([...items, { id: newItemId(), nombre: '', url: '' }]); }, [startAdding]); // eslint-disable-line react-hooks/exhaustive-deps
-  const set = (id: string, patch: Partial<{ nombre: string; url: string }>) => onChange(items.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  const set = (id: string, patch: Partial<AccessRow>) => onChange(items.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   const move = (i: number, d: -1 | 1) => {
     const j = i + d;
     if (j < 0 || j >= items.length) return;
@@ -587,16 +615,32 @@ function AccessEditor({ items, onChange, startAdding }: { items: { id: string; n
     onChange(next);
   };
   return (
-    <div className="space-y-1.5">
-      {items.map((a, i) => (
-        <div key={a.id} className="flex items-center gap-1.5">
-          <input className={`${input} basis-2/5`} value={a.nombre} placeholder="Nombre" aria-label="Nombre del acceso" onChange={(e) => set(a.id, { nombre: e.target.value })} />
-          <input className={input} value={a.url} placeholder="https://" aria-label={`Link de ${a.nombre || 'acceso'}`} onChange={(e) => set(a.id, { url: e.target.value })} />
-          <button type="button" aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)} className="text-zinc-500 hover:text-zinc-200 disabled:opacity-30">↑</button>
-          <button type="button" aria-label="Bajar" disabled={i === items.length - 1} onClick={() => move(i, 1)} className="text-zinc-500 hover:text-zinc-200 disabled:opacity-30">↓</button>
-          <button type="button" aria-label={`Borrar ${a.nombre || 'acceso'}`} onClick={() => onChange(items.filter((x) => x.id !== a.id))} className="text-zinc-500 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>
-        </div>
-      ))}
+    <div className="space-y-2">
+      <ul className="grid gap-2 sm:grid-cols-2">
+        {items.map((a, i) => {
+          const issue = accessIssue(a, privados);
+          const host = accessHost(a.url);
+          return (
+            <li key={a.id} className={`group rounded-xl border p-2.5 transition ${issue ? 'border-amber-400/40 bg-amber-400/[0.04]' : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700'}`}>
+              <div className="flex items-start gap-2.5">
+                <span className={`flex w-9 h-9 shrink-0 items-center justify-center rounded-lg ${issue ? 'bg-zinc-800 text-zinc-500' : 'bg-zinc-100 text-zinc-950'}`}>
+                  <AccessIcon nombre={a.nombre} url={a.url} />
+                </span>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <input className="w-full bg-transparent text-xs font-semibold text-zinc-100 placeholder:text-zinc-600 outline-none" value={a.nombre} placeholder="Nombre (ej. Calendario de contenido)" aria-label="Nombre del acceso" onChange={(e) => set(a.id, { nombre: e.target.value })} />
+                  <input className="w-full bg-transparent text-[11px] text-zinc-400 placeholder:text-zinc-600 outline-none" value={a.url} placeholder="Pegá el link https://" aria-label={`Link de ${a.nombre || 'acceso'}`} onChange={(e) => set(a.id, { url: e.target.value })} />
+                  <p className={`text-[10px] ${issue ? 'text-amber-300' : 'text-zinc-500'}`}>{issue || `${host} · lo ve el cliente`}</p>
+                </div>
+                <div className="flex flex-col items-center gap-0.5 text-zinc-500">
+                  <button type="button" aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)} className="hover:text-zinc-200 disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>
+                  <button type="button" aria-label="Bajar" disabled={i === items.length - 1} onClick={() => move(i, 1)} className="hover:text-zinc-200 disabled:opacity-30"><ArrowDown className="w-3.5 h-3.5" /></button>
+                  <button type="button" aria-label={`Borrar ${a.nombre || 'acceso'}`} onClick={() => onChange(items.filter((x) => x.id !== a.id))} className="hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
       <button type="button" onClick={() => onChange([...items, { id: newItemId(), nombre: '', url: '' }])} className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 text-[11px] font-bold">+ Agregar acceso</button>
     </div>
   );

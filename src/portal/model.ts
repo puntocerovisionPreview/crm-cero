@@ -20,8 +20,8 @@ export const PRESENCIA_HITOS = [
   'Revisamos y cerramos',
 ] as const;
 
-/** PAF-002, PAF-PRUEBA-001… Un ID no se reutiliza nunca. */
-export const CLIENTE_ID_RE = /^PAF-(PRUEBA-)?\d{3,}$/;
+/** PAF-002, PAF-PRUEBA-001, WEB-001… Un ID no se reutiliza nunca. */
+export const CLIENTE_ID_RE = /^(PAF-(PRUEBA-)?|WEB-)\d{3,}$/;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -240,16 +240,11 @@ export function buildPafPortal(
 
   // Accesos directos libres (o los 5 enlaces de antes, si todavía no se editaron)
   const accesos: { nombre: string; url: string }[] = [];
-  const fromOld = !input.draft.accesos; // los enlaces de antes ya se validaron arriba
   for (const a of draftAccesos(input.draft)) {
     const nombre = a.nombre.trim().slice(0, 60);
-    if (!nombre && !a.url.trim()) continue;
     const url = safeHttpsUrl(a.url);
-    if (fromOld) { if (url && !isPrivateUrl(url, input.privados)) accesos.push({ nombre, url }); continue; }
-    if (!nombre) errors.push('Cada acceso necesita un nombre.');
-    else if (!url) errors.push(`El acceso "${nombre}" tiene que ser un link https://`);
-    else if (isPrivateUrl(url, input.privados)) errors.push(`"${nombre}" es la carpeta interna o la ficha: eso no lo puede ver el estudio.`);
-    else accesos.push({ nombre, url });
+    // Un acceso a medio cargar o privado no se publica, pero no frena lo demás (la ficha lo marca con accessIssue)
+    if (nombre && url && !isPrivateUrl(url, input.privados)) accesos.push({ nombre, url });
   }
 
   if (errors.length) return { errors };
@@ -744,4 +739,50 @@ export function checkPieza(
   if (!pieza) return { error: 'Pieza inexistente' };
   if (pieza.estado !== 'para_aprobar' && pieza.estado !== 'cambios') return { error: 'Esta pieza ya no está para revisar' };
   return { titulo: pieza.titulo };
+}
+
+/** Próximo WEB-### libre para el portal de un cliente Web */
+export function suggestWebClienteId(usedIds: string[]): string {
+  const max = Math.max(0, ...usedIds.map((id) => Number(id.trim().toUpperCase().match(/^WEB-(\d{3,})$/)?.[1] ?? 0)));
+  return `WEB-${String(max + 1).padStart(3, '0')}`;
+}
+
+/** Qué le falta a un acceso para publicarse (se muestra al lado de la fila) */
+export function accessIssue(a: { nombre: string; url: string }, privados: (string | undefined)[] = []): string | null {
+  if (!a.nombre.trim() && !a.url.trim()) return null;
+  if (!a.nombre.trim()) return 'Ponele un nombre para que se publique';
+  const url = safeHttpsUrl(a.url);
+  if (!url) return 'Pegá un link que empiece con https://';
+  if (isPrivateUrl(url, privados)) return 'Es la carpeta interna o la ficha: no se publica';
+  return null;
+}
+
+export type AccessIconKey = 'drive' | 'doc' | 'sheet' | 'calendar' | 'web' | 'instagram' | 'video' | 'design' | 'chart' | 'image' | 'chat' | 'meet' | 'link';
+
+/** El sitio del link, para mostrar debajo del nombre (drive.google.com, asana.com…) */
+export function accessHost(url: string): string {
+  try { return new URL(url.trim()).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+
+/** Ícono según lo que es el acceso: mira el sitio del link y el nombre */
+export function accessIcon(nombre: string, url = ''): AccessIconKey {
+  const n = ` ${nombre.toLowerCase()} `;
+  const host = accessHost(url);
+  const has = (...w: string[]) => w.some((x) => n.includes(x));
+  const at = (...h: string[]) => h.some((x) => host.includes(x));
+  if (at('docs.google.com') && url.includes('/spreadsheets/')) return 'sheet';
+  if (at('docs.google.com') && url.includes('/presentation/')) return 'doc';
+  if (at('instagram.com') || has('instagram')) return 'instagram';
+  if (at('youtube.com', 'youtu.be', 'vimeo.com') || has('video', 'reel', 'grabación', 'grabacion')) return 'video';
+  if (at('meet.google', 'zoom.us') || has('reunión', 'reunion', ' meet', 'zoom')) return 'meet';
+  if (at('figma.com', 'canva.com') || has('diseño', 'diseno', 'marca', 'logo', 'identidad')) return 'design';
+  if (at('lookerstudio', 'analytics.google', 'datastudio') || has('resultado', 'métrica', 'metrica', 'reporte', 'estadística', 'estadistica', 'analytics')) return 'chart';
+  if (at('asana.com', 'calendar.google', 'trello.com', 'notion.so') || has('calendario', 'contenido', 'agenda', 'cronograma', 'planificación', 'planificacion')) return 'calendar';
+  if (at('wa.me', 'whatsapp') || has('whatsapp', ' chat')) return 'chat';
+  if (has('planilla', 'excel', 'sheet')) return 'sheet';
+  if (at('docs.google.com') || has('documento', ' doc ', 'pdf', 'brief', 'propuesta', 'contrato', 'guía', 'guia')) return 'doc';
+  if (has('foto', 'imagen', 'material', 'galería', 'galeria')) return 'image';
+  if (at('drive.google.com', 'dropbox.com') || has('carpeta', 'drive', 'archivos')) return 'drive';
+  if (has(' web', 'sitio', 'página', 'pagina', 'landing', 'tienda')) return 'web';
+  return host ? 'web' : 'link';
 }

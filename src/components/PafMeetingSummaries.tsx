@@ -30,7 +30,7 @@ export const PafMeetingSummaries: React.FC<{
   const save = (next: PafMeetingSummary[]) => {
     setError('');
     onUpdateProject(project.id, { pafResumenes: next });
-    republishIfPublished({ ...project, pafResumenes: next }, meetings).catch(() => setError('Se guardó en la ficha, pero no se pudo actualizar el portal. Reintentá.'));
+    republishIfPublished({ ...project, pafResumenes: next }, meetings).catch((e: Error) => setError(e.message));
   };
 
   const add = () => {

@@ -8,7 +8,8 @@ import { EmptyState, SegmentedControl } from '../ui';
 import { auth } from '../firebaseAuth';
 import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { formatDisplayDate } from '../utils/projectTimeline';
-import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, accessesFromEnlaces, isOverdue, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
+import { AccessIcon } from '../components/AccessIcon';
+import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, accessHost, accessesFromEnlaces, isOverdue, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
 /**
@@ -21,13 +22,6 @@ import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPorta
 type Tab = 'inicio' | 'tareas' | 'entregas' | 'archivos';
 type PortalTask = PafPortalDoc['tareas'][number];
 
-const LINK_ICON: Record<PafPortalLinkKey, React.ElementType> = {
-  carpeta: Folder,
-  materiales: FileText,
-  resultados: BarChart3,
-  web: Globe,
-  asana: LayoutList,
-};
 const LINK_HINT: Record<PafPortalLinkKey, string> = {
   carpeta: 'Todo lo del programa',
   materiales: 'Fotos, planos y lo que nos compartís',
@@ -402,6 +396,26 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
                 <MeetingSummary s={reuniones[0]} />
               </Card>
             )}
+
+            {/* Accesos a mano desde el inicio: los primeros, con su ícono */}
+            {accesos.length > 0 && (
+              <section>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <Eyebrow>Tus accesos</Eyebrow>
+                  {accesos.length > 4 && <button type="button" onClick={() => setTab('archivos')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver los {accesos.length}</button>}
+                </div>
+                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {accesos.slice(0, 4).map((a, i) => (
+                    <li key={`${a.url}-${i}`}>
+                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="card-swiss group flex h-full flex-col gap-3 p-4">
+                        <span className="w-9 h-9 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"><AccessIcon nombre={a.nombre} url={a.url} /></span>
+                        <span className="text-sm font-medium leading-snug text-[var(--text-primary)] break-words">{a.nombre}</span>
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
         )}
 
@@ -460,16 +474,15 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
             {accesos.length ? (
               <ul className="grid gap-3 sm:grid-cols-2">
                 {accesos.map((a, i) => {
-                  // Los 5 accesos de siempre conservan su ícono y su descripción; los nuevos, carpeta
+                  // Los 5 accesos de siempre conservan su descripción; el ícono sale de lo que es el link
                   const k = PAF_PORTAL_LINK_KEYS.find((key) => PAF_PORTAL_LINK_LABEL[key] === a.nombre);
-                  const Icon = k ? LINK_ICON[k] : Folder;
                   return (
                     <li key={`${a.url}-${i}`}>
                       <a href={a.url} target="_blank" rel="noopener noreferrer" className="card-swiss group flex items-center gap-4 p-4">
-                        <span className="w-10 h-10 shrink-0 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"><Icon className="w-[18px] h-[18px]" /></span>
+                        <span className="w-10 h-10 shrink-0 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"><AccessIcon nombre={a.nombre} url={a.url} className="w-[18px] h-[18px]" /></span>
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm font-medium text-[var(--text-primary)] break-words">{a.nombre}</span>
-                          {k && <span className="block text-xs text-[var(--text-tertiary)] truncate">{LINK_HINT[k]}</span>}
+                          <span className="block text-xs text-[var(--text-tertiary)] truncate">{k ? LINK_HINT[k] : accessHost(a.url)}</span>
                         </span>
                         <ArrowUpRight className="w-4 h-4 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                       </a>
