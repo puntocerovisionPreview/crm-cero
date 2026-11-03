@@ -30,6 +30,7 @@ describe('portal PAF con login', () => {
       entregas: [],
       proximaReunion: null,
       semana: null,
+      reuniones: [],
       actualizadoEn: '2026-11-02T10:00:00.000Z',
     });
   });
@@ -308,5 +309,55 @@ describe('fase 3: portal del cliente', () => {
 
   it('el cliente ve "Calendario de contenido" en lugar de Asana', () => {
     expect(PAF_PORTAL_LINK_LABEL_FOR_TEST.asana).toBe('Calendario de contenido');
+  });
+});
+
+import { checkPieza, missingTemplateTasks, pafTodayRows, portalPieces, publicSummaries, PAF_STAGE_TEMPLATES } from '../src/portal/model';
+
+describe('fase 4: operación', () => {
+  it('PAF hoy: para revisar arriba, después el más quieto', () => {
+    const rows = pafTodayRows([
+      { id: 'a', clientName: 'Quieto', lastContactDate: '2026-10-20', pafPortal: { emails: [], hito: 2, resumen: '', enlaces: {} } },
+      { id: 'b', clientName: 'Con aviso', pafTareas: [{ id: '1', titulo: 'x', estado: 'enviada', avisoEn: '2026-11-03T09:00:00Z' }] },
+      { id: 'c', clientName: 'Nuevo' },
+    ], [{ projectId: 'a', date: '2026-11-10', time: '10:00', completed: false }], '2026-11-03');
+    expect(rows.map((r) => r.id)).toEqual(['b', 'a', 'c']);
+    expect(rows[0]).toMatchObject({ paraRevisar: 1, diasSinNovedades: 0, etapa: null });
+    expect(rows[1]).toMatchObject({ etapa: 2, diasSinNovedades: 14, proximaReunion: { fecha: '2026-11-10', hora: '10:00' } });
+    expect(rows[2].diasSinNovedades).toBeNull();
+  });
+
+  it('resúmenes de reunión: solo los publicados, del más nuevo al más viejo', () => {
+    expect(publicSummaries([
+      { id: '1', fecha: '2026-10-01', acuerdos: 'A', proximosPasos: '', publicado: true },
+      { id: '2', fecha: '2026-10-20', acuerdos: 'B', proximosPasos: 'C', publicado: true },
+      { id: '3', fecha: '2026-10-25', acuerdos: 'Privado', proximosPasos: '', publicado: false },
+    ])).toEqual([{ fecha: '2026-10-20', acuerdos: 'B', proximosPasos: 'C' }, { fecha: '2026-10-01', acuerdos: 'A', proximosPasos: '' }]);
+  });
+
+  it('plantilla de etapa: arranque con formulario, sin repetir lo que ya está', () => {
+    expect(PAF_STAGE_TEMPLATES[1].reunion).toBe('Reunión de arranque');
+    expect(PAF_STAGE_TEMPLATES[1].tareas.map((t) => t.titulo)).toContain('Completar el formulario de arranque');
+    const falta = missingTemplateTasks(1, [{ id: 'x', titulo: ' completar el formulario de arranque ', estado: 'aprobada' }]);
+    expect(falta.map((t) => t.titulo)).not.toContain('Completar el formulario de arranque');
+    expect(missingTemplateTasks(9)).toEqual([]);
+  });
+
+  it('contenido: el estudio nunca recibe archivos privados (fs:)', () => {
+    const r = portalPieces([{ id: 'p', date: '2026-11-05', support: 'carrusel', title: 'T', state: 'para_aprobar',
+      slides: [{ display: 'pub:a', thumb: 'pub:b' }, { display: 'fs:privado', thumb: 'fs:privado2' }, { display: 'https://x.com/i.png', thumb: 'https://x.com/t.png' }] }]);
+    expect(r[0].slides).toEqual([{ display: 'pub:a', thumb: 'pub:b' }, { display: 'https://x.com/i.png', thumb: 'https://x.com/t.png' }]);
+    expect(JSON.stringify(r)).not.toContain('fs:');
+  });
+
+  it('contenido: solo el estudio autorizado aprueba, y solo lo que está para revisar', () => {
+    const portal = { emailsAutorizados: ['e@x.com'], piezas: [
+      { id: '1', fecha: '', soporte: 'reel' as const, titulo: 'Para revisar', slides: [], estado: 'para_aprobar' as const },
+      { id: '2', fecha: '', soporte: 'reel' as const, titulo: 'Ya publicada', slides: [], estado: 'publicada' as const },
+    ] };
+    expect(checkPieza(portal, 'E@x.com', '1')).toEqual({ titulo: 'Para revisar' });
+    expect(checkPieza(portal, 'otro@x.com', '1')).toEqual({ error: 'Correo no autorizado' });
+    expect('error' in checkPieza(portal, 'e@x.com', '2')).toBe(true);
+    expect('error' in checkPieza(portal, 'e@x.com', 'zzz')).toBe(true);
   });
 });

@@ -5,7 +5,7 @@ import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
   approveTask, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
-  suggestedChannel, type PafDelivery, type PafPedidoAlta, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
+  missingTemplateTasks, PAF_STAGE_TEMPLATES, suggestedChannel, type PafDelivery, type PafPedidoAlta, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
 } from '../portal/model';
 import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, unpublishPafPortal } from '../portal/store';
 import { subscribePanelOfProject } from '../panels/store';
@@ -15,6 +15,7 @@ import { hapticFeedback } from '../utils/haptics';
 import { PafAltaCard } from './PafAltaCard';
 import { PafReunionCard } from './PafReunionCard';
 import { PafWeekGoals } from './PafWeekGoals';
+import { PafMeetingSummaries } from './PafMeetingSummaries';
 
 const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
 const STATE_STYLE: Record<PafTaskState, string> = {
@@ -44,6 +45,7 @@ type Props = {
  */
 export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, legacy }) => {
   const [tab, setTab] = useState<Tab>('hoy');
+  const [meetingTitle, setMeetingTitle] = useState<string | undefined>(undefined);
   const portal = usePortalDraft(project, meetings, onUpdateProject);
   const work = usePafWork(project, meetings, onUpdateProject);
   const toReview = work.tasks.filter((t) => t.estado === 'enviada');
@@ -65,6 +67,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 
       {tab === 'hoy' && (
         <div className="space-y-5">
+          <StageTemplate project={project} hito={portal.draft.hito} work={work} onMeeting={setMeetingTitle} />
           <Block title="Esta semana" hint="El foco y 2 o 3 objetivos, con quién hace cada uno. Lo ve el estudio arriba de todo.">
             <textarea className={input} rows={2} value={portal.draft.resumen} placeholder="Foco: esta semana cerramos a quién le hablamos." onChange={(e) => portal.set({ resumen: e.target.value })} />
             <PafWeekGoals project={project} publishedId={portal.published?.clienteId} />
@@ -74,7 +77,8 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
             {toReview.length ? <TaskList tasks={toReview} work={work} /> : <p className="text-[11px] text-zinc-500">Nada para revisar.</p>}
           </Block>
 
-          <PafReunionCard project={project} meetings={meetings} onAddMeeting={onAddMeeting} />
+          <PafReunionCard project={project} meetings={meetings} onAddMeeting={onAddMeeting} suggestedTitle={meetingTitle} />
+          <PafMeetingSummaries project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
 
           <Deliveries work={work} />
         </div>
@@ -82,6 +86,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 
       {tab === 'tareas' && (
         <div className="space-y-3">
+          <StageTemplate project={project} hito={portal.draft.hito} work={work} onMeeting={(t) => { setMeetingTitle(t); setTab('hoy'); }} always />
           {!project.pafClienteId && <p className="text-[11px] text-zinc-500">Los avisos de "Terminé" llegan cuando el estudio tenga ID y portal publicado.</p>}
           {work.tasks.length ? <TaskList tasks={work.tasks} work={work} /> : <p className="text-[11px] text-zinc-500">Todavía no hay tareas.</p>}
           <AddTask work={work} />
@@ -326,6 +331,11 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
     reopen: (id: string, motivo: string) => update(id, (t) => reopenTask(t, motivo)),
     remove: (id: string) => saveTasks(tasks.filter((t) => t.id !== id)),
     add: (t: Omit<PafTask, 'id' | 'estado'>) => saveTasks([...tasks, { ...t, id: newItemId(), estado: 'borrador' }]),
+    /** Varias de una (plantilla de la etapa): ocultas o ya habilitadas */
+    addMany: (list: Omit<PafTask, 'id' | 'estado'>[], enable: boolean) => {
+      const now = new Date().toISOString();
+      saveTasks([...tasks, ...list.map((t) => ({ ...t, id: newItemId(), estado: (enable ? 'habilitada' : 'borrador') as PafTaskState, ...(enable ? { habilitadaEn: now } : {}) }))]);
+    },
   };
 }
 type Work = ReturnType<typeof usePafWork>;
@@ -451,5 +461,62 @@ function WhatsappField({ value, onSave }: { value: string; onSave: (raw: string)
       <input className={input} inputMode="tel" value={v} placeholder="11 2345 6789" onChange={(e) => setV(e.target.value)} />
       <button type="button" onClick={() => onSave(v).catch(() => undefined)} disabled={v === value} className="shrink-0 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 text-[11px] font-bold disabled:opacity-50">Guardar</button>
     </div>
+  );
+}
+/**
+ * Plantilla de la etapa: tareas sugeridas que todavía no están (por título).
+ * En Hoy aparece al cambiar de etapa; "Ahora no" la oculta para esa etapa en este dispositivo.
+ */
+function StageTemplate({ project, hito, work, onMeeting, always }: { project: Project; hito: number; work: Work; onMeeting: (title: string) => void; always?: boolean }) {
+  const key = `paf_plantilla_${project.id}_${hito}`;
+  const missing = missingTemplateTasks(hito, work.tasks);
+  const reunion = PAF_STAGE_TEMPLATES[hito]?.reunion;
+  const [picked, setPicked] = useState<Set<string>>(() => new Set(missing.map((t) => t.titulo)));
+  const [hidden, setHidden] = useState(() => { try { return !always && !!localStorage.getItem(key); } catch { return false; } });
+  const [open, setOpen] = useState(!always);
+  useEffect(() => {
+    setPicked(new Set(missingTemplateTasks(hito, work.tasks).map((t) => t.titulo)));
+    try { setHidden(!always && !!localStorage.getItem(key)); } catch { /* sin almacenamiento */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hito]);
+
+  if (hidden || (!missing.length && !reunion)) return null;
+  const dismiss = () => { setHidden(true); try { localStorage.setItem(key, '1'); } catch { /* sin almacenamiento */ } };
+  const add = (enable: boolean) => {
+    const list = missing.filter((t) => picked.has(t.titulo));
+    if (!list.length) return;
+    hapticFeedback.light();
+    work.addMany(list, enable);
+  };
+
+  if (always && !open) {
+    return missing.length ? <button type="button" onClick={() => setOpen(true)} className="text-[11px] font-bold text-sky-300">+ Tareas sugeridas para la etapa {hito} ({missing.length})</button> : null;
+  }
+
+  return (
+    <section className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-3 space-y-2">
+      <div>
+        <h3 className="text-xs font-bold text-zinc-100">Etapa {hito} · {PRESENCIA_HITOS[hito - 1]}: sugerencias</h3>
+        <p className="text-[11px] text-zinc-500">Elegí cuáles sumar. Las podés editar o borrar después.</p>
+      </div>
+      {missing.length > 0 && (
+        <ul className="space-y-1">
+          {missing.map((t) => (
+            <li key={t.titulo}>
+              <label className="flex items-start gap-2 text-xs text-zinc-200">
+                <input type="checkbox" className="mt-0.5" checked={picked.has(t.titulo)} onChange={(e) => setPicked((s) => { const n = new Set(s); if (e.target.checked) n.add(t.titulo); else n.delete(t.titulo); return n; })} />
+                <span>{t.titulo}{t.pideArchivos && <span className="text-zinc-500"> · pide archivos</span>}{t.detalle && <span className="block text-[11px] text-zinc-500">{t.detalle}</span>}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+        {missing.length > 0 && <button type="button" onClick={() => add(true)} className="rounded-lg bg-sky-500/15 text-sky-300 px-2 py-1">Agregar y habilitar</button>}
+        {missing.length > 0 && <button type="button" onClick={() => add(false)} className="rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1">Agregar ocultas</button>}
+        {reunion && <button type="button" onClick={() => onMeeting(reunion)} className="rounded-lg bg-emerald-500/15 text-emerald-300 px-2 py-1">Agendar {reunion.toLowerCase()}</button>}
+        <button type="button" onClick={always ? () => setOpen(false) : dismiss} className="ml-auto text-zinc-500 font-normal">{always ? 'Cerrar' : 'Ahora no'}</button>
+      </div>
+    </section>
   );
 }

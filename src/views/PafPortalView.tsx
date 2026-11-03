@@ -9,7 +9,10 @@ import { auth } from '../firebaseAuth';
 import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { formatDisplayDate } from '../utils/projectTimeline';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, isOverdue, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
-import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
+import { sendPiezaDecision, sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
+import { AssetImg } from '../content/AssetImg';
+import { PANEL_STATE_LABEL } from '../panels/model';
+import type { PafPortalPiece } from '../portal/model';
 
 /**
  * /portal: el estudio entra con su cuenta de Google (el mismo correo con el que se
@@ -18,7 +21,7 @@ import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPorta
  * En desarrollo, /portal?demo muestra un ejemplo sin login para revisar el diseño.
  */
 
-type Tab = 'inicio' | 'tareas' | 'entregas' | 'archivos';
+type Tab = 'inicio' | 'tareas' | 'contenido' | 'entregas' | 'archivos';
 type PortalTask = PafPortalDoc['tareas'][number];
 
 const LINK_ICON: Record<PafPortalLinkKey, React.ElementType> = {
@@ -63,6 +66,12 @@ const DEMO: PafPortalDoc = {
     { texto: 'Subir las fotos de obra', hecho: false, quien: 'estudio' },
   ],
   contacto: { whatsapp: '5491100000000' },
+  reuniones: [{ fecha: '2026-10-30', acuerdos: 'El foco es vivienda unifamiliar en zona norte. El tono: cercano y técnico.', proximosPasos: 'Ustedes: subir fotos de obra. Nosotros: borrador del mensaje para el martes.' }],
+  piezas: [
+    { id: 'c1', fecha: '2026-11-05', soporte: 'carrusel', titulo: 'Cómo trabajamos una vivienda desde cero', caption: 'Cinco pasos, del primer boceto a la llave.', estado: 'para_aprobar',
+      slides: ['Del boceto', 'a la obra', 'a la llave'].map((t) => { const svg = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500"><rect width="400" height="500" fill="#e5e5e5"/><text x="200" y="260" font-family="sans-serif" font-size="32" text-anchor="middle" fill="#171717">${t}</text></svg>`)}`; return { display: svg, thumb: svg }; }) },
+    { id: 'c2', fecha: '2026-11-08', soporte: 'reel', titulo: 'Recorrido por la casa Belgrano', estado: 'aprobada', slides: [] },
+  ],
 };
 
 /** Claro u oscuro según el dispositivo del estudio (el CRM usa las mismas variables) */
@@ -244,6 +253,14 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
   const hito = Math.min(PRESENCIA_HITOS.length, Math.max(1, p.hitoVisible || 1));
   const initial = (email[0] || '?').toUpperCase();
   const objetivos = p.objetivos || [];
+  const reuniones = p.reuniones || [];
+  const [piezas, setPiezas] = useState<PafPortalPiece[]>(p.piezas || []);
+  useEffect(() => setPiezas(p.piezas || []), [p.piezas]);
+  const paraAprobar = piezas.filter((x) => x.estado === 'para_aprobar').length;
+  const decidePieza = async (pieceId: string, decision: 'aprobar' | 'cambios', comment?: string) => {
+    if (demo) { setPiezas((list) => list.map((x) => (x.id === pieceId ? { ...x, estado: decision === 'aprobar' ? 'aprobada' : 'cambios', comentario: comment } : x))); return; }
+    await sendPiezaDecision(p.clienteId, pieceId, decision, comment);
+  };
   const whatsapp = p.contacto?.whatsapp || '';
   const [showStages, setShowStages] = useState(false);
 
@@ -310,6 +327,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
             { id: 'inicio', label: 'Inicio' },
             { id: 'tareas', label: 'Tareas', count: pendientes.length || undefined },
             { id: 'entregas', label: 'Entregas', count: entregas.length || undefined },
+            ...(piezas.length ? [{ id: 'contenido' as Tab, label: 'Contenido', count: paraAprobar || undefined }] : []),
             { id: 'archivos', label: 'Archivos' },
           ]}
         />
@@ -334,6 +352,12 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
 
             <section>
               <SectionTitle title="Lo que necesitamos de vos" hint={pendientes.length ? 'Cuando termines, tocá “Terminé”. Lo revisamos y te confirmamos.' : undefined} />
+              {paraAprobar > 0 && (
+                <button type="button" onClick={() => setTab('contenido')} className="card-swiss mb-3 w-full flex items-center gap-3 p-4 text-left">
+                  <span className="flex-1 text-sm text-[var(--text-primary)]">{paraAprobar === 1 ? 'Tenés 1 pieza de contenido para revisar' : `Tenés ${paraAprobar} piezas de contenido para revisar`}</span>
+                  <ArrowRight className="w-4 h-4 text-[var(--text-tertiary)]" />
+                </button>
+              )}
               {pendientes.length ? (
                 <>
                   <ul className="space-y-3">
@@ -362,6 +386,16 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
                 {entregas.length ? <DeliveryRow d={latest(entregas)} /> : <p className="mt-3 text-sm text-[var(--text-secondary)]">Las entregas aparecen acá cuando las compartimos.</p>}
               </Card>
             </div>
+
+            {reuniones.length > 0 && (
+              <Card className="p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <Eyebrow>Lo que acordamos · {formatDisplayDate(reuniones[0].fecha, 'medium')}</Eyebrow>
+                  {reuniones.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver anteriores</button>}
+                </div>
+                <MeetingSummary s={reuniones[0]} />
+              </Card>
+            )}
           </div>
         )}
 
@@ -401,6 +435,25 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
                 {[...entregas].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map((d) => <DeliveryRow key={d.id} d={d} />)}
               </Card>
             ) : <EmptyState icon={<Package className="w-5 h-5" />} title="Todavía no hay entregas" description="Aparecen acá a medida que las compartimos." />}
+            {reuniones.length > 0 && (
+              <div className="mt-10">
+                <SectionTitle title="Resúmenes de reunión" hint="Acuerdos y próximos pasos de cada encuentro." />
+                <ul className="space-y-3">
+                  {reuniones.map((s, i) => (
+                    <li key={i}><Card className="p-5"><p className="text-xs text-[var(--text-tertiary)]">{formatDisplayDate(s.fecha, 'medium')}</p><MeetingSummary s={s} /></Card></li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        )}
+
+        {tab === 'contenido' && (
+          <section>
+            <SectionTitle title="Contenido para revisar" hint="Mirá cada pieza y aprobala o contanos qué cambiar." />
+            <ul className="space-y-6">
+              {piezas.map((x) => <li key={x.id}><PieceCard piece={x} readOnly={!!readOnly} onDecide={decidePieza} /></li>)}
+            </ul>
           </section>
         )}
 
@@ -606,5 +659,77 @@ function WhatsappButton({ number, studio }: { number: string; studio: string }) 
     <a href={href} target="_blank" rel="noopener noreferrer" className="btn-solid-primary fixed z-40 right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm shadow-lg">
       <MessageCircle className="w-4 h-4" /> Hablar con Juan
     </a>
+  );
+}
+function MeetingSummary({ s }: { s: { acuerdos: string; proximosPasos: string } }) {
+  return (
+    <div className="mt-3 grid gap-4 sm:grid-cols-2">
+      {s.acuerdos && <div><p className="text-xs font-medium text-[var(--text-tertiary)]">Acuerdos</p><p className="mt-1 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{s.acuerdos}</p></div>}
+      {s.proximosPasos && <div><p className="text-xs font-medium text-[var(--text-tertiary)]">Próximos pasos</p><p className="mt-1 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{s.proximosPasos}</p></div>}
+    </div>
+  );
+}
+const SOPORTE_LABEL: Record<PafPortalPiece['soporte'], string> = { carrusel: 'Carrusel', reel: 'Reel', estatico: 'Estático' };
+
+/** Una pieza de contenido: imágenes, texto y, si está para revisar, aprobar o pedir cambios */
+function PieceCard({ piece: x, readOnly, onDecide }: { piece: PafPortalPiece; readOnly: boolean; onDecide: (id: string, decision: 'aprobar' | 'cambios', comment?: string) => Promise<void> }) {
+  const [mode, setMode] = useState<'idle' | 'cambios'>('idle');
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const open = x.estado === 'para_aprobar' || x.estado === 'cambios';
+  const dot = x.estado === 'aprobada' || x.estado === 'publicada' ? 'bg-emerald-500' : x.estado === 'cambios' ? 'bg-sky-500' : 'bg-amber-500';
+
+  const decide = async (decision: 'aprobar' | 'cambios') => {
+    setBusy(true); setError('');
+    try {
+      await onDecide(x.id, decision, decision === 'cambios' ? comment.trim() : undefined);
+      setMode('idle'); setComment('');
+    } catch (e) {
+      setError((e as Error).message || 'No se pudo guardar. Probá de nuevo.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card className="overflow-hidden">
+      {x.slides.length > 0 && (
+        <div className="flex overflow-x-auto snap-x snap-mandatory bg-[var(--bg-surface-muted)] [scrollbar-width:none]">
+          {x.slides.map((s, k) => (
+            <div key={k} className="shrink-0 w-full snap-center aspect-[4/5]">
+              <AssetImg src={s.display} alt={`${x.titulo} · ${k + 1} de ${x.slides.length}`} className="w-full h-full object-contain" />
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="p-5 space-y-3">
+        <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+          <span>{formatDisplayDate(x.fecha, 'medium')} · {SOPORTE_LABEL[x.soporte]}{x.slides.length > 1 ? ` · ${x.slides.length} imágenes` : ''}</span>
+          <span className="ml-auto inline-flex items-center gap-1.5 text-[var(--text-secondary)]"><span className={`w-1.5 h-1.5 rounded-full ${dot}`} aria-hidden />{PANEL_STATE_LABEL[x.estado]}</span>
+        </div>
+        <p className="text-[15px] font-medium text-[var(--text-primary)]">{x.titulo}</p>
+        {x.caption && <p className="text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{x.caption}</p>}
+        {x.estado === 'cambios' && x.comentario && <p className="rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm"><span className="text-[var(--text-tertiary)]">Pediste: </span>{x.comentario}</p>}
+        {open && mode === 'idle' && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button type="button" onClick={() => decide('aprobar')} disabled={busy || readOnly} className="btn-solid-primary inline-flex items-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60">
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Aprobar
+            </button>
+            <button type="button" onClick={() => setMode('cambios')} disabled={busy || readOnly} className="rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--text-primary)] disabled:opacity-60">Pedir cambios</button>
+          </div>
+        )}
+        {mode === 'cambios' && (
+          <div className="space-y-2">
+            <textarea autoFocus rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="¿Qué cambiarías?" className="w-full rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)]" />
+            <div className="flex gap-2">
+              <button type="button" onClick={() => decide('cambios')} disabled={busy || !comment.trim()} className="btn-solid-primary px-4 py-2 text-sm disabled:opacity-60">Enviar</button>
+              <button type="button" onClick={() => setMode('idle')} className="px-3 py-2 text-sm text-[var(--text-secondary)]">Cancelar</button>
+            </div>
+          </div>
+        )}
+        {error && <p role="alert" className="text-sm text-rose-500">{error}</p>}
+      </div>
+    </Card>
   );
 }

@@ -120,14 +120,18 @@ export interface PafPortalDoc {
   proximaReunion: { fecha: string; hora?: string } | null;
   /** Semana del programa (sale de la fecha de inicio) */
   semana?: { actual: number; total: number } | null;
+  /** Resúmenes de reunión publicados (acuerdos y próximos pasos) */
+  reuniones?: { fecha: string; acuerdos: string; proximosPasos: string }[];
   actualizadoEn: string;
   /** Se publican aparte (ver PORTAL_SEPARATE_FIELDS): objetivos de la semana y WhatsApp de Juan */
   objetivos?: PafPortalGoal[];
   contacto?: { whatsapp?: string };
+  /** Contenido para aprobar (sale de las piezas del panel del estudio) */
+  piezas?: PafPortalPiece[];
 }
 
 /** Campos que no pisa la publicación general (vienen del panel del estudio y de la configuración de Juan) */
-export const PORTAL_SEPARATE_FIELDS = ['objetivos', 'contacto'] as const;
+export const PORTAL_SEPARATE_FIELDS = ['objetivos', 'contacto', 'piezas'] as const;
 
 /** Semana X de 12 a partir de la fecha de inicio (null si no arrancó o no hay fecha) */
 export function programWeek(start: string | undefined, today: string, total = 12): { actual: number; total: number } | null {
@@ -170,7 +174,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; privados?: (string | undefined)[] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; privados?: (string | undefined)[] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -207,6 +211,7 @@ export function buildPafPortal(
       entregas: (input.entregas || []).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, ...(fecha ? { fecha } : {}), ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
       proximaReunion: input.proximaReunion || null,
       semana: input.semana || null,
+      reuniones: input.reuniones || [],
       actualizadoEn: now,
     },
   };
@@ -248,7 +253,7 @@ export function nextMeeting(
 }
 
 export function portalFromProject(
-  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string },
+  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[] },
   meetings: Parameters<typeof nextMeeting>[0],
   draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
   clienteId = project.pafClienteId,
@@ -266,6 +271,7 @@ export function portalFromProject(
       entregas: publicDeliveries(project.pafEntregas),
       proximaReunion: nextMeeting(meetings, project.id, today),
       semana: programWeek(project.pafStartDate || project.startDate, today),
+      reuniones: publicSummaries(project.pafResumenes),
       privados: [project.pafDrive?.carpetaInterna, project.pafDrive?.ficha, ...privados],
     },
     now.toISOString()
@@ -482,4 +488,168 @@ export function portalGoals(goals: { text: string; done: boolean; quien?: 'cero'
 /** Tarea habilitada con fecha pasada que el estudio todavía no avisó */
 export function isOverdue(t: Pick<PafPortalTask, 'estado' | 'fecha'>, today: string): boolean {
   return t.estado === 'habilitada' && !!t.fecha && t.fecha < today;
+}
+
+// ---------- Tablero "PAF hoy" (fase 4) ----------
+
+export interface PafTodayRow {
+  id: string;
+  estudio: string;
+  paraRevisar: number;
+  proximaReunion: { fecha: string; hora?: string } | null;
+  etapa: number | null; // la que ve el estudio (null si no tiene portal cargado)
+  diasSinNovedades: number | null; // desde el último movimiento del estudio o de Juan
+}
+
+/** Una fila por estudio: lo urgente arriba (para revisar, después el más quieto) */
+export function pafTodayRows(
+  projects: { id: string; clientName: string; pafTareas?: PafTask[]; pafPortal?: PafPortalDraft; lastContactDate?: string }[],
+  meetings: Parameters<typeof nextMeeting>[0],
+  today: string
+): PafTodayRow[] {
+  const day = (iso?: string) => (iso ? iso.slice(0, 10) : '');
+  return projects.map((p) => {
+    const tasks = p.pafTareas || [];
+    const done = meetings.filter((m) => m.projectId === p.id && (m.completed || m.date < today)).map((m) => m.date);
+    const last = [
+      ...tasks.map((t) => day(t.avisoEn)),
+      ...tasks.map((t) => day(t.aprobacion?.fecha)),
+      ...tasks.map((t) => day(t.habilitadaEn)),
+      day(p.lastContactDate),
+      ...done,
+    ].filter(Boolean).sort().pop();
+    return {
+      id: p.id,
+      estudio: p.clientName,
+      paraRevisar: tasks.filter((t) => t.estado === 'enviada').length,
+      proximaReunion: nextMeeting(meetings, p.id, today),
+      etapa: p.pafPortal ? Math.min(PRESENCIA_HITOS.length, Math.max(1, p.pafPortal.hito || 1)) : null,
+      diasSinNovedades: last ? Math.max(0, Math.round((Date.parse(today) - Date.parse(last)) / 86400000)) : null,
+    };
+  }).sort((a, b) => b.paraRevisar - a.paraRevisar || (b.diasSinNovedades ?? -1) - (a.diasSinNovedades ?? -1) || a.estudio.localeCompare(b.estudio));
+}
+
+// ---------- Resumen de reunión (fase 4) ----------
+
+/** Lo que Juan anota después de una reunión (en la ficha) */
+export interface PafMeetingSummary {
+  id: string;
+  fecha: string; // YYYY-MM-DD
+  acuerdos: string;
+  proximosPasos: string;
+  publicado: boolean;
+}
+
+/** Lo que ve el estudio: solo los publicados, del más nuevo al más viejo */
+export function publicSummaries(items: PafMeetingSummary[] = []): { fecha: string; acuerdos: string; proximosPasos: string }[] {
+  return items
+    .filter((s) => s.publicado && (s.acuerdos.trim() || s.proximosPasos.trim()))
+    .sort((a, b) => b.fecha.localeCompare(a.fecha))
+    .slice(0, 12)
+    .map((s) => ({ fecha: s.fecha, acuerdos: s.acuerdos.trim().slice(0, 2000), proximosPasos: s.proximosPasos.trim().slice(0, 2000) }));
+}
+
+// ---------- Plantillas de tareas por etapa (fase 4) ----------
+
+export interface PafStageTemplate {
+  /** Reunión que conviene agendar al entrar en la etapa */
+  reunion?: string;
+  tareas: { titulo: string; detalle?: string; pideArchivos?: boolean }[];
+}
+
+/**
+ * Tareas sugeridas para el estudio en cada etapa de Presencia. Son un punto de partida:
+ * Juan elige cuáles agregar y las puede editar o borrar después.
+ */
+export const PAF_STAGE_TEMPLATES: Record<number, PafStageTemplate> = {
+  1: {
+    reunion: 'Reunión de arranque',
+    tareas: [
+      { titulo: 'Completar el formulario de arranque', detalle: 'El link de Tally que te mandamos. Con eso preparamos tu carpeta.' },
+      { titulo: 'Compartir accesos a redes y web', detalle: 'Usuario o acceso de colaborador de Instagram, Google y tu sitio, si tenés.' },
+      { titulo: 'Subir logo y fotos de obras', detalle: 'Las de mejor calidad que tengas, sin editar.', pideArchivos: true },
+    ],
+  },
+  2: {
+    reunion: 'Reunión de foco',
+    tareas: [
+      { titulo: 'Elegir 3 proyectos que te representen', detalle: 'Los que te gustaría hacer más seguido.' },
+      { titulo: 'Contarnos tu cliente ideal', detalle: 'Quién es, qué busca y por qué te elegiría.' },
+    ],
+  },
+  3: {
+    reunion: 'Reunión de mensaje',
+    tareas: [
+      { titulo: 'Revisar la propuesta de mensaje', detalle: 'Leela con calma y marcá lo que no te suene a vos.' },
+      { titulo: 'Aprobar la bio y los textos clave' },
+    ],
+  },
+  4: {
+    tareas: [
+      { titulo: 'Subir fotos para el perfil', detalle: 'Retrato y equipo, si querés que aparezcan.', pideArchivos: true },
+      { titulo: 'Revisar el perfil actualizado' },
+      { titulo: 'Revisar la web', detalle: 'Navegala desde el celular y contanos qué cambiarías.' },
+    ],
+  },
+  5: {
+    reunion: 'Reunión de cierre',
+    tareas: [
+      { titulo: 'Completar la encuesta de cierre' },
+    ],
+  },
+};
+
+const sameTitle = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** Lo que falta de la plantilla de una etapa (no repite tareas que ya existen, por título) */
+export function missingTemplateTasks(hito: number, tasks: PafTask[] = []): PafStageTemplate['tareas'] {
+  return (PAF_STAGE_TEMPLATES[hito]?.tareas || []).filter((t) => !tasks.some((x) => sameTitle(x.titulo, t.titulo)));
+}
+
+// ---------- Contenido para aprobar (fase 4) ----------
+
+export type PafPieceState = 'para_aprobar' | 'aprobada' | 'cambios' | 'publicada';
+
+/** Pieza tal como la ve el estudio (sale de las piezas del panel del estudio) */
+export interface PafPortalPiece {
+  id: string;
+  fecha: string;
+  soporte: 'carrusel' | 'reel' | 'estatico';
+  titulo: string;
+  caption?: string;
+  /** Solo imágenes públicas ("pub:…" o https); nunca archivos privados */
+  slides: { display: string; thumb: string }[];
+  estado: PafPieceState;
+  comentario?: string;
+}
+
+const publicRef = (ref: string) => ref.startsWith('pub:') || !!safeHttpsUrl(ref);
+
+export function portalPieces(pieces: { id: string; date: string; support: PafPortalPiece['soporte']; title: string; caption?: string; slides: { display: string; thumb: string }[]; state: PafPieceState; clientComment?: string }[] = []): PafPortalPiece[] {
+  return [...pieces]
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((p) => ({
+      id: p.id,
+      fecha: p.date,
+      soporte: p.support,
+      titulo: p.title,
+      ...(p.caption ? { caption: p.caption } : {}),
+      slides: p.slides.filter((s) => publicRef(s.display) && publicRef(s.thumb)).map((s) => ({ display: s.display, thumb: s.thumb })),
+      estado: p.state,
+      ...(p.clientComment ? { comentario: p.clientComment } : {}),
+    }));
+}
+
+/** ¿Puede este correo aprobar o pedir cambios en esta pieza? (lo usa el servidor) */
+export function checkPieza(
+  portal: (Pick<PafPortalDoc, 'emailsAutorizados'> & { piezas?: PafPortalPiece[] }) | null | undefined,
+  email: string,
+  pieceId: string
+): { titulo: string } | { error: string } {
+  if (!portal) return { error: 'Portal inexistente' };
+  if (!portal.emailsAutorizados?.includes(email.trim().toLowerCase())) return { error: 'Correo no autorizado' };
+  const pieza = (portal.piezas || []).find((p) => p.id === pieceId);
+  if (!pieza) return { error: 'Pieza inexistente' };
+  if (pieza.estado !== 'para_aprobar' && pieza.estado !== 'cambios') return { error: 'Esta pieza ya no está para revisar' };
+  return { titulo: pieza.titulo };
 }

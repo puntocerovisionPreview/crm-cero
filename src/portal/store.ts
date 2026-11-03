@@ -13,7 +13,7 @@ export async function publishPafPortal(portal: PafPortalDoc): Promise<void> {
 }
 
 /** Objetivos de la semana y/o WhatsApp de Juan en un portal ya publicado */
-export async function publishPortalExtras(clienteId: string, extras: Pick<PafPortalDoc, 'objetivos' | 'contacto'>): Promise<void> {
+export async function publishPortalExtras(clienteId: string, extras: Pick<PafPortalDoc, 'objetivos' | 'contacto' | 'piezas'>): Promise<void> {
   await setDoc(doc(db, PAF_PORTAL_COLLECTION, clienteId), extras, { merge: true });
 }
 
@@ -164,4 +164,14 @@ export function subscribePedidoDeProyecto(projectId: string, onChanged: (p: PafP
     },
     () => onChanged(null)
   );
+}
+
+/** El estudio aprueba o pide cambios en una pieza (lo aplica el servidor) */
+export async function sendPiezaDecision(clienteId: string, pieceId: string, decision: 'aprobar' | 'cambios', comment?: string): Promise<void> {
+  const res = await fetch('/api/paf/pieza', {
+    method: 'POST',
+    headers: { ...(await getAuthHeaders()), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clienteId, pieceId, decision, comment }),
+  });
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error || 'No se pudo guardar. Probá de nuevo.');
 }

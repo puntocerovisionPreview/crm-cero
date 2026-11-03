@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { CalendarPlus, ExternalLink } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
 import { getAuthHeaders } from '../utils/authAccess';
@@ -29,8 +29,17 @@ export const PafReunionCard: React.FC<{
   project: Project;
   meetings: AgendaMeeting[];
   onAddMeeting: (meeting: Omit<AgendaMeeting, 'id' | 'createdAt'>) => void;
-}> = ({ project, meetings, onAddMeeting }) => {
+  /** Título que propone la plantilla de la etapa (ej. "Reunión de arranque") */
+  suggestedTitle?: string;
+}> = ({ project, meetings, onAddMeeting, suggestedTitle }) => {
   const [form, setForm] = useState({ title: `Reunión PAF · ${project.clientName}`, date: getTodayString(), time: '11:00', durationHours: 1, notes: '' });
+  const titleRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!suggestedTitle) return;
+    setForm((f) => ({ ...f, title: `${suggestedTitle} · ${project.clientName}` }));
+    titleRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    titleRef.current?.focus();
+  }, [suggestedTitle, project.clientName]);
   const [calendarSync, setCalendarSync] = useState<boolean | null>(null);
   const [notice, setNotice] = useState('');
 
@@ -97,7 +106,7 @@ export const PafReunionCard: React.FC<{
         </ul>
       )}
 
-      <input className={input} value={form.title} aria-label="Título" onChange={(e) => setForm({ ...form, title: e.target.value })} />
+      <input ref={titleRef} className={input} value={form.title} aria-label="Título" onChange={(e) => setForm({ ...form, title: e.target.value })} />
       <div className="flex flex-wrap gap-1.5">
         <input className={`${field} flex-1 min-w-[9.5rem]`} type="date" aria-label="Fecha" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
         <input className={`${field} w-28`} type="time" aria-label="Hora" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />

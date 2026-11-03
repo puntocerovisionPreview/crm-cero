@@ -1,7 +1,8 @@
 import type express from 'express';
 import type { Firestore } from 'firebase-admin/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
-import { CLIENTE_ID_RE, PAF_PORTAL_COLLECTION, checkTerminado } from '../src/portal/model';
+import { CLIENTE_ID_RE, PAF_PORTAL_COLLECTION, checkPieza, checkTerminado, portalPieces } from '../src/portal/model';
+import { ClientPanel, applyClientAction, panelDocId, parseClientAction, snapshotOf } from '../src/panels/model';
 
 /**
  * PORTAL PAF: cuando el estudio toca "Terminé", el portal guarda el aviso en Firestore
@@ -67,6 +68,48 @@ export function registerPafPortalRoutes(
     } catch (err) {
       console.error('[portal PAF] terminado:', (err as Error).message);
       res.status(500).json({ error: 'No se pudo avisar' });
+    }
+  });
+
+  /**
+   * Contenido para aprobar: el estudio aprueba o pide cambios desde su portal.
+   * Se aplica sobre el panel del estudio (misma lógica que el portal anterior) y se
+   * actualiza la copia del portal nuevo. Te avisa por push/Telegram.
+   */
+  app.post('/api/paf/pieza', async (req, res) => {
+    const clienteId = String(req.body?.clienteId || '');
+    const action = parseClientAction({ type: 'pieza', pieceId: req.body?.pieceId, decision: req.body?.decision, comment: req.body?.comment });
+    if (!CLIENTE_ID_RE.test(clienteId) || !action || action.type !== 'pieza') {
+      return res.status(400).json({ error: req.body?.decision === 'cambios' ? 'Contanos qué cambiar' : 'Pedido inválido' });
+    }
+    const email = await verifiedEmail(req);
+    if (!email) return res.status(401).json({ error: 'Iniciá sesión' });
+    if (tooMany(email)) return res.status(429).json({ error: 'Demasiados cambios seguidos. Esperá un minuto.' });
+    const db = getDb();
+    if (!db) return res.status(503).json({ error: 'No se pudo guardar ahora. Avisale a Juan por WhatsApp.' });
+    try {
+      const portalRef = db.collection(PAF_PORTAL_COLLECTION).doc(clienteId);
+      const portal = (await portalRef.get()).data() as any;
+      const check = checkPieza(portal, email, action.pieceId);
+      if ('error' in check) return res.status(403).json({ error: check.error });
+      const project = await db.collection('projects').where('pafClienteId', '==', clienteId).limit(1).get();
+      if (project.empty) return res.status(404).json({ error: 'No encontramos tu estudio' });
+      const found = await db.collection('client_panels').where('projectId', '==', project.docs[0].id).limit(1).get();
+      const ref = found.docs[0]?.ref;
+      const panel = found.docs[0]?.data() as ClientPanel | undefined;
+      if (!ref || !panel) return res.status(404).json({ error: 'No encontramos el contenido' });
+      const result = applyClientAction({ ...panel, id: ref.id }, action);
+      if ('error' in result) return res.status(404).json({ error: result.error });
+      const batch = db.batch();
+      batch.set(ref, JSON.parse(JSON.stringify(result.panel)));
+      if (panel.active) batch.set(db.collection('student_portals').doc(panelDocId(panel.token)), JSON.parse(JSON.stringify(snapshotOf(result.panel))));
+      batch.set(portalRef, { piezas: JSON.parse(JSON.stringify(portalPieces(result.panel.pieces))) }, { merge: true });
+      await batch.commit();
+      res.json({ ok: true });
+      await notify(result.notice.title, result.notice.body, `/clientes/${project.docs[0].id}`).catch(() => undefined);
+    } catch (err) {
+      console.error('[portal PAF] pieza:', (err as Error).message);
+      res.status(500).json({ error: 'No se pudo guardar. Probá de nuevo.' });
     }
   });
 }

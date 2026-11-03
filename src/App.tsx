@@ -156,6 +156,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { usePafAvisos } from './portal/usePafAvisos';
+import { usePafPiezasSync } from './portal/usePafPiezasSync';
 import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -2165,6 +2166,8 @@ export default function App() {
 
   // Portal PAF: los "Terminé" de los estudios llegan a cada ficha sin tener que abrirla
   usePafAvisos(Boolean(authToken), projects, meetings, handleUpdateProject);
+  // Portal PAF: el contenido para aprobar que cargás en Paneles llega al portal de cada estudio
+  usePafPiezasSync(Boolean(authToken), projects);
 
   const handleDeleteProject = async (id: string) => {
     const projectToDelete = projects.find(p => p.id === id);
