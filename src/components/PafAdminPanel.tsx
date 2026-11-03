@@ -1,15 +1,16 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, CalendarDays, CalendarPlus, Check, CircleAlert, Copy, ExternalLink, Eye, FolderOpen, Home, ImagePlus, Link2, ListChecks, Loader2, Megaphone, MessageCircle, NotebookPen, Package, Palette, Radio, Settings2, Smartphone, Target, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarDays, FileText, Star, CalendarPlus, Check, CircleAlert, Copy, ExternalLink, Eye, FolderOpen, Home, ImagePlus, Link2, ListChecks, Loader2, Megaphone, MessageCircle, NotebookPen, Package, Palette, Radio, Settings2, Smartphone, Target, Trash2, Undo2 } from 'lucide-react';
 import { shrinkLogo } from '../utils/logoImage';
 import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
-  accessHost, accessIssue, accesosDelAlta, approveTask, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
-  missingTemplateTasks, PAF_STAGE_TEMPLATES, suggestedChannel, type PafDelivery, type PafPedidoAlta, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
+  accessHost, accessIssue, accesosDelAlta, approveTask, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
+  missingTemplateTasks, PAF_STAGE_TEMPLATES, suggestedChannel, type PafDelivery, type PafDeliveryState, type PafPedidoAlta, type PafResponsable, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
 } from '../portal/model';
 import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
 import { AccessIcon } from './AccessIcon';
+import { MENSAJES, hoyAcordamos, mensaje, type MensajeId } from '../portal/mensajes';
 import { subscribePanelOfProject } from '../panels/store';
 import type { ClientPanel } from '../panels/model';
 import { SegmentedControl } from '../ui';
@@ -18,6 +19,9 @@ import { PafAltaCard } from './PafAltaCard';
 import { PafMeetingsSection } from './PafMeetingsSection';
 import { PafWeekGoals } from './PafWeekGoals';
 import { PafAnnouncements } from './PafAnnouncements';
+import { PafHitosCard } from './PafHitosCard';
+import { PafReportes } from './PafReportes';
+import { PortalLinksEditor, PortalSectionsToggles } from './PafPortalSettings';
 
 // El portal tal cual lo ve el cliente (se carga solo al abrir la vista previa)
 const PortalPreviewScreen = lazy(() => import('../views/PafPortalView').then((m) => ({ default: m.PortalPreviewScreen })));
@@ -43,10 +47,10 @@ type Props = {
 };
 
 type Section = 'inicio' | 'tareas' | 'reuniones' | 'entregas' | 'archivos' | 'ajustes';
-type Adding = null | 'anuncio' | 'tarea' | 'acceso' | 'entrega' | 'reunion' | 'acuerdo' | 'semana';
+type Adding = null | 'anuncio' | 'tarea' | 'acceso' | 'entrega' | 'reunion' | 'acuerdo' | 'semana' | 'reporte';
 
 /** Acciones rápidas: cada una abre su sección con el formulario listo */
-const QUICK: { id: Exclude<Adding, null> | 'marca'; label: string; hint: string; icon: React.ElementType; section: Section }[] = [
+const QUICK: { id: Exclude<Adding, null>; label: string; hint: string; icon: React.ElementType; section: Section }[] = [
   { id: 'anuncio', label: 'Anuncio', hint: 'Lo primero que lee', icon: Megaphone, section: 'inicio' },
   { id: 'tarea', label: 'Tarea', hint: 'Algo que tiene que hacer', icon: ListChecks, section: 'tareas' },
   { id: 'reunion', label: 'Reunión', hint: 'Va a tu Calendar', icon: CalendarPlus, section: 'reuniones' },
@@ -54,7 +58,7 @@ const QUICK: { id: Exclude<Adding, null> | 'marca'; label: string; hint: string;
   { id: 'entrega', label: 'Entrega', hint: 'Algo que le mandás', icon: Package, section: 'entregas' },
   { id: 'acceso', label: 'Acceso', hint: 'Drive, Asana, web…', icon: Link2, section: 'archivos' },
   { id: 'semana', label: 'Foco semanal', hint: 'Foco y objetivos', icon: Target, section: 'inicio' },
-  { id: 'marca', label: 'Marca', hint: 'Logo y color', icon: Palette, section: 'ajustes' },
+  { id: 'reporte', label: 'Reporte', hint: 'El del viernes', icon: FileText, section: 'inicio' },
 ];
 
 const SECTION_INFO: Record<Section, { label: string; icon: React.ElementType; hint: string }> = {
@@ -63,7 +67,7 @@ const SECTION_INFO: Record<Section, { label: string; icon: React.ElementType; hi
   reuniones: { label: 'Reuniones', icon: CalendarDays, hint: 'Agendar, mover y anotar acuerdos. Todo pasa a tu Google Calendar.' },
   entregas: { label: 'Entregas', icon: Package, hint: 'Lo que le mandás. Nacen ocultas: las mostrás cuando quieras.' },
   archivos: { label: 'Archivos', icon: FolderOpen, hint: 'Accesos directos con ícono: Drive, calendario de contenido, su web…' },
-  ajustes: { label: 'Ajustes', icon: Settings2, hint: 'Marca, quién entra, tu WhatsApp y el alta.' },
+  ajustes: { label: 'Ajustes', icon: Settings2, hint: 'Qué ve tu cliente, marca, quién entra, tu WhatsApp y el alta.' },
 };
 
 /**
@@ -91,7 +95,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
   const quick = (q: (typeof QUICK)[number]) => {
     hapticFeedback.light();
     setSection(q.section);
-    setAdding(q.id === 'marca' ? null : q.id);
+    setAdding(q.id);
     requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   };
 
@@ -107,7 +111,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 
   return (
     <div className="space-y-4">
-      <PanelHeader portal={portal} studio={project.clientName} phone={project.clientPhone} preview={showPreview} onTogglePreview={() => setShowPreview((v) => !v)} />
+      <PanelHeader portal={portal} project={project} studio={project.clientName} phone={project.clientPhone} preview={showPreview} onTogglePreview={() => setShowPreview((v) => !v)} />
       {showPreview && portal.published && <PortalPreview portal={portal.published} />}
 
       {/* Acciones rápidas: lo que más hacés, a un toque */}
@@ -149,17 +153,8 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
           {section === 'inicio' && (
             <>
               {showAlta && <AltaStatus pedido={portal.pedido} carpeta={project.pafDrive?.carpetaCompartida} />}
-              <Card title="Avance">
-                <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <select aria-label="Etapa" className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1 text-xs text-zinc-100" value={portal.draft.hito} onChange={(e) => portal.set({ hito: Number(e.target.value) })}>
-                    {PRESENCIA_HITOS.map((t, i) => <option key={t} value={i + 1}>Etapa {i + 1} · {t}</option>)}
-                  </select>
-                  <label className="ml-auto inline-flex items-center gap-1.5 text-zinc-400">
-                    <input type="checkbox" checked={portal.draft.mostrarAvance !== false} onChange={(e) => portal.set({ mostrarAvance: e.target.checked })} />
-                    Que lo vea
-                  </label>
-                </div>
-              </Card>
+              <PafHitosCard project={project} meetings={meetings} hito={portal.draft.hito} mostrarAvance={portal.draft.mostrarAvance !== false}
+                onSetHito={(n) => portal.set({ hito: n })} onToggleAvance={(v) => portal.set({ mostrarAvance: v })} onUpdateProject={onUpdateProject} />
 
               {toReview.length > 0 && (
                 <Card title={`Para revisar (${toReview.length})`} hint="Avisó que las terminó. Aprobá o volvé a habilitar." tone="amber">
@@ -182,6 +177,10 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
                   ? <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'anuncio'} onDone={done} bare />
                   : <Empty>Sin anuncios.</Empty>}
               </Card>
+
+              <Card title="Reporte del viernes" hint="Se arma con lo que cargaste en la semana. Los números los ponés vos." action={adding !== 'reporte' && <SmallButton onClick={() => setAdding('reporte')}>Armar reporte</SmallButton>}>
+                <PafReportes project={project} meetings={meetings} onUpdateProject={onUpdateProject} open={adding === 'reporte'} onOpen={(o) => setAdding(o ? 'reporte' : null)} />
+              </Card>
             </>
           )}
 
@@ -199,6 +198,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
           {section === 'reuniones' && (
             <PafMeetingsSection project={project} meetings={meetings} onAddMeeting={onAddMeeting} onUpdateMeeting={onUpdateMeeting} onToggleMeeting={onToggleMeeting} onDeleteMeeting={onDeleteMeeting} onUpdateProject={onUpdateProject}
               linkReunion={portal.draft.linkReunion || ''} onLinkReunion={(v) => portal.set({ linkReunion: v })}
+              reunionesAcordadas={portal.draft.reunionesAcordadas} onReunionesAcordadas={(n) => portal.set({ reunionesAcordadas: n })}
               scheduling={adding === 'reunion'} onScheduling={(o) => setAdding(o ? 'reunion' : null)}
               writingSummary={adding === 'acuerdo'} onWritingSummary={(o) => setAdding(o ? 'acuerdo' : null)} />
           )}
@@ -214,9 +214,17 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
               <AccessEditor items={accesos} privados={portal.privados} startAdding={adding === 'acceso'} onChange={(list) => { portal.set({ accesos: list }); }} />
             </Card>
           )}
+          {section === 'archivos' && (
+            <Card title="Bienvenida, contenido y materiales" hint="Botones directos: el cliente no tiene que buscar en Drive.">
+              <PortalLinksEditor draft={portal.draft} onChange={portal.set} />
+            </Card>
+          )}
 
           {section === 'ajustes' && (
             <>
+              <Card title="Qué ve tu cliente" hint="Prendé solo lo que quieras mostrar. Lo apagado no se manda a su portal.">
+                <PortalSectionsToggles draft={portal.draft} onChange={portal.set} />
+              </Card>
               <BrandBlock portal={portal} studio={project.clientName} />
               <Card title="Quién puede entrar" hint="Solo estos correos, con su cuenta de Google. El del alta se agrega solo.">
                 <label className="block text-[11px] text-zinc-400">ID del cliente
@@ -358,7 +366,7 @@ function PortalPreview({ portal }: { portal: PafPortalDoc }) {
 
 // ---------- Encabezado ----------
 
-function PanelHeader({ portal, studio, phone, preview, onTogglePreview }: { portal: ReturnType<typeof usePortalDraft>; studio: string; phone?: string; preview: boolean; onTogglePreview: () => void }) {
+function PanelHeader({ portal, project, studio, phone, preview, onTogglePreview }: { portal: ReturnType<typeof usePortalDraft>; project: Project; studio: string; phone?: string; preview: boolean; onTogglePreview: () => void }) {
   const { published } = portal;
   const viewUrl = published ? `/portal?ver=${encodeURIComponent(published.clienteId)}` : '';
   const updated = published ? new Date(published.actualizadoEn) : null;
@@ -411,12 +419,7 @@ function PanelHeader({ portal, studio, phone, preview, onTogglePreview }: { port
             <Smartphone className="w-3.5 h-3.5" /> {preview ? 'Cerrar vista previa' : 'Vista previa'}
           </button>
         )}
-        {published && phone && whatsappDigits(phone).length >= 10 && (
-          <a href={`https://wa.me/${whatsappDigits(phone)}?text=${encodeURIComponent(novedades(published, studio, window.location.origin))}`} target="_blank" rel="noopener noreferrer" title="Abre WhatsApp con el mensaje armado: lo mandás vos"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 text-xs font-bold">
-            <MessageCircle className="w-3.5 h-3.5" /> Avisarle
-          </a>
-        )}
+        {published && phone && whatsappDigits(phone).length >= 10 && <AvisarleMenu project={project} published={published} phone={whatsappDigits(phone)} />}
         <button type="button" onClick={portal.copyLink} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 text-xs font-bold">
           <Copy className="w-3.5 h-3.5" /> Copiar enlace
         </button>
@@ -499,7 +502,7 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   // Guardado automático en la ficha (no publica)
   const current = useMemo(() => ({ ...draft, emails: normalizeEmails(emailsText) }), [draft, emailsText]);
   // Solo guarda si algo cambió de verdad (abrir la ficha no escribe nada)
-  const snapshot = (d: PafPortalDraft) => JSON.stringify([d.emails, d.hito, d.resumen, d.enlaces, d.accesos ?? null, d.mostrarAvance ?? null, d.logo ?? null, d.marca ?? null, d.linkReunion ?? null]);
+  const snapshot = (d: PafPortalDraft) => { const { publishedAt: _p, ...rest } = d; return JSON.stringify(rest); };
   const lastSaved = useRef(snapshot(current));
   useEffect(() => {
     const snap = snapshot(current);
@@ -522,13 +525,18 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
 
   // Si cambia la próxima reunión en la agenda, el portal publicado se actualiza solo
   const today = new Date().toLocaleDateString('en-CA');
-  const nextKey = JSON.stringify(nextMeeting(meetings, project.id, today));
+  // Lo que sale de la agenda (próxima reunión, la que está por confirmar y cuántas van):
+  // si cambia, el portal publicado se actualiza solo
+  const agendaDoc = (() => { const r = portalFromProject(project, meetings); return 'doc' in r ? r.doc : null; })();
+  const agendaKey = (d: Pick<PafPortalDoc, 'proximaReunion' | 'reunionPorConfirmar' | 'reunionesAcuerdo'> | null | undefined) =>
+    JSON.stringify([d?.proximaReunion ?? null, d?.reunionPorConfirmar ?? null, d?.reunionesAcuerdo ?? null]);
+  const nextKey = agendaKey(agendaDoc);
+  const publishedKey = agendaKey(published);
   useEffect(() => {
-    if (!published || !project.pafPortal?.publishedAt || JSON.stringify(published.proximaReunion ?? null) === nextKey) return;
-    const r = portalFromProject(project, meetings);
-    if ('doc' in r) publishPafPortal(r.doc).catch(() => undefined);
+    if (!published || !project.pafPortal?.publishedAt || !agendaDoc || publishedKey === nextKey) return;
+    publishPafPortal(agendaDoc).catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [nextKey, published?.proximaReunion]);
+  }, [nextKey, publishedKey]);
 
   const privados = [pedido?.alta?.carpetaInterna, pedido?.alta?.ficha];
   const set = (patch: Partial<PafPortalDraft>) => { setDraft((d) => ({ ...d, ...patch })); setNotice(''); };
@@ -613,6 +621,8 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
     approve: (id: string, canal: string) => update(id, (t) => approveTask(t, canal)),
     reopen: (id: string, motivo: string) => update(id, (t) => reopenTask(t, motivo)),
     remove: (id: string) => saveTasks(tasks.filter((t) => t.id !== id)),
+    /** Una sola prioritaria: la que va arriba del portal como "Tu próxima acción" */
+    togglePrioritaria: (id: string) => saveTasks(tasks.map((t) => ({ ...t, prioritaria: t.id === id ? !t.prioritaria : false }))),
     add: (t: Omit<PafTask, 'id' | 'estado'>, visible = false) => saveTasks([...tasks, { ...t, id: newItemId(), estado: visible ? 'habilitada' : 'borrador', ...(visible ? { habilitadaEn: new Date().toISOString() } : {}) }]),
     /** Varias de una (plantilla de la etapa): ocultas o ya habilitadas */
     addMany: (list: Omit<PafTask, 'id' | 'estado'>[], enable: boolean) => {
@@ -639,21 +649,23 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
       <div className="flex items-start gap-2">
         <span className="flex-1 min-w-0 text-xs text-zinc-100">
           <span className="font-semibold">{t.titulo}</span>{t.fecha && <span className="text-zinc-500"> · {t.fecha}</span>}
+          {t.paraQue && <span className="block text-[11px] text-zinc-300"><span className="text-zinc-500">Para qué: </span>{t.paraQue}</span>}
           {t.detalle && <span className="block text-[11px] text-zinc-400">{t.detalle}</span>}
+          <span className="block text-[10px] text-zinc-500">Hace: {PAF_RESPONSABLE_LABEL[t.responsable || 'estudio']}{t.prioritaria && <span className="ml-2 text-amber-300">★ Su próxima acción</span>}</span>
           {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-sky-300 truncate">{t.link}</a>}
           {t.pideArchivos && <span className="block text-[10px] text-zinc-500">Pide archivos · link a Materiales</span>}
           {t.motivo && t.estado === 'habilitada' && <span className="block text-[10px] text-sky-300">Reabierta: {t.motivo}</span>}
           {t.aprobacion && <span className="block text-[10px] text-emerald-400">Aprobada el {t.aprobacion.fecha.slice(0, 10)} por {t.aprobacion.canal}</span>}
           {t.estado === 'enviada' && t.avisoEn && <span className="block text-[10px] text-amber-300">Avisó que terminó el {t.avisoEn.slice(0, 10)}</span>}
         </span>
-        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${STATE_STYLE[t.estado]}`}>{PAF_TASK_STATE_LABEL[t.estado]}</span>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${t.estado === 'habilitada' && t.motivo ? 'bg-amber-400/15 text-amber-300' : STATE_STYLE[t.estado]}`}>{t.estado === 'habilitada' && t.motivo ? 'Requiere ajustes' : PAF_TASK_STATE_LABEL[t.estado]}</span>
       </div>
 
       {reopening ? (
         <div className="space-y-1.5">
-          <input autoFocus className={input} maxLength={140} value={motivo} placeholder="Motivo corto (lo ve el estudio). Ej: faltan las fotos de la obra Belgrano" onChange={(e) => setMotivo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && motivo.trim() && (work.reopen(t.id, motivo), setReopening(false))} />
+          <input autoFocus className={input} maxLength={140} value={motivo} placeholder="Qué ajustar (lo ve el estudio). Ej: faltan las fotos de la obra Belgrano" onChange={(e) => setMotivo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && motivo.trim() && (work.reopen(t.id, motivo), setReopening(false))} />
           <div className="flex gap-2">
-            <button type="button" disabled={!motivo.trim()} onClick={() => { work.reopen(t.id, motivo); setReopening(false); setMotivo(''); }} className="rounded-lg bg-sky-500/15 text-sky-300 px-2 py-1 text-[11px] font-bold disabled:opacity-50">Volver a habilitar</button>
+            <button type="button" disabled={!motivo.trim()} onClick={() => { work.reopen(t.id, motivo); setReopening(false); setMotivo(''); }} className="rounded-lg bg-sky-500/15 text-sky-300 px-2 py-1 text-[11px] font-bold disabled:opacity-50">Pedir ajustes</button>
             <button type="button" onClick={() => setReopening(false)} className="text-[11px] text-zinc-400">Cancelar</button>
           </div>
         </div>
@@ -661,15 +673,17 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
           {t.estado === 'borrador' && <button type="button" onClick={() => work.enable(t.id)} className="rounded-lg bg-sky-500/15 text-sky-300 px-2 py-1">Habilitar</button>}
           {t.estado === 'habilitada' && <button type="button" onClick={() => work.hide(t.id)} className="rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1">Ocultar</button>}
+          {t.estado === 'habilitada' && <button type="button" onClick={() => work.togglePrioritaria(t.id)} title="La que ve arriba de todo como «Tu próxima acción»" className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 ${t.prioritaria ? 'bg-amber-400/15 text-amber-300' : 'bg-zinc-800 text-zinc-300'}`}><Star className="w-3 h-3" />{t.prioritaria ? 'Prioritaria' : 'Hacer prioritaria'}</button>}
+          {canApprove && t.estado === 'enviada' && <span className="text-[10px] font-normal text-zinc-500">Revisala y confirmá:</span>}
           {canApprove && (
             <span className="inline-flex items-center rounded-lg overflow-hidden border border-emerald-500/30">
-              <button type="button" onClick={() => { hapticFeedback.success(); work.approve(t.id, canal); }} className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-300 px-2 py-1"><Check className="w-3 h-3" />Aprobar</button>
+              <button type="button" onClick={() => { hapticFeedback.success(); work.approve(t.id, canal); }} className="inline-flex items-center gap-1 bg-emerald-500/15 text-emerald-300 px-2 py-1"><Check className="w-3 h-3" />Completada</button>
               <select aria-label="Canal de la aprobación" value={canal} onChange={(e) => setCanal(e.target.value)} className="bg-transparent text-emerald-300 text-[11px] px-1 py-1 border-l border-emerald-500/30">
                 {APPROVAL_CHANNELS.map((c) => <option key={c}>{c}</option>)}
               </select>
             </span>
           )}
-          {canReopen && <button type="button" onClick={() => setReopening(true)} className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1"><Undo2 className="w-3 h-3" />Volver a habilitar</button>}
+          {canReopen && <button type="button" onClick={() => setReopening(true)} className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1"><Undo2 className="w-3 h-3" />Pedir ajustes</button>}
           <button type="button" aria-label={`Borrar ${t.titulo}`} onClick={() => window.confirm(`¿Borrar la tarea "${t.titulo}"?`) && work.remove(t.id)} className="ml-auto text-zinc-500 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       )}
@@ -678,7 +692,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
 }
 
 function AddTask({ work, onDone }: { work: Work; onDone?: () => void }) {
-  const [f, setF] = useState({ titulo: '', link: '', detalle: '', fecha: '' });
+  const [f, setF] = useState({ titulo: '', link: '', detalle: '', fecha: '', paraQue: '', responsable: 'estudio' as PafResponsable });
   const [visible, setVisible] = useState(false);
   const [error, setError] = useState('');
   const add = () => {
@@ -687,16 +701,22 @@ function AddTask({ work, onDone }: { work: Work; onDone?: () => void }) {
     if (f.link.trim() && !link) { setError('El link tiene que empezar con https://'); return; }
     setError('');
     hapticFeedback.light();
-    work.add({ titulo: f.titulo.trim(), ...(link ? { link } : {}), ...(f.detalle.trim() ? { detalle: f.detalle.trim() } : {}), ...(f.fecha ? { fecha: f.fecha } : {}) }, visible);
-    setF({ titulo: '', link: '', detalle: '', fecha: '' });
+    work.add({ titulo: f.titulo.trim(), ...(link ? { link } : {}), ...(f.detalle.trim() ? { detalle: f.detalle.trim() } : {}), ...(f.fecha ? { fecha: f.fecha } : {}), ...(f.paraQue.trim() ? { paraQue: f.paraQue.trim() } : {}), ...(f.responsable !== 'estudio' ? { responsable: f.responsable } : {}) }, visible);
+    setF({ titulo: '', link: '', detalle: '', fecha: '', paraQue: '', responsable: 'estudio' });
     onDone?.();
   };
   return (
     <div className="space-y-1.5 pt-2 border-t border-zinc-800">
-      <input className={input} value={f.titulo} placeholder="Nueva tarea para el estudio" onChange={(e) => setF({ ...f, titulo: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
-      <input className={input} value={f.link} placeholder="Link (opcional, https://)" onChange={(e) => setF({ ...f, link: e.target.value })} />
+      <input className={input} value={f.titulo} placeholder="Qué tiene que hacer (ej. Completar la hoja Cliente ideal)" onChange={(e) => setF({ ...f, titulo: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && add()} />
+      <input className={input} value={f.paraQue} placeholder="Para qué sirve (ej. con esto definimos a quién le hablamos)" onChange={(e) => setF({ ...f, paraQue: e.target.value })} />
+      <input className={input} value={f.link} placeholder="Link al archivo exacto (opcional, https://)" onChange={(e) => setF({ ...f, link: e.target.value })} />
+      <label className="flex items-center gap-2 text-[11px] text-zinc-400">La hace
+        <select className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1 text-xs text-zinc-100" value={f.responsable} onChange={(e) => setF({ ...f, responsable: e.target.value as PafResponsable })}>
+          {(Object.keys(PAF_RESPONSABLE_LABEL) as PafResponsable[]).map((r) => <option key={r} value={r}>{PAF_RESPONSABLE_LABEL[r]}</option>)}
+        </select>
+      </label>
       <div className="flex gap-1.5">
-        <input className={input} value={f.detalle} placeholder="Nota (opcional)" onChange={(e) => setF({ ...f, detalle: e.target.value })} />
+        <input className={input} value={f.detalle} placeholder="Cómo hacerla (opcional)" onChange={(e) => setF({ ...f, detalle: e.target.value })} />
         <input className={`${input} w-36`} type="date" aria-label="Fecha (opcional)" value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} />
       </div>
       {error && <p role="alert" className="text-[11px] text-rose-300">{error}</p>}
@@ -708,41 +728,83 @@ function AddTask({ work, onDone }: { work: Work; onDone?: () => void }) {
 }
 
 function Deliveries({ work, showForm = true, onDone }: { work: Work; showForm?: boolean; onDone?: () => void }) {
-  const [f, setF] = useState({ titulo: '', enlace: '', fecha: '' });
+  const vacio = { titulo: '', enlace: '', fecha: '', version: '', decision: '', hasta: '', canal: '' };
+  const [f, setF] = useState(vacio);
   const [error, setError] = useState('');
+  // Control antes de mostrarla (no bloquea: es para no olvidarse)
+  const [controlando, setControlando] = useState<string | null>(null);
+  const [checks, setChecks] = useState<boolean[]>([]);
+  const CONTROL = ['Versión y fecha correctas', 'Arriba está el resumen y qué tiene que decidir', 'Nada interno: sin notas, ficha, Tally ni borradores', 'Plazo y canal para confirmar acordados'];
+  const update = (id: string, patch: Partial<PafDelivery>) => work.saveDeliveries(work.deliveries.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const add = () => {
     if (!f.titulo.trim()) return;
     const enlace = f.enlace.trim() ? safeHttpsUrl(f.enlace) : null;
     if (f.enlace.trim() && !enlace) { setError('El enlace tiene que empezar con https://'); return; }
     setError('');
-    work.saveDeliveries([...work.deliveries, { id: newItemId(), titulo: f.titulo.trim(), publicada: false, ...(enlace ? { enlace } : {}), ...(f.fecha ? { fecha: f.fecha } : {}) }]);
-    setF({ titulo: '', enlace: '', fecha: '' });
+    work.saveDeliveries([...work.deliveries, {
+      id: newItemId(), titulo: f.titulo.trim(), publicada: false, estado: 'en_revision',
+      ...(enlace ? { enlace } : {}), ...(f.fecha ? { fecha: f.fecha } : {}), ...(f.version.trim() ? { version: f.version.trim() } : {}),
+      ...(f.decision.trim() ? { decision: f.decision.trim() } : {}), ...(f.hasta ? { hasta: f.hasta } : {}), ...(f.canal.trim() ? { canal: f.canal.trim() } : {}),
+    }]);
+    setF(vacio);
     onDone?.();
   };
   return (
-    <Block title="Entregas" hint="Nacen ocultas: marcá «La ve el estudio» cuando la quieras mostrar.">
+    <div className="space-y-2">
       {work.deliveries.length > 0 && (
         <ul className="space-y-1.5">
           {work.deliveries.map((d) => (
-            <li key={d.id} className="flex items-center gap-2 rounded-lg border border-zinc-800 p-2 text-xs">
-              <Package className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-              <span className="flex-1 min-w-0 truncate">{d.enlace ? <a href={d.enlace} target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-1">{d.titulo}<ExternalLink className="w-3 h-3" /></a> : d.titulo}{d.fecha && <span className="text-zinc-500"> · {d.fecha}</span>}</span>
-              <label className="flex items-center gap-1 text-[10px] text-zinc-400"><input type="checkbox" checked={d.publicada} onChange={(e) => work.saveDeliveries(work.deliveries.map((x) => (x.id === d.id ? { ...x, publicada: e.target.checked } : x)))} />La ve el estudio</label>
-              <button type="button" aria-label={`Borrar ${d.titulo}`} onClick={() => window.confirm(`¿Borrar la entrega "${d.titulo}"?`) && work.saveDeliveries(work.deliveries.filter((x) => x.id !== d.id))} className="text-zinc-500 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>
+            <li key={d.id} className="rounded-lg border border-zinc-800 p-2.5 text-xs space-y-1.5">
+              <div className="flex items-start gap-2">
+                <Package className="mt-0.5 w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate">{d.enlace ? <a href={d.enlace} target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-1">{d.titulo}<ExternalLink className="w-3 h-3" /></a> : d.titulo}
+                    {d.version && <span className="text-zinc-500"> · {d.version}</span>}{d.fecha && <span className="text-zinc-500"> · {d.fecha}</span>}</span>
+                  {d.decision && <span className="block text-[11px] text-zinc-400">Decide: {d.decision}{d.hasta && ` · hasta el ${d.hasta.split('-').reverse().slice(0, 2).join('/')}`}{d.canal && ` · por ${d.canal}`}</span>}
+                </span>
+                <select aria-label="Estado de la entrega" value={d.estado || 'en_revision'} onChange={(e) => update(d.id, { estado: e.target.value as PafDeliveryState })} className="rounded-md bg-zinc-950 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">
+                  {(Object.keys(PAF_DELIVERY_STATE_LABEL) as PafDeliveryState[]).map((k) => <option key={k} value={k}>{PAF_DELIVERY_STATE_LABEL[k]}</option>)}
+                </select>
+                <label className="flex items-center gap-1 text-[10px] text-zinc-400"><input type="checkbox" checked={d.publicada} onChange={(e) => {
+                  if (!e.target.checked) { update(d.id, { publicada: false }); return; }
+                  setControlando(d.id); setChecks(CONTROL.map(() => false));
+                }} />La ve</label>
+                <button type="button" aria-label={`Borrar ${d.titulo}`} onClick={() => window.confirm(`¿Borrar la entrega "${d.titulo}"?`) && work.saveDeliveries(work.deliveries.filter((x) => x.id !== d.id))} className="text-zinc-500 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>
+              </div>
+              {controlando === d.id && (
+                <div className="rounded-lg border border-amber-400/30 bg-amber-400/[0.04] p-2 space-y-1">
+                  <p className="text-[11px] font-semibold text-zinc-100">Antes de mostrarla</p>
+                  {CONTROL.map((c, i) => (
+                    <label key={c} className="flex items-center gap-2 text-[11px] text-zinc-300"><input type="checkbox" checked={!!checks[i]} onChange={(e) => setChecks((x) => x.map((v, j) => (j === i ? e.target.checked : v)))} />{c}</label>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <button type="button" onClick={() => { update(d.id, { publicada: true }); setControlando(null); }} className="btn-solid-primary px-2.5 py-1 text-[11px]">{checks.every(Boolean) ? 'Mostrarla' : 'Mostrarla igual'}</button>
+                    <button type="button" onClick={() => setControlando(null)} className="text-[11px] text-zinc-400">Cancelar</button>
+                  </div>
+                </div>
+              )}
             </li>
           ))}
         </ul>
       )}
       {showForm && <div className="space-y-1.5">
-        <input className={input} value={f.titulo} placeholder="Nueva entrega (ej. Guía de mensaje)" onChange={(e) => setF({ ...f, titulo: e.target.value })} />
+        <div className="flex gap-1.5">
+          <input className={input} value={f.titulo} placeholder="Nueva entrega (ej. Kit de cliente ideal)" onChange={(e) => setF({ ...f, titulo: e.target.value })} />
+          <input className={`${input} w-24`} value={f.version} placeholder="v1" aria-label="Versión" onChange={(e) => setF({ ...f, version: e.target.value })} />
+        </div>
         <div className="flex gap-1.5">
           <input className={input} value={f.enlace} placeholder="Enlace de Drive (https://)" onChange={(e) => setF({ ...f, enlace: e.target.value })} />
           <input className={`${input} w-36`} type="date" aria-label="Fecha de la entrega" value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} />
         </div>
+        <input className={input} value={f.decision} placeholder="Qué tiene que decidir o revisar (ej. si este foco representa al estudio)" onChange={(e) => setF({ ...f, decision: e.target.value })} />
+        <div className="flex gap-1.5">
+          <input className={`${input} w-36`} type="date" aria-label="Hasta cuándo" value={f.hasta} onChange={(e) => setF({ ...f, hasta: e.target.value })} />
+          <input className={input} value={f.canal} placeholder="Dónde lo confirma (mail, Asana, reunión)" onChange={(e) => setF({ ...f, canal: e.target.value })} />
+        </div>
         <button type="button" onClick={add} className="btn-solid-primary px-3 py-1.5 text-xs">Agregar entrega</button>
       </div>}
       {(error || work.error) && <p role="alert" className="text-[11px] text-rose-300">{error || work.error}</p>}
-    </Block>
+    </div>
   );
 }
 
@@ -894,4 +956,40 @@ function novedades(p: PafPortalDoc, studio: string, origin: string): string {
   if (p.proximaReunion) lines.push(`• Nuestra próxima reunión: ${new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}${p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}`);
   if (p.entregas?.length) lines.push(`• Nueva entrega: ${[...p.entregas].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0].titulo}`);
   return [`¡Hola ${studio}! Te dejé novedades en tu portal:`, ...lines, '', `Entrás acá con tu cuenta de Google: ${origin}/portal`].join('\n');
+}
+
+/** Avisarle: elegís el mensaje (con tus plantillas), se abre WhatsApp armado y lo mandás vos */
+function AvisarleMenu({ project, published, phone }: { project: Project; published: PafPortalDoc; phone: string }) {
+  const [open, setOpen] = useState(false);
+  const nombre = project.ownerName || project.clientName;
+  const portalUrl = `${window.location.origin}/portal`;
+  const ultimo = [...(project.pafResumenes || [])].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
+  const entrega = [...(project.pafEntregas || [])].filter((e) => e.publicada).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0];
+  const texto = (id: MensajeId): string => {
+    if (id === 'novedades') return novedades(published, project.clientName, window.location.origin);
+    if (id === 'hoyAcordamos') {
+      const parte = (titulo: string) => (ultimo?.proximosPasos.split(/\n(?=De )/).find((x) => x.startsWith(titulo)) || '').replace(`${titulo}:`, '').trim();
+      return hoyAcordamos({ nombre, decisiones: ultimo?.acuerdos || '', deTuLado: parte('De tu lado'), deNuestroLado: parte('De nuestro lado'), proxima: published.proximaReunion });
+    }
+    return mensaje(id, { nombre, portal: portalUrl, materiales: published.materiales?.proyectos || project.pafDrive?.carpetaCompartida, proxima: published.proximaReunion, entrega });
+  };
+  return (
+    <span className="relative">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 text-xs font-bold">
+        <MessageCircle className="w-3.5 h-3.5" /> Avisarle
+      </button>
+      {open && (
+        <>
+          <span className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
+          <span className="absolute left-0 top-full z-40 mt-1 w-64 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-2xl">
+            {MENSAJES.filter((m) => m.id !== 'hoyAcordamos' || ultimo).map((m) => (
+              <a key={m.id} href={`https://wa.me/${phone}?text=${encodeURIComponent(texto(m.id))}`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
+                className="block rounded-lg px-2.5 py-2 text-xs text-zinc-200 hover:bg-zinc-800">{m.label}</a>
+            ))}
+            <span className="block px-2.5 py-1.5 text-[10px] text-zinc-500">Se abre WhatsApp con el texto: completá lo que está entre [corchetes] y mandalo vos.</span>
+          </span>
+        </>
+      )}
+    </span>
+  );
 }

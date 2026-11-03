@@ -58,6 +58,7 @@ import { playTaskDone } from '../utils/sound';
 import { PaymentPlanManager } from '../components/PaymentPlanManager';
 import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
 import { PafAdminPanel } from '../components/PafAdminPanel';
+import { ProximaAccionCard } from '../components/ProximaAccionCard';
 import { ClientAdminStrip } from '../components/ClientAdminStrip';
 import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
 import { PafPanelButton } from '../components/PafPanelButton';
@@ -829,6 +830,9 @@ export const ClientDetailView: React.FC<Props> = ({
               </div>
             </div>
           </div>
+
+          {/* Una sola próxima acción: lo primero que ves */}
+          {!project.archived && <ProximaAccionCard project={project} onUpdateProject={onUpdateProject} />}
 
           {/* Las tres partes de la ficha */}
           <nav className="sticky top-[calc(env(safe-area-inset-top,0px)+3.75rem)] z-10 grid grid-cols-3 gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/95 p-1 backdrop-blur-md" aria-label="Partes de la ficha">

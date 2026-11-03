@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildPafPortal, emptyPortalDraft, normalizeEmails, type PafPortalDraft } from '../src/portal/model';
+import { seccionesVisibles } from '../src/portal/model';
 import { CLIENTE_ID_RE, accessHost, accessIcon, accessIssue, calendarLink, normalizeLinkInput, portalDirty as dirtyOf, safeLogo, suggestWebClienteId } from '../src/portal/model';
 
 const draft: PafPortalDraft = {
@@ -38,9 +39,17 @@ describe('portal PAF con login', () => {
       ],
       anuncios: [],
       mostrarAvance: true,
+      hitosCompletados: [],
       logo: null,
       marca: null,
       linkReunion: null,
+      secciones: seccionesVisibles(),
+      gestionContenido: null,
+      bienvenida: null,
+      materiales: {},
+      reunionesAcuerdo: null,
+      reunionPorConfirmar: null,
+      reportes: [],
       actualizadoEn: '2026-11-02T10:00:00.000Z',
     });
   });
@@ -491,5 +500,32 @@ describe('portal restaurado: mostrar avance', () => {
     expect('doc' in on && on.doc.mostrarAvance).toBe(true);
     const off = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, mostrarAvance: false } });
     expect('doc' in off && off.doc.mostrarAvance).toBe(false);
+  });
+});
+
+describe('portal según el método: hitos, secciones y lo que no compromete', () => {
+  const base = { ...emptyPortalDraft('a@b.com') };
+  it('el avance se cuenta por hitos confirmados, sin repetir ni fuera de rango', () => {
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: base, hitosCompletados: [2, 1, 2, 9] });
+    expect('doc' in r && r.doc.hitosCompletados).toEqual([1, 2]);
+  });
+  it('lo oculto no viaja al navegador del cliente', () => {
+    const draft = { ...base, secciones: { entregas: false, anuncios: false, reportes: false }, reunionesAcordadas: 8 };
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft,
+      entregas: [{ id: 'e', titulo: 'Kit' }], anuncios: [{ id: 'a', texto: 'Hola', fecha: '2026-11-03' }], reunionesHechas: 3,
+      reportes: [{ id: 'r', desde: '2026-11-01', hasta: '2026-11-07', hicimos: 'x', aprobaste: '', falta: '', viene: '', numeros: '', publicado: true, creadoEn: '' }] });
+    if (!('doc' in r)) throw new Error('sin doc');
+    expect(r.doc.entregas).toEqual([]);
+    expect(r.doc.anuncios).toEqual([]);
+    expect(r.doc.reportes).toEqual([]);
+    expect(r.doc.reunionesAcuerdo).toBeNull(); // apagado por defecto: no compromete
+    const conAcuerdo = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, secciones: { reunionesAcuerdo: true } }, reunionesHechas: 3 });
+    expect('doc' in conAcuerdo && conAcuerdo.doc.reunionesAcuerdo).toEqual({ total: 8, hechas: 3 });
+  });
+  it('materiales y gestión de contenido solo con links válidos', () => {
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...base, materiales: { proyectos: 'drive.google.com/drive/folders/abc', equipo: 'no' }, gestionContenido: 'app.asana.com/0/1' } });
+    if (!('doc' in r)) throw new Error('sin doc');
+    expect(r.doc.materiales).toEqual({ proyectos: 'https://drive.google.com/drive/folders/abc' });
+    expect(r.doc.gestionContenido).toBe('https://app.asana.com/0/1');
   });
 });

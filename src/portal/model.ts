@@ -51,7 +51,62 @@ export interface PafPortalDraft {
   marca?: string;
   /** Link fijo de las reuniones (Meet o Zoom) */
   linkReunion?: string;
+  /** Qué secciones ve el cliente (lo que no está, va por defecto) */
+  secciones?: Partial<Record<PortalSeccion, boolean>>;
+  /** Espacio del estudio en la app de la CM */
+  gestionContenido?: string;
+  /** PDF de bienvenida del estudio */
+  bienvenida?: string;
+  /** Subcarpetas de 02_Materiales */
+  materiales?: Partial<Record<MaterialKey, string>>;
+  /** Reuniones que incluye el acuerdo (si lo define) */
+  reunionesAcordadas?: number;
   publishedAt?: string;
+}
+
+/** Secciones del portal que Juan puede mostrar u ocultar */
+export type PortalSeccion = 'novedades' | 'proximaAccion' | 'recorrido' | 'anuncios' | 'semana' | 'tareas' | 'reuniones' | 'reunionesAcuerdo' | 'acuerdos' | 'entregas' | 'reportes' | 'materiales' | 'contenido' | 'cicloCM' | 'accesos';
+export const PORTAL_SECCIONES: { id: PortalSeccion; label: string; hint: string; porDefecto: boolean }[] = [
+  { id: 'novedades', label: 'Desde tu última visita', hint: 'Resumen de lo nuevo arriba de todo', porDefecto: true },
+  { id: 'proximaAccion', label: 'Tu próxima acción', hint: 'La tarea prioritaria, grande, arriba', porDefecto: true },
+  { id: 'recorrido', label: 'Mi recorrido', hint: 'Los 5 hitos explicados', porDefecto: true },
+  { id: 'anuncios', label: 'Anuncios', hint: 'Lo que fijás arriba', porDefecto: true },
+  { id: 'semana', label: 'Esta semana', hint: 'Foco y objetivos de la semana', porDefecto: true },
+  { id: 'tareas', label: 'Tareas', hint: 'Lo que necesitamos de su lado', porDefecto: true },
+  { id: 'reuniones', label: 'Próxima reunión', hint: 'Con objetivo y qué preparar', porDefecto: true },
+  { id: 'reunionesAcuerdo', label: 'Reuniones del acuerdo', hint: 'Cuántas van de las acordadas', porDefecto: false },
+  { id: 'acuerdos', label: 'Lo que acordamos', hint: 'Resumen de cada reunión', porDefecto: true },
+  { id: 'entregas', label: 'Entregas', hint: 'Con la decisión que le pedís', porDefecto: true },
+  { id: 'reportes', label: 'Reportes', hint: 'El reporte del viernes publicado', porDefecto: false },
+  { id: 'materiales', label: 'Materiales', hint: 'Dónde subir cada cosa', porDefecto: true },
+  { id: 'contenido', label: 'Gestión de contenido', hint: 'Botón a la app de la CM', porDefecto: true },
+  { id: 'cicloCM', label: 'Ritmo del contenido', hint: 'Propuesta el jueves, aprobación el lunes 12 h', porDefecto: false },
+  { id: 'accesos', label: 'Accesos', hint: 'Carpetas y links', porDefecto: true },
+];
+export function seccionesVisibles(s?: Partial<Record<PortalSeccion, boolean>>): Record<PortalSeccion, boolean> {
+  return Object.fromEntries(PORTAL_SECCIONES.map((x) => [x.id, s?.[x.id] ?? x.porDefecto])) as Record<PortalSeccion, boolean>;
+}
+
+export type MaterialKey = 'proyectos' | 'equipo' | 'referencias' | 'registro';
+export const MATERIALES: { id: MaterialKey; label: string; pedido: string }[] = [
+  { id: 'proyectos', label: 'Proyectos', pedido: 'Una carpeta por proyecto: renders (también el de antes de construir), fotos y videos de obra. Marcá tus 3 favoritos.' },
+  { id: 'equipo', label: 'Equipo y marca', pedido: 'Fotos del equipo, logo y elementos de tu marca.' },
+  { id: 'referencias', label: 'Referencias', pedido: 'Campañas anteriores y cuentas o estudios que te gusten.' },
+  { id: 'registro', label: 'Registro de obra', pedido: 'Imaginate que somos un cliente muy exigente que quiere ver el paso a paso: mandanos lo que le mandarías a él, aunque parezca chico.' },
+];
+
+/** Reporte del viernes (Juan lo arma; el estudio lo ve si se publica) */
+export interface PafReporte {
+  id: string;
+  desde: string; // YYYY-MM-DD
+  hasta: string;
+  hicimos: string;
+  aprobaste: string;
+  falta: string;
+  viene: string;
+  numeros: string;
+  publicado: boolean;
+  creadoEn: string;
 }
 
 /** Acceso directo del portal: Juan elige el nombre (ej. "Contenido en Asana") */
@@ -88,11 +143,15 @@ export interface PafPortalAnnouncement {
  */
 export type PafTaskState = 'borrador' | 'habilitada' | 'enviada' | 'aprobada';
 export const PAF_TASK_STATE_LABEL: Record<PafTaskState, string> = {
-  borrador: 'Sin habilitar',
-  habilitada: 'Habilitada',
-  enviada: 'Avisó que terminó',
-  aprobada: 'Aprobada',
+  borrador: 'Por preparar',
+  habilitada: 'Disponible',
+  enviada: 'Recibida · en revisión',
+  aprobada: 'Completada',
 };
+
+/** Quién hace la tarea */
+export type PafResponsable = 'estudio' | 'cero' | 'cm';
+export const PAF_RESPONSABLE_LABEL: Record<PafResponsable, string> = { estudio: 'Tu estudio', cero: '.CERO', cm: 'Community manager' };
 export interface PafTask {
   id: string;
   titulo: string;
@@ -108,6 +167,33 @@ export interface PafTask {
   pideArchivos?: boolean;
   /** Link que el estudio abre para hacer la tarea (opcional) */
   link?: string;
+  /** La que va arriba del portal como "Tu próxima acción" (una sola) */
+  prioritaria?: boolean;
+  /** Para qué sirve (lo ve el estudio arriba de la explicación) */
+  paraQue?: string;
+  /** Quién la hace (por defecto, el estudio) */
+  responsable?: PafResponsable;
+}
+
+/** Hito de Presencia que Juan confirmó, con su evidencia (privada: el estudio solo ve cuáles) */
+export interface PafHitoConfirmado {
+  hito: number; // 1 a 5
+  fecha: string; // YYYY-MM-DD
+  evidencia: string;
+}
+
+/** Qué agrupa cada hito y cuándo se completa (de la especificación del servicio) */
+export const PRESENCIA_HITO_INFO: { trabajo: string; seCompleta: string }[] = [
+  { trabajo: 'Arranque, objetivo, participantes, canales, datos y materiales necesarios.', seCompleta: 'Objetivo y responsabilidades confirmados; siguiente acción acordada.' },
+  { trabajo: 'Cliente ideal, nicho y oferta; diagnóstico, competencia y metas.', seCompleta: 'Kit y prioridades revisados; decisiones esenciales confirmadas.' },
+  { trabajo: 'Frase, presentación, tono y aplicaciones.', seCompleta: 'Versión del mensaje confirmada por quien decide.' },
+  { trabajo: 'Contenido e Instagram con la CM; Google Business, web y medición según alcance.', seCompleta: 'Trabajo contratado aplicado y comprobado.' },
+  { trabajo: 'Resultados, evidencias, indicadores disponibles, pendientes y continuidad.', seCompleta: 'Cierre compartido y decisión de continuidad registrada.' },
+];
+
+/** Hitos confirmados, sin repetir y en orden (lo único que se publica de los hitos) */
+export function hitosCompletados(items: PafHitoConfirmado[] = []): number[] {
+  return [...new Set(items.map((h) => h.hito).filter((n) => Number.isInteger(n) && n >= 1 && n <= PRESENCIA_HITOS.length))].sort((a, b) => a - b);
 }
 
 /** Entrega de Juan al estudio: archivo en Drive, se publica cuando él decide */
@@ -117,7 +203,17 @@ export interface PafDelivery {
   fecha?: string;
   enlace?: string;
   publicada: boolean;
+  version?: string;
+  /** Qué tiene que decidir o revisar el estudio */
+  decision?: string;
+  /** Hasta cuándo (YYYY-MM-DD) */
+  hasta?: string;
+  /** Dónde lo confirma (mail, Asana, reunión…) */
+  canal?: string;
+  estado?: PafDeliveryState;
 }
+export type PafDeliveryState = 'en_revision' | 'aprobada' | 'ajustes';
+export const PAF_DELIVERY_STATE_LABEL: Record<PafDeliveryState, string> = { en_revision: 'Para revisar', aprobada: 'Aprobada', ajustes: 'Con ajustes' };
 
 /** Tarea tal como la ve el cliente */
 export interface PafPortalTask {
@@ -131,6 +227,9 @@ export interface PafPortalTask {
   motivo?: string; // por qué se volvió a habilitar
   pideArchivos?: boolean; // muestra el link a Materiales
   link?: string; // link para hacer la tarea
+  prioritaria?: boolean; // va arriba como "Tu próxima acción"
+  paraQue?: string;
+  responsable?: PafResponsable;
 }
 
 /** Objetivo de la semana (sale de los objetivos del panel del estudio) */
@@ -144,6 +243,11 @@ export interface PafPortalDelivery {
   titulo: string;
   fecha?: string;
   enlace?: string;
+  version?: string;
+  decision?: string;
+  hasta?: string;
+  canal?: string;
+  estado?: PafDeliveryState;
 }
 
 /** Documento paf_portal/{clienteId}: lo único que lee el cliente */
@@ -158,7 +262,7 @@ export interface PafPortalDoc {
   /** IDs de las tareas habilitadas: las reglas solo dejan avisar "Terminé" en estas */
   tareasHabilitadas: string[];
   entregas: PafPortalDelivery[];
-  proximaReunion: { fecha: string; hora?: string } | null;
+  proximaReunion: { fecha: string; hora?: string; objetivo?: string; preparar?: string; conCM?: boolean } | null;
   /** Semana del programa (sale de la fecha de inicio) */
   semana?: { actual: number; total: number } | null;
   /** Resúmenes de reunión publicados (acuerdos y próximos pasos) */
@@ -169,6 +273,18 @@ export interface PafPortalDoc {
   anuncios?: PafPortalAnnouncement[];
   /** Si es false, el portal oculta la etapa, la barra y el paso a paso */
   mostrarAvance?: boolean;
+  /** Hitos que Juan confirmó (el avance se cuenta por estos, nunca por fechas) */
+  hitosCompletados?: number[];
+  /** Qué secciones se muestran */
+  secciones?: Record<PortalSeccion, boolean>;
+  gestionContenido?: string | null;
+  bienvenida?: string | null;
+  materiales?: Partial<Record<MaterialKey, string>>;
+  /** Reuniones del acuerdo: cuántas hay y cuántas se hicieron */
+  reunionesAcuerdo?: { total: number; hechas: number } | null;
+  /** Reunión propuesta que todavía no tiene día (se ve como "por confirmar") */
+  reunionPorConfirmar?: { objetivo?: string } | null;
+  reportes?: Omit<PafReporte, 'publicado' | 'creadoEn'>[];
   logo?: string | null;
   marca?: string | null;
   linkReunion?: string | null;
@@ -224,7 +340,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -253,6 +369,11 @@ export function buildPafPortal(
 
   if (errors.length) return { errors };
   const hito = Math.min(PRESENCIA_HITOS.length, Math.max(1, Math.round(input.draft.hito || 1)));
+  // Lo que Juan ocultó no viaja al navegador del cliente
+  const ver = seccionesVisibles(input.draft.secciones);
+  const materiales = Object.fromEntries((Object.entries(input.draft.materiales || {}) as [MaterialKey, string][])
+    .map(([k, v]) => [k, v ? safeHttpsUrl(normalizeLinkInput(v)) : null]).filter(([, v]) => v)) as Partial<Record<MaterialKey, string>>;
+  const acordadas = Math.max(0, Math.round(input.draft.reunionesAcordadas || 0));
   return {
     doc: {
       clienteId,
@@ -261,18 +382,26 @@ export function buildPafPortal(
       hitoVisible: hito,
       resumenVisible: input.draft.resumen.trim().slice(0, 2000),
       enlaces,
-      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo, pideArchivos, link }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}), ...(pideArchivos ? { pideArchivos: true } : {}), ...(link && safeHttpsUrl(link) ? { link: safeHttpsUrl(link)! } : {}) })),
-      tareasHabilitadas: (input.tareas || []).filter((t) => t.estado === 'habilitada').map((t) => t.id),
-      entregas: (input.entregas || []).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, ...(fecha ? { fecha } : {}), ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
-      proximaReunion: input.proximaReunion || null,
+      tareas: (ver.tareas || ver.proximaAccion ? input.tareas || [] : []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo, pideArchivos, link, prioritaria, paraQue, responsable }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}), ...(pideArchivos ? { pideArchivos: true } : {}), ...(link && safeHttpsUrl(link) ? { link: safeHttpsUrl(link)! } : {}), ...(prioritaria ? { prioritaria: true } : {}), ...(paraQue?.trim() ? { paraQue: paraQue.trim().slice(0, 300) } : {}), ...(responsable && responsable !== 'estudio' ? { responsable } : {}) })),
+      tareasHabilitadas: (ver.tareas || ver.proximaAccion ? input.tareas || [] : []).filter((t) => t.estado === 'habilitada').map((t) => t.id),
+      entregas: (ver.entregas ? input.entregas || [] : []).map(({ enlace, ...d }) => ({ ...d, ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
+      proximaReunion: ver.reuniones ? input.proximaReunion || null : null,
       semana: input.semana || null,
-      reuniones: input.reuniones || [],
-      accesos,
-      anuncios: input.anuncios || [],
+      reuniones: ver.acuerdos ? input.reuniones || [] : [],
+      accesos: ver.accesos ? accesos : [],
+      anuncios: ver.anuncios ? input.anuncios || [] : [],
       mostrarAvance: input.draft.mostrarAvance !== false,
+      hitosCompletados: hitosCompletados((input.hitosCompletados || []).map((hito) => ({ hito, fecha: '', evidencia: '' }))),
       logo: safeLogo(input.draft.logo),
       marca: safeColor(input.draft.marca),
       linkReunion: input.draft.linkReunion ? safeHttpsUrl(normalizeLinkInput(input.draft.linkReunion)) : null,
+      secciones: ver,
+      gestionContenido: ver.contenido && input.draft.gestionContenido ? safeHttpsUrl(normalizeLinkInput(input.draft.gestionContenido)) : null,
+      bienvenida: input.draft.bienvenida ? safeHttpsUrl(normalizeLinkInput(input.draft.bienvenida)) : null,
+      materiales: ver.materiales ? materiales : {},
+      reunionesAcuerdo: ver.reunionesAcuerdo && acordadas ? { total: acordadas, hechas: Math.min(acordadas, input.reunionesHechas || 0) } : null,
+      reunionPorConfirmar: ver.reuniones ? input.reunionPorConfirmar || null : null,
+      reportes: ver.reportes ? (input.reportes || []).filter((r) => r.publicado).sort((a, b) => b.hasta.localeCompare(a.hasta)).slice(0, 6).map(({ publicado: _p, creadoEn: _c, ...r }) => r) : [],
       actualizadoEn: now,
     },
   };
@@ -294,28 +423,47 @@ export function publicTasks(tasks: PafTask[] = []): PafPortalTask[] {
       ...(t.motivo && t.estado === 'habilitada' ? { motivo: t.motivo } : {}),
       ...(t.pideArchivos ? { pideArchivos: true } : {}),
       ...(t.link ? { link: t.link } : {}),
+      ...(t.prioritaria && t.estado === 'habilitada' ? { prioritaria: true } : {}),
+      ...(t.paraQue?.trim() ? { paraQue: t.paraQue.trim() } : {}),
+      ...(t.responsable && t.responsable !== 'estudio' ? { responsable: t.responsable } : {}),
       ...(t.estado === 'aprobada' && t.aprobacion ? { aprobadaEl: t.aprobacion.fecha.slice(0, 10) } : {}),
     }));
 }
 
 export function publicDeliveries(items: PafDelivery[] = []): PafPortalDelivery[] {
-  return items.filter((d) => d.publicada).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, fecha, enlace }));
+  return items.filter((d) => d.publicada).map(({ id, titulo, fecha, enlace, version, decision, hasta, canal, estado }) => ({
+    id, titulo,
+    ...(fecha ? { fecha } : {}), ...(enlace ? { enlace } : {}), ...(version?.trim() ? { version: version.trim() } : {}),
+    ...(decision?.trim() ? { decision: decision.trim() } : {}), ...(hasta ? { hasta } : {}), ...(canal?.trim() ? { canal: canal.trim() } : {}), ...(estado ? { estado } : {}),
+  }));
 }
 
 /** Próxima reunión confirmada del proyecto (sin las propuestas sin hora) */
 export function nextMeeting(
-  meetings: { projectId?: string; date: string; time?: string; completed: boolean; proposed?: boolean }[],
+  meetings: { projectId?: string; date: string; time?: string; completed: boolean; proposed?: boolean; objetivo?: string; preparar?: string; conCM?: boolean }[],
   projectId: string,
   today: string
 ): PafPortalDoc['proximaReunion'] {
   const next = meetings
     .filter((m) => m.projectId === projectId && !m.completed && !m.proposed && m.date >= today)
     .sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))[0];
-  return next ? { fecha: next.date, ...(next.time ? { hora: next.time } : {}) } : null;
+  return next ? {
+    fecha: next.date, ...(next.time ? { hora: next.time } : {}),
+    ...(next.objetivo?.trim() ? { objetivo: next.objetivo.trim() } : {}), ...(next.preparar?.trim() ? { preparar: next.preparar.trim() } : {}), ...(next.conCM ? { conCM: true } : {}),
+  } : null;
+}
+
+/** La reunión propuesta (sin día confirmado) más próxima: el cliente la ve como "por confirmar" */
+export function meetingPorConfirmar(
+  meetings: { projectId?: string; date: string; completed: boolean; proposed?: boolean; objetivo?: string; title?: string }[],
+  projectId: string
+): PafPortalDoc['reunionPorConfirmar'] {
+  const m = meetings.filter((x) => x.projectId === projectId && x.proposed && !x.completed).sort((a, b) => a.date.localeCompare(b.date))[0];
+  return m ? { ...(m.objetivo?.trim() ? { objetivo: m.objetivo.trim() } : {}) } : null;
 }
 
 export function portalFromProject(
-  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[] },
+  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[]; pafHitos?: PafHitoConfirmado[]; pafReportes?: PafReporte[] },
   meetings: Parameters<typeof nextMeeting>[0],
   draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
   clienteId = project.pafClienteId,
@@ -335,6 +483,10 @@ export function portalFromProject(
       semana: programWeek(project.pafStartDate || project.startDate, today),
       reuniones: publicSummaries(project.pafResumenes),
       anuncios: publicAnnouncements(project.pafAnuncios),
+      hitosCompletados: hitosCompletados(project.pafHitos),
+      reunionesHechas: (meetings as { projectId?: string; completed: boolean; proposed?: boolean }[]).filter((m) => m.projectId === project.id && m.completed && !m.proposed).length,
+      reunionPorConfirmar: meetingPorConfirmar(meetings as Parameters<typeof meetingPorConfirmar>[0], project.id),
+      reportes: project.pafReportes,
       privados: [project.pafDrive?.carpetaInterna, project.pafDrive?.ficha, ...privados],
     },
     now.toISOString()

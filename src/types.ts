@@ -76,6 +76,10 @@ export interface AgendaMeeting {
   googleInviteHash?: string; // Invitados a los que ya se mandó
   googleInviteError?: string | null; // Por qué no se pudo invitar (para mostrarlo en la ficha)
   durationHours?: number; // Duración de la sesión en horas (ej: 1 o 1.5) para sumar automáticamente a las horas de consultoría PAF
+  objetivo?: string; // Para qué es la reunión (lo ve el cliente)
+  preparar?: string; // Qué tiene que traer o pensar el cliente (lo ve el cliente)
+  conCM?: boolean; // Se suma la community manager
+  prep?: { saleCon?: string; decide?: string; mostrar?: string; pedir?: string; ojo?: string }; // Preparación privada de Juan
 }
 
 // 2. Proyectos (Estado simple)
@@ -387,6 +391,9 @@ export interface Project {
   pafAnuncios?: import('./portal/model').PafAnnouncement[]; // Anuncios para el estudio (ve los publicados)
   pafResumenes?: import('./portal/model').PafMeetingSummary[]; // Acuerdos y próximos pasos de cada reunión (el estudio ve los publicados)
   pafTareas?: import('./portal/model').PafTask[]; // Tareas del estudio: el cliente ve solo las habilitadas
+  pafHitos?: import('./portal/model').PafHitoConfirmado[]; // Hitos de Presencia confirmados (con evidencia privada)
+  pafReportes?: import('./portal/model').PafReporte[]; // Reportes del viernes (el estudio ve los publicados)
+  proximaAccion?: ProximaAccion; // La única próxima acción del cliente (responsable, fecha y qué necesita)
   pafEntregas?: import('./portal/model').PafDelivery[]; // Entregas (enlaces a Drive), visibles si están publicadas
   studentPortalToken?: string; // Link de solo lectura para el alumno (/alumno/{token})
   statusOverride?: 'not_started' | 'in_progress' | 'waiting_client' | 'overdue_payment' | 'completed'; // Override manual del sistema de estado visual
@@ -1139,4 +1146,14 @@ export interface ProspectingSettings {
     audit: string; // (compatibilidad: igual a speech)
     video: string;
   };
+}
+
+/** Próxima acción de un cliente: una sola, con responsable, fecha y qué necesita para avanzar */
+export interface ProximaAccion {
+  texto: string;
+  responsable: 'yo' | 'cliente' | 'cm';
+  fecha?: string; // YYYY-MM-DD
+  necesita?: string;
+  bloqueado?: boolean;
+  actualizada: string; // ISO
 }

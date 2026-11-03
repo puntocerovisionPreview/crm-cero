@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  ArrowRight, ArrowUpRight, CalendarPlus, Check, ChevronDown, Folder, Loader2, Lock, MessageCircle, Package, Paperclip, Video,
+  ArrowRight, ArrowUpRight, CalendarPlus, Check, ChevronDown, Folder, LayoutList, Loader2, MessageCircle, Package, Paperclip, Video,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
@@ -9,6 +9,7 @@ import { auth } from '../firebaseAuth';
 import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { formatDisplayDate } from '../utils/projectTimeline';
 import { AccessIcon } from '../components/AccessIcon';
+import { MATERIALES, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, PRESENCIA_HITO_INFO, seccionesVisibles } from '../portal/model';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
@@ -19,7 +20,7 @@ import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPorta
  * En desarrollo, /portal?demo muestra un ejemplo sin login para revisar el diseño.
  */
 
-type Tab = 'inicio' | 'tareas' | 'entregas' | 'archivos';
+type Tab = 'inicio' | 'recorrido' | 'tareas' | 'entregas' | 'archivos';
 type PortalTask = PafPortalDoc['tareas'][number];
 
 const LINK_HINT: Record<PafPortalLinkKey, string> = {
@@ -47,20 +48,24 @@ const DEMO: PafPortalDoc = {
     { id: 'a1', titulo: 'Ya está el borrador de tu web', texto: 'Miralo con calma y anotá lo que cambiarías. Lo vemos el martes.', link: 'https://example.com/', fijado: true, fecha: '2026-11-03' },
   ],
   mostrarAvance: true,
-  marca: '#c2410c',
   linkReunion: 'https://meet.google.com/',
+  hitosCompletados: [1],
+  secciones: { novedades: true, proximaAccion: true, recorrido: true, anuncios: true, semana: true, tareas: true, reuniones: true, reunionesAcuerdo: true, acuerdos: true, entregas: true, reportes: true, materiales: true, contenido: true, cicloCM: true, accesos: true },
+  gestionContenido: 'https://app.asana.com/',
+  materiales: { proyectos: 'https://drive.google.com/', equipo: 'https://drive.google.com/', referencias: 'https://drive.google.com/', registro: 'https://drive.google.com/' },
+  reunionesAcuerdo: { total: 8, hechas: 3 },
   tareas: [
     { id: 'd1', titulo: 'Completar el formulario de arranque', estado: 'aprobada', aprobadaEl: '2026-10-28' },
-    { id: 'd2', titulo: 'Subir 10 fotos de obras terminadas', detalle: 'Las de mejor calidad que tengas, sin editar.', link: 'https://drive.google.com/', fecha: '2026-11-06', estado: 'habilitada' },
+    { id: 'd2', titulo: 'Subir 10 fotos de obras terminadas', paraQue: 'Con esto armamos las primeras publicaciones de tu portfolio.', detalle: 'Las de mejor calidad que tengas, sin editar.', link: 'https://drive.google.com/', fecha: '2026-11-06', estado: 'habilitada', prioritaria: true },
     { id: 'd3', titulo: 'Elegir 3 proyectos que te representen', detalle: 'Los que te gustaría hacer más seguido.', fecha: '2026-11-01', estado: 'habilitada', motivo: 'Sumá uno de vivienda, así comparamos.' },
     { id: 'd4', titulo: 'Revisar la propuesta de foco', estado: 'enviada' },
   ],
   tareasHabilitadas: ['d2', 'd3'],
   entregas: [
     { id: 'e1', titulo: 'Diagnóstico inicial del estudio', fecha: '2026-10-30', enlace: 'https://drive.google.com/' },
-    { id: 'e2', titulo: 'Propuesta de foco', fecha: '2026-11-04', enlace: 'https://drive.google.com/' },
+    { id: 'e2', titulo: 'Propuesta de foco', version: 'v2', fecha: '2026-11-04', enlace: 'https://drive.google.com/', estado: 'en_revision', decision: 'si este foco representa a tu estudio', hasta: '2026-11-07', canal: 'mail' },
   ],
-  proximaReunion: { fecha: '2026-11-10', hora: '10:30' },
+  proximaReunion: { fecha: '2026-11-10', hora: '10:30', objetivo: 'Revisar la propuesta de mensaje', preparar: 'Tus 3 proyectos favoritos', conCM: true },
   semana: { actual: 3, total: 12 },
   actualizadoEn: '2026-11-02T20:00:00.000Z',
   objetivos: [
@@ -78,9 +83,10 @@ function useSystemTheme() {
     const root = document.documentElement;
     const prev = { dark: root.classList.contains('dark'), light: root.classList.contains('light') };
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    // El portal va siempre en la estética clara de .CERO (fondo claro y tarjetas blancas)
     const apply = () => {
-      root.classList.toggle('dark', mq.matches);
-      root.classList.toggle('light', !mq.matches);
+      root.classList.toggle('dark', false);
+      root.classList.toggle('light', true);
     };
     apply();
     mq.addEventListener('change', apply);
@@ -185,9 +191,20 @@ export function PortalPreviewScreen({ portal }: { portal: PafPortalDoc }) {
   return <PortalScreen portal={portal} email="vista previa" readOnly embedded onLogout={() => undefined} />;
 }
 
+/** Estética aprobada de .CERO: fondo claro, tarjetas blancas, grafito y naranja (el color del estudio lo reemplaza si tiene) */
+const CERO_BRAND = {
+  '--bg-app': '#F5F6F8',
+  '--bg-surface': '#FFFFFF',
+  '--text-primary': '#191B20',
+  '--solid-contrast-bg': '#191B20',
+  '--solid-contrast-text': '#FFFFFF',
+  '--marca': '#E77813',
+  '--marca-text': '#FFFFFF',
+} as const;
+
 function Shell({ children, right, marca, embedded }: { children: React.ReactNode; right?: React.ReactNode; marca?: string | null; embedded?: boolean }) {
   return (
-    <div className={`${embedded ? 'min-h-full' : 'min-h-screen'} bg-[var(--bg-app)] text-[var(--text-primary)]`} style={marca ? ({ '--marca': marca, '--marca-text': '#fff' } as React.CSSProperties) : undefined}>
+    <div className={`light ${embedded ? 'min-h-full' : 'min-h-screen'} bg-[var(--bg-app)] text-[var(--text-primary)]`} style={{ ...CERO_BRAND, '--marca': marca || CERO_BRAND['--marca'] } as React.CSSProperties}>
       <div className="mx-auto max-w-3xl px-4 sm:px-8 pb-16">
         <div className="flex items-center justify-between gap-3 py-5 sm:py-7"><BrandLogo size="sm" />{right}</div>
         {children}
@@ -246,23 +263,31 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
     }
   };
 
+  // Qué secciones eligió mostrar Juan (lo apagado ni siquiera llega)
+  const ver = seccionesVisibles(p.secciones);
   const tareas = p.tareas || [];
   const avisada = (t: PortalTask) =>
     t.estado === 'enviada' || (t.estado === 'habilitada' && avisos.some((a) => a.tareaId === t.id && (!t.habilitadaEn || a.creadoEn > t.habilitadaEn)));
-  const pendientes = tareas.filter((t) => t.estado === 'habilitada' && !avisada(t));
+  const pendientes = tareas.filter((t) => t.estado === 'habilitada' && !avisada(t))
+    .sort((a, b) => Number(!!b.prioritaria) - Number(!!a.prioritaria) || (a.fecha || '9').localeCompare(b.fecha || '9'));
   const enRevision = tareas.filter((t) => t.estado !== 'aprobada' && avisada(t));
   const aprobadas = tareas.filter((t) => t.estado === 'aprobada');
+  // "Tu próxima acción": la que marcó Juan o, si no, la más urgente del estudio
+  const principal = ver.proximaAccion ? pendientes.find((t) => t.prioritaria) || pendientes.find((t) => (t.responsable || 'estudio') === 'estudio') : undefined;
+  const resto = pendientes.filter((t) => t !== principal);
   const entregas = p.entregas || [];
   // Accesos libres; los portales publicados antes traen los 5 enlaces fijos
   const accesos = p.accesos ?? accessesFromEnlaces(p.enlaces || {});
   const anuncios = p.anuncios || [];
   const mostrarAvance = p.mostrarAvance !== false;
   const hito = Math.min(PRESENCIA_HITOS.length, Math.max(1, p.hitoVisible || 1));
+  const hechos = p.hitosCompletados || [];
   const initial = (email[0] || '?').toUpperCase();
   const objetivos = p.objetivos || [];
   const reuniones = p.reuniones || [];
+  const reportes = p.reportes || [];
+  const materiales = MATERIALES.filter((m) => p.materiales?.[m.id]);
   const whatsapp = p.contacto?.whatsapp || '';
-  const [showStages, setShowStages] = useState(false);
   const isNew = useNewItems(p, !readOnly && !demo);
   useBrandHead(p, !embedded);
 
@@ -279,9 +304,10 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
 
   const taskProps = {
     today: new Date().toLocaleDateString('en-CA'),
-    uploadUrl: p.enlaces?.materiales || p.enlaces?.carpeta,
+    uploadUrl: p.materiales?.proyectos || p.enlaces?.materiales || p.enlaces?.carpeta,
     sending, readOnly: !!readOnly, onDone: done,
   };
+  const verRecorrido = ver.recorrido && mostrarAvance;
 
   const account = (
     <div className="flex items-center gap-3">
@@ -293,12 +319,20 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
     </div>
   );
 
+  const tabs: { id: Tab; label: string; count?: number }[] = [
+    { id: 'inicio', label: 'Inicio' },
+    ...(verRecorrido ? [{ id: 'recorrido' as Tab, label: 'Mi recorrido' }] : []),
+    ...(ver.tareas ? [{ id: 'tareas' as Tab, label: 'Tareas', count: pendientes.length || undefined }] : []),
+    ...(ver.entregas || ver.acuerdos || ver.reportes ? [{ id: 'entregas' as Tab, label: 'Entregas', count: entregas.length || undefined }] : []),
+    ...(ver.accesos || ver.materiales || ver.contenido ? [{ id: 'archivos' as Tab, label: 'Archivos' }] : []),
+  ];
+
   return (
     <Shell right={readOnly ? undefined : account} marca={p.marca} embedded={embedded}>
       {readOnly && !embedded && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista previa: así ve {p.estudio} su portal ahora. Es solo lectura: los botones no hacen nada.</p>}
       {demo && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista de ejemplo, solo en tu compu: así lo ve un estudio. Los datos son inventados.</p>}
 
-      {/* Encabezado de marca: logo del estudio, saludo y avance del programa */}
+      {/* Encabezado de marca: logo del estudio, saludo y avance por hitos */}
       <header className="pt-1 sm:pt-4">
         <div className="flex items-center gap-4 sm:gap-5">
           {p.logo && (
@@ -307,54 +341,72 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
             </span>
           )}
           <div className="min-w-0">
-            <Eyebrow>Método PAF · tu portal</Eyebrow>
+            <Eyebrow>Tu espacio con .CERO · Presencia</Eyebrow>
             <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">Hola, {p.estudio}</h1>
           </div>
         </div>
-        {mostrarAvance && <button type="button" onClick={() => setShowStages((v) => !v)} aria-expanded={showStages} className="mt-6 w-full text-left group">
-          <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm text-[var(--text-secondary)]">
-            <span className="flex flex-wrap items-baseline gap-x-1.5">
-              <span>Etapa {hito} de {PRESENCIA_HITOS.length}</span>
-              <span aria-hidden>·</span><span className="font-serif italic text-base text-[var(--text-primary)]">{PRESENCIA_HITOS[hito - 1]}</span>
+        {mostrarAvance && (
+          <button type="button" onClick={() => verRecorrido && setTab('recorrido')} className="mt-6 w-full text-left group">
+            <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm text-[var(--text-secondary)]">
+              <span className="flex flex-wrap items-baseline gap-x-1.5">
+                <span>Ahora:</span>
+                <span className="font-serif italic text-base text-[var(--text-primary)]">{PRESENCIA_HITOS[hito - 1]}</span>
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]">
+                {hechos.length} de {PRESENCIA_HITOS.length} hitos completados{verRecorrido && <ArrowRight className="w-3.5 h-3.5" />}
+              </span>
             </span>
-            <span className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]">
-              {p.semana ? `Semana ${p.semana.actual} de ${p.semana.total}` : 'Ver el programa'}
-              <ChevronDown className={`w-4 h-4 transition-transform ${showStages ? 'rotate-180' : ''}`} />
-            </span>
-          </span>
-          <ProgressBar hito={hito} semana={p.semana} />
-        </button>}
-        {mostrarAvance && showStages && <StageDetail hito={hito} semana={p.semana} />}
+            <HitosBar hito={hito} hechos={hechos} />
+          </button>
+        )}
       </header>
 
       {/* Lo nuevo desde la última visita, en una línea: cada parte lleva a su lugar */}
-      {!showWelcome && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => setTab(t)} />}
+      {!showWelcome && ver.novedades && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => setTab(t)} />}
 
-      {showWelcome && <Welcome onClose={closeWelcome} hasWhatsapp={!!whatsapp} />}
+      {showWelcome && <Welcome onClose={closeWelcome} hasWhatsapp={!!whatsapp} bienvenida={p.bienvenida} />}
 
       {/* Pestañas */}
-      <nav className="mt-8 sm:mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
-        <SegmentedControl<Tab>
-          value={tab}
-          onChange={setTab}
-          options={[
-            { id: 'inicio', label: 'Inicio' },
-            { id: 'tareas', label: 'Tareas', count: pendientes.length || undefined },
-            { id: 'entregas', label: 'Entregas', count: entregas.length || undefined },
-            { id: 'archivos', label: 'Archivos' },
-          ]}
-        />
-      </nav>
+      {tabs.length > 1 && (
+        <nav className="mt-8 sm:mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
+          <SegmentedControl<Tab> value={tab} onChange={setTab} options={tabs} />
+        </nav>
+      )}
 
       <main className="mt-8 animate-in fade-in duration-200" key={tab}>
         {tab === 'inicio' && (
           <div className="space-y-8">
-            {/* Anuncios de Juan, arriba de todo */}
+            {/* Tu próxima acción y la reunión: lo primero, también en el celular */}
+            {(principal || (ver.proximaAccion && !pendientes.length && enRevision.length > 0)) && (
+              principal ? <NextAction t={principal} {...taskProps} nuevo={isNew(`t:${principal.id}:${principal.habilitadaEn || ''}`)} /> : (
+                <Card className="p-5 sm:p-6"><Eyebrow>Tu próxima acción</Eyebrow><p className="mt-3 text-[15px] text-[var(--text-primary)]">Nada pendiente de tu lado. Estamos revisando lo que nos mandaste.</p></Card>
+              )
+            )}
+            {error && <p role="alert" className="text-sm text-rose-500">{error}</p>}
+
+            {ver.reuniones && (
+              <Card className="p-5 sm:p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <Eyebrow>Próxima reunión</Eyebrow>
+                  {p.reunionesAcuerdo && <span className="text-xs text-[var(--text-tertiary)]">Llevamos {p.reunionesAcuerdo.hechas} de {p.reunionesAcuerdo.total} reuniones del acuerdo</span>}
+                </div>
+                {p.proximaReunion ? <MeetingDate {...p.proximaReunion} link={p.linkReunion} estudio={p.estudio} whatsapp={whatsapp} />
+                  : p.reunionPorConfirmar ? (
+                    <div className="mt-3">
+                      <span className="inline-flex rounded-full border border-[var(--border-strong)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)]">Por confirmar</span>
+                      {p.reunionPorConfirmar.objetivo && <p className="mt-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Objetivo: </span>{p.reunionPorConfirmar.objetivo}</p>}
+                      <p className="mt-1 text-sm text-[var(--text-secondary)]">La fecha la acordamos con vos.</p>
+                    </div>
+                  ) : <p className="mt-3 text-sm text-[var(--text-secondary)]">La vas a ver acá cuando la coordinemos.</p>}
+              </Card>
+            )}
+
+            {/* Anuncios de Juan */}
             {anuncios.length > 0 && (
               <ul className="space-y-3" aria-label="Anuncios">
                 {anuncios.map((a) => (
                   <li key={a.id}>
-                    <Card className={`p-5 ${a.fijado ? 'border-l-[3px] border-l-[var(--marca,var(--text-primary))]' : ''}`}>
+                    <Card className={`p-5 ${a.fijado ? 'border-l-[3px] border-l-[var(--marca)]' : ''}`}>
                       {isNew(`a:${a.id}`) && <NewBadge className="mb-2" />}
                       {a.titulo && <p className="text-[15px] font-medium text-[var(--text-primary)]">{a.titulo}</p>}
                       <p className={`${a.titulo ? 'mt-1.5' : ''} text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-line`}>{a.texto}</p>
@@ -365,8 +417,28 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </ul>
             )}
 
+            {/* El ritmo del contenido con la CM */}
+            {ver.cicloCM && (
+              <Card className="p-5 sm:p-6">
+                <Eyebrow>El ritmo del contenido</Eyebrow>
+                <ol className="mt-4 grid gap-3 sm:grid-cols-3">
+                  {[
+                    { d: 'Jueves', t: 'Te llega la propuesta de la semana siguiente: imagen, texto y formato.' },
+                    { d: 'Hasta el lunes 12 h', t: 'La aprobás o pedís cambios donde lo acordamos.' },
+                    { d: 'Toda la semana', t: 'Publicamos lo aprobado. Lo que no llegó, se reprograma con vos.' },
+                  ].map((x) => (
+                    <li key={x.d} className="rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] p-3">
+                      <p className="text-xs font-semibold text-[var(--marca)]">{x.d}</p>
+                      <p className="mt-1 text-sm leading-snug text-[var(--text-primary)]">{x.t}</p>
+                    </li>
+                  ))}
+                </ol>
+                {ver.contenido && <ContentButton url={p.gestionContenido} className="mt-4" />}
+              </Card>
+            )}
+
             {/* Esta semana: foco y objetivos (si no hay nada cargado, no se muestra) */}
-            {(p.resumenVisible || objetivos.length > 0) && (
+            {ver.semana && (p.resumenVisible || objetivos.length > 0) && (
               <Card className="p-5 sm:p-6">
                 <Eyebrow>Esta semana</Eyebrow>
                 {p.resumenVisible && <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{p.resumenVisible}</p>}
@@ -379,36 +451,28 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </Card>
             )}
 
-            <section>
-              <SectionTitle title="Lo que necesitamos de vos" hint={pendientes.length ? 'Cuando termines, tocá “Terminé”. Lo revisamos y te confirmamos.' : undefined} />
-              {pendientes.length ? (
-                <>
-                  <ul className="space-y-3">
-                    {pendientes.slice(0, 3).map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} nuevo={isNew(`t:${t.id}:${t.habilitadaEn || ''}`)} /></li>)}
-                  </ul>
-                  {pendientes.length > 3 && <button type="button" onClick={() => setTab('tareas')} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">Ver las {pendientes.length} tareas <ArrowRight className="w-4 h-4" /></button>}
-                </>
-              ) : (
-                <p className="text-sm text-[var(--text-secondary)]">Nada pendiente de tu lado. {enRevision.length ? `Estamos revisando ${enRevision.length === 1 ? 'lo que nos mandaste' : `${enRevision.length} cosas que nos mandaste`}.` : 'Te avisamos cuando haya algo nuevo.'}</p>
-              )}
-              {error && <p role="alert" className="mt-3 text-sm text-rose-500">{error}</p>}
-            </section>
+            {ver.tareas && resto.length > 0 && (
+              <section>
+                <SectionTitle title={principal ? 'También te toca' : 'Lo que necesitamos de vos'} hint="Cuando termines, tocá “Terminé”. Lo revisamos y te confirmamos." />
+                <ul className="space-y-3">
+                  {resto.slice(0, 3).map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} nuevo={isNew(`t:${t.id}:${t.habilitadaEn || ''}`)} /></li>)}
+                </ul>
+                {resto.length > 3 && <button type="button" onClick={() => setTab('tareas')} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">Ver las {pendientes.length} tareas <ArrowRight className="w-4 h-4" /></button>}
+              </section>
+            )}
+            {ver.tareas && !pendientes.length && !enRevision.length && !principal && (
+              <p className="text-sm text-[var(--text-secondary)]">Nada pendiente de tu lado. Te avisamos cuando haya algo nuevo.</p>
+            )}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Card className="p-5 sm:p-6">
-                <Eyebrow>Próxima reunión</Eyebrow>
-                {p.proximaReunion ? <MeetingDate fecha={p.proximaReunion.fecha} hora={p.proximaReunion.hora} link={p.linkReunion} estudio={p.estudio} whatsapp={whatsapp} /> : (
-                  <p className="mt-3 text-sm text-[var(--text-secondary)]">La vas a ver acá cuando la coordinemos.</p>
-                )}
-              </Card>
+            {(ver.entregas && entregas.length > 0) && (
               <Card className="p-5 sm:p-6">
                 <div className="flex items-center justify-between gap-3">
                   <Eyebrow>Última entrega</Eyebrow>
                   {entregas.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver todas</button>}
                 </div>
-                {entregas.length ? <DeliveryRow d={latest(entregas)} nuevo={isNew(`e:${latest(entregas).id}`)} /> : <p className="mt-3 text-sm text-[var(--text-secondary)]">Las entregas aparecen acá cuando las compartimos.</p>}
+                <DeliveryRow d={latest(entregas)} nuevo={isNew(`e:${latest(entregas).id}`)} />
               </Card>
-            </div>
+            )}
 
             {reuniones.length > 0 && (
               <Card className="p-5 sm:p-6">
@@ -420,19 +484,22 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </Card>
             )}
 
-            {/* Accesos a mano desde el inicio: los primeros, con su ícono */}
-            {accesos.length > 0 && (
+            {reportes.length > 0 && <ReportCard r={reportes[0]} />}
+
+            {/* Accesos a mano desde el inicio: gestión de contenido y los primeros accesos */}
+            {(accesos.length > 0 || (ver.contenido && !ver.cicloCM && p.gestionContenido)) && (
               <section>
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <Eyebrow>Tus accesos</Eyebrow>
                   {accesos.length > 4 && <button type="button" onClick={() => setTab('archivos')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver los {accesos.length}</button>}
                 </div>
+                {ver.contenido && !ver.cicloCM && p.gestionContenido && <ContentButton url={p.gestionContenido} className="mb-3" />}
                 <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {accesos.slice(0, 4).map((a, i) => (
                     <li key={`${a.url}-${i}`}>
                       <a href={a.url} target="_blank" rel="noopener noreferrer" className="card-swiss group relative flex h-full flex-col gap-3 p-4 transition hover:-translate-y-0.5">
                         {isNew(`l:${a.url}`) && <NewBadge className="absolute right-3 top-3" />}
-                        <span className="w-9 h-9 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--marca,var(--text-secondary))]"><AccessIcon nombre={a.nombre} url={a.url} /></span>
+                        <span className="w-9 h-9 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--marca)]"><AccessIcon nombre={a.nombre} url={a.url} /></span>
                         <span className="text-sm font-medium leading-snug text-[var(--text-primary)] break-words">{a.nombre}</span>
                       </a>
                     </li>
@@ -443,10 +510,12 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
           </div>
         )}
 
+        {tab === 'recorrido' && <Recorrido hito={hito} hechos={hechos} />}
+
         {tab === 'tareas' && (
           <div className="space-y-10">
             <section>
-              <SectionTitle title="Lo que necesitamos de vos" hint="Cuando termines una, tocá “Terminé”. La revisamos y te confirmamos." />
+              <SectionTitle title="Lo que necesitamos de vos" hint="Cuando termines una, tocá “Terminé”. La revisamos y te confirmamos: avisar no la da por aprobada." />
               {pendientes.length ? (
                 <ul className="space-y-3">
                   {pendientes.map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} nuevo={isNew(`t:${t.id}:${t.habilitadaEn || ''}`)} /></li>)}
@@ -457,14 +526,14 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
 
             {enRevision.length > 0 && (
               <section>
-                <SectionTitle title="En revisión" hint="Nos avisaste que las terminaste." />
+                <SectionTitle title="Recibidas · en revisión" hint="Nos avisaste que las terminaste. Te confirmamos cuando las revisemos." />
                 <TaskList items={enRevision} dot="bg-sky-500" />
               </section>
             )}
 
             {aprobadas.length > 0 && (
               <section>
-                <SectionTitle title="Aprobadas" />
+                <SectionTitle title="Completadas" />
                 <TaskList items={aprobadas} dot="bg-emerald-500" muted />
               </section>
             )}
@@ -472,15 +541,25 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
         )}
 
         {tab === 'entregas' && (
-          <section>
-            <SectionTitle title="Entregas" hint="Lo que preparamos para tu estudio." />
-            {entregas.length ? (
-              <Card className="px-5 divide-y divide-[var(--border-divider)]">
-                {[...entregas].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map((d) => <DeliveryRow key={d.id} d={d} nuevo={isNew(`e:${d.id}`)} />)}
-              </Card>
-            ) : <EmptyState icon={<Package className="w-5 h-5" />} title="Todavía no hay entregas" description="Aparecen acá a medida que las compartimos." />}
+          <section className="space-y-10">
+            {ver.entregas && (
+              <div>
+                <SectionTitle title="Entregas" hint="Lo que preparamos para tu estudio y qué necesitamos que decidas." />
+                {entregas.length ? (
+                  <Card className="px-5 divide-y divide-[var(--border-divider)]">
+                    {[...entregas].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map((d) => <DeliveryRow key={d.id} d={d} nuevo={isNew(`e:${d.id}`)} />)}
+                  </Card>
+                ) : <EmptyState icon={<Package className="w-5 h-5" />} title="Todavía no hay entregas" description="Aparecen acá a medida que las compartimos." />}
+              </div>
+            )}
+            {reportes.length > 0 && (
+              <div>
+                <SectionTitle title="Reportes" hint="El resumen de cada semana." />
+                <ul className="space-y-3">{reportes.map((r) => <li key={r.id}><ReportCard r={r} /></li>)}</ul>
+              </div>
+            )}
             {reuniones.length > 0 && (
-              <div className="mt-10">
+              <div>
                 <SectionTitle title="Resúmenes de reunión" hint="Acuerdos y próximos pasos de cada encuentro." />
                 <ul className="space-y-3">
                   {reuniones.map((s, i) => (
@@ -493,34 +572,59 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
         )}
 
         {tab === 'archivos' && (
-          <section>
-            <SectionTitle title="Tus carpetas y enlaces" hint="Se abren en Drive y en las herramientas que usamos juntos." />
-            {accesos.length ? (
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {accesos.map((a, i) => {
-                  // Los 5 accesos de siempre conservan su descripción; el ícono sale de lo que es el link
-                  const k = PAF_PORTAL_LINK_KEYS.find((key) => PAF_PORTAL_LINK_LABEL[key] === a.nombre);
-                  return (
-                    <li key={`${a.url}-${i}`}>
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="card-swiss group flex items-center gap-4 p-4 transition hover:-translate-y-0.5">
-                        <span className="w-10 h-10 shrink-0 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--marca,var(--text-secondary))]"><AccessIcon nombre={a.nombre} url={a.url} className="w-[18px] h-[18px]" /></span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">{a.nombre}{isNew(`l:${a.url}`) && <NewBadge />}</span>
-                          <span className="block text-xs text-[var(--text-tertiary)] truncate">{k ? LINK_HINT[k] : accessHost(a.url)}</span>
-                        </span>
-                        <ArrowUpRight className="w-4 h-4 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+          <section className="space-y-10">
+            {ver.contenido && (
+              <div>
+                <SectionTitle title="Gestión de contenido" hint="Donde ves y aprobás las publicaciones con la community manager." />
+                <ContentButton url={p.gestionContenido} />
+              </div>
+            )}
+            {ver.materiales && materiales.length > 0 && (
+              <div>
+                <SectionTitle title="Materiales" hint="Subí cada cosa en su lugar. Así no tenés que buscar en Drive." />
+                <ul className="grid gap-3 sm:grid-cols-2">
+                  {materiales.map((m) => (
+                    <li key={m.id}>
+                      <a href={p.materiales![m.id]} target="_blank" rel="noopener noreferrer" className="card-swiss group flex h-full flex-col gap-2 p-4 transition hover:-translate-y-0.5">
+                        <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]"><Folder className="w-4 h-4 text-[var(--marca)]" />{m.label}<ArrowUpRight className="ml-auto w-4 h-4 text-[var(--text-tertiary)]" /></span>
+                        <span className="text-xs leading-relaxed text-[var(--text-secondary)]">{m.pedido}</span>
                       </a>
                     </li>
-                  );
-                })}
-              </ul>
-            ) : <EmptyState icon={<Folder className="w-5 h-5" />} title="Tus accesos aparecen acá" description="Carpetas de Drive, calendario de contenido y todo lo que usamos juntos. Te avisamos cuando estén listos." />}
+                  ))}
+                </ul>
+              </div>
+            )}
+            {ver.accesos && (
+              <div>
+                <SectionTitle title="Tus carpetas y enlaces" hint="Se abren en Drive y en las herramientas que usamos juntos." />
+                {accesos.length ? (
+                  <ul className="grid gap-3 sm:grid-cols-2">
+                    {accesos.map((a, i) => {
+                      // Los 5 accesos de siempre conservan su descripción; el ícono sale de lo que es el link
+                      const k = PAF_PORTAL_LINK_KEYS.find((key) => PAF_PORTAL_LINK_LABEL[key] === a.nombre);
+                      return (
+                        <li key={`${a.url}-${i}`}>
+                          <a href={a.url} target="_blank" rel="noopener noreferrer" className="card-swiss group flex items-center gap-4 p-4 transition hover:-translate-y-0.5">
+                            <span className="w-10 h-10 shrink-0 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--marca)]"><AccessIcon nombre={a.nombre} url={a.url} className="w-[18px] h-[18px]" /></span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">{a.nombre}{isNew(`l:${a.url}`) && <NewBadge />}</span>
+                              <span className="block text-xs text-[var(--text-tertiary)] truncate">{k ? LINK_HINT[k] : accessHost(a.url)}</span>
+                            </span>
+                            <ArrowUpRight className="w-4 h-4 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                          </a>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : <EmptyState icon={<Folder className="w-5 h-5" />} title="Tus accesos aparecen acá" description="Carpetas de Drive y todo lo que usamos juntos. Te avisamos cuando estén listos." />}
+              </div>
+            )}
           </section>
         )}
       </main>
 
       <footer className={`mt-16 pt-6 ${whatsapp ? 'mb-16' : ''} border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-tertiary)]`}>
-        <span>.CERO</span>
+        <BrandLogo size="sm" />
         <span>Actualizado {formatDisplayDate(p.actualizadoEn.slice(0, 10), 'medium')}</span>
       </footer>
       {whatsapp && <WhatsappButton number={whatsapp} studio={p.estudio} />}
@@ -534,7 +638,7 @@ function latest<T extends { fecha?: string }>(items: T[]): T {
   return [...items].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0];
 }
 
-function MeetingDate({ fecha, hora, link, estudio, whatsapp }: { fecha: string; hora?: string; link?: string | null; estudio?: string; whatsapp?: string }) {
+function MeetingDate({ fecha, hora, objetivo, preparar, conCM, link, estudio, whatsapp }: { fecha: string; hora?: string; objetivo?: string; preparar?: string; conCM?: boolean; link?: string | null; estudio?: string; whatsapp?: string }) {
   const d = new Date(`${fecha}T12:00:00`);
   const month = d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '');
   const weekday = d.toLocaleDateString('es-AR', { weekday: 'long' });
@@ -543,17 +647,24 @@ function MeetingDate({ fecha, hora, link, estudio, whatsapp }: { fecha: string; 
     <>
     <div className="mt-3 flex items-center gap-4">
       <div className="w-14 shrink-0 rounded-[var(--radius-control)] border border-[var(--border-subtle)] overflow-hidden text-center">
-        <p className="bg-[var(--bg-surface-muted)] py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--text-secondary)]">{month}</p>
+        <p className="bg-[var(--marca)] py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--marca-text)]">{month}</p>
         <p className="py-1.5 text-2xl font-light tracking-tight">{d.getDate()}</p>
       </div>
       <div>
         <p className="text-sm font-medium capitalize text-[var(--text-primary)]">{weekday}</p>
         <p className="text-sm text-[var(--text-secondary)]">{hora ? `${hora} hs · hora de Argentina` : 'Horario a confirmar'}</p>
+        <p className="text-xs text-[var(--text-tertiary)]">Con Juan{conCM ? ' y la community manager' : ''}</p>
       </div>
     </div>
+    {(objetivo || preparar) && (
+      <div className="mt-4 space-y-1.5 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] px-3 py-2.5 text-sm">
+        {objetivo && <p className="text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué: </span>{objetivo}</p>}
+        {preparar && <p className="text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Traé o pensá: </span>{preparar}</p>}
+      </div>
+    )}
     {estudio !== undefined && (
       <div className="mt-4 flex flex-wrap gap-2">
-        {link && <a href={link} target="_blank" rel="noopener noreferrer" className="btn-solid-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs"><Video className="w-3.5 h-3.5" />Unirme</a>}
+        {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--marca)] px-3 py-1.5 text-xs font-medium text-[var(--marca-text)]"><Video className="w-3.5 h-3.5" />Entrar a la reunión</a>}
         <a href={calendarLink({ fecha, hora }, `Reunión .CERO · ${estudio}`, link)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)]"><CalendarPlus className="w-3.5 h-3.5" />Agregar a mi calendario</a>
         {whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola Juan, soy de ${estudio}. ¿Podemos mover la reunión del ${cuando}?`)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-1 py-1.5 text-xs text-[var(--text-tertiary)] underline underline-offset-4 hover:text-[var(--text-primary)]">Reprogramar</a>}
       </div>
@@ -563,18 +674,29 @@ function MeetingDate({ fecha, hora, link, estudio, whatsapp }: { fecha: string; 
 }
 
 function DeliveryRow({ d, nuevo }: { d: PafPortalDoc['entregas'][number]; nuevo?: boolean }) {
-  const body = (
-    <>
-      <span className="min-w-0 flex-1">
-        <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">{d.titulo}{nuevo && <NewBadge />}</span>
-        {d.fecha && <span className="block mt-0.5 text-xs text-[var(--text-tertiary)]">{formatDisplayDate(d.fecha, 'medium')}</span>}
-      </span>
-      {d.enlace && <ArrowUpRight className="w-4 h-4 shrink-0 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />}
-    </>
+  const hasta = d.hasta ? formatDisplayDate(d.hasta, 'medium') : '';
+  return (
+    <div className="py-4">
+      <div className="flex items-start gap-4">
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">
+            {d.titulo}{d.version && <span className="text-xs font-normal text-[var(--text-tertiary)]">{d.version}</span>}{nuevo && <NewBadge />}
+          </span>
+          <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-[var(--text-tertiary)]">
+            {d.fecha && <span>{formatDisplayDate(d.fecha, 'medium')}</span>}
+            {d.estado && <span className={d.estado === 'aprobada' ? 'text-emerald-600' : d.estado === 'ajustes' ? 'text-amber-600' : ''}>{PAF_DELIVERY_STATE_LABEL[d.estado]}</span>}
+          </span>
+        </span>
+        {d.enlace && <a href={d.enlace} target="_blank" rel="noopener noreferrer" className="shrink-0 inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)]">Revisar <ArrowUpRight className="w-3.5 h-3.5" /></a>}
+      </div>
+      {d.decision && d.estado !== 'aprobada' && (
+        <p className="mt-3 rounded-[var(--radius-control)] border-l-[3px] border-l-[var(--marca)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]">
+          <span className="text-[var(--text-tertiary)]">Necesitamos que decidas: </span>{d.decision}
+          {(hasta || d.canal) && <span className="block text-xs text-[var(--text-secondary)]">{hasta && `Hasta el ${hasta}`}{hasta && d.canal ? ' · ' : ''}{d.canal && `Confirmalo por ${d.canal}`}</span>}
+        </p>
+      )}
+    </div>
   );
-  return d.enlace
-    ? <a href={d.enlace} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-4 py-4">{body}</a>
-    : <div className="flex items-center gap-4 py-4">{body}</div>;
 }
 
 function TaskList({ items, dot, muted }: { items: PortalTask[]; dot: string; muted?: boolean }) {
@@ -591,62 +713,92 @@ function TaskList({ items, dot, muted }: { items: PortalTask[]; dot: string; mut
   );
 }
 
-/** Detalle de la línea de avance: los tres pilares (lo futuro, visible y bloqueado) y las 5 etapas */
-function StageDetail({ hito, semana }: { hito: number; semana?: PafPortalDoc['semana'] }) {
-  const pillars = [
-    { name: 'Presencia', state: 'current' },
-    { name: 'Adquisición', state: 'locked' },
-    { name: 'Conversión', state: 'locked' },
-  ];
+/** Barra del avance: un tramo por hito; lleno si está confirmado, marcado si es el actual */
+function HitosBar({ hito, hechos }: { hito: number; hechos: number[] }) {
   return (
-    <div className="mt-4 card-swiss p-5 space-y-5 animate-in fade-in duration-200">
-      <ol className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs" aria-label="Pilares del método">
-        {pillars.map((x, i) => (
-          <React.Fragment key={x.name}>
-            {i > 0 && <span aria-hidden className="hidden sm:block h-px flex-1 bg-[var(--border-strong)]" />}
-            <li className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${x.state === 'current' ? 'border-[var(--text-primary)] text-[var(--text-primary)] font-medium' : 'border-[var(--border-subtle)] text-[var(--text-tertiary)]'}`} aria-current={x.state === 'current' ? 'step' : undefined}>
-              {x.state === 'locked' && <Lock className="w-3 h-3" aria-label="Próximamente" />}{x.name}
-            </li>
-          </React.Fragment>
-        ))}
-      </ol>
-      {semana && (
-        <div>
-          <p className="text-xs text-[var(--text-tertiary)]">Las {semana.total} semanas del programa</p>
-          <ol className="mt-2 grid gap-1" style={{ gridTemplateColumns: `repeat(${semana.total}, minmax(0, 1fr))` }} aria-label={`Semana ${semana.actual} de ${semana.total}`}>
-            {Array.from({ length: semana.total }, (_, i) => (
-              <li key={i} className={`flex h-7 items-center justify-center rounded-md text-[10px] tabular-nums ${i + 1 < semana.actual ? 'bg-[var(--marca,var(--solid-contrast-bg))] text-[var(--marca-text,var(--solid-contrast-text))]' : i + 1 === semana.actual ? 'border-2 border-[var(--marca,var(--text-primary))] font-semibold text-[var(--text-primary)]' : 'bg-[var(--bg-surface-muted)] text-[var(--text-tertiary)]'}`}>{i + 1}</li>
-            ))}
-          </ol>
-          <p className="mt-2 text-xs text-[var(--text-secondary)]">{semana.actual >= semana.total ? 'Última semana del programa.' : `Faltan ${semana.total - semana.actual} ${semana.total - semana.actual === 1 ? 'semana' : 'semanas'}.`}</p>
-        </div>
-      )}
-      <ol className="space-y-3">
-        {PRESENCIA_HITOS.map((title, i) => {
+    <span className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden>
+      {PRESENCIA_HITOS.map((t, i) => (
+        <span key={t} className={`block h-1.5 rounded-full ${hechos.includes(i + 1) ? 'bg-[var(--marca)]' : i + 1 === hito ? 'bg-[var(--marca)] opacity-40' : 'bg-[var(--border-strong)]'}`} />
+      ))}
+    </span>
+  );
+}
+
+/** MI RECORRIDO: los cinco hitos de Presencia, qué se trabaja en cada uno y cuándo se completa */
+function Recorrido({ hito, hechos }: { hito: number; hechos: number[] }) {
+  return (
+    <section>
+      <SectionTitle title="Tu recorrido en Presencia" hint={`${hechos.length} de ${PRESENCIA_HITOS.length} hitos completados. Un hito se completa cuando lo confirmamos juntos, no por la fecha.`} />
+      <ol className="relative space-y-3">
+        {PRESENCIA_HITOS.map((titulo, i) => {
           const n = i + 1;
-          const state = n < hito ? 'done' : n === hito ? 'current' : 'pending';
+          const state = hechos.includes(n) ? 'done' : n === hito ? 'current' : 'pending';
           return (
-            <li key={title} className="flex items-center gap-3 text-sm" aria-current={state === 'current' ? 'step' : undefined}>
-              <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold ${state === 'done' ? 'bg-[var(--marca,var(--solid-contrast-bg))] text-[var(--marca-text,var(--solid-contrast-text))]' : state === 'current' ? 'border-2 border-[var(--marca,var(--text-primary))] text-[var(--text-primary)]' : 'border border-[var(--border-subtle)] text-[var(--text-tertiary)]'}`}>
-                {state === 'done' ? <Check className="w-3.5 h-3.5" /> : n}
-              </span>
-              <span className={state === 'pending' ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'}>{title}{state === 'current' && <span className="ml-2 text-xs text-[var(--text-tertiary)]">Estamos acá</span>}</span>
+            <li key={titulo} aria-current={state === 'current' ? 'step' : undefined}>
+              <Card className={`p-5 ${state === 'current' ? 'border-[var(--marca)] shadow-sm' : ''}`}>
+                <div className="flex items-start gap-4">
+                  <span className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-xs font-semibold ${state === 'done' ? 'bg-[var(--marca)] text-[var(--marca-text)]' : state === 'current' ? 'border-2 border-[var(--marca)] text-[var(--text-primary)]' : 'border border-[var(--border-strong)] text-[var(--text-tertiary)]'}`}>
+                    {state === 'done' ? <Check className="w-4 h-4" /> : n}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-2 text-[15px] font-medium text-[var(--text-primary)]">
+                      {titulo}
+                      {state === 'current' && <span className="rounded-full bg-[var(--marca)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--marca-text)]">Estamos acá</span>}
+                      {state === 'done' && <span className="text-xs font-normal text-[var(--text-tertiary)]">Completado</span>}
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-secondary)]">{PRESENCIA_HITO_INFO[i].trabajo}</p>
+                    <p className="mt-1 text-xs text-[var(--text-tertiary)]">Se completa cuando: {PRESENCIA_HITO_INFO[i].seCompleta}</p>
+                  </div>
+                </div>
+              </Card>
             </li>
           );
         })}
       </ol>
-      <p className="text-xs text-[var(--text-tertiary)]">Adquisición y Conversión se habilitan cuando cerremos Presencia.</p>
+    </section>
+  );
+}
+
+/** "Tu próxima acción": la tarea prioritaria, grande, con su explicación y su botón */
+function NextAction(props: { t: PortalTask; today: string; uploadUrl?: string; sending: string | null; readOnly: boolean; onDone: (id: string) => void; nuevo?: boolean }) {
+  return (
+    <div className="rounded-[var(--radius-card)] border-2 border-[var(--marca)] bg-[var(--bg-surface)] shadow-sm">
+      <p className="flex items-center gap-2 px-5 pt-4 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--marca)]">Tu próxima acción</p>
+      <PendingTask {...props} bare />
     </div>
   );
 }
 
-/** Barra del avance: por semanas si hay fecha de inicio; si no, por etapas */
-function ProgressBar({ hito, semana }: { hito: number; semana?: PafPortalDoc['semana'] }) {
-  const pct = semana ? (semana.actual / semana.total) * 100 : ((hito - 0.5) / PRESENCIA_HITOS.length) * 100;
+/** Botón a la app de la CM: sin link configurado, dice "Aún no disponible" y no abre nada */
+function ContentButton({ url, className = '' }: { url?: string | null; className?: string }) {
+  if (!url) return <span className={`inline-flex items-center gap-2 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2.5 text-sm text-[var(--text-tertiary)] ${className}`}><LayoutList className="w-4 h-4" />Gestión de contenido · aún no disponible</span>;
   return (
-    <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]" aria-hidden>
-      <span className="block h-full rounded-full bg-[var(--marca,var(--text-primary))] transition-[width] duration-700" style={{ width: `${Math.min(100, Math.max(4, pct))}%` }} />
-    </span>
+    <a href={url} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-2 rounded-[var(--radius-control)] bg-[var(--marca)] px-4 py-2.5 text-sm font-medium text-[var(--marca-text)] ${className}`}>
+      <LayoutList className="w-4 h-4" />Abrir gestión de contenido<ArrowUpRight className="w-4 h-4" />
+    </a>
+  );
+}
+
+/** Reporte de la semana publicado por Juan */
+function ReportCard({ r }: { r: NonNullable<PafPortalDoc['reportes']>[number] }) {
+  const [open, setOpen] = useState(false);
+  const partes = [
+    { t: 'Lo que hicimos', v: r.hicimos }, { t: 'Lo que aprobaste', v: r.aprobaste }, { t: 'Lo que falta de tu lado', v: r.falta },
+    { t: 'Lo que viene', v: r.viene }, { t: 'Números', v: r.numeros },
+  ].filter((x) => x.v.trim());
+  return (
+    <Card className="p-5 sm:p-6">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-expanded={open} className="flex w-full items-center justify-between gap-3 text-left">
+        <Eyebrow>Resumen de la semana · {formatDisplayDate(r.desde, 'short')} al {formatDisplayDate(r.hasta, 'short')}</Eyebrow>
+        <ChevronDown className={`w-4 h-4 text-[var(--text-tertiary)] transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {(open ? partes : partes.slice(0, 1)).map((x) => (
+        <div key={x.t} className="mt-3">
+          <p className="text-xs font-medium text-[var(--text-tertiary)]">{x.t}</p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{x.v}</p>
+        </div>
+      ))}
+    </Card>
   );
 }
 
@@ -732,10 +884,10 @@ function PortalSkeleton() {
   );
 }
 
-function Welcome({ onClose, hasWhatsapp }: { onClose: () => void; hasWhatsapp: boolean }) {
+function Welcome({ onClose, hasWhatsapp, bienvenida }: { onClose: () => void; hasWhatsapp: boolean; bienvenida?: string | null }) {
   const steps = [
-    'Arriba ves en qué etapa estamos. Tocá la línea para ver el recorrido completo.',
-    'Cuando necesitemos algo de vos, aparece en “Lo que necesitamos de vos”. Hacelo y tocá “Terminé”: lo revisamos y te confirmamos.',
+    'Arriba ves en qué hito estamos. En “Mi recorrido” está qué trabajamos en cada uno.',
+    'Tu próxima acción va siempre arriba, con su explicación. No hace falta completar nada hasta que te lo indiquemos. Cuando la termines, tocá “Terminé”: la revisamos y te confirmamos.',
     'Tus carpetas de Drive y todo lo que te entregamos están en Archivos y Entregas.',
   ];
   return (
@@ -750,7 +902,10 @@ function Welcome({ onClose, hasWhatsapp }: { onClose: () => void; hasWhatsapp: b
         ))}
       </ol>
       {hasWhatsapp && <p className="mt-4 text-sm text-[var(--text-secondary)]">¿Dudas? Escribime por WhatsApp con el botón de abajo.</p>}
-      <button type="button" onClick={onClose} className="btn-solid-primary mt-5 px-4 py-2 text-sm">Entendido</button>
+      <div className="mt-5 flex flex-wrap gap-2">
+        {bienvenida && <a href={bienvenida} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--marca)] px-4 py-2 text-sm font-medium text-[var(--marca-text)]">Abrir la bienvenida <ArrowUpRight className="w-4 h-4" /></a>}
+        <button type="button" onClick={onClose} className="btn-solid-primary px-4 py-2 text-sm">Entendido</button>
+      </div>
     </Card>
   );
 }
@@ -772,35 +927,38 @@ function GoalColumn({ title, items }: { title: string; items: { texto: string; h
   );
 }
 
-function PendingTask({ t, today, uploadUrl, sending, readOnly, onDone, nuevo }: { t: PortalTask; today: string; uploadUrl?: string; sending: string | null; readOnly: boolean; onDone: (id: string) => void; nuevo?: boolean }) {
+function PendingTask({ t, today, uploadUrl, sending, readOnly, onDone, nuevo, bare }: { t: PortalTask; today: string; uploadUrl?: string; sending: string | null; readOnly: boolean; onDone: (id: string) => void; nuevo?: boolean; bare?: boolean }) {
   const overdue = isOverdue(t, today);
-  return (
-    <Card className="p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          {nuevo && <NewBadge className="mb-2" />}
-          <p className="text-[15px] font-medium text-[var(--text-primary)] break-words">{t.titulo}</p>
-          {t.fecha && (
-            <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
-              {overdue && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden />}
-              {overdue ? `Venció el ${formatDisplayDate(t.fecha, 'medium')}` : `Para el ${formatDisplayDate(t.fecha, 'medium')}`}
-            </p>
-          )}
-          {t.motivo && <p className="mt-3 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Te pedimos: </span>{t.motivo}</p>}
-          {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
-          {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">Abrir <ArrowUpRight className="w-3.5 h-3.5" /></a>}
+  const delEstudio = (t.responsable || 'estudio') === 'estudio';
+  const body = (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="min-w-0">
+        {nuevo && <NewBadge className="mb-2" />}
+        <p className={`${bare ? 'text-lg' : 'text-[15px]'} font-medium text-[var(--text-primary)] break-words`}>{t.titulo}</p>
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)]">
+          {!delEstudio && <span className="rounded-full bg-[var(--bg-surface-muted)] px-2 py-0.5 text-[var(--text-secondary)]">Lo hace {PAF_RESPONSABLE_LABEL[t.responsable!]}</span>}
+          {t.fecha && <span className="inline-flex items-center gap-1.5">{overdue && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden />}{overdue ? `Venció el ${formatDisplayDate(t.fecha, 'medium')}` : `Para el ${formatDisplayDate(t.fecha, 'medium')}`}</span>}
+        </p>
+        {t.paraQue && <p className="mt-3 text-sm leading-relaxed text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué sirve: </span>{t.paraQue}</p>}
+        {t.motivo && <p className="mt-3 rounded-[var(--radius-control)] border-l-[3px] border-l-amber-500 bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Requiere ajustes: </span>{t.motivo}</p>}
+        {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+          {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">Abrir <ArrowUpRight className="w-3.5 h-3.5" /></a>}
           {t.pideArchivos && uploadUrl && (
-            <a href={uploadUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
+            <a href={uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
               <Paperclip className="w-3.5 h-3.5" /> Subir a Materiales <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
           )}
         </div>
-        <button type="button" onClick={() => onDone(t.id)} disabled={sending === t.id || readOnly} title={readOnly ? 'Vista previa: el botón no hace nada' : undefined} className="btn-solid-primary shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60">
+      </div>
+      {delEstudio && (
+        <button type="button" onClick={() => onDone(t.id)} disabled={sending === t.id || readOnly} title={readOnly ? 'Vista previa: el botón no hace nada' : 'Avisanos que lo terminaste: lo revisamos y te confirmamos'} className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--marca)] px-4 py-2 text-sm font-medium text-[var(--marca-text)] disabled:opacity-60">
           {sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
         </button>
-      </div>
-    </Card>
+      )}
+    </div>
   );
+  return bare ? <div className="px-5 pb-5 pt-2">{body}</div> : <Card className="p-5">{body}</Card>;
 }
 
 /** Botón fijo para escribirle a Juan por WhatsApp */

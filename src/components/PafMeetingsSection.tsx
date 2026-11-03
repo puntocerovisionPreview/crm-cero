@@ -23,6 +23,9 @@ export const PafMeetingsSection: React.FC<{
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
   linkReunion: string;
   onLinkReunion: (v: string) => void;
+  /** Reuniones que incluye el acuerdo (si lo define) */
+  reunionesAcordadas?: number;
+  onReunionesAcordadas: (n: number | undefined) => void;
   /** Abre el formulario (desde las acciones rápidas) */
   scheduling: boolean;
   onScheduling: (open: boolean) => void;
@@ -58,6 +61,17 @@ export const PafMeetingsSection: React.FC<{
           <ul className="space-y-2">{upcoming.map((m, i) => <MeetingRow key={m.id} m={m} first={i === 0} connected={isCalendarConnected} clientEmails={clientInviteEmails(project)} {...props} />)}</ul>
         ) : !props.scheduling && <p className="rounded-xl border border-dashed border-zinc-700 p-3 text-center text-xs text-zinc-500">Sin reuniones agendadas. El cliente ve “La vas a ver acá cuando la coordinemos”.</p>}
         {upcoming.length > 0 && <p className="text-[11px] text-zinc-500">El cliente ve la primera, con botones para unirse, agregarla a su calendario y pedirte reprogramar.</p>}
+      </section>
+
+      <section className="space-y-1.5">
+        <h3 className="text-xs font-bold text-zinc-100">Reuniones del acuerdo</h3>
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-400">
+          <span>El acuerdo incluye</span>
+          <input type="number" min={0} className={`${field} w-16`} value={props.reunionesAcordadas || ''} placeholder="—" aria-label="Reuniones acordadas" onChange={(e) => props.onReunionesAcordadas(e.target.value ? Math.max(0, Number(e.target.value)) : undefined)} />
+          <span>reuniones</span>
+          {!!props.reunionesAcordadas && <span className="text-zinc-200">· van {mine.filter((m) => m.completed && !m.proposed).length}, quedan {Math.max(0, props.reunionesAcordadas - mine.filter((m) => m.completed && !m.proposed).length)}</span>}
+        </div>
+        <p className="text-[11px] text-zinc-500">Solo si el acuerdo lo define. El cliente lo ve si prendés “Reuniones del acuerdo” en Ajustes.</p>
       </section>
 
       <section className="space-y-1.5">
@@ -192,8 +206,18 @@ function MeetingRow({ m, first, connected, clientEmails, onUpdateMeeting, onTogg
   onWritingSummary: (open: boolean) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [f, setF] = useState({ date: m.date, time: m.time || '', durationHours: m.durationHours || 1 });
+  const [f, setF] = useState({ date: m.date, time: m.time || '', durationHours: m.durationHours || 1, objetivo: m.objetivo || '', preparar: m.preparar || '', conCM: !!m.conCM });
+  const [prepOpen, setPrepOpen] = useState(false);
+  const [prep, setPrep] = useState(m.prep || {});
   const d = new Date(`${m.date}T12:00:00`);
+  const PREP: { k: keyof NonNullable<AgendaMeeting['prep']>; label: string }[] = [
+    { k: 'saleCon', label: 'Quiero que salga con' },
+    { k: 'decide', label: 'Necesito que decida o confirme' },
+    { k: 'mostrar', label: 'Voy a mostrar' },
+    { k: 'pedir', label: 'Le voy a pedir' },
+    { k: 'ojo', label: 'Ojo con' },
+  ];
+  const prepListo = PREP.filter((p) => m.prep?.[p.k]?.trim()).length;
   return (
     <li className={`rounded-xl border p-3 ${first ? 'border-zinc-600 bg-white/[0.03]' : 'border-zinc-800'}`}>
       <div className="flex items-start gap-3">
@@ -204,9 +228,12 @@ function MeetingRow({ m, first, connected, clientEmails, onUpdateMeeting, onTogg
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-zinc-100 truncate">{m.title}</p>
           <p className="text-[11px] text-zinc-400 capitalize">{d.toLocaleDateString('es-AR', { weekday: 'long' })}{m.time ? ` · ${m.time} hs` : ' · sin hora'}{m.durationHours ? ` · ${m.durationHours === 0.5 ? '30 min' : `${m.durationHours} h`}` : ''}</p>
+          {(m.objetivo || m.preparar || m.conCM) && (
+            <p className="mt-0.5 text-[11px] text-zinc-300">{m.objetivo && <><span className="text-zinc-500">Objetivo: </span>{m.objetivo}</>}{m.preparar && <span className="block"><span className="text-zinc-500">Que traiga: </span>{m.preparar}</span>}{m.conCM && <span className="block text-zinc-500">Se suma la CM</span>}</p>
+          )}
           <InviteLine m={m} clientEmails={clientEmails} onInvite={onUpdateMeeting ? () => onUpdateMeeting(m.id, { invitados: clientEmails }) : undefined} />
           <p className="mt-0.5 text-[10px]">
-            {m.proposed && <span className="mr-2 text-amber-300">Propuesta: tocá Mover y poné día y hora para confirmarla</span>}
+            {m.proposed && <span className="mr-2 text-amber-300">Propuesta: tocá Editar o mover y poné día y hora para confirmarla</span>}
             {first && !m.proposed && <span className="mr-2 text-sky-300">La ve el cliente</span>}
             {m.googleEventId ? <span className="text-emerald-400">En tu Google Calendar</span>
               : connected ? <span className="text-zinc-500">Pasando a Calendar…</span>
@@ -214,19 +241,39 @@ function MeetingRow({ m, first, connected, clientEmails, onUpdateMeeting, onTogg
           </p>
         </div>
       </div>
+      {prepOpen && (
+        <div className="mt-2.5 space-y-1.5 rounded-lg border border-zinc-700 p-2.5">
+          <p className="text-[11px] font-semibold text-zinc-100">Tu preparación <span className="font-normal text-zinc-500">· solo para vos</span></p>
+          {PREP.map((p) => (
+            <label key={p.k} className="block text-[11px] text-zinc-400">{p.label}
+              <input className={`${field} w-full`} value={prep[p.k] || ''} onChange={(e) => setPrep({ ...prep, [p.k]: e.target.value })} />
+            </label>
+          ))}
+          <div className="flex gap-2">
+            <button type="button" onClick={() => { onUpdateMeeting?.(m.id, { prep }); setPrepOpen(false); }} className="btn-solid-primary px-3 py-1 text-[11px]">Guardar</button>
+            <button type="button" onClick={() => setPrepOpen(false)} className="text-[11px] text-zinc-400">Cancelar</button>
+          </div>
+        </div>
+      )}
       {editing ? (
-        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2.5 space-y-1.5">
+        <input className={`${field} w-full`} value={f.objetivo} placeholder="Objetivo (lo ve el cliente)" onChange={(e) => setF({ ...f, objetivo: e.target.value })} />
+        <input className={`${field} w-full`} value={f.preparar} placeholder="Qué traer o pensar (lo ve el cliente)" onChange={(e) => setF({ ...f, preparar: e.target.value })} />
+        <label className="flex items-center gap-2 text-[11px] text-zinc-400"><input type="checkbox" checked={f.conCM} onChange={(e) => setF({ ...f, conCM: e.target.checked })} />Se suma la community manager</label>
+        <div className="flex flex-wrap items-center gap-1.5">
           <input className={`${field} flex-1 min-w-[9rem]`} type="date" aria-label="Fecha" value={f.date} onChange={(e) => setF({ ...f, date: e.target.value })} />
           <input className={`${field} w-24`} type="time" aria-label="Hora" value={f.time} onChange={(e) => setF({ ...f, time: e.target.value })} />
           <select className={`${field} w-24`} aria-label="Duración" value={f.durationHours} onChange={(e) => setF({ ...f, durationHours: Number(e.target.value) })}>
             <option value={0.5}>30 min</option><option value={1}>1 h</option><option value={1.5}>1 h 30</option><option value={2}>2 h</option>
           </select>
-          <button type="button" onClick={() => { onUpdateMeeting?.(m.id, { date: f.date, ...(f.time ? { time: f.time, proposed: false } : {}), durationHours: f.durationHours }); setEditing(false); }} className="btn-solid-primary px-3 py-1.5 text-xs">Guardar</button>
+          <button type="button" onClick={() => { onUpdateMeeting?.(m.id, { date: f.date, ...(f.time ? { time: f.time, proposed: false } : {}), durationHours: f.durationHours, objetivo: f.objetivo.trim(), preparar: f.preparar.trim(), conCM: f.conCM }); setEditing(false); }} className="btn-solid-primary px-3 py-1.5 text-xs">Guardar</button>
           <button type="button" onClick={() => setEditing(false)} className="text-[11px] text-zinc-400">Cancelar</button>
+        </div>
         </div>
       ) : (
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
-          {onUpdateMeeting && <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-zinc-300 hover:bg-zinc-700"><Pencil className="w-3 h-3" />Mover</button>}
+          {onUpdateMeeting && <button type="button" onClick={() => setEditing(true)} className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 px-2 py-1 text-zinc-300 hover:bg-zinc-700"><Pencil className="w-3 h-3" />Editar o mover</button>}
+          {onUpdateMeeting && <button type="button" onClick={() => setPrepOpen((v) => !v)} className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 ${prepListo ? 'bg-sky-500/15 text-sky-300' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>Preparar{prepListo ? ` (${prepListo}/5)` : ''}</button>}
           {onToggleMeeting && <button type="button" onClick={() => { onToggleMeeting(m.id); onWritingSummary(true); }} className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2 py-1 text-emerald-300"><Check className="w-3 h-3" />Ya la hicimos</button>}
           {onDeleteMeeting && <button type="button" aria-label={`Borrar ${m.title}`} onClick={() => window.confirm(`¿Borrar la reunión "${m.title}"? También se borra de tu Google Calendar.`) && onDeleteMeeting(m.id)} className="ml-auto text-zinc-500 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>}
         </div>

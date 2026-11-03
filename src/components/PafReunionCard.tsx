@@ -53,7 +53,7 @@ export const PafReunionCard: React.FC<{
   calendarConnected?: boolean;
   onCancel?: () => void;
 }> = ({ project, meetings, onAddMeeting, suggestedTitle, hideUpcoming, calendarConnected, onCancel }) => {
-  const [form, setForm] = useState({ title: `Reunión PAF · ${project.clientName}`, date: getTodayString(), time: '11:00', durationHours: 1, notes: '' });
+  const [form, setForm] = useState({ title: `Reunión PAF · ${project.clientName}`, date: getTodayString(), time: '11:00', durationHours: 1, notes: '', objetivo: '', preparar: '', conCM: false });
   // A quién invitar: los correos que entran a su portal (o el del cliente)
   const clientEmails = clientInviteEmails(project);
   const [invitar, setInvitar] = useState(clientEmails.length > 0);
@@ -91,6 +91,9 @@ export const PafReunionCard: React.FC<{
       time: form.time,
       durationHours: form.durationHours,
       notes: form.notes.trim() || undefined,
+      ...(form.objetivo.trim() ? { objetivo: form.objetivo.trim() } : {}),
+      ...(form.preparar.trim() ? { preparar: form.preparar.trim() } : {}),
+      ...(form.conCM ? { conCM: true } : {}),
       completed: false,
       projectId: project.id,
       projectName: project.clientName,
@@ -141,7 +144,10 @@ export const PafReunionCard: React.FC<{
           <option value={0.5}>30 min</option><option value={1}>1 h</option><option value={1.5}>1 h 30</option><option value={2}>2 h</option>
         </select>
       </div>
-      <input className={input} value={form.notes} placeholder="Temas (opcional)" onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      <input className={input} value={form.objetivo} placeholder="Objetivo (lo ve el cliente). Ej: revisar la propuesta de mensaje" onChange={(e) => setForm({ ...form, objetivo: e.target.value })} />
+      <input className={input} value={form.preparar} placeholder="Qué traer o pensar (lo ve el cliente). Ej: 3 proyectos que te representen" onChange={(e) => setForm({ ...form, preparar: e.target.value })} />
+      <input className={input} value={form.notes} placeholder="Notas para vos (no las ve el cliente)" onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      <label className="flex items-center gap-2 text-[11px] text-zinc-400"><input type="checkbox" checked={form.conCM} onChange={(e) => setForm({ ...form, conCM: e.target.checked })} />Se suma la community manager</label>
       {clientEmails.length > 0 ? (
         <label className="flex items-start gap-2 rounded-lg border border-zinc-800 p-2 text-[11px] text-zinc-300">
           <input type="checkbox" className="mt-0.5" checked={invitar} onChange={(e) => setInvitar(e.target.checked)} />

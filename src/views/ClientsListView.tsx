@@ -3,10 +3,14 @@ import { ChevronRight, Plus, Search } from 'lucide-react';
 import { AgendaMeeting, IncomeRecord, Project, getServiceType } from '../types';
 import { calculateProjectBilling } from '../utils/paymentPlans';
 import { nextMeeting } from '../portal/model';
+import { RESPONSABLE_ACCION, estadoCliente, type EstadoCliente } from '../components/ProximaAccionCard';
 
-type Filter = 'activos' | 'paf' | 'web' | 'archivados';
+type Filter = 'activos' | 'mi_accion' | 'esperando' | 'bloqueado' | 'paf' | 'web' | 'archivados';
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'activos', label: 'Activos' },
+  { id: 'mi_accion', label: 'Necesitan mi acción' },
+  { id: 'esperando', label: 'Esperando al cliente' },
+  { id: 'bloqueado', label: 'Bloqueados' },
   { id: 'paf', label: 'PAF' },
   { id: 'web', label: 'Web' },
   { id: 'archivados', label: 'Archivados' },
@@ -19,9 +23,11 @@ interface Row {
   cobro: { fecha: string; monto: string; vencido: boolean } | null;
   reunion: { fecha: string; hora?: string } | null;
   dot: string; // punto de estado: lo único con color
+  estado: EstadoCliente;
 }
 
 const fmt = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+const ORDEN: Record<EstadoCliente, number> = { bloqueado: 0, mi_accion: 1, esperando: 2, sin_accion: 3 };
 
 /**
  * CLIENTES: una lista limpia. Por fila: estudio, tipo y estado; próximo cobro y
@@ -42,6 +48,7 @@ export const ClientsListView: React.FC<{
   const rows = useMemo<Row[]>(() => projects
     .filter((p) => (filter === 'archivados' ? p.archived : !p.archived))
     .filter((p) => filter === 'paf' ? getServiceType(p.projectType) === 'paf' : filter === 'web' ? getServiceType(p.projectType) === 'web' : true)
+    .filter((p) => (['mi_accion', 'esperando', 'bloqueado'] as Filter[]).includes(filter) ? estadoCliente(p, today) === filter : true)
     .filter((p) => !q.trim() || `${p.clientName} ${p.ownerName || ''} ${p.clientEmail || ''}`.toLowerCase().includes(q.trim().toLowerCase()))
     .map((p) => {
       const billing = calculateProjectBilling(p, incomes);
@@ -58,11 +65,13 @@ export const ClientsListView: React.FC<{
         revisar,
         cobro,
         reunion: nextMeeting(meetings, p.id, today),
-        dot: cobro?.vencido ? 'bg-rose-500' : revisar ? 'bg-amber-500' : p.archived ? 'bg-zinc-600' : 'bg-emerald-500',
+        dot: estadoCliente(p, today) === 'bloqueado' || cobro?.vencido ? 'bg-rose-500' : estadoCliente(p, today) === 'mi_accion' ? 'bg-amber-500' : p.archived ? 'bg-zinc-600' : 'bg-emerald-500',
+        estado: estadoCliente(p, today),
       };
     })
     // Lo que pide atención, arriba
-    .sort((a, b) => Number(!!b.cobro?.vencido) - Number(!!a.cobro?.vencido) || b.revisar - a.revisar || a.project.clientName.localeCompare(b.project.clientName)),
+    // Primero bloqueos y lo que necesita una acción tuya; después cobros vencidos y revisiones
+    .sort((a, b) => ORDEN[a.estado] - ORDEN[b.estado] || Number(!!b.cobro?.vencido) - Number(!!a.cobro?.vencido) || b.revisar - a.revisar || a.project.clientName.localeCompare(b.project.clientName)),
   [projects, meetings, incomes, filter, q, privacyMode, today]);
 
   return (
@@ -73,10 +82,10 @@ export const ClientsListView: React.FC<{
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1" role="tablist" aria-label="Filtro">
+        <div className="flex max-w-full gap-1 overflow-x-auto no-scrollbar" role="tablist" aria-label="Filtro">
           {FILTERS.map((f) => (
             <button key={f.id} type="button" role="tab" aria-selected={filter === f.id} onClick={() => setFilter(f.id)}
-              className={`rounded-full px-3 py-1 text-xs font-medium transition ${filter === f.id ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition ${filter === f.id ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
               {f.label}
             </button>
           ))}
@@ -98,6 +107,12 @@ export const ClientsListView: React.FC<{
                     <span className="truncate text-sm font-medium text-[var(--text-primary)]">{r.project.clientName}</span>
                     <span className="shrink-0 text-xs text-[var(--text-tertiary)]">{r.tipo} · {r.project.status}</span>
                   </span>
+                  {r.project.proximaAccion ? (
+                    <span className={`mt-0.5 block truncate text-xs ${r.estado === 'bloqueado' ? 'text-rose-500' : 'text-[var(--text-primary)]'}`}>
+                      → {r.project.proximaAccion.texto}
+                      <span className="text-[var(--text-tertiary)]"> · {RESPONSABLE_ACCION[r.project.proximaAccion.responsable]}{r.project.proximaAccion.fecha ? ` · ${fmt(r.project.proximaAccion.fecha)}` : ''}{r.estado === 'esperando' && r.project.proximaAccion.necesita ? ` · espera: ${r.project.proximaAccion.necesita}` : ''}</span>
+                    </span>
+                  ) : !r.project.archived && <span className="mt-0.5 block text-xs text-amber-600">Sin próxima acción definida</span>}
                   <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-[var(--text-secondary)]">
                     <span>{r.cobro ? <>Cobro {r.cobro.monto} · {fmt(r.cobro.fecha)}{r.cobro.vencido && <span className="text-rose-500"> vencido</span>}</> : 'Sin cobro pendiente'}</span>
                     <span>{r.reunion ? `Reunión ${fmt(r.reunion.fecha)}${r.reunion.hora ? ` ${r.reunion.hora}` : ''}` : 'Sin reunión'}</span>
@@ -111,7 +126,7 @@ export const ClientsListView: React.FC<{
         </ul>
       ) : (
         <p className="rounded-[var(--radius-card)] border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--text-secondary)]">
-          {q ? 'No hay clientes con ese nombre.' : filter === 'archivados' ? 'No hay clientes archivados.' : 'Todavía no hay clientes acá.'}
+          {q ? 'No hay clientes con ese nombre.' : filter === 'archivados' ? 'No hay clientes archivados.' : filter === 'mi_accion' ? 'Nada espera una acción tuya.' : filter === 'esperando' ? 'No estás esperando a ningún cliente.' : filter === 'bloqueado' ? 'Ningún cliente bloqueado.' : 'Todavía no hay clientes acá.'}
         </p>
       )}
 
