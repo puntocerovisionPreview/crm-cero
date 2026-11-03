@@ -157,6 +157,14 @@ import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { usePafAvisos } from './portal/usePafAvisos';
 import { requestCalendarSync } from './utils/calendarSyncClient';
+import {
+  createGoogleCalendarEventInBrowser,
+  updateGoogleCalendarEventInBrowser,
+  deleteGoogleCalendarEventInBrowser,
+  hasGoogleCalendarTokenInMemory,
+  getGoogleCalendarSnapshot,
+} from './utils/googleCalendarBrowser';
+import { GoogleCalendarReconnectBanner } from './components/GoogleCalendarSettingsCard';
 import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -2043,7 +2051,25 @@ export default function App() {
     }
   };
 
+  const syncBrowserGoogleEventId = useCallback((meetingId: string, googleEventId: string) => {
+    setMeetings(prev => {
+      const updated = prev.map(m => (m.id === meetingId ? { ...m, googleEventId } : m));
+      saveStoredMeetings(updated);
+      return updated;
+    });
+    updateMeetingInFirestore(meetingId, { googleEventId }).catch(err =>
+      console.error('Error saving googleEventId to Firestore:', err)
+    );
+  }, []);
+
+  const shouldUseBrowserCalendar = () => {
+    const snap = getGoogleCalendarSnapshot();
+    return hasGoogleCalendarTokenInMemory() || snap.tokenExpired;
+  };
+
   const handleMoveMeetingDate = async (meetingId: string, targetDate: string) => {
+    const current = meetings.find(m => m.id === meetingId);
+    const merged = current ? { ...current, date: targetDate } : null;
     setMeetings(prev => {
       const updated = prev.map(m => m.id === meetingId ? { ...m, date: targetDate } : m);
       saveStoredMeetings(updated);
@@ -2052,6 +2078,11 @@ export default function App() {
     playPostpone();
     try {
       await updateMeetingInFirestore(meetingId, { date: targetDate });
+      if (merged && shouldUseBrowserCalendar()) {
+        void updateGoogleCalendarEventInBrowser(merged, (eventId) =>
+          syncBrowserGoogleEventId(meetingId, eventId)
+        );
+      }
       requestCalendarSync();
       showToast('Reunión postergada a mañana');
     } catch (err) {
@@ -2078,6 +2109,9 @@ export default function App() {
     playItemDeleted();
     try {
       await deleteMeetingFromFirestore(meetingId);
+      if (meetingToDelete?.googleEventId && shouldUseBrowserCalendar()) {
+        void deleteGoogleCalendarEventInBrowser(meetingToDelete.googleEventId);
+      }
       requestCalendarSync();
       showToast('Reunión enviada a la papelera', () => {
         if (meetingToDelete) {
@@ -2091,6 +2125,8 @@ export default function App() {
   };
 
   const handleUpdateMeeting = async (meetingId: string, updates: Partial<AgendaMeeting>) => {
+    const current = meetings.find(m => m.id === meetingId);
+    const merged = current ? { ...current, ...updates } : null;
     setMeetings(prev => {
       const updated = prev.map(m => m.id === meetingId ? { ...m, ...updates } : m);
       saveStoredMeetings(updated);
@@ -2098,6 +2134,11 @@ export default function App() {
     });
     try {
       await updateMeetingInFirestore(meetingId, updates);
+      if (merged && shouldUseBrowserCalendar()) {
+        void updateGoogleCalendarEventInBrowser(merged, (eventId) =>
+          syncBrowserGoogleEventId(meetingId, eventId)
+        );
+      }
       requestCalendarSync();
       showToast('Reunión actualizada');
     } catch (err) {
@@ -2119,6 +2160,11 @@ export default function App() {
     playItemCreated();
     try {
       await saveMeetingToFirestore(newMeeting);
+      if (shouldUseBrowserCalendar()) {
+        void createGoogleCalendarEventInBrowser(newMeeting, (eventId) =>
+          syncBrowserGoogleEventId(newMeeting.id, eventId)
+        );
+      }
       requestCalendarSync();
       showToast('Reunión agendada');
     } catch (err) {
@@ -4418,6 +4464,11 @@ export default function App() {
           )}
         </div>
       )}
+
+      {/* Google Calendar Reconnect / Error Banner (401 token vencido, popup bloqueado, permiso rechazado, fallo API) */}
+      <GoogleCalendarReconnectBanner
+        onReconnected={() => showToast('Google Calendar reconectado y sincronizado')}
+      />
 
       {/* PWA Install Button (if eligible) */}
       <PWAInstallButton />

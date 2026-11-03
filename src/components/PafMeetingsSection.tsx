@@ -3,6 +3,7 @@ import { CalendarCheck, CalendarX, Check, ExternalLink, Loader2, Pencil, Refresh
 import { AgendaMeeting, Project } from '../types';
 import { getTodayString } from '../utils/storage';
 import { getCalendarStatus, syncCalendarNow, type CalendarStatus } from '../utils/calendarSyncClient';
+import { connectGoogleCalendar, useGoogleCalendarBrowser } from '../utils/googleCalendarBrowser';
 import { PafReunionCard, clientInviteEmails, googleCalendarLink } from './PafReunionCard';
 import { PafMeetingSummaries } from './PafMeetingSummaries';
 
@@ -34,7 +35,9 @@ export const PafMeetingsSection: React.FC<{
   const upcoming = mine.filter((m) => !m.completed && m.date >= today).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')));
   const past = mine.filter((m) => m.completed || m.date < today).sort((a, b) => (b.date + (b.time || '')).localeCompare(a.date + (a.time || ''))).slice(0, 5);
   const [status, setStatus] = useState<CalendarStatus | null>(null);
+  const browserCal = useGoogleCalendarBrowser();
   useEffect(() => { getCalendarStatus().then(setStatus); }, []);
+  const isCalendarConnected = Boolean(status?.connected || browserCal.connected);
 
   return (
     <div className="space-y-5">
@@ -47,12 +50,12 @@ export const PafMeetingsSection: React.FC<{
         </div>
         {props.scheduling && (
           <div className="rounded-xl border border-zinc-700 p-3">
-            <PafReunionCard project={project} meetings={meetings} hideUpcoming calendarConnected={status?.connected}
+            <PafReunionCard project={project} meetings={meetings} hideUpcoming calendarConnected={isCalendarConnected}
               onAddMeeting={(m) => { props.onAddMeeting(m); props.onScheduling(false); }} onCancel={() => props.onScheduling(false)} />
           </div>
         )}
         {upcoming.length ? (
-          <ul className="space-y-2">{upcoming.map((m, i) => <MeetingRow key={m.id} m={m} first={i === 0} connected={!!status?.connected} clientEmails={clientInviteEmails(project)} {...props} />)}</ul>
+          <ul className="space-y-2">{upcoming.map((m, i) => <MeetingRow key={m.id} m={m} first={i === 0} connected={isCalendarConnected} clientEmails={clientInviteEmails(project)} {...props} />)}</ul>
         ) : !props.scheduling && <p className="rounded-xl border border-dashed border-zinc-700 p-3 text-center text-xs text-zinc-500">Sin reuniones agendadas. El cliente ve “La vas a ver acá cuando la coordinemos”.</p>}
         {upcoming.length > 0 && <p className="text-[11px] text-zinc-500">El cliente ve la primera, con botones para unirse, agregarla a su calendario y pedirte reprogramar.</p>}
       </section>
@@ -98,15 +101,60 @@ function fmtDate(d: string) {
 function CalendarStatusLine({ status }: { status: CalendarStatus | null }) {
   const [syncing, setSyncing] = useState(false);
   const [msg, setMsg] = useState('');
+  const browserCal = useGoogleCalendarBrowser();
+
+  if (browserCal.connected) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2">
+        <CalendarCheck className="w-4 h-4 text-emerald-400" />
+        <span className="flex-1 min-w-0 text-[11px] text-zinc-300">
+          Google Calendar conectado en este navegador. Lo que agendás, editás o borrás acá impacta directo en tu calendario.
+        </span>
+      </div>
+    );
+  }
+
+  if (browserCal.tokenExpired) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-400/30 bg-amber-400/[0.06] px-3 py-2">
+        <span className="flex-1 min-w-0 text-[11px] text-amber-200">
+          Tu sesión de Google Calendar venció (~1 hora). Reconectá sin perder lo cargado.
+        </span>
+        <button
+          type="button"
+          onClick={() => connectGoogleCalendar()}
+          disabled={browserCal.connecting}
+          className="inline-flex items-center gap-1 rounded-lg bg-amber-400 px-2.5 py-1 text-[11px] font-bold text-zinc-950 hover:bg-amber-300 disabled:opacity-50"
+        >
+          {browserCal.connecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+          Reconectar Google Calendar
+        </button>
+      </div>
+    );
+  }
+
   if (!status) return <p className="text-[11px] text-zinc-500">Revisando Google Calendar…</p>;
   if (!status.connected) {
     return (
       <div className="flex items-start gap-2.5 rounded-xl border border-zinc-800 p-3">
         <CalendarX className="mt-0.5 w-4 h-4 shrink-0 text-zinc-500" />
-        <div className="text-[11px] text-zinc-400 space-y-1">
-          <p className="text-xs font-semibold text-zinc-200">Google Calendar no está conectado en el servidor</p>
-          <p>Mientras tanto, al agendar se abre Google Calendar con el evento listo para guardar.</p>
-          <p>Para que pase solo: en Google AI Studio → Secrets, cargá <span className="font-mono text-zinc-300">GOOGLE_CALENDAR_ID</span> con tu Gmail, y en Google Calendar compartí tu calendario con {status.serviceAccountEmail ? <span className="font-mono text-zinc-300">{status.serviceAccountEmail}</span> : 'la cuenta de servicio'} con permiso “Hacer cambios en los eventos”.</p>
+        <div className="text-[11px] text-zinc-400 space-y-2 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-zinc-200">Google Calendar no está conectado</p>
+            <button
+              type="button"
+              onClick={() => connectGoogleCalendar()}
+              disabled={browserCal.connecting}
+              className="inline-flex items-center gap-1 rounded-lg bg-zinc-100 px-2.5 py-1 text-[11px] font-bold text-zinc-950 hover:bg-white disabled:opacity-50"
+            >
+              {browserCal.connecting ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+              Conectar Google Calendar
+            </button>
+          </div>
+          {browserCal.error && (
+            <p className="text-amber-300">{browserCal.error.message}</p>
+          )}
+          <p>También podés conectarlo desde Ajustes → Conectar Google Calendar.</p>
         </div>
       </div>
     );
@@ -129,7 +177,7 @@ function CalendarStatusLine({ status }: { status: CalendarStatus | null }) {
     </div>
     {!status.invites && (
       <p className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] px-3 py-2 text-[11px] text-zinc-300">
-        Para que al cliente le llegue la invitación: andá a Ajustes → Automatizaciones → Google Drive, tocá “Volver a conectar” y aceptá también <span className="text-zinc-100">Google Calendar</span>. Es una sola vez.
+        Para que al cliente le llegue la invitación: andá a Ajustes → Conectar Google Calendar o Automatizaciones → Google Drive.
       </p>
     )}
     </div>

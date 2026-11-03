@@ -3,6 +3,7 @@ import { CheckCircle2, Circle, Loader2, Send, Eye, RefreshCw, Copy, Check } from
 import { getAuthHeaders } from '../utils/authAccess';
 import { PushSettingsCard } from './PushSettingsCard';
 import { DriveSettings } from './DriveSettings';
+import { GoogleCalendarSettingsCard } from './GoogleCalendarSettingsCard';
 
 interface Status {
   serviceAccount: boolean;
@@ -151,6 +152,7 @@ export const AutomationSettings: React.FC = () => {
         </button>
       </div>
 
+      <GoogleCalendarSettingsCard />
       <PushSettingsCard />
       <DriveSettings />
 

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { CalendarPlus, ExternalLink } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
 import { getCalendarStatus } from '../utils/calendarSyncClient';
+import { useGoogleCalendarBrowser } from '../utils/googleCalendarBrowser';
 import { getTodayString } from '../utils/storage';
 import { hapticFeedback } from '../utils/haptics';
 
@@ -57,6 +58,7 @@ export const PafReunionCard: React.FC<{
   const clientEmails = clientInviteEmails(project);
   const [invitar, setInvitar] = useState(clientEmails.length > 0);
   const titleRef = useRef<HTMLInputElement>(null);
+  const browserCal = useGoogleCalendarBrowser();
   useEffect(() => {
     if (!suggestedTitle) return;
     setForm((f) => ({ ...f, title: `${suggestedTitle} · ${project.clientName}` }));
@@ -72,6 +74,8 @@ export const PafReunionCard: React.FC<{
     getCalendarStatus().then((st) => { if (alive) setCalendarSync(st.connected); });
     return () => { alive = false; };
   }, [calendarConnected]);
+
+  const effectiveSync = Boolean(calendarSync || browserCal.connected || browserCal.tokenExpired);
 
   const upcoming = meetings
     .filter((m) => m.projectId === project.id && !m.completed && m.date >= getTodayString())
@@ -93,7 +97,7 @@ export const PafReunionCard: React.FC<{
       ...(invitar && clientEmails.length ? { invitados: clientEmails } : {}),
     };
     onAddMeeting(meeting);
-    if (calendarSync) {
+    if (effectiveSync) {
       setNotice(invitar && clientEmails.length ? `Agendada. En segundos aparece en tu Calendar y Google le manda la invitación a ${clientEmails.join(', ')}.` : 'Agendada. Aparece en tu Google Calendar en segundos.');
     } else {
       // Se abre en el mismo clic para que el navegador no lo bloquee
@@ -107,7 +111,7 @@ export const PafReunionCard: React.FC<{
       <div className="flex items-center gap-2">
         <CalendarPlus className="w-3.5 h-3.5 text-emerald-400" />
         <h3 className="text-xs font-bold text-zinc-100 flex-1">Agendar reunión</h3>
-        {calendarSync !== null && <span className="text-[10px] text-zinc-500">{calendarSync ? 'Calendar sincronizado' : 'Se abre Google Calendar'}</span>}
+        {(calendarSync !== null || browserCal.connected) && <span className="text-[10px] text-zinc-500">{effectiveSync ? 'Calendar sincronizado' : 'Se abre Google Calendar'}</span>}
       </div>
 
       {!hideUpcoming && upcoming.length > 0 && (
@@ -115,7 +119,7 @@ export const PafReunionCard: React.FC<{
           {upcoming.map((m) => (
             <li key={m.id} className="flex items-center gap-2 text-[11px] text-zinc-300">
               <span className="flex-1 min-w-0 truncate">{m.date}{m.time ? ` · ${m.time}` : ''} · {m.title}</span>
-              {!calendarSync && !m.googleEventId && (
+              {!effectiveSync && !m.googleEventId && (
                 <a href={googleCalendarLink(m)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sky-300 font-bold">Calendar <ExternalLink className="w-3 h-3" /></a>
               )}
             </li>
