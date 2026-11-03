@@ -16,43 +16,6 @@ service cloud.firestore {
       allow get: if true;
     }
 
-    // Portal del cliente PAF: solo lo lee un correo de emailsAutorizados, entrando con
-    // su propia cuenta de Google. Saber el ID (PAF-002) no alcanza. Para listar, la
-    // consulta tiene que filtrar por su correo (array-contains). Escribe solo el dueño.
-    // Los correos se guardan en minúscula; se compara también en minúscula.
-    match /paf_portal/{clienteId} {
-      allow get, list: if request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.token.email.lower() in resource.data.emailsAutorizados;
-    }
-
-    // "Terminé" del estudio: lo único que el cliente puede escribir. Solo crea un aviso,
-    // con su propio correo y la hora del servidor, y solo para una tarea que Juan habilitó
-    // en SU portal. No puede editar ni borrar avisos, ni aprobar nada (eso lo hace Juan).
-    function portalOf(clienteId) {
-      return get(/databases/$(database)/documents/paf_portal/$(clienteId)).data;
-    }
-    function isPortalReader(clienteId) {
-      return request.auth != null
-        && request.auth.token.email_verified == true
-        && request.auth.token.email.lower() in portalOf(clienteId).emailsAutorizados;
-    }
-
-    match /paf_portal/{clienteId}/avisos/{avisoId} {
-      allow read: if isPortalReader(clienteId);
-      allow create: if isPortalReader(clienteId)
-        && request.resource.data.keys().hasOnly(['tareaId', 'email', 'creadoEn'])
-        && request.resource.data.tareaId is string
-        && request.resource.data.tareaId in portalOf(clienteId).get('tareasHabilitadas', [])
-        && request.resource.data.email == request.auth.token.email.lower()
-        && request.resource.data.creadoEn == request.time;
-    }
-
-    // El CRM junta los avisos de todos los estudios (contador "PAF para revisar")
-    match /{path=**}/avisos/{avisoId} {
-      allow read: if isOwner();
-    }
-
     match /{document=**} {
       allow read, write: if isOwner();
     }

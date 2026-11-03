@@ -13,7 +13,6 @@ const App = lazy(() => import('./App.tsx'));
 const StudentPortalView = lazy(() => import('./views/StudentPortalView').then((m) => ({ default: m.StudentPortalView })));
 const DocumentPublicView = lazy(() => import('./views/DocumentPublicView'));
 const ClientPanelView = lazy(() => import('./views/ClientPanelView').then((m) => ({ default: m.ClientPanelView })));
-const PafPortalView = lazy(() => import('./views/PafPortalView').then((m) => ({ default: m.PafPortalView })));
 
 // Red de seguridad para las animaciones entre pantallas: si el navegador no está dibujando
 // (pestaña o app en segundo plano), la animación esperaría para siempre y la pantalla quedaría
@@ -39,8 +38,6 @@ const portalMatch = window.location.pathname.match(/^\/alumno\/([^/?#]+)/);
 const docMatch = window.location.pathname.match(/^\/doc\/([^/?#]+)/);
 // Panel del cliente: objetivos, tareas y contenido para aprobar (público, por link)
 const panelMatch = window.location.pathname.match(/^\/panel\/([^/?#]+)/);
-// Portal del cliente PAF: entra con su cuenta de Google y ve solo lo suyo
-const pafPortalMatch = /^\/portal\/?$/.test(window.location.pathname);
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -52,8 +49,6 @@ createRoot(document.getElementById('root')!).render(
           <DocumentPublicView token={docMatch[1]} />
         ) : panelMatch ? (
           <ClientPanelView token={panelMatch[1]} />
-        ) : pafPortalMatch ? (
-          <PafPortalView />
         ) : (
           <App />
         )}

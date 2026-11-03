@@ -1,6 +1,5 @@
 import React, { ViewTransition, useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { mergeWithCloud } from './utils/cloudMirror';
-import { driveApi } from './automation/driveApi';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import { ViewTab, AgendaTask, AgendaMeeting, Project, IncomeRecord, ExpenseRecord, SyncStatus, SubTask, SubtareaFoco, WeeklyGoal, WeeklyMission, TimeLog, SecondBrainNote, PersonalAccount, PersonalCategory, PersonalTransaction, PersonalRecurring, PersonalBudget, SavingsGoal, StudyItem, PersonalFinanceSettings, Payment, StudioPaymentSettings, TrashItem, StudioFixedExpense, Client, MercadoPagoIncomingPayment } from './types';
 import { 
@@ -155,7 +154,6 @@ import { AuthScreen } from './components/AuthScreen';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
-import { usePafAvisos } from './portal/usePafAvisos';
 import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -2125,7 +2123,6 @@ export default function App() {
     const newProject: Project = {
       ...newProjectData,
       id: `proj-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      webAutomationRequested: newProjectData.serviceType ? newProjectData.serviceType === 'web' : newProjectData.projectType === 'web',
       createdAt: now,
       updatedAt: now,
     };
@@ -2137,9 +2134,6 @@ export default function App() {
     playItemCreated();
     try {
       await saveProjectToFirestore(newProject);
-      if (newProject.webAutomationRequested) {
-        void driveApi(`/api/web-automation/${newProject.id}/run`, {}).catch(() => showToast('Proyecto guardado. La preparación Web quedó pendiente; podés reintentar desde la ficha.'));
-      }
       showToast('Proyecto registrado');
     } catch (err) {
       console.error('Error adding project:', err);
@@ -2162,9 +2156,6 @@ export default function App() {
       console.error('Error updating project:', err);
     }
   };
-
-  // Portal PAF: los "Terminé" de los estudios llegan a cada ficha sin tener que abrirla
-  usePafAvisos(Boolean(authToken), projects, meetings, handleUpdateProject);
 
   const handleDeleteProject = async (id: string) => {
     const projectToDelete = projects.find(p => p.id === id);

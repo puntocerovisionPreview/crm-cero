@@ -58,7 +58,6 @@ async function gcal(path: string, init: RequestInit = {}): Promise<any> {
 }
 
 interface MeetingDoc {
-  proposed?: boolean;
   id: string;
   title: string;
   date: string;
@@ -197,7 +196,6 @@ export async function runCalendarSync(db: Firestore, opts: { dryRun?: boolean } 
 
   // 2) CRM → Google
   for (const m of meetings.values()) {
-    if (m.proposed && !m.time) continue;
     if (!m.date || m.date < from || m.date > to) continue;
     const hash = meetingHash(m);
     if (!m.googleEventId) {
