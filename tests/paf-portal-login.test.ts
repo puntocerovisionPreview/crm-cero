@@ -31,6 +31,11 @@ describe('portal PAF con login', () => {
       proximaReunion: null,
       semana: null,
       reuniones: [],
+      accesos: [
+        { nombre: 'Tu carpeta', url: 'https://drive.google.com/drive/folders/abc' },
+        { nombre: 'Calendario de contenido', url: 'https://app.asana.com/0/1' },
+      ],
+      anuncios: [],
       actualizadoEn: '2026-11-02T10:00:00.000Z',
     });
   });
@@ -359,5 +364,69 @@ describe('fase 4: operación', () => {
     expect(checkPieza(portal, 'otro@x.com', '1')).toEqual({ error: 'Correo no autorizado' });
     expect('error' in checkPieza(portal, 'e@x.com', '2')).toBe(true);
     expect('error' in checkPieza(portal, 'e@x.com', 'zzz')).toBe(true);
+  });
+});
+
+import { accessesFromEnlaces, draftAccesos, publicAnnouncements } from '../src/portal/model';
+
+describe('portal libre (fase 2): anuncios, tareas simples y accesos', () => {
+  it('anuncios: solo publicados, fijados arriba, link solo https', () => {
+    const r = publicAnnouncements([
+      { id: '1', texto: 'Viejo', publicado: true, creadoEn: '2026-11-01T10:00:00Z' },
+      { id: '2', texto: 'Nuevo', publicado: true, creadoEn: '2026-11-03T10:00:00Z', link: 'javascript:alert(1)' },
+      { id: '3', texto: 'Fijado', publicado: true, fijado: true, creadoEn: '2026-10-01T10:00:00Z', titulo: 'Importante', link: 'https://x.com' },
+      { id: '4', texto: 'Borrador', publicado: false, creadoEn: '2026-11-04T10:00:00Z' },
+    ]);
+    expect(r.map((a) => a.id)).toEqual(['3', '2', '1']);
+    expect(r[0]).toEqual({ id: '3', texto: 'Fijado', titulo: 'Importante', link: 'https://x.com/', fijado: true, fecha: '2026-10-01' });
+    expect(r[1].link).toBeUndefined();
+  });
+
+  it('el portal publica los anuncios desde la ficha', () => {
+    const r = portalFromProject({ id: 'p', clientName: 'E', pafClienteId: 'PAF-002', pafPortal: draft, pafAnuncios: [{ id: 'a', texto: 'Hola', publicado: true, creadoEn: '2026-11-03T10:00:00Z' }] }, []);
+    expect('doc' in r && r.doc.anuncios?.map((a) => a.texto)).toEqual(['Hola']);
+  });
+
+  it('los 5 enlaces de antes pasan a accesos sin perderse', () => {
+    expect(accessesFromEnlaces({ carpeta: 'https://a.com', asana: 'https://b.com' }).map((a) => [a.nombre, a.url])).toEqual([['Tu carpeta', 'https://a.com'], ['Calendario de contenido', 'https://b.com']]);
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, enlaces: { carpeta: 'https://drive.google.com/drive/folders/abc' } } });
+    expect('doc' in r && r.doc.accesos).toEqual([{ nombre: 'Tu carpeta', url: 'https://drive.google.com/drive/folders/abc' }]);
+  });
+
+  it('accesos libres: orden de Juan, nombre libre, solo https, bloquea carpeta interna y ficha', () => {
+    const libres = { ...draft, accesos: [
+      { id: '1', nombre: 'Contenido en Asana', url: 'https://app.asana.com/x' },
+      { id: '2', nombre: 'Carpeta', url: 'https://drive.google.com/drive/folders/1AbCdEfGhIjK' },
+    ] };
+    const ok = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: libres });
+    expect('doc' in ok && ok.doc.accesos?.map((a) => a.nombre)).toEqual(['Contenido en Asana', 'Carpeta']);
+    expect('doc' in ok && ok.doc.enlaces).toEqual({});
+    const privado = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: libres, privados: ['https://drive.google.com/drive/u/0/folders/1AbCdEfGhIjK?usp=sharing'] });
+    expect('errors' in privado && privado.errors[0]).toContain('carpeta interna');
+    const http = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, accesos: [{ id: '1', nombre: 'Web', url: 'http://x.com' }] } });
+    expect('errors' in http && http.errors[0]).toContain('https');
+    expect(draftAccesos({ enlaces: {}, accesos: [] })).toEqual([]);
+  });
+
+  it('tareas simples: link opcional (solo https) y sin fecha no vencen', () => {
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft, tareas: publicTasks([
+      { id: '1', titulo: 'Con link', estado: 'habilitada', link: 'https://drive.google.com/x' },
+      { id: '2', titulo: 'Link raro', estado: 'habilitada', link: 'javascript:alert(1)' },
+    ]) });
+    expect('doc' in r && r.doc.tareas.map((t) => t.link)).toEqual(['https://drive.google.com/x', undefined]);
+    expect('doc' in r && r.doc.tareasHabilitadas).toEqual(['1', '2']);
+    expect(isOverdue({ estado: 'habilitada' }, '2026-11-03')).toBe(false);
+  });
+
+  it('el documento público nunca lleva montos ni pagos', () => {
+    const project = {
+      id: 'p', clientName: 'E', pafClienteId: 'PAF-002', pafPortal: draft,
+      montoAcordado: 400, estimatedPrice: 400, estimatedCurrency: 'USD', payments: [{ amount: 400 }], installments: [{ amount: 400 }],
+      billingAgreement: { amount: 400 }, notes: 'nota privada',
+    } as any;
+    const r = portalFromProject(project, []);
+    if (!('doc' in r)) throw new Error(r.errors.join());
+    const json = JSON.stringify(r.doc);
+    for (const k of ['monto', 'amount', 'price', 'payments', 'installments', 'billing', 'currency', 'nota privada']) expect(json.toLowerCase()).not.toContain(k.toLowerCase());
   });
 });

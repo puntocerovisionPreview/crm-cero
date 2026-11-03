@@ -41,7 +41,37 @@ export interface PafPortalDraft {
   hito: number; // 1 a 5
   resumen: string;
   enlaces: Partial<Record<PafPortalLinkKey, string>>;
+  /** Accesos directos libres (nombre y link, en este orden). Si no hay, salen de `enlaces`. */
+  accesos?: PafAccess[];
   publishedAt?: string;
+}
+
+/** Acceso directo del portal: Juan elige el nombre (ej. "Contenido en Asana") */
+export interface PafAccess {
+  id: string;
+  nombre: string;
+  url: string;
+}
+
+/** Anuncio de Juan (privado en el proyecto; el estudio ve los publicados) */
+export interface PafAnnouncement {
+  id: string;
+  texto: string;
+  titulo?: string;
+  link?: string;
+  fijado?: boolean;
+  publicado: boolean;
+  creadoEn: string; // ISO
+}
+
+/** Anuncio tal como lo ve el estudio */
+export interface PafPortalAnnouncement {
+  id: string;
+  texto: string;
+  titulo?: string;
+  link?: string;
+  fijado?: boolean;
+  fecha: string; // YYYY-MM-DD
 }
 
 /**
@@ -68,6 +98,8 @@ export interface PafTask {
   motivo?: string;
   /** La tarea pide subir archivos: el portal muestra el link a Materiales */
   pideArchivos?: boolean;
+  /** Link que el estudio abre para hacer la tarea (opcional) */
+  link?: string;
 }
 
 /** Entrega de Juan al estudio: archivo en Drive, se publica cuando él decide */
@@ -90,6 +122,7 @@ export interface PafPortalTask {
   habilitadaEn?: string; // para no mostrar como avisada una tarea que se volvió a habilitar
   motivo?: string; // por qué se volvió a habilitar
   pideArchivos?: boolean; // muestra el link a Materiales
+  link?: string; // link para hacer la tarea
 }
 
 /** Objetivo de la semana (sale de los objetivos del panel del estudio) */
@@ -122,6 +155,10 @@ export interface PafPortalDoc {
   semana?: { actual: number; total: number } | null;
   /** Resúmenes de reunión publicados (acuerdos y próximos pasos) */
   reuniones?: { fecha: string; acuerdos: string; proximosPasos: string }[];
+  /** Accesos directos, en el orden que eligió Juan */
+  accesos?: { nombre: string; url: string }[];
+  /** Anuncios publicados: fijados primero, después los más nuevos */
+  anuncios?: PafPortalAnnouncement[];
   actualizadoEn: string;
   /** Se publican aparte (ver PORTAL_SEPARATE_FIELDS): objetivos de la semana y WhatsApp de Juan */
   objetivos?: PafPortalGoal[];
@@ -174,7 +211,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; privados?: (string | undefined)[] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -186,14 +223,29 @@ export function buildPafPortal(
   const wrong = emails.filter((e) => !EMAIL_RE.test(e));
   if (wrong.length) errors.push(`Correo inválido: ${wrong.join(', ')}`);
 
+  // Los 5 enlaces fijos de antes: solo mientras no se pasaron a accesos libres
   const enlaces: PafPortalDoc['enlaces'] = {};
-  for (const key of PAF_PORTAL_LINK_KEYS) {
+  for (const key of input.draft.accesos ? [] : PAF_PORTAL_LINK_KEYS) {
     const raw = input.draft.enlaces[key]?.trim();
     if (!raw) continue;
     const url = safeHttpsUrl(raw);
     if (url && isPrivateUrl(url, input.privados)) errors.push(`"${PAF_PORTAL_LINK_LABEL[key]}" es la carpeta interna o la ficha: eso no lo puede ver el estudio.`);
     else if (url) enlaces[key] = url;
     else errors.push(`El enlace "${PAF_PORTAL_LINK_LABEL[key]}" tiene que empezar con https://`);
+  }
+
+  // Accesos directos libres (o los 5 enlaces de antes, si todavía no se editaron)
+  const accesos: { nombre: string; url: string }[] = [];
+  const fromOld = !input.draft.accesos; // los enlaces de antes ya se validaron arriba
+  for (const a of draftAccesos(input.draft)) {
+    const nombre = a.nombre.trim().slice(0, 60);
+    if (!nombre && !a.url.trim()) continue;
+    const url = safeHttpsUrl(a.url);
+    if (fromOld) { if (url && !isPrivateUrl(url, input.privados)) accesos.push({ nombre, url }); continue; }
+    if (!nombre) errors.push('Cada acceso necesita un nombre.');
+    else if (!url) errors.push(`El acceso "${nombre}" tiene que ser un link https://`);
+    else if (isPrivateUrl(url, input.privados)) errors.push(`"${nombre}" es la carpeta interna o la ficha: eso no lo puede ver el estudio.`);
+    else accesos.push({ nombre, url });
   }
 
   if (errors.length) return { errors };
@@ -206,12 +258,14 @@ export function buildPafPortal(
       hitoVisible: hito,
       resumenVisible: input.draft.resumen.trim().slice(0, 2000),
       enlaces,
-      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo, pideArchivos }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}), ...(pideArchivos ? { pideArchivos: true } : {}) })),
+      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo, pideArchivos, link }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}), ...(pideArchivos ? { pideArchivos: true } : {}), ...(link && safeHttpsUrl(link) ? { link: safeHttpsUrl(link)! } : {}) })),
       tareasHabilitadas: (input.tareas || []).filter((t) => t.estado === 'habilitada').map((t) => t.id),
       entregas: (input.entregas || []).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, ...(fecha ? { fecha } : {}), ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
       proximaReunion: input.proximaReunion || null,
       semana: input.semana || null,
       reuniones: input.reuniones || [],
+      accesos,
+      anuncios: input.anuncios || [],
       actualizadoEn: now,
     },
   };
@@ -232,6 +286,7 @@ export function publicTasks(tasks: PafTask[] = []): PafPortalTask[] {
       ...(t.habilitadaEn ? { habilitadaEn: t.habilitadaEn } : {}),
       ...(t.motivo && t.estado === 'habilitada' ? { motivo: t.motivo } : {}),
       ...(t.pideArchivos ? { pideArchivos: true } : {}),
+      ...(t.link ? { link: t.link } : {}),
       ...(t.estado === 'aprobada' && t.aprobacion ? { aprobadaEl: t.aprobacion.fecha.slice(0, 10) } : {}),
     }));
 }
@@ -253,7 +308,7 @@ export function nextMeeting(
 }
 
 export function portalFromProject(
-  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[] },
+  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[] },
   meetings: Parameters<typeof nextMeeting>[0],
   draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
   clienteId = project.pafClienteId,
@@ -272,6 +327,7 @@ export function portalFromProject(
       proximaReunion: nextMeeting(meetings, project.id, today),
       semana: programWeek(project.pafStartDate || project.startDate, today),
       reuniones: publicSummaries(project.pafResumenes),
+      anuncios: publicAnnouncements(project.pafAnuncios),
       privados: [project.pafDrive?.carpetaInterna, project.pafDrive?.ficha, ...privados],
     },
     now.toISOString()
@@ -454,16 +510,47 @@ export function isPrivateUrl(url: string, privados: (string | undefined)[] = [])
 }
 
 /** Lo que el estudio ve hoy difiere de lo que Juan tiene cargado (etapa, foco, correos, enlaces) */
-export function portalDirty(draft: PafPortalDraft, published: Pick<PafPortalDoc, 'emailsAutorizados' | 'hitoVisible' | 'resumenVisible' | 'enlaces'> | null | undefined): boolean {
+export function portalDirty(draft: PafPortalDraft, published: Pick<PafPortalDoc, 'emailsAutorizados' | 'hitoVisible' | 'resumenVisible' | 'enlaces' | 'accesos'> | null | undefined): boolean {
   if (!published) return false;
-  const links = (e: PafPortalDraft['enlaces']) =>
-    JSON.stringify(PAF_PORTAL_LINK_KEYS.map((k) => (e[k]?.trim() ? safeHttpsUrl(e[k]!) || e[k]!.trim() : '')));
+  const links = (list: { nombre: string; url: string }[]) =>
+    JSON.stringify(list.filter((a) => a.nombre.trim() || a.url.trim()).map((a) => [a.nombre.trim(), safeHttpsUrl(a.url) || a.url.trim()]));
   return (
     normalizeEmails(draft.emails).join(',') !== [...(published.emailsAutorizados || [])].join(',') ||
     Math.min(PRESENCIA_HITOS.length, Math.max(1, Math.round(draft.hito || 1))) !== published.hitoVisible ||
     draft.resumen.trim().slice(0, 2000) !== (published.resumenVisible || '') ||
-    links(draft.enlaces) !== links(published.enlaces || {})
+    links(draftAccesos(draft)) !== links(published.accesos ?? accessesFromEnlaces(published.enlaces || {}))
   );
+}
+
+// ---------- Portal libre: accesos directos y anuncios ----------
+
+/** Los 5 enlaces de antes como accesos directos (mismo nombre y orden) */
+export function accessesFromEnlaces(enlaces: Partial<Record<PafPortalLinkKey, string>>): PafAccess[] {
+  return PAF_PORTAL_LINK_KEYS.filter((k) => enlaces[k]?.trim()).map((k) => ({ id: `enlace-${k}`, nombre: PAF_PORTAL_LINK_LABEL[k], url: enlaces[k]!.trim() }));
+}
+
+/** Accesos del borrador: los libres si ya se editaron; si no, los 5 enlaces de antes (no se pierden) */
+export function draftAccesos(draft: Pick<PafPortalDraft, 'accesos' | 'enlaces'>): PafAccess[] {
+  return draft.accesos ?? accessesFromEnlaces(draft.enlaces || {});
+}
+
+/** Lo que ve el estudio: solo publicados, fijados arriba y después los más nuevos; links solo https */
+export function publicAnnouncements(items: PafAnnouncement[] = []): PafPortalAnnouncement[] {
+  return items
+    .filter((a) => a.publicado && a.texto.trim())
+    .sort((a, b) => Number(!!b.fijado) - Number(!!a.fijado) || b.creadoEn.localeCompare(a.creadoEn))
+    .slice(0, 20)
+    .map((a) => {
+      const link = a.link ? safeHttpsUrl(a.link) : null;
+      return {
+        id: a.id,
+        texto: a.texto.trim().slice(0, 1000),
+        fecha: a.creadoEn.slice(0, 10),
+        ...(a.titulo?.trim() ? { titulo: a.titulo.trim().slice(0, 120) } : {}),
+        ...(link ? { link } : {}),
+        ...(a.fijado ? { fijado: true } : {}),
+      };
+    });
 }
 
 /** Canal que se propone al aprobar: el último que usó Juan, o Portal */
