@@ -60,10 +60,7 @@ import { PaymentPlanManager } from '../components/PaymentPlanManager';
 import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
 import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
 import { PafPanelButton } from '../components/PafPanelButton';
-import { PafPortalCard } from '../components/PafPortalCard';
-import { PafAltaCard } from '../components/PafAltaCard';
-import { PafTareasCard } from '../components/PafTareasCard';
-import { PafReunionCard } from '../components/PafReunionCard';
+import { PafAdminPanel } from '../components/PafAdminPanel';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { 
   formatProjectPrice, 
@@ -879,14 +876,18 @@ export const ClientDetailView: React.FC<Props> = ({
           </div>
 
           {isPaf && <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-3">
-            <h2 className="text-sm font-bold text-zinc-100">Panel del cliente · Método PAF</h2>
-            <p className="text-xs text-zinc-400">Su plan de tres meses, tareas, contenido y sesiones. Entra con su enlace, sin contraseña.</p>
-            <StudentPortalLinkButton project={project} phone={project.clientPhone} onUpdateProject={onUpdateProject} />
-            <PafPanelButton project={project} onUpdateProject={onUpdateProject} />
-            <PafAltaCard project={project} onUpdateProject={onUpdateProject} />
-            <PafPortalCard project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
-            <PafReunionCard project={project} meetings={meetings} onAddMeeting={onAddMeeting} />
-            <PafTareasCard project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
+            <h2 className="text-sm font-bold text-zinc-100">Portal del estudio · Método PAF</h2>
+            <PafAdminPanel
+              key={project.id}
+              project={project}
+              meetings={meetings}
+              onUpdateProject={onUpdateProject}
+              onAddMeeting={onAddMeeting}
+              legacy={<div className="space-y-2">
+                <StudentPortalLinkButton project={project} phone={project.clientPhone} onUpdateProject={onUpdateProject} />
+                <PafPanelButton project={project} onUpdateProject={onUpdateProject} />
+              </div>}
+            />
           </div>}
           {/* Key Links Card */}
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-md">
