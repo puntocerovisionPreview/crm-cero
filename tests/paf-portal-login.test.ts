@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildPafPortal, emptyPortalDraft, normalizeEmails, type PafPortalDraft } from '../src/portal/model';
-import { CLIENTE_ID_RE, accessHost, accessIcon, accessIssue, suggestWebClienteId } from '../src/portal/model';
+import { CLIENTE_ID_RE, accessHost, accessIcon, accessIssue, calendarLink, normalizeLinkInput, portalDirty as dirtyOf, safeLogo, suggestWebClienteId } from '../src/portal/model';
 
 const draft: PafPortalDraft = {
   emails: ['Estudio@Gmail.com', 'estudio@gmail.com', 'socia@gmail.com'],
@@ -38,6 +38,9 @@ describe('portal PAF con login', () => {
       ],
       anuncios: [],
       mostrarAvance: true,
+      logo: null,
+      marca: null,
+      linkReunion: null,
       actualizadoEn: '2026-11-02T10:00:00.000Z',
     });
   });
@@ -407,11 +410,22 @@ describe('portal libre (fase 2): anuncios, tareas simples y accesos', () => {
     // Lo privado o mal cargado no se publica, pero no frena el resto del portal
     expect('doc' in privado && privado.doc.accesos?.map((a) => a.nombre)).toEqual(['Contenido en Asana']);
     expect(accessIssue(libres.accesos[1], ['https://drive.google.com/drive/u/0/folders/1AbCdEfGhIjK?usp=sharing'])).toContain('carpeta interna');
-    const http = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, accesos: [{ id: '1', nombre: 'Web', url: 'http://x.com' }, { id: '2', nombre: '', url: '' }] } });
-    expect('doc' in http && http.doc.accesos).toEqual([]);
-    expect(accessIssue({ nombre: 'Web', url: 'http://x.com' })).toContain('https');
-    expect(accessIssue({ nombre: '', url: 'https://x.com' })).toContain('nombre');
+    // Lo que se pega a mano se completa: https, y un nombre si no tiene
+    const pegados = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, accesos: [
+      { id: '1', nombre: 'Web', url: 'http://x.com' },
+      { id: '2', nombre: '', url: 'drive.google.com/drive/folders/1AbCdEfGhIjK' },
+      { id: '3', nombre: '', url: '' },
+      { id: '4', nombre: 'Roto', url: 'no es un link' },
+    ] } });
+    expect('doc' in pegados && pegados.doc.accesos).toEqual([
+      { nombre: 'Web', url: 'https://x.com/' },
+      { nombre: 'Carpeta de Drive', url: 'https://drive.google.com/drive/folders/1AbCdEfGhIjK' },
+    ]);
+    expect(accessIssue({ nombre: 'Web', url: 'http://x.com' })).toBeNull();
+    expect(accessIssue({ nombre: 'Roto', url: 'no es un link' })).toContain('link');
+    expect(accessIssue({ nombre: 'Algo', url: '' })).toContain('link');
     expect(accessIssue({ nombre: '', url: '' })).toBeNull();
+    expect(normalizeLinkInput('app.asana.com/0/1')).toBe('https://app.asana.com/0/1');
     expect(draftAccesos({ enlaces: {}, accesos: [] })).toEqual([]);
   });
 
@@ -426,6 +440,19 @@ describe('portal libre (fase 2): anuncios, tareas simples y accesos', () => {
     expect(accessIcon('Tu web', 'https://estudio.com.ar')).toBe('web');
     expect(accessIcon('Algo', '')).toBe('link');
     expect(accessHost('https://www.figma.com/file/x')).toBe('figma.com');
+  });
+
+  it('logo, color y reunión: solo lo seguro llega al portal', () => {
+    const logo = 'data:image/png;base64,iVBORw0KGgo=';
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...emptyPortalDraft('a@b.com'), logo, marca: '#C2410C', linkReunion: 'meet.google.com/abc-defg-hij' } });
+    expect('doc' in r && [r.doc.logo, r.doc.marca, r.doc.linkReunion]).toEqual([logo, '#c2410c', 'https://meet.google.com/abc-defg-hij']);
+    expect(safeLogo('data:text/html;base64,PHNjcmlwdD4=')).toBeNull();
+    expect(safeLogo(`data:image/png;base64,${'A'.repeat(210_000)}`)).toBeNull();
+    const bad = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...emptyPortalDraft('a@b.com'), marca: 'red; x', linkReunion: 'javascript:alert(1)' } });
+    expect('doc' in bad && [bad.doc.marca, bad.doc.linkReunion]).toEqual([null, null]);
+    expect(calendarLink({ fecha: '2026-11-10', hora: '10:30' }, 'Reunión', 'https://meet.google.com/x')).toContain('dates=20261110T103000%2F20261110T113000');
+    if ('doc' in r) expect(dirtyOf({ ...emptyPortalDraft('a@b.com'), logo, marca: '#c2410c', linkReunion: 'meet.google.com/abc-defg-hij' }, r.doc)).toBe(false);
+    if ('doc' in r) expect(dirtyOf({ ...emptyPortalDraft('a@b.com'), marca: '#c2410c', linkReunion: 'meet.google.com/abc-defg-hij' }, r.doc)).toBe(true);
   });
 
   it('clientes Web: ID WEB-### válido y el siguiente libre', () => {

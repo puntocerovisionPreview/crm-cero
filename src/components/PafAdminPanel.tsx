@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, Copy, ExternalLink, Eye, Loader2, Package, Radio, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, CircleAlert, Copy, ExternalLink, Eye, ImagePlus, Loader2, Package, Radio, Smartphone, Trash2, Undo2 } from 'lucide-react';
+import { shrinkLogo } from '../utils/logoImage';
 import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
-  accessHost, accessIssue, approveTask, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
+  accessHost, accessIssue, approveTask, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
   missingTemplateTasks, PAF_STAGE_TEMPLATES, suggestedChannel, type PafDelivery, type PafPedidoAlta, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
 } from '../portal/model';
 import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
@@ -63,6 +64,7 @@ const ADD_OPTIONS: { id: Exclude<Adding, null | 'acuerdo'>; label: string }[] = 
 export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, showAlta = true }) => {
   const [adding, setAdding] = useState<Adding>(null);
   const [editWeek, setEditWeek] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const portal = usePortalDraft(project, meetings, onUpdateProject, !showAlta);
   const work = usePafWork(project, meetings, onUpdateProject);
   const toReview = work.tasks.filter((t) => t.estado === 'enviada');
@@ -77,7 +79,9 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 
   return (
     <div className="space-y-5">
-      <PanelHeader portal={portal} studio={project.clientName} />
+      <PanelHeader portal={portal} studio={project.clientName} preview={showPreview} onTogglePreview={() => setShowPreview((v) => !v)} />
+      {showPreview && portal.published && <PortalPreview clienteId={portal.published.clienteId} />}
+      <BrandBlock portal={portal} studio={project.clientName} />
       {showAlta && <AltaStatus pedido={portal.pedido} carpeta={project.pafDrive?.carpetaCompartida} />}
 
       {/* Avance: etapa y si el cliente lo ve, en una línea */}
@@ -159,6 +163,9 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
               <input className={input} value={portal.emailsText} placeholder="estudio@gmail.com, socia@gmail.com" onChange={(e) => portal.setEmailsText(e.target.value)} />
             </label>
           </Block>
+          <Block title="Link de las reuniones" hint="Si usás siempre la misma sala de Meet o Zoom: el cliente la ve con un botón «Unirme».">
+            <input className={input} value={portal.draft.linkReunion || ''} placeholder="https://meet.google.com/abc-defg-hij" onChange={(e) => portal.set({ linkReunion: e.target.value })} />
+          </Block>
           <Block title="Tu WhatsApp" hint="Para el botón «Hablar con Juan». Es uno solo para todos los clientes.">
             <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
           </Block>
@@ -170,13 +177,92 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
           )}
         </div>
       </details>
+
+      <SaveBar portal={portal} />
     </div>
   );
 };
 
+// ---------- Guardar y publicar ----------
+
+/** Barra fija abajo: si el cliente ya ve lo último, o qué falta. El botón publica en el momento. */
+function SaveBar({ portal }: { portal: ReturnType<typeof usePortalDraft> }) {
+  const { published, pending, dirty, busy, errors, savedAt } = portal;
+  if (published === undefined) return null;
+  const hora = (d: Date) => d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  const last = savedAt || (published ? new Date(published.actualizadoEn) : null);
+  const state = errors.length ? { icon: <CircleAlert className="w-4 h-4 text-rose-300" />, text: 'No se publicó: revisá lo que dice arriba' }
+    : busy || pending ? { icon: <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />, text: 'Guardando…' }
+    : !published ? { icon: <Radio className="w-4 h-4 text-amber-300" />, text: 'Tu cliente todavía no ve nada' }
+    : dirty ? { icon: <CircleAlert className="w-4 h-4 text-amber-300" />, text: 'Hay cambios que tu cliente no ve' }
+    : { icon: <Check className="w-4 h-4 text-emerald-400" />, text: `Guardado · tu cliente lo ve desde las ${last ? hora(last) : ''}` };
+  return (
+    <div className="sticky bottom-24 z-10 flex items-center gap-3 rounded-xl border border-zinc-700 bg-zinc-900/95 px-3 py-2.5 shadow-lg shadow-black/40 backdrop-blur" role="status">
+      {state.icon}
+      <span className="flex-1 min-w-0 text-xs text-zinc-200">{state.text}</span>
+      <button type="button" onClick={portal.publish} disabled={busy} className="btn-solid-primary shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs">
+        {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{published ? 'Guardar y publicar' : 'Publicar portal'}
+      </button>
+    </div>
+  );
+}
+
+// ---------- Marca del cliente ----------
+
+function BrandBlock({ portal, studio }: { portal: ReturnType<typeof usePortalDraft>; studio: string }) {
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const { logo, marca } = portal.draft;
+  const upload = async (file?: File) => {
+    if (!file) return;
+    setError(''); setLoading(true);
+    try {
+      const r = await shrinkLogo(file);
+      portal.set({ logo: r.dataUrl, ...(r.color && !marca ? { marca: r.color } : {}) });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-zinc-800 p-3">
+      <button type="button" onClick={() => fileRef.current?.click()} className="relative flex w-14 h-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-zinc-700 bg-white/[0.03] hover:border-zinc-500" aria-label="Subir logo">
+        {loading ? <Loader2 className="w-4 h-4 animate-spin text-zinc-400" /> : logo ? <img src={logo} alt={`Logo de ${studio}`} className="max-w-full max-h-full object-contain p-1.5" /> : <ImagePlus className="w-5 h-5 text-zinc-500" />}
+      </button>
+      <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="hidden" onChange={(e) => upload(e.target.files?.[0])} />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-semibold text-zinc-100">Marca del cliente</p>
+        <p className="text-[11px] text-zinc-500">{logo ? 'Aparece arriba en su portal y en la pestaña.' : 'Subí su logo: se achica solo y le da su identidad al portal.'}</p>
+        {error && <p role="alert" className="text-[11px] text-rose-300">{error}</p>}
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+          <button type="button" onClick={() => fileRef.current?.click()} className="font-bold text-zinc-300 hover:text-zinc-100">{logo ? 'Cambiar logo' : 'Subir logo'}</button>
+          {logo && <button type="button" onClick={() => portal.set({ logo: undefined })} className="text-zinc-500 hover:text-rose-300">Quitar</button>}
+          <label className="ml-auto inline-flex items-center gap-1.5 text-zinc-400">
+            Color
+            <input type="color" value={marca || '#a1a1aa'} onChange={(e) => portal.set({ marca: e.target.value })} className="w-6 h-6 cursor-pointer rounded border border-zinc-700 bg-transparent p-0" aria-label="Color de su marca" />
+          </label>
+          {marca && <button type="button" onClick={() => portal.set({ marca: undefined })} className="text-zinc-500 hover:text-zinc-300">Sin color</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** El portal tal como lo ve el cliente, en vivo, dentro de la ficha */
+function PortalPreview({ clienteId }: { clienteId: string }) {
+  return (
+    <div className="mx-auto w-full max-w-[400px] overflow-hidden rounded-[28px] border-[6px] border-zinc-800 bg-black shadow-2xl">
+      <iframe title="Vista previa del portal" src={`/portal?ver=${encodeURIComponent(clienteId)}&marco=1`} className="block w-full h-[640px] bg-white" />
+    </div>
+  );
+}
+
 // ---------- Encabezado ----------
 
-function PanelHeader({ portal, studio }: { portal: ReturnType<typeof usePortalDraft>; studio: string }) {
+function PanelHeader({ portal, studio, preview, onTogglePreview }: { portal: ReturnType<typeof usePortalDraft>; studio: string; preview: boolean; onTogglePreview: () => void }) {
   const { published } = portal;
   const viewUrl = published ? `/portal?ver=${encodeURIComponent(published.clienteId)}` : '';
   const updated = published ? new Date(published.actualizadoEn) : null;
@@ -224,6 +310,11 @@ function PanelHeader({ portal, studio }: { portal: ReturnType<typeof usePortalDr
             <Eye className="w-3.5 h-3.5" /> Ver como cliente
           </a>
         )}
+        {published && (
+          <button type="button" onClick={onTogglePreview} aria-pressed={preview} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${preview ? 'bg-zinc-100 text-zinc-950' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'}`}>
+            <Smartphone className="w-3.5 h-3.5" /> {preview ? 'Cerrar vista previa' : 'Vista previa'}
+          </button>
+        )}
         <button type="button" onClick={portal.copyLink} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 text-xs font-bold">
           <Copy className="w-3.5 h-3.5" /> Copiar enlace
         </button>
@@ -257,6 +348,9 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [notice, setNotice] = useState('');
+  // Cambios esperando el guardado automático, y la última vez que el cliente recibió algo
+  const [pending, setPending] = useState(false);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   const savedId = project.pafClienteId && CLIENTE_ID_RE.test(project.pafClienteId) ? project.pafClienteId : '';
   useEffect(() => {
@@ -290,19 +384,21 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   // Guardado automático en la ficha (no publica)
   const current = useMemo(() => ({ ...draft, emails: normalizeEmails(emailsText) }), [draft, emailsText]);
   // Solo guarda si algo cambió de verdad (abrir la ficha no escribe nada)
-  const snapshot = (d: PafPortalDraft) => JSON.stringify([d.emails, d.hito, d.resumen, d.enlaces, d.accesos ?? null, d.mostrarAvance ?? null]);
+  const snapshot = (d: PafPortalDraft) => JSON.stringify([d.emails, d.hito, d.resumen, d.enlaces, d.accesos ?? null, d.mostrarAvance ?? null, d.logo ?? null, d.marca ?? null, d.linkReunion ?? null]);
   const lastSaved = useRef(snapshot(current));
   useEffect(() => {
     const snap = snapshot(current);
-    if (snap === lastSaved.current) return;
+    if (snap === lastSaved.current) { setPending(false); return; }
+    setPending(true);
     const t = setTimeout(() => {
       lastSaved.current = snap;
+      setPending(false);
       onUpdateProject(project.id, { pafPortal: { ...current, publishedAt: project.pafPortal?.publishedAt } });
       // Si el portal ya está publicado, el cambio se publica solo (sin "Publicar cambios")
       if (published) {
         const r = portalFromProject(project, meetings, current, clienteId, new Date(), privados);
         if ('errors' in r) setErrors(r.errors);
-        else { setErrors([]); publishPafPortal(r.doc).catch(() => setErrors(['Se guardó, pero no se pudo actualizar el portal. Reintentá.'])); }
+        else { setErrors([]); publishPafPortal(r.doc).then(() => setSavedAt(new Date())).catch(() => setErrors(['Se guardó, pero no se pudo actualizar el portal. Tocá «Guardar y publicar».'])); }
       }
     }, 800);
     return () => clearTimeout(t);
@@ -334,7 +430,8 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
       await publishPafPortal(result.doc);
       await publishPortalExtras(result.doc.clienteId, { objetivos: portalGoals(panel?.goals), contacto: { whatsapp: config.whatsapp || '' } });
       onUpdateProject(project.id, { pafClienteId: result.doc.clienteId, pafPortal: { ...current, publishedAt: result.doc.actualizadoEn } });
-      setNotice(published ? 'Cambios publicados.' : 'Publicado. Copiá el enlace y pasáselo por tu canal.');
+      lastSaved.current = snapshot(current); setPending(false); setSavedAt(new Date());
+      setNotice(published ? '' : 'Publicado. Copiá el enlace y pasáselo por tu canal.');
     } catch {
       setErrors(['No se pudo publicar. Revisá la conexión y reintentá.']);
     } finally {
@@ -364,7 +461,7 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
 
   return {
     draft, set, emailsText, setEmailsText, clienteId, setClienteId, published,
-    pedido, privados, dirty: portalDirty(current, published), busy, errors, notice, publish, unpublish, copyLink,
+    pedido, privados, pending, savedAt, dirty: portalDirty(current, published, privados), busy, errors, notice, publish, unpublish, copyLink,
     whatsapp: config.whatsapp || '',
     saveWhatsapp: async (raw: string) => {
       const whatsapp = whatsappDigits(raw);
@@ -619,17 +716,18 @@ function AccessEditor({ items, onChange, startAdding, privados }: { items: Acces
       <ul className="grid gap-2 sm:grid-cols-2">
         {items.map((a, i) => {
           const issue = accessIssue(a, privados);
-          const host = accessHost(a.url);
+          const fixed = normalizeLinkInput(a.url);
+          const host = accessHost(fixed);
           return (
             <li key={a.id} className={`group rounded-xl border p-2.5 transition ${issue ? 'border-amber-400/40 bg-amber-400/[0.04]' : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700'}`}>
               <div className="flex items-start gap-2.5">
                 <span className={`flex w-9 h-9 shrink-0 items-center justify-center rounded-lg ${issue ? 'bg-zinc-800 text-zinc-500' : 'bg-zinc-100 text-zinc-950'}`}>
-                  <AccessIcon nombre={a.nombre} url={a.url} />
+                  <AccessIcon nombre={a.nombre} url={fixed} />
                 </span>
                 <div className="flex-1 min-w-0 space-y-1">
                   <input className="w-full bg-transparent text-xs font-semibold text-zinc-100 placeholder:text-zinc-600 outline-none" value={a.nombre} placeholder="Nombre (ej. Calendario de contenido)" aria-label="Nombre del acceso" onChange={(e) => set(a.id, { nombre: e.target.value })} />
                   <input className="w-full bg-transparent text-[11px] text-zinc-400 placeholder:text-zinc-600 outline-none" value={a.url} placeholder="Pegá el link https://" aria-label={`Link de ${a.nombre || 'acceso'}`} onChange={(e) => set(a.id, { url: e.target.value })} />
-                  <p className={`text-[10px] ${issue ? 'text-amber-300' : 'text-zinc-500'}`}>{issue || `${host} · lo ve el cliente`}</p>
+                  <p className={`text-[10px] ${issue ? 'text-amber-300' : 'text-zinc-500'}`}>{issue || (a.url.trim() ? `${host}${a.nombre.trim() ? '' : ` · se ve como «${defaultAccessName(fixed)}»`}` : 'Pegá el link: el ícono sale solo')}</p>
                 </div>
                 <div className="flex flex-col items-center gap-0.5 text-zinc-500">
                   <button type="button" aria-label="Subir" disabled={i === 0} onClick={() => move(i, -1)} className="hover:text-zinc-200 disabled:opacity-30"><ArrowUp className="w-3.5 h-3.5" /></button>

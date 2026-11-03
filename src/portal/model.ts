@@ -45,6 +45,12 @@ export interface PafPortalDraft {
   accesos?: PafAccess[];
   /** Mostrar la etapa, la barra y el paso a paso en el portal (por defecto sí) */
   mostrarAvance?: boolean;
+  /** Logo del estudio, ya achicado (data:image/…;base64) */
+  logo?: string;
+  /** Color de su marca (#rrggbb), para detalles del portal */
+  marca?: string;
+  /** Link fijo de las reuniones (Meet o Zoom) */
+  linkReunion?: string;
   publishedAt?: string;
 }
 
@@ -163,6 +169,9 @@ export interface PafPortalDoc {
   anuncios?: PafPortalAnnouncement[];
   /** Si es false, el portal oculta la etapa, la barra y el paso a paso */
   mostrarAvance?: boolean;
+  logo?: string | null;
+  marca?: string | null;
+  linkReunion?: string | null;
   actualizadoEn: string;
   /** Se publican aparte (ver PORTAL_SEPARATE_FIELDS): objetivos de la semana y WhatsApp de Juan */
   objetivos?: PafPortalGoal[];
@@ -240,12 +249,7 @@ export function buildPafPortal(
 
   // Accesos directos libres (o los 5 enlaces de antes, si todavía no se editaron)
   const accesos: { nombre: string; url: string }[] = [];
-  for (const a of draftAccesos(input.draft)) {
-    const nombre = a.nombre.trim().slice(0, 60);
-    const url = safeHttpsUrl(a.url);
-    // Un acceso a medio cargar o privado no se publica, pero no frena lo demás (la ficha lo marca con accessIssue)
-    if (nombre && url && !isPrivateUrl(url, input.privados)) accesos.push({ nombre, url });
-  }
+  accesos.push(...publishableAccesos(draftAccesos(input.draft), input.privados));
 
   if (errors.length) return { errors };
   const hito = Math.min(PRESENCIA_HITOS.length, Math.max(1, Math.round(input.draft.hito || 1)));
@@ -266,6 +270,9 @@ export function buildPafPortal(
       accesos,
       anuncios: input.anuncios || [],
       mostrarAvance: input.draft.mostrarAvance !== false,
+      logo: safeLogo(input.draft.logo),
+      marca: safeColor(input.draft.marca),
+      linkReunion: input.draft.linkReunion ? safeHttpsUrl(normalizeLinkInput(input.draft.linkReunion)) : null,
       actualizadoEn: now,
     },
   };
@@ -510,15 +517,17 @@ export function isPrivateUrl(url: string, privados: (string | undefined)[] = [])
 }
 
 /** Lo que el estudio ve hoy difiere de lo que Juan tiene cargado (etapa, foco, correos, enlaces) */
-export function portalDirty(draft: PafPortalDraft, published: Pick<PafPortalDoc, 'emailsAutorizados' | 'hitoVisible' | 'resumenVisible' | 'enlaces' | 'accesos'> | null | undefined): boolean {
+export function portalDirty(draft: PafPortalDraft, published: Pick<PafPortalDoc, 'emailsAutorizados' | 'hitoVisible' | 'resumenVisible' | 'enlaces' | 'accesos' | 'logo' | 'marca' | 'linkReunion' | 'mostrarAvance'> | null | undefined, privados: (string | undefined)[] = []): boolean {
   if (!published) return false;
-  const links = (list: { nombre: string; url: string }[]) =>
-    JSON.stringify(list.filter((a) => a.nombre.trim() || a.url.trim()).map((a) => [a.nombre.trim(), safeHttpsUrl(a.url) || a.url.trim()]));
   return (
+    (safeLogo(draft.logo) ?? null) !== (published.logo ?? null) ||
+    (safeColor(draft.marca) ?? null) !== (published.marca ?? null) ||
+    (draft.linkReunion ? safeHttpsUrl(normalizeLinkInput(draft.linkReunion)) : null) !== (published.linkReunion ?? null) ||
+    (draft.mostrarAvance !== false) !== (published.mostrarAvance !== false) ||
+    JSON.stringify(publishableAccesos(draftAccesos(draft), privados)) !== JSON.stringify((published.accesos ?? accessesFromEnlaces(published.enlaces || {})).map(({ nombre, url }) => ({ nombre, url }))) ||
     normalizeEmails(draft.emails).join(',') !== [...(published.emailsAutorizados || [])].join(',') ||
     Math.min(PRESENCIA_HITOS.length, Math.max(1, Math.round(draft.hito || 1))) !== published.hitoVisible ||
-    draft.resumen.trim().slice(0, 2000) !== (published.resumenVisible || '') ||
-    links(draftAccesos(draft)) !== links(published.accesos ?? accessesFromEnlaces(published.enlaces || {}))
+    draft.resumen.trim().slice(0, 2000) !== (published.resumenVisible || '')
   );
 }
 
@@ -749,10 +758,9 @@ export function suggestWebClienteId(usedIds: string[]): string {
 
 /** Qué le falta a un acceso para publicarse (se muestra al lado de la fila) */
 export function accessIssue(a: { nombre: string; url: string }, privados: (string | undefined)[] = []): string | null {
-  if (!a.nombre.trim() && !a.url.trim()) return null;
-  if (!a.nombre.trim()) return 'Ponele un nombre para que se publique';
-  const url = safeHttpsUrl(a.url);
-  if (!url) return 'Pegá un link que empiece con https://';
+  if (!a.url.trim()) return a.nombre.trim() ? 'Falta pegar el link' : null;
+  const url = safeHttpsUrl(normalizeLinkInput(a.url));
+  if (!url) return 'Ese link no se puede abrir: copialo de nuevo desde el navegador';
   if (isPrivateUrl(url, privados)) return 'Es la carpeta interna o la ficha: no se publica';
   return null;
 }
@@ -785,4 +793,70 @@ export function accessIcon(nombre: string, url = ''): AccessIconKey {
   if (at('drive.google.com', 'dropbox.com') || has('carpeta', 'drive', 'archivos')) return 'drive';
   if (has(' web', 'sitio', 'página', 'pagina', 'landing', 'tienda')) return 'web';
   return host ? 'web' : 'link';
+}
+
+/** "drive.google.com/…" o "http://…" → "https://…" (lo que se pega a mano suele venir sin https) */
+export function normalizeLinkInput(raw: string): string {
+  const v = raw.trim();
+  if (/^http:\/\//i.test(v)) return `https://${v.slice(7)}`;
+  if (!/^[a-z][a-z0-9+.-]*:/i.test(v) && /^[\w-]+(\.[\w-]+)+(\/|$|\?)/.test(v)) return `https://${v}`;
+  return v;
+}
+
+const ICON_NAME: Record<AccessIconKey, string> = {
+  drive: 'Carpeta de Drive', doc: 'Documento', sheet: 'Planilla', calendar: 'Calendario de contenido', web: '', instagram: 'Instagram',
+  video: 'Video', design: 'Diseño', chart: 'Resultados', image: 'Imágenes', chat: 'WhatsApp', meet: 'Reunión', link: 'Enlace',
+};
+
+/** Nombre para un acceso que se cargó solo con el link */
+export function defaultAccessName(url: string): string {
+  return ICON_NAME[accessIcon('', url)] || accessHost(url) || 'Enlace';
+}
+
+/** Lo que de verdad se publica: link completado, nombre por defecto y nada privado */
+export function publishableAccesos(list: { nombre: string; url: string }[], privados: (string | undefined)[] = []): { nombre: string; url: string }[] {
+  const out: { nombre: string; url: string }[] = [];
+  for (const a of list) {
+    const url = a.url.trim() ? safeHttpsUrl(normalizeLinkInput(a.url)) : null;
+    if (!url || isPrivateUrl(url, privados)) continue;
+    out.push({ nombre: a.nombre.trim().slice(0, 60) || defaultAccessName(url), url });
+  }
+  return out;
+}
+
+const LOGO_RE = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
+/** Logo chico y en formato de imagen; si no, no se publica */
+export function safeLogo(v?: string | null): string | null {
+  return v && v.length <= 200_000 && LOGO_RE.test(v) ? v : null;
+}
+export function safeColor(v?: string | null): string | null {
+  return v && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null;
+}
+
+/** Link para sumar la reunión a Google Calendar (lo abre el cliente) */
+export function calendarLink(r: { fecha: string; hora?: string }, title: string, link?: string | null): string {
+  const d = r.fecha.replace(/-/g, '');
+  let dates = `${d}/${d}`;
+  if (r.hora) {
+    const [h, m] = r.hora.split(':').map(Number);
+    const start = `${d}T${String(h).padStart(2, '0')}${String(m || 0).padStart(2, '0')}00`;
+    const end = `${d}T${String(Math.min(23, h + 1)).padStart(2, '0')}${String(m || 0).padStart(2, '0')}00`;
+    dates = `${start}/${end}`;
+  } else {
+    const next = new Date(`${r.fecha}T12:00:00Z`); next.setUTCDate(next.getUTCDate() + 1);
+    dates = `${d}/${next.toISOString().slice(0, 10).replace(/-/g, '')}`;
+  }
+  const q = new URLSearchParams({ action: 'TEMPLATE', text: title, dates, ctz: 'America/Argentina/Buenos_Aires', ...(link ? { details: `Link: ${link}`, location: link } : {}) });
+  return `https://calendar.google.com/calendar/render?${q.toString()}`;
+}
+
+/** Claves de lo que hay en el portal, para marcar "Nuevo" lo que no vio la última vez */
+export function portalItemKeys(p: Pick<PafPortalDoc, 'anuncios' | 'tareas' | 'entregas' | 'accesos' | 'enlaces' | 'reuniones'>): string[] {
+  return [
+    ...(p.anuncios || []).map((a) => `a:${a.id}`),
+    ...(p.tareas || []).filter((t) => t.estado === 'habilitada').map((t) => `t:${t.id}:${t.habilitadaEn || ''}`),
+    ...(p.entregas || []).map((e) => `e:${e.id}`),
+    ...(p.accesos ?? accessesFromEnlaces(p.enlaces || {})).map((a) => `l:${a.url}`),
+    ...(p.reuniones || []).map((r) => `r:${r.fecha}`),
+  ];
 }
