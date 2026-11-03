@@ -44,6 +44,7 @@ import { getMissionsConfig, saveMissionsConfig, MissionsConfig } from '../utils/
 import { DEFAULT_USD_RATE, USD_RATE_SOURCE_LABELS, UsdRateSource } from '../utils/currency';
 import { AutomationSettings } from '../components/AutomationSettings';
 import { AppHealthPanel } from '../components/AppHealthPanel';
+import { GoogleCalendarSettingsCard } from '../components/GoogleCalendarSettingsCard';
 import { Activity, Zap } from 'lucide-react';
 
 interface Props {
@@ -406,6 +407,8 @@ export const AjustesView: React.FC<Props> = ({
                 </div>
               </div>
             )}
+
+            <GoogleCalendarSettingsCard />
 
             <p className="text-xs text-[var(--text-secondary)] mb-2">
               Configurá todos los módulos, preferencias visuales, datos bancarios y copias de seguridad de tu CRM .Cero.
