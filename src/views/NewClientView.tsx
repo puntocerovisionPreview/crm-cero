@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Check, Copy, Loader2, MessageCircle } from 'lucide-react';
 import type { AgendaMeeting, Project } from '../types';
-import { buildNewClientProject, validateNewClient, type BillingMode, type NewClientForm } from '../utils/newClient';
+import { buildNewClientProject, validateNewClient, type BillingMode, type NewClientForm, businessDaysAfter } from '../utils/newClient';
 import { buildPedidoAlta, portalFromProject, type PafPortalDraft } from '../portal/model';
 import { createPedidoAlta, publishPafPortal, suggestNextClienteId } from '../portal/store';
 import { getTodayString } from '../utils/storage';
@@ -64,7 +64,10 @@ export const NewClientView: React.FC<{
       const res: Result = { projectId, estudio: form.estudio.trim(), whatsapp: form.whatsapp.replace(/\D/g, ''), warnings };
 
       if (reunion.fecha) {
-        onAddMeeting({ title: `Reunión · ${form.estudio.trim()}`, date: reunion.fecha, time: reunion.hora || undefined, durationHours: 1, completed: false, projectId, projectName: form.estudio.trim() });
+        onAddMeeting({ title: `${isPaf ? 'Reunión de arranque' : 'Reunión'} · ${form.estudio.trim()}`, date: reunion.fecha, time: reunion.hora || undefined, durationHours: isPaf ? 1.5 : 1, completed: false, projectId, projectName: form.estudio.trim() });
+      } else if (isPaf) {
+        // Sin fecha: queda propuesta (no va a Calendar ni al portal hasta que le pongas día y hora)
+        onAddMeeting({ title: `Reunión de arranque · ${form.estudio.trim()}`, date: businessDaysAfter(new Date().toLocaleDateString('en-CA'), 3), durationHours: 1.5, proposed: true, completed: false, projectId, projectName: form.estudio.trim() });
       }
 
       if (isPaf) {
@@ -223,6 +226,13 @@ function SendThis({ result: r, onOpen }: { result: Result; onOpen: () => void })
       ) : <p className="text-sm text-[var(--text-secondary)]">No hay nada para mandarle todavía.</p>}
 
       {r.warnings.length > 0 && <ul className="space-y-1 text-sm text-amber-600">{r.warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
+
+      {r.clienteId && (
+        <section className="card-swiss p-5 space-y-1.5">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)]">Ya le dejamos el arranque cargado</h2>
+          <p className="text-sm text-[var(--text-secondary)]">Las 3 tareas de la etapa 1 (ocultas), un anuncio de bienvenida (sin publicar) y la reunión de arranque. Revisalos en su ficha y habilitalos cuando quieras: hasta entonces, el cliente no los ve.</p>
+        </section>
+      )}
 
       <button type="button" onClick={onOpen} className="btn-solid-primary w-full px-4 py-3 text-sm">Ir a la ficha</button>
     </div>

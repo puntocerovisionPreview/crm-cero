@@ -56,3 +56,41 @@ describe('alta en una pantalla: precio libre', () => {
     for (const k of ['400', 'retainer', 'recurring', 'installments', 'amount', 'cliente referido']) expect(json).not.toContain(k);
   });
 });
+
+import { businessDaysAfter } from '../src/utils/newClient';
+import { accesosDelAlta } from '../src/portal/model';
+
+describe('arranque cargado y carpetas del alta', () => {
+  it('un PAF nuevo trae las tareas de la etapa 1 ocultas y la bienvenida sin publicar', () => {
+    const p = buildNewClientProject({ ...base, tipo: 'paf' } as NewClientForm, new Date('2026-11-03T12:00:00Z'));
+    expect(p.pafTareas?.map((t) => t.estado)).toEqual(['borrador', 'borrador', 'borrador']);
+    expect(p.pafTareas?.[0].titulo).toBe('Completar el formulario de arranque');
+    expect(p.pafAnuncios).toHaveLength(1);
+    expect(p.pafAnuncios?.[0]).toMatchObject({ titulo: 'Bienvenida', publicado: false, fijado: true });
+  });
+
+  it('un cliente Web no trae el arranque PAF', () => {
+    const p = buildNewClientProject({ ...base, tipo: 'web' } as NewClientForm);
+    expect(p.pafTareas).toBeUndefined();
+    expect(p.pafAnuncios).toBeUndefined();
+  });
+
+  it('la reunión de arranque se propone a 3 días hábiles', () => {
+    expect(businessDaysAfter('2026-11-03', 3)).toBe('2026-11-06'); // martes → viernes
+    expect(businessDaysAfter('2026-11-05', 3)).toBe('2026-11-10'); // jueves → martes
+  });
+
+  it('las carpetas del alta se suman a los accesos sin repetir', () => {
+    let n = 0;
+    const id = () => `x${++n}`;
+    const alta = { carpetaCompartida: 'https://drive.google.com/drive/folders/1AbCdEfGhIjK', materiales: 'https://drive.google.com/drive/folders/2ZyXwVuTsRqP' };
+    expect(accesosDelAlta([], alta, id)).toEqual([
+      { id: 'x1', nombre: 'Tu carpeta', url: alta.carpetaCompartida },
+      { id: 'x2', nombre: 'Materiales', url: alta.materiales },
+    ]);
+    const yaEsta = [{ id: 'a', nombre: 'Carpeta', url: 'https://drive.google.com/drive/u/0/folders/1AbCdEfGhIjK?usp=sharing' }];
+    expect(accesosDelAlta(yaEsta, alta, id)?.map((a) => a.nombre)).toEqual(['Carpeta', 'Materiales']);
+    expect(accesosDelAlta(yaEsta, { carpetaCompartida: alta.carpetaCompartida }, id)).toBeNull();
+    expect(accesosDelAlta([], { carpetaCompartida: 'no es link' }, id)).toBeNull();
+  });
+});

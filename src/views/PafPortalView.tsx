@@ -327,6 +327,9 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
         {mostrarAvance && showStages && <StageDetail hito={hito} semana={p.semana} />}
       </header>
 
+      {/* Lo nuevo desde la última visita, en una línea: cada parte lleva a su lugar */}
+      {!showWelcome && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => setTab(t)} />}
+
       {showWelcome && <Welcome onClose={closeWelcome} hasWhatsapp={!!whatsapp} />}
 
       {/* Pestañas */}
@@ -644,6 +647,31 @@ function ProgressBar({ hito, semana }: { hito: number; semana?: PafPortalDoc['se
     <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-[var(--border-subtle)]" aria-hidden>
       <span className="block h-full rounded-full bg-[var(--marca,var(--text-primary))] transition-[width] duration-700" style={{ width: `${Math.min(100, Math.max(4, pct))}%` }} />
     </span>
+  );
+}
+
+/** "Desde tu última visita: 1 anuncio, 2 tareas nuevas y 1 entrega" (nada si no hay novedades) */
+function SinceLastVisit({ keys, onGo }: { keys: string[]; onGo: (tab: Tab) => void }) {
+  const n = (prefix: string) => keys.filter((k) => k.startsWith(prefix)).length;
+  const parts: { text: string; tab: Tab }[] = [
+    { count: n('a:'), one: '1 anuncio', many: 'anuncios', tab: 'inicio' as Tab },
+    { count: n('t:'), one: '1 tarea nueva', many: 'tareas nuevas', tab: 'tareas' as Tab },
+    { count: n('e:'), one: '1 entrega', many: 'entregas', tab: 'entregas' as Tab },
+    { count: n('l:'), one: '1 acceso', many: 'accesos', tab: 'archivos' as Tab },
+    { count: n('r:'), one: '1 resumen de reunión', many: 'resúmenes de reunión', tab: 'inicio' as Tab },
+  ].filter((x) => x.count > 0).map((x) => ({ text: x.count === 1 ? x.one : `${x.count} ${x.many}`, tab: x.tab }));
+  if (!parts.length) return null;
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 text-sm text-[var(--text-secondary)]" role="status">
+      <span className="mr-0.5 inline-block w-2 h-2 rounded-full bg-[var(--marca,var(--text-primary))]" aria-hidden />
+      <span>Desde tu última visita:</span>
+      {parts.map((x, i) => (
+        <React.Fragment key={x.text}>
+          {i > 0 && <span aria-hidden>{i === parts.length - 1 ? ' y ' : ', '}</span>}
+          <button type="button" onClick={() => onGo(x.tab)} className="font-medium text-[var(--text-primary)] underline decoration-[var(--border-strong)] underline-offset-4 hover:decoration-[var(--text-primary)]">{x.text}</button>
+        </React.Fragment>
+      ))}
+    </div>
   );
 }
 

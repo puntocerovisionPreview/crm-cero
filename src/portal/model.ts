@@ -403,6 +403,8 @@ export interface PafPedidoAlta {
     estado?: string;
     carpetaInterna?: string;
     carpetaCompartida?: string;
+    /** Subcarpeta Materiales de la compartida (si el script la devuelve) */
+    materiales?: string;
     ficha?: string;
     fechaRespuesta?: string;
     error?: string;
@@ -859,4 +861,17 @@ export function portalItemKeys(p: Pick<PafPortalDoc, 'anuncios' | 'tareas' | 'en
     ...(p.accesos ?? accessesFromEnlaces(p.enlaces || {})).map((a) => `l:${a.url}`),
     ...(p.reuniones || []).map((r) => `r:${r.fecha}`),
   ];
+}
+
+/**
+ * Accesos que se suman solos cuando el script devuelve las carpetas del alta:
+ * "Tu carpeta" y "Materiales", sin repetir los que ya están (por carpeta de Drive).
+ */
+export function accesosDelAlta(actuales: PafAccess[], alta: { carpetaCompartida?: string; materiales?: string } | undefined, newId: () => string): PafAccess[] | null {
+  const nuevos = [
+    { nombre: 'Tu carpeta', url: alta?.carpetaCompartida },
+    { nombre: 'Materiales', url: alta?.materiales },
+  ].filter((a): a is { nombre: string; url: string } => !!a.url && !!safeHttpsUrl(a.url))
+    .filter((a) => !actuales.some((x) => x.url && driveKey(x.url) === driveKey(a.url)));
+  return nuevos.length ? [...actuales, ...nuevos.map((a) => ({ id: newId(), nombre: a.nombre, url: safeHttpsUrl(a.url)! }))] : null;
 }

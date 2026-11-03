@@ -1,5 +1,23 @@
 import type { BillingInstallment, FlexiblePaymentCommitment, PafMilestone, Project, ProjectInstallment, RecurringIncomePlan } from '../types';
 import { PAF_BASE_MILESTONES, PAF_PRO_MILESTONES } from './pafTemplates';
+import { PAF_STAGE_TEMPLATES } from '../portal/model';
+
+/** Anuncio de bienvenida que se deja listo (sin publicar) en cada PAF nuevo */
+export const BIENVENIDA_PAF = {
+  titulo: 'Bienvenida',
+  texto: '¡Bienvenido a tu portal! Acá vas a ver en qué estamos, lo que necesitamos de vos y todo lo que te entregamos. Para arrancar, completá las tareas de abajo.',
+};
+
+/** Día hábil N días después (para proponer la reunión de arranque) */
+export function businessDaysAfter(date: string, days: number): string {
+  const d = new Date(`${date}T12:00:00`);
+  let left = days;
+  while (left > 0) {
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() !== 0 && d.getDay() !== 6) left--;
+  }
+  return d.toLocaleDateString('en-CA');
+}
 
 /**
  * ALTA EN UNA PANTALLA: arma la ficha a partir de lo que carga Juan.
@@ -126,5 +144,10 @@ export function buildNewClientProject(f: NewClientForm, now = new Date()): Omit<
     pafConsultingHoursDone: isPaf ? 0 : undefined,
     pafMilestones: milestones,
     startDate: today,
+    // Arranque listo para revisar: las tareas de la etapa 1 (ocultas) y la bienvenida (sin publicar)
+    ...(isPaf ? {
+      pafTareas: PAF_STAGE_TEMPLATES[1].tareas.map((t, i) => ({ ...t, id: `t_${stamp}_${i}`, estado: 'borrador' as const })),
+      pafAnuncios: [{ id: `a_${stamp}`, ...BIENVENIDA_PAF, publicado: false, fijado: true, creadoEn: now.toISOString() }],
+    } : {}),
   };
 }

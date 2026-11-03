@@ -142,4 +142,105 @@ function actualizarPedido_(nombreDoc, campos) {
 
 - La respuesta de Tally de PAF-008 que ya llegó con "Sin venta registrada" puede que no se vuelva a procesar. Para probar, mandá el formulario de nuevo con el mismo link.
 - Desde ahora, los IDs se crean **solo desde el CRM** (no desde el menú PAF), para que no se repitan.
-- Opcional, más adelante: que el script devuelva las carpetas al CRM (función `devolverCarpetasAlCRM` en `docs/PAF_FASE4_PLANES.md`), así no tenés que pegar los links a mano.
+- Que el script devuelva las carpetas al CRM: ver la parte 2, abajo.
+
+---
+
+# Parte 2: que el script devuelva las carpetas al CRM
+
+Ya aplicada la parte 1 (los pedidos quedan en `registrado`). Con esto, cuando el script crea las carpetas de un estudio, el CRM las recibe solo: marca "Carpetas listas" en el alta y agrega "Tu carpeta" y "Materiales" a los accesos del portal. No hace falta pegar links a mano.
+
+## Pedido para la extensión
+
+En el mismo Apps Script **"PAF — Alta de clientes"**:
+
+1. **Antes de tocar nada**, en la pestaña `Clientes` anotá los nombres exactos de las columnas de: ID, estado del alta, carpeta interna, carpeta compartida, ficha, fecha de respuesta y error del alta.
+2. En el archivo **`PedidosCRM.gs`** (el de la parte 1), pegá al final el código de abajo y ajustá `COLUMNAS_ALTA` con lo que anotaste. No modifiques nada más.
+3. Si el manifiesto `appsscript.json` no tiene `https://www.googleapis.com/auth/drive` ni `https://www.googleapis.com/auth/drive.readonly`, agregá `https://www.googleapis.com/auth/drive.readonly` (sirve para encontrar la subcarpeta Materiales). Si ya tiene alguno de los dos, no hace falta.
+4. Ejecutá **`devolverCarpetasAlCRM`** una vez a mano y aceptá los permisos.
+5. En **Activadores**, creá uno de tiempo: función `devolverCarpetasAlCRM`, cada 5 minutos.
+6. Contame qué dijo la ejecución: cuántos devolvió y si hubo errores.
+
+```javascript
+// ===== Devuelve al CRM las carpetas que creó el alta =====
+// Escribe SOLO el bloque "alta" de paf_pedidos_alta/{ID}, y solo si ese pedido existe
+// (las altas viejas hechas desde la Sheet se ignoran). No toca nada más del CRM.
+
+// AJUSTAR con los encabezados reales de la pestaña Clientes
+const COLUMNAS_ALTA = {
+  id: 'ID',
+  estado: 'ESTADO_ALTA',
+  carpetaInterna: 'CARPETA_INTERNA',
+  carpetaCompartida: 'CARPETA_COMPARTIDA',
+  ficha: 'FICHA',
+  fechaRespuesta: 'FECHA_RESPUESTA',
+  error: 'ERROR_ALTA',
+};
+
+/** Link de la subcarpeta "Materiales" dentro de la carpeta compartida ('' si no está) */
+function linkMateriales_(urlCompartida) {
+  try {
+    const m = String(urlCompartida).match(/folders\/([\w-]{10,})/);
+    if (!m) return '';
+    const sub = DriveApp.getFolderById(m[1]).getFoldersByName('Materiales');
+    return sub.hasNext() ? sub.next().getUrl() : '';
+  } catch (e) { return ''; }
+}
+
+function devolverCarpetasAlCRM() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return;
+  try {
+    const hoja = SpreadsheetApp.getActive().getSheetByName(HOJA_CLIENTES);
+    const datos = hoja.getDataRange().getValues();
+    const enc = datos.shift().map(function (h) { return String(h).trim(); });
+    const c = {};
+    Object.keys(COLUMNAS_ALTA).forEach(function (k) {
+      c[k] = enc.indexOf(COLUMNAS_ALTA[k]);
+      if (c[k] < 0 && (k === 'id' || k === 'carpetaCompartida')) throw new Error('Falta la columna "' + COLUMNAS_ALTA[k] + '" en ' + HOJA_CLIENTES);
+    });
+    const celda = function (fila, k) { return c[k] < 0 ? '' : fila[c[k]]; };
+    // No repetir lo que ya se mandó (se recuerda por ID + carpeta)
+    const props = PropertiesService.getScriptProperties();
+    const enviados = JSON.parse(props.getProperty('CRM_CARPETAS_ENVIADAS') || '{}');
+
+    let devueltos = 0, errores = 0;
+    datos.forEach(function (fila) {
+      const id = String(celda(fila, 'id')).trim();
+      const compartida = String(celda(fila, 'carpetaCompartida') || '').trim();
+      if (!/^PAF-(PRUEBA-)?\d{3,}$/.test(id) || !compartida) return;
+      if (enviados[id] === compartida) return;
+      const fecha = celda(fila, 'fechaRespuesta');
+      const alta = { mapValue: { fields: {
+        estado: { stringValue: String(celda(fila, 'estado') || '') },
+        carpetaInterna: { stringValue: String(celda(fila, 'carpetaInterna') || '') },
+        carpetaCompartida: { stringValue: compartida },
+        materiales: { stringValue: linkMateriales_(compartida) },
+        ficha: { stringValue: String(celda(fila, 'ficha') || '') },
+        fechaRespuesta: { stringValue: fecha ? new Date(fecha).toISOString() : '' },
+        error: { stringValue: String(celda(fila, 'error') || '') },
+      } } };
+      try {
+        fsFetch_(FS_URL + '/paf_pedidos_alta/' + encodeURIComponent(id) + '?updateMask.fieldPaths=alta&currentDocument.exists=true', {
+          method: 'patch', payload: JSON.stringify({ fields: { alta: alta } }),
+        });
+        enviados[id] = compartida;
+        devueltos++;
+      } catch (e) {
+        // 404: el pedido no existe en el CRM (alta vieja hecha desde la Sheet): se ignora
+        if (String(e.message).indexOf('Firestore 404') !== 0) { errores++; console.warn(id + ': ' + e.message); }
+        else enviados[id] = compartida;
+      }
+    });
+    props.setProperty('CRM_CARPETAS_ENVIADAS', JSON.stringify(enviados));
+    console.log('Carpetas devueltas al CRM: ' + devueltos + (errores ? ', con error: ' + errores : ''));
+  } finally {
+    lock.releaseLock();
+  }
+}
+```
+
+## Después
+
+- En el CRM, la ficha del estudio pasa a "Carpetas listas" y en Archivos aparecen solos "Tu carpeta" y "Materiales". Si el portal está publicado, el cliente los ve en segundos.
+- La carpeta interna y la ficha nunca se publican: el CRM las bloquea.

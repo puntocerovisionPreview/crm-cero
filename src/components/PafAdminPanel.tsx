@@ -5,7 +5,7 @@ import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
-  accessHost, accessIssue, approveTask, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
+  accessHost, accessIssue, accesosDelAlta, approveTask, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
   missingTemplateTasks, PAF_STAGE_TEMPLATES, suggestedChannel, type PafDelivery, type PafPedidoAlta, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
 } from '../portal/model';
 import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
@@ -128,13 +128,13 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 
       {/* Secciones del portal */}
       <div ref={sectionRef} className="scroll-mt-24 rounded-2xl border border-zinc-800 overflow-hidden">
-        <nav className="flex overflow-x-auto no-scrollbar border-b border-zinc-800 bg-zinc-950/50" aria-label="Secciones">
+        <nav className="grid grid-cols-3 sm:flex sm:overflow-x-auto no-scrollbar border-b border-zinc-800 bg-zinc-950/50" aria-label="Secciones">
           {(Object.keys(SECTION_INFO) as Section[]).map((s) => {
             const SIcon = SECTION_INFO[s].icon;
             const on = section === s;
             return (
               <button key={s} type="button" onClick={() => { setSection(s); setAdding(null); }} aria-current={on ? 'page' : undefined}
-                className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition ${on ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                className={`relative flex shrink-0 items-center justify-center sm:justify-start gap-1.5 px-3 py-2.5 text-xs font-semibold transition ${on ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}>
                 <SIcon className="w-3.5 h-3.5" />{SECTION_INFO[s].label}
                 {counts[s] ? <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${s === 'inicio' ? 'bg-amber-400/20 text-amber-300' : 'bg-zinc-800 text-zinc-400'}`}>{counts[s]}</span> : null}
                 {on && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-zinc-100" aria-hidden />}
@@ -482,6 +482,19 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   useEffect(() => {
     if (sharedFolder) setDraft((d) => (d.enlaces.carpeta ? d : { ...d, enlaces: { ...d.enlaces, carpeta: sharedFolder } }));
   }, [sharedFolder]);
+
+  // Cuando el script devuelve las carpetas del alta: quedan guardadas en la ficha y se suman
+  // solas a los accesos del portal. Pasa una sola vez (si después sacás un acceso, no vuelve)
+  const alta = pedido?.alta;
+  useEffect(() => {
+    if (!alta?.carpetaCompartida || project.pafDrive?.carpetaCompartida) return;
+    onUpdateProject(project.id, { pafDrive: { ...project.pafDrive, carpetaCompartida: alta.carpetaCompartida, ...(alta.carpetaInterna ? { carpetaInterna: alta.carpetaInterna } : {}), ...(alta.ficha ? { ficha: alta.ficha } : {}) } });
+    setDraft((d) => {
+      const next = accesosDelAlta(draftAccesos(d), alta, newItemId);
+      return next ? { ...d, accesos: next } : d;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alta?.carpetaCompartida, alta?.materiales]);
 
   // Guardado automático en la ficha (no publica)
   const current = useMemo(() => ({ ...draft, emails: normalizeEmails(emailsText) }), [draft, emailsText]);
@@ -851,6 +864,8 @@ function AltaStatus({ pedido, carpeta }: { pedido: PafPedidoAlta | null; carpeta
   if (!pedido?.enlaceFormulario) {
     return <p className="text-[11px] text-zinc-500">Alta: todavía sin link de Tally (Ajustes → Alta del estudio).</p>;
   }
+  const fallo = pedido.estado === 'error' ? pedido.error : pedido.alta?.error;
+  if (fallo) return <p role="alert" className="text-[11px] text-rose-300">Alta con error: {fallo}</p>;
   const respondio = !!pedido.alta?.fechaRespuesta;
   const carpetas = !!(pedido.alta?.carpetaCompartida || carpeta);
   const steps = [

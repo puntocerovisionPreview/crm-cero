@@ -206,7 +206,8 @@ function MeetingRow({ m, first, connected, clientEmails, onUpdateMeeting, onTogg
           <p className="text-[11px] text-zinc-400 capitalize">{d.toLocaleDateString('es-AR', { weekday: 'long' })}{m.time ? ` · ${m.time} hs` : ' · sin hora'}{m.durationHours ? ` · ${m.durationHours === 0.5 ? '30 min' : `${m.durationHours} h`}` : ''}</p>
           <InviteLine m={m} clientEmails={clientEmails} onInvite={onUpdateMeeting ? () => onUpdateMeeting(m.id, { invitados: clientEmails }) : undefined} />
           <p className="mt-0.5 text-[10px]">
-            {first && <span className="mr-2 text-sky-300">La ve el cliente</span>}
+            {m.proposed && <span className="mr-2 text-amber-300">Propuesta: tocá Mover y poné día y hora para confirmarla</span>}
+            {first && !m.proposed && <span className="mr-2 text-sky-300">La ve el cliente</span>}
             {m.googleEventId ? <span className="text-emerald-400">En tu Google Calendar</span>
               : connected ? <span className="text-zinc-500">Pasando a Calendar…</span>
               : <a href={googleCalendarLink(m)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-sky-300">Guardar en Calendar <ExternalLink className="w-3 h-3" /></a>}
@@ -220,7 +221,7 @@ function MeetingRow({ m, first, connected, clientEmails, onUpdateMeeting, onTogg
           <select className={`${field} w-24`} aria-label="Duración" value={f.durationHours} onChange={(e) => setF({ ...f, durationHours: Number(e.target.value) })}>
             <option value={0.5}>30 min</option><option value={1}>1 h</option><option value={1.5}>1 h 30</option><option value={2}>2 h</option>
           </select>
-          <button type="button" onClick={() => { onUpdateMeeting?.(m.id, { date: f.date, ...(f.time ? { time: f.time } : {}), durationHours: f.durationHours }); setEditing(false); }} className="btn-solid-primary px-3 py-1.5 text-xs">Guardar</button>
+          <button type="button" onClick={() => { onUpdateMeeting?.(m.id, { date: f.date, ...(f.time ? { time: f.time, proposed: false } : {}), durationHours: f.durationHours }); setEditing(false); }} className="btn-solid-primary px-3 py-1.5 text-xs">Guardar</button>
           <button type="button" onClick={() => setEditing(false)} className="text-[11px] text-zinc-400">Cancelar</button>
         </div>
       ) : (

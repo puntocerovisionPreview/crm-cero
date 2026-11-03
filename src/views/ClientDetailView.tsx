@@ -225,7 +225,16 @@ export const ClientDetailView: React.FC<Props> = ({
 
   // 5 Unified Tabs per Stage 3 spec: Resumen · Cobros · Trabajo · Notas · Horas
   type ClientTab = 'resumen' | 'historial' | 'cobros' | 'trabajo' | 'notas' | 'horas';
-  const [activeTab, setActiveTab] = useState<ClientTab>('cobros');
+  const [activeTab, setActiveTab] = useState<ClientTab>('resumen');
+  // Ficha en tres partes: Portal (lo que ve el cliente), Cobros y Cliente (contacto, trabajo y notas)
+  type FichaSection = 'portal' | 'cobros' | 'cliente';
+  const [fichaSection, setFichaSectionState] = useState<FichaSection>(() => {
+    try { return (localStorage.getItem('ficha_seccion') as FichaSection) || 'portal'; } catch { return 'portal'; }
+  });
+  const setFichaSection = (s: FichaSection) => {
+    setFichaSectionState(s);
+    try { localStorage.setItem('ficha_seccion', s); } catch { /* sin almacenamiento */ }
+  };
 
   // Collapsible sections inside Trabajo
   const [trabajoTareasOpen, setTrabajoTareasOpen] = useState(true);
@@ -616,8 +625,11 @@ export const ClientDetailView: React.FC<Props> = ({
     );
   }
 
+  const currentSection: FichaSection = fichaSection === 'portal' && !(isPaf || isWebClient) ? 'cliente' : fichaSection;
+  const shownTab: ClientTab = currentSection === 'cobros' ? 'cobros' : activeTab === 'cobros' ? 'resumen' : activeTab;
+
   return (
-    <div className="flex-1 flex flex-col min-h-0 bg-zinc-950 text-zinc-100 overflow-y-auto animate-in slide-in-from-right-4 duration-150">
+    <div className="flex-1 flex flex-col min-h-0 bg-zinc-950 text-zinc-100 animate-in slide-in-from-right-4 duration-150">
       {/* Top Mobile Bar / Desktop Breadcrumb Bar */}
       <div 
         style={{ paddingTop: 'max(0.75rem, calc(env(safe-area-inset-top, 0px) + 0.65rem))' }}
@@ -818,9 +830,27 @@ export const ClientDetailView: React.FC<Props> = ({
             </div>
           </div>
 
-          <ClientAdminStrip project={project} billing={billing} meetings={meetings} privacyMode={privacyMode} onRegisterPayment={() => { hapticFeedback.medium(); setEditingPayment(null); setShowRegisterPaymentModal(true); }} onWhatsappCobro={() => handleSendSmartWhatsApp()} />
+          {/* Las tres partes de la ficha */}
+          <nav className="sticky top-[calc(env(safe-area-inset-top,0px)+3.75rem)] z-10 grid grid-cols-3 gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/95 p-1 backdrop-blur-md" aria-label="Partes de la ficha">
+            {([
+              { id: 'portal' as FichaSection, label: 'Portal', icon: Globe, hidden: !(isPaf || isWebClient) },
+              { id: 'cobros' as FichaSection, label: 'Cobros', icon: DollarSign },
+              { id: 'cliente' as FichaSection, label: 'Cliente', icon: User },
+            ]).filter((t) => !t.hidden).map((t) => {
+              const Icon = t.icon;
+              const on = currentSection === t.id;
+              return (
+                <button key={t.id} type="button" aria-current={on ? 'page' : undefined} onClick={() => { hapticFeedback.light(); setFichaSection(t.id); }}
+                  className={`min-h-[40px] flex items-center justify-center gap-1.5 rounded-xl text-xs font-semibold transition ${on ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)]' : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200'}`}>
+                  <Icon className="w-3.5 h-3.5" />{t.label}
+                </button>
+              );
+            })}
+          </nav>
 
-          {(isPaf || isWebClient) && <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-3">
+          {currentSection === 'cobros' && <ClientAdminStrip project={project} billing={billing} meetings={meetings} privacyMode={privacyMode} onRegisterPayment={() => { hapticFeedback.medium(); setEditingPayment(null); setShowRegisterPaymentModal(true); }} onWhatsappCobro={() => handleSendSmartWhatsApp()} />}
+
+          {currentSection === 'portal' && <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-3">
             <h2 className="text-sm font-bold text-zinc-100">Lo que ve el cliente</h2>
             <PafAdminPanel
               key={project.id}
@@ -837,11 +867,10 @@ export const ClientDetailView: React.FC<Props> = ({
         </div>
 
         {/* ================= COLUMNA DERECHA (70% Scrollable) ================= */}
-        <details className="group rounded-2xl border border-zinc-800 bg-zinc-900/60">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-zinc-100">Más detalles: cobros, historial, trabajo, notas y horas</summary>
-        <main className="min-w-0 space-y-4 p-3 border-t border-zinc-800">
-          {/* Portal anterior por link: queda a mano hasta que todos pasen al portal nuevo */}
-          {(project.studentPortalToken || isWebClient) && (
+        {currentSection !== 'portal' && (
+        <main className="min-w-0 space-y-4">
+          {/* Portal anterior por link: solo si este cliente todavía lo tiene */}
+          {currentSection === 'cliente' && project.studentPortalToken && (
             <div className="rounded-xl border border-zinc-800 p-3 space-y-2">
               <p className="text-[11px] text-zinc-500">Portal anterior (por link). Sigue funcionando para quien ya lo usa.</p>
               {isPaf ? (
@@ -853,7 +882,7 @@ export const ClientDetailView: React.FC<Props> = ({
             </div>
           )}
           {/* Universal Timeline de Cuotas con Chips & Barra de Progreso */}
-          {activeTab === 'cobros' && (
+          {currentSection === 'cobros' && (
           <ClientInstallmentTimeline
             project={project}
             incomes={incomes}
@@ -872,18 +901,17 @@ export const ClientDetailView: React.FC<Props> = ({
           )}
 
           {/* Horizontal Tabs: 5 Unified Tabs per Stage 3 spec: Resumen · Cobros · Trabajo · Notas · Horas */}
-          <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-1.5 sticky top-16 z-10 backdrop-blur-md">
+          {currentSection === 'cliente' && <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-1.5">
             <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
               {[
                 { id: 'resumen' as ClientTab, label: 'Resumen', icon: Sparkles },
                 { id: 'historial' as ClientTab, label: 'Historial', icon: History },
-                { id: 'cobros' as ClientTab, label: 'Cobros', icon: DollarSign },
                 { id: 'trabajo' as ClientTab, label: `Trabajo (${clientTasks.length + clientMeetings.length})`, icon: CheckCircle2 },
                 { id: 'notas' as ClientTab, label: 'Notas & Links', icon: FileText },
                 { id: 'horas' as ClientTab, label: `Horas (${timeLogs.filter(t => t.projectId === project.id).length})`, icon: Clock },
               ].map(tab => {
                 const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
+                const isActive = shownTab === tab.id;
                 return (
                   <button
                     key={tab.id}
@@ -904,17 +932,17 @@ export const ClientDetailView: React.FC<Props> = ({
                 );
               })}
             </div>
-          </div>
+          </div>}
 
           {/* TAB CONTENTS (FADE-IN NO RELOAD) */}
           <div className="space-y-4">
             {/* 1. RESUMEN: 5-Second Executive Dashboard */}
             {/* Cliente nuevo sin tareas: tareas de arranque con un toque */}
-            {activeTab === 'resumen' && !project.isLead && !project.onboardingApplied && clientTasks.length === 0 && (
+            {shownTab === 'resumen' && !project.isLead && !project.onboardingApplied && clientTasks.length === 0 && (
               <OnboardingTemplateCard project={project} onAddTask={onAddTask} onUpdateProject={onUpdateProject} />
             )}
 
-            {activeTab === 'resumen' && (
+            {shownTab === 'resumen' && (
               <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-5 animate-in fade-in duration-150">
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -928,7 +956,7 @@ export const ClientDetailView: React.FC<Props> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setActiveTab('cobros')}
+                    onClick={() => setFichaSection('cobros')}
                     className="text-xs text-emerald-400 hover:underline font-semibold flex items-center gap-1"
                   >
                     <span>Ver detalle de cobros</span>
@@ -1189,7 +1217,7 @@ export const ClientDetailView: React.FC<Props> = ({
             )}
 
             {/* 2. COBROS: Unified Billing, Real Payments & Flexible Commitments */}
-            {activeTab === 'cobros' && (
+            {shownTab === 'cobros' && (
               <div className="space-y-6 animate-in fade-in duration-150">
                 {/* Puntualidad y Hábitos de Pago del Cliente */}
                 <ClientPaymentHabitsCard
@@ -1313,7 +1341,7 @@ export const ClientDetailView: React.FC<Props> = ({
             )}
 
             {/* 3. TRABAJO: 12 Semanas PAF o Entregables Web + Tareas & Reuniones vinculadas */}
-            {activeTab === 'trabajo' && (
+            {shownTab === 'trabajo' && (
               <div className="space-y-5 animate-in fade-in duration-150">
                 {isPaf && (
                   <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-6">
@@ -1596,12 +1624,12 @@ export const ClientDetailView: React.FC<Props> = ({
             )}
 
             {/* HISTORIAL: todo lo que pasó con el cliente */}
-            {activeTab === 'historial' && (
+            {shownTab === 'historial' && (
               <ClientTimeline project={project} tasks={tasks} meetings={meetings} privacyMode={privacyMode} onUpdateProject={onUpdateProject} onNewDocument={onNewDocument} />
             )}
 
             {/* 4. NOTAS & LINKS */}
-            {activeTab === 'notas' && (
+            {shownTab === 'notas' && (
             <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4"><ProjectKeyLinks
               links={project.keyLinks}
               onUpdateLinks={(links) => onUpdateProject(project.id, { keyLinks: links })}
@@ -1609,7 +1637,7 @@ export const ClientDetailView: React.FC<Props> = ({
             />
             </div>
           )}
-          {activeTab === 'notas' && (
+          {shownTab === 'notas' && (
               <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-4 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1694,7 +1722,7 @@ export const ClientDetailView: React.FC<Props> = ({
             )}
 
             {/* 5. HORAS & TIME TRACKING */}
-            {activeTab === 'horas' && (
+            {shownTab === 'horas' && (
               <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-4 animate-in fade-in duration-150">
                 <div>
                   <h3 className="text-sm font-bold text-zinc-100 flex items-center gap-2">
@@ -1719,7 +1747,7 @@ export const ClientDetailView: React.FC<Props> = ({
             )}
           </div>
         </main>
-        </details>
+        )}
       </div>
 
       {/* Confirmation Modal: Delete Project */}
