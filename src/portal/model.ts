@@ -64,6 +64,8 @@ export interface PafTask {
   habilitadaEn?: string;
   avisoEn?: string;
   aprobacion?: { fecha: string; canal: string };
+  /** Por qué Juan la volvió a habilitar (lo ve el estudio) */
+  motivo?: string;
 }
 
 /** Entrega de Juan al estudio: archivo en Drive, se publica cuando él decide */
@@ -84,6 +86,7 @@ export interface PafPortalTask {
   estado: 'habilitada' | 'enviada' | 'aprobada';
   aprobadaEl?: string; // YYYY-MM-DD
   habilitadaEn?: string; // para no mostrar como avisada una tarea que se volvió a habilitar
+  motivo?: string; // por qué se volvió a habilitar
 }
 export interface PafPortalDelivery {
   id: string;
@@ -133,7 +136,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion'] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; privados?: (string | undefined)[] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -150,7 +153,8 @@ export function buildPafPortal(
     const raw = input.draft.enlaces[key]?.trim();
     if (!raw) continue;
     const url = safeHttpsUrl(raw);
-    if (url) enlaces[key] = url;
+    if (url && isPrivateUrl(url, input.privados)) errors.push(`"${PAF_PORTAL_LINK_LABEL[key]}" es la carpeta interna o la ficha: eso no lo puede ver el estudio.`);
+    else if (url) enlaces[key] = url;
     else errors.push(`El enlace "${PAF_PORTAL_LINK_LABEL[key]}" tiene que empezar con https://`);
   }
 
@@ -164,7 +168,7 @@ export function buildPafPortal(
       hitoVisible: hito,
       resumenVisible: input.draft.resumen.trim().slice(0, 2000),
       enlaces,
-      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}) })),
+      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}) })),
       tareasHabilitadas: (input.tareas || []).filter((t) => t.estado === 'habilitada').map((t) => t.id),
       entregas: (input.entregas || []).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, ...(fecha ? { fecha } : {}), ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
       proximaReunion: input.proximaReunion || null,
@@ -186,6 +190,7 @@ export function publicTasks(tasks: PafTask[] = []): PafPortalTask[] {
       ...(t.detalle ? { detalle: t.detalle } : {}),
       ...(t.fecha ? { fecha: t.fecha } : {}),
       ...(t.habilitadaEn ? { habilitadaEn: t.habilitadaEn } : {}),
+      ...(t.motivo && t.estado === 'habilitada' ? { motivo: t.motivo } : {}),
       ...(t.estado === 'aprobada' && t.aprobacion ? { aprobadaEl: t.aprobacion.fecha.slice(0, 10) } : {}),
     }));
 }
@@ -207,11 +212,13 @@ export function nextMeeting(
 }
 
 export function portalFromProject(
-  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[] },
+  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks },
   meetings: Parameters<typeof nextMeeting>[0],
   draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
   clienteId = project.pafClienteId,
-  now = new Date()
+  now = new Date(),
+  /** Otros links que el estudio no puede ver (la carpeta interna y la ficha que trajo el script) */
+  privados: (string | undefined)[] = []
 ) {
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   return buildPafPortal(
@@ -222,6 +229,7 @@ export function portalFromProject(
       tareas: publicTasks(project.pafTareas),
       entregas: publicDeliveries(project.pafEntregas),
       proximaReunion: nextMeeting(meetings, project.id, today),
+      privados: [project.pafDrive?.carpetaInterna, project.pafDrive?.ficha, ...privados],
     },
     now.toISOString()
   );
@@ -386,4 +394,45 @@ export function pafToReview<P extends { id: string; clientName: string; archived
     .map((p) => ({ project: p, count: (p.pafTareas || []).filter((t) => t.estado === 'enviada').length }))
     .filter((x) => x.count > 0)
     .sort((a, b) => b.count - a.count || a.project.clientName.localeCompare(b.project.clientName));
+}
+
+// ---------- Panel de Juan (fase 2) ----------
+
+/** Clave comparable de un link: el ID del archivo/carpeta de Drive, o el link sin barra final */
+export function driveKey(url: string): string {
+  const m = url.match(/\/folders\/([\w-]{10,})|\/d\/([\w-]{10,})|[?&]id=([\w-]{10,})/);
+  return m ? (m[1] || m[2] || m[3]) : url.trim().replace(/\/+$/, '').toLowerCase();
+}
+
+/** ¿El link es la carpeta interna o la ficha? (eso nunca va al portal) */
+export function isPrivateUrl(url: string, privados: (string | undefined)[] = []): boolean {
+  const key = driveKey(url);
+  return privados.some((p) => p && driveKey(p) === key);
+}
+
+/** Lo que el estudio ve hoy difiere de lo que Juan tiene cargado (etapa, foco, correos, enlaces) */
+export function portalDirty(draft: PafPortalDraft, published: Pick<PafPortalDoc, 'emailsAutorizados' | 'hitoVisible' | 'resumenVisible' | 'enlaces'> | null | undefined): boolean {
+  if (!published) return false;
+  const links = (e: PafPortalDraft['enlaces']) =>
+    JSON.stringify(PAF_PORTAL_LINK_KEYS.map((k) => (e[k]?.trim() ? safeHttpsUrl(e[k]!) || e[k]!.trim() : '')));
+  return (
+    normalizeEmails(draft.emails).join(',') !== [...(published.emailsAutorizados || [])].join(',') ||
+    Math.min(PRESENCIA_HITOS.length, Math.max(1, Math.round(draft.hito || 1))) !== published.hitoVisible ||
+    draft.resumen.trim().slice(0, 2000) !== (published.resumenVisible || '') ||
+    links(draft.enlaces) !== links(published.enlaces || {})
+  );
+}
+
+/** Canal que se propone al aprobar: el último que usó Juan, o Portal */
+export function suggestedChannel(tasks: PafTask[]): string {
+  const last = tasks
+    .filter((t) => t.aprobacion)
+    .sort((a, b) => b.aprobacion!.fecha.localeCompare(a.aprobacion!.fecha))[0];
+  return last?.aprobacion?.canal || 'Portal';
+}
+
+/** Volver a habilitar con un motivo corto que ve el estudio. Borra el aviso y la aprobación anteriores. */
+export function reopenTask(task: PafTask, motivo: string, now = new Date().toISOString()): PafTask {
+  const { avisoEn: _a, aprobacion: _b, ...rest } = task;
+  return { ...rest, estado: 'habilitada', habilitadaEn: now, motivo: motivo.trim().slice(0, 140) };
 }

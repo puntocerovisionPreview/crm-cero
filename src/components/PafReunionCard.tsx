@@ -5,7 +5,8 @@ import { getAuthHeaders } from '../utils/authAccess';
 import { getTodayString } from '../utils/storage';
 import { hapticFeedback } from '../utils/haptics';
 
-const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
+const field = 'rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
+const input = `w-full ${field}`;
 
 /** Evento prellenado en Google Calendar (sin invitados: la invitación la mandás vos) */
 export function googleCalendarLink(m: { title: string; date: string; time?: string; durationHours?: number; notes?: string }): string {
@@ -97,10 +98,10 @@ export const PafReunionCard: React.FC<{
       )}
 
       <input className={input} value={form.title} aria-label="Título" onChange={(e) => setForm({ ...form, title: e.target.value })} />
-      <div className="flex gap-1.5">
-        <input className={input} type="date" aria-label="Fecha" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-        <input className={`${input} w-28`} type="time" aria-label="Hora" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
-        <select className={`${input} w-24`} aria-label="Duración" value={form.durationHours} onChange={(e) => setForm({ ...form, durationHours: Number(e.target.value) })}>
+      <div className="flex flex-wrap gap-1.5">
+        <input className={`${field} flex-1 min-w-[9.5rem]`} type="date" aria-label="Fecha" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+        <input className={`${field} w-28`} type="time" aria-label="Hora" value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} />
+        <select className={`${field} w-24`} aria-label="Duración" value={form.durationHours} onChange={(e) => setForm({ ...form, durationHours: Number(e.target.value) })}>
           <option value={0.5}>30 min</option><option value={1}>1 h</option><option value={1.5}>1 h 30</option><option value={2}>2 h</option>
         </select>
       </div>

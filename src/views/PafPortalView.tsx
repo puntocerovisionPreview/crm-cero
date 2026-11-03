@@ -6,10 +6,10 @@ import {
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
 import { auth } from '../firebaseAuth';
-import { signInWithGoogle, signOutUser } from '../utils/authAccess';
+import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { formatDisplayDate } from '../utils/projectTimeline';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
-import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals } from '../portal/store';
+import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
 /**
  * /portal: el estudio entra con su cuenta de Google (el mismo correo con el que se
@@ -80,7 +80,11 @@ function useSystemTheme() {
 
 export const PafPortalView: React.FC = () => {
   useSystemTheme();
-  const demo = import.meta.env.DEV && new URLSearchParams(window.location.search).has('demo');
+  const params = new URLSearchParams(window.location.search);
+  const demo = import.meta.env.DEV && params.has('demo');
+  // "Ver como cliente" desde la ficha: solo para Juan, solo lectura
+  const previewId = params.get('ver') || '';
+  const [preview, setPreview] = useState<PafPortalDoc | null | undefined>(undefined);
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [portals, setPortals] = useState<PafPortalDoc[] | null>(null);
   const [error, setError] = useState('');
@@ -93,12 +97,19 @@ export const PafPortalView: React.FC = () => {
   }, [demo]);
 
   useEffect(() => {
-    setPortals(null); setError(''); setSelected(0);
+    setPortals(null); setPreview(undefined); setError(''); setSelected(0);
     if (!user?.email || !user.emailVerified) return;
+    if (previewId && isAllowedUser(user)) return subscribePafPortal(previewId, setPreview);
     return subscribeMyPafPortals(user.email, setPortals, () => setError('No pudimos cargar tu portal. Revisá tu conexión y volvé a intentar.'));
   }, [user]);
 
   if (demo) return <PortalScreen portal={DEMO} email="demo@example.com" demo onLogout={() => undefined} />;
+
+  if (previewId && user && isAllowedUser(user)) {
+    if (preview === undefined) return <Shell><div role="status" className="flex items-center justify-center gap-3 py-40 text-sm text-[var(--text-tertiary)]"><Loader2 className="w-4 h-4 animate-spin" /> Cargando la vista previa…</div></Shell>;
+    if (!preview) return <Shell><p className="py-24 text-center text-sm text-[var(--text-secondary)]">El portal {previewId} no está publicado.</p></Shell>;
+    return <PortalScreen portal={preview} email={user.email!} readOnly onLogout={() => undefined} />;
+  }
 
   const login = async () => {
     setError('');
@@ -192,7 +203,7 @@ function GoogleMark() {
 
 // ---------- Portal ----------
 
-function PortalScreen({ portal: p, email, demo, onLogout, switcher }: { portal: PafPortalDoc; email: string; demo?: boolean; onLogout: () => void; switcher?: React.ReactNode }) {
+function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: { portal: PafPortalDoc; email: string; demo?: boolean; readOnly?: boolean; onLogout: () => void; switcher?: React.ReactNode }) {
   const [tab, setTab] = useState<Tab>('inicio');
   const [avisos, setAvisos] = useState<PafAviso[]>([]);
   const [sending, setSending] = useState<string | null>(null);
@@ -237,7 +248,8 @@ function PortalScreen({ portal: p, email, demo, onLogout, switcher }: { portal: 
   );
 
   return (
-    <Shell right={account}>
+    <Shell right={readOnly ? undefined : account}>
+      {readOnly && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista previa: así ve {p.estudio} su portal ahora. Es solo lectura: los botones no hacen nada.</p>}
       {demo && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista de ejemplo, solo en tu compu: así lo ve un estudio. Los datos son inventados.</p>}
 
       {/* Encabezado */}
@@ -341,9 +353,10 @@ function PortalScreen({ portal: p, email, demo, onLogout, switcher }: { portal: 
                           <div className="min-w-0">
                             <p className="text-[15px] font-medium text-[var(--text-primary)] break-words">{t.titulo}</p>
                             {t.fecha && <p className="mt-1 text-xs text-[var(--text-tertiary)]">Para el {formatDisplayDate(t.fecha, 'medium')}</p>}
+                            {t.motivo && <p className="mt-3 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Te pedimos: </span>{t.motivo}</p>}
                             {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
                           </div>
-                          <button type="button" onClick={() => done(t.id)} disabled={sending === t.id} className="btn-solid-primary shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60">
+                          <button type="button" onClick={() => done(t.id)} disabled={sending === t.id || readOnly} title={readOnly ? 'Vista previa: el botón no hace nada' : undefined} className="btn-solid-primary shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60">
                             {sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
                           </button>
                         </div>

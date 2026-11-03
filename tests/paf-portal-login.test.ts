@@ -216,3 +216,46 @@ describe('fase 1: circuito del "Terminé"', () => {
     expect(rules).toMatch(/match \/\{path=\*\*\}\/avisos\/\{avisoId\} \{\s*allow read: if isOwner\(\);/);
   });
 });
+import { driveKey, isPrivateUrl, portalDirty, reopenTask, suggestedChannel } from '../src/portal/model';
+
+describe('fase 2: panel de Juan', () => {
+  const pub = { emailsAutorizados: ['a@b.com'], hitoVisible: 2, resumenVisible: 'Foco', enlaces: { carpeta: 'https://drive.google.com/drive/folders/abcdefghij123' } };
+  const base = { emails: ['a@b.com'], hito: 2, resumen: 'Foco', enlaces: { carpeta: 'https://drive.google.com/drive/folders/abcdefghij123' } };
+
+  it('"Hay cambios sin publicar" solo cuando cambia algo que ve el estudio', () => {
+    expect(portalDirty(base, pub)).toBe(false);
+    expect(portalDirty({ ...base, emails: [' A@B.com '] }, pub)).toBe(false);
+    expect(portalDirty({ ...base, resumen: 'Foco  ' }, pub)).toBe(false);
+    expect(portalDirty({ ...base, hito: 3 }, pub)).toBe(true);
+    expect(portalDirty({ ...base, resumen: 'Otro' }, pub)).toBe(true);
+    expect(portalDirty({ ...base, emails: ['a@b.com', 'c@d.com'] }, pub)).toBe(true);
+    expect(portalDirty({ ...base, enlaces: { ...base.enlaces, web: 'https://x.com' } }, pub)).toBe(true);
+    expect(portalDirty(base, null)).toBe(false);
+  });
+
+  it('bloquea la carpeta interna o la ficha aunque el link venga escrito distinto', () => {
+    expect(driveKey('https://drive.google.com/drive/u/0/folders/1AbCdEfGhIjK?usp=sharing')).toBe('1AbCdEfGhIjK');
+    expect(isPrivateUrl('https://drive.google.com/drive/folders/1AbCdEfGhIjK', ['https://drive.google.com/drive/u/1/folders/1AbCdEfGhIjK?usp=drive_link'])).toBe(true);
+    expect(isPrivateUrl('https://docs.google.com/document/d/1ZyXwVuTsRqP/edit', [undefined, 'https://docs.google.com/document/d/1ZyXwVuTsRqP/view'])).toBe(true);
+    expect(isPrivateUrl('https://drive.google.com/drive/folders/otraCarpeta123', ['https://drive.google.com/drive/folders/1AbCdEfGhIjK'])).toBe(false);
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, enlaces: { carpeta: 'https://drive.google.com/drive/folders/1AbCdEfGhIjK' } }, privados: ['https://drive.google.com/drive/folders/1AbCdEfGhIjK?usp=sharing'] });
+    expect('errors' in r && r.errors[0]).toContain('carpeta interna');
+  });
+
+  it('al aprobar propone el último canal usado, o Portal', () => {
+    expect(suggestedChannel([])).toBe('Portal');
+    expect(suggestedChannel([
+      { id: '1', titulo: 'a', estado: 'aprobada', aprobacion: { fecha: '2026-11-01T10:00:00Z', canal: 'Reunión' } },
+      { id: '2', titulo: 'b', estado: 'aprobada', aprobacion: { fecha: '2026-11-02T10:00:00Z', canal: 'WhatsApp' } },
+    ])).toBe('WhatsApp');
+  });
+
+  it('volver a habilitar guarda el motivo, borra aviso y aprobación, y el estudio lo ve', () => {
+    const t = reopenTask({ id: '1', titulo: 'Fotos', estado: 'aprobada', avisoEn: 'x', aprobacion: { fecha: 'y', canal: 'Portal' } }, '  Faltan las de Belgrano ', '2026-11-03T10:00:00.000Z');
+    expect(t).toEqual({ id: '1', titulo: 'Fotos', estado: 'habilitada', habilitadaEn: '2026-11-03T10:00:00.000Z', motivo: 'Faltan las de Belgrano' });
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft, tareas: publicTasks([t]) });
+    expect('doc' in r && r.doc.tareas[0].motivo).toBe('Faltan las de Belgrano');
+    const aprobada = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft, tareas: publicTasks([{ ...t, estado: 'aprobada' }]) });
+    expect('doc' in aprobada && aprobada.doc.tareas[0].motivo).toBeUndefined();
+  });
+});
