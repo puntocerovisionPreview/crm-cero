@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, ChevronUp, ClipboardCopy, MessageCircle, MoreHorizontal, Phone, Undo2, Video } from 'lucide-react';
 import { Prospect, ProspectingSettings } from '../types';
 import { ProspectAction, normalizeInstagram } from '../prospecting/core';
@@ -10,8 +10,7 @@ import { PersonalLineButton } from './ProspectingDayStart';
 
 /**
  * LA TARJETA DE UN PROSPECTO (igual en Hoy y en el tablero)
- * Una cosa para hacer, un botón. "Enviar por WhatsApp" abre el chat con el mensaje y ya lo
- * marca como enviado (con Deshacer). "Respondió" es lo único que avisás a mano.
+ * Abrir el chat no registra envíos. El operador confirma "Ya envié el mensaje" al volver.
  */
 
 export type Send = (p: Prospect, action: ProspectAction, note?: string, label?: string) => unknown;
@@ -52,6 +51,9 @@ export const ProspectCard: React.FC<{
   big?: boolean;
   draggable?: boolean;
 }> = ({ prospect: p, settings, today, onSend, onMove, onCall, onDetail, big, draggable }) => {
+  const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const locked = useRef(false);
   const move: NextMove = nextMove(p, today, settings);
   const tone = TONE[turnTone(p, move, settings)];
   const [showMsg, setShowMsg] = useState(!!big);
@@ -61,9 +63,13 @@ export const ProspectCard: React.FC<{
   const name = p.studio || p.name;
   const ig = normalizeInstagram(p.instagram);
 
-  const pick = (action: ProspectAction, note?: string) => {
+  const pick = async (action: ProspectAction, note?: string) => {
     if (action === 'call') return onCall(p);
-    onSend(p, action, note);
+    if (locked.current) return;
+    locked.current = true; setBusy(true); setSaveError(null);
+    try { const saved = await onSend(p, action, note); if (saved === false) setSaveError('No se guardó. Volvé a intentar.'); }
+    catch { setSaveError('No se guardó. Volvé a intentar.'); }
+    finally { locked.current = false; setBusy(false); }
   };
   const copyAndMark = () => {
     navigator.clipboard?.writeText(move.message).then(() => {
@@ -78,11 +84,10 @@ export const ProspectCard: React.FC<{
         href={formatWhatsAppUrl(p.whatsapp, move.message || undefined)}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={() => onSend(p, move.send!)}
         className={`${btn} ${big ? 'h-12 text-[15px] px-5 w-full sm:w-auto' : 'h-9 text-[13px] px-3'} text-white`}
         style={{ backgroundColor: TINT }}
       >
-        <MessageCircle className={big ? 'w-5 h-5' : 'w-4 h-4'} /> {move.sendLabel}
+        <MessageCircle className={big ? 'w-5 h-5' : 'w-4 h-4'} /> Abrir WhatsApp
       </a>
     ) : (
       <button
@@ -90,7 +95,6 @@ export const ProspectCard: React.FC<{
         onClick={() => {
           copyAndMark();
           if (ig) window.open(`https://instagram.com/${ig}`, '_blank', 'noopener');
-          onSend(p, move.send!);
         }}
         className={`${btn} ${big ? 'h-12 text-[15px] px-5' : 'h-9 text-[13px] px-3'} text-white`}
         style={{ backgroundColor: TINT }}
@@ -137,10 +141,10 @@ export const ProspectCard: React.FC<{
                   Cliente
                 </button>
                 <div className="my-1 border-t border-[var(--border-subtle)]" />
-                <button type="button" className="w-full text-left px-3 py-2 rounded-[8px] hover:bg-[var(--bg-surface-muted)]" onClick={() => { setMenu(false); onSend(p, 'lost', 'No le interesa'); }}>
+                <button type="button" className="w-full text-left px-3 py-2 rounded-[8px] hover:bg-[var(--bg-surface-muted)]" onClick={() => { setMenu(false); pick('lost', 'No le interesa'); }}>
                   No le interesa
                 </button>
-                <button type="button" className="w-full text-left px-3 py-2 rounded-[8px] hover:bg-[var(--bg-surface-muted)] text-red-400" onClick={() => { setMenu(false); onSend(p, 'do_not_contact'); }}>
+                <button type="button" className="w-full text-left px-3 py-2 rounded-[8px] hover:bg-[var(--bg-surface-muted)] text-red-400" onClick={() => { setMenu(false); pick('do_not_contact'); }}>
                   No contactar nunca más
                 </button>
               </div>
@@ -177,6 +181,10 @@ export const ProspectCard: React.FC<{
 
       <div className={`flex flex-wrap items-center gap-2 ${big ? 'pt-1' : ''}`}>
         {primary}
+        {move.send && <button type="button" disabled={busy} onClick={() => pick(move.send!)} className={ghost + ' h-12'}>
+          <Check className="w-4 h-4" /> {busy ? 'Guardando…' : 'Ya envié el mensaje'}
+        </button>}
+        {saveError && <p role="alert" className="text-xs text-red-400">{saveError}</p>}
         {move.need === 'call_time' && (
           <button type="button" onClick={() => onCall(p)} className={`${btn} ${big ? 'h-12 text-[15px] px-5' : 'h-9 text-[13px] px-3'} text-white`} style={{ backgroundColor: '#0A84FF' }}>
             <Phone className="w-4 h-4" /> Ponerle día y hora

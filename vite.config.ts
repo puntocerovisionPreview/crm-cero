@@ -1,3 +1,4 @@
+import './server/nodeCrypto';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
@@ -161,6 +162,9 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
+          // Node 18 (solo en compus locales): el minificador del service worker corre en un
+          // worker sin `crypto` y falla. Ahí se arma sin minificar; en Node 19+ (AI Studio) igual que siempre.
+          ...(Number(process.versions.node.split('.')[0]) < 19 ? { mode: 'development' as const } : {}),
           // Recibe las notificaciones push y abre la pantalla al tocarlas
           importScripts: ['push-sw.js'],
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],

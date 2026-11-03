@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Check, CheckCircle2, Circle, Clapperboard, Copy, Image as ImageIcon, Images, Loader2, Pencil, ThumbsUp } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
+import { ClientWebSections } from '../components/ClientWebSections';
+import { ClientDriveFolders } from '../components/ClientDriveFolders';
 import { AssetImg } from '../content/AssetImg';
 import { PANEL_STATE_LABEL, PanelPiece, PanelSnapshot, PanelTask, byTask } from '../panels/model';
 import { sendClientAction, subscribePanelSnapshot } from '../panels/store';
@@ -64,7 +66,7 @@ export const ClientPanelView: React.FC<{ token: string }> = ({ token }) => {
 
       <PanelSections token={token} data={data} />
 
-      {!data.goals.length && !data.tasks.length && !data.pieces.length && (
+      {!data.web && !data.goals.length && !data.tasks.length && !data.pieces.length && (
         <p className="text-center text-zinc-500 py-10">Todavía no hay nada cargado. Pronto vas a ver acá tus objetivos, tareas y contenido.</p>
       )}
 
@@ -77,14 +79,16 @@ export const ClientPanelView: React.FC<{ token: string }> = ({ token }) => {
  * Objetivos, tareas y contenido para aprobar. Se usa en /panel/{token} y, para los alumnos PAF,
  * adentro de su portal (/alumno/{token}): un solo link para todo.
  */
-export const PanelSections: React.FC<{ token: string; data: PanelSnapshot; showNote?: boolean }> = ({ token, data, showNote }) => {
+export const PanelSections: React.FC<{ token: string; data: PanelSnapshot; showNote?: boolean; section?: 'all' | 'work' | 'content' }> = ({ token, data, showNote, section = 'all' }) => {
   const goalsDone = data.goals.filter((g) => g.done).length;
   const pending = data.pieces.filter((p) => p.state === 'para_aprobar');
   const reviewed = data.pieces.filter((p) => p.state !== 'para_aprobar');
   return (
     <>
       {showNote && data.note && <p className="text-[15px] text-zinc-300 bg-zinc-900/70 border border-zinc-800 rounded-2xl px-4 py-3 whitespace-pre-line">{data.note}</p>}
-      {data.goals.length > 0 && (
+      {section !== 'content' && data.web && <ClientWebSections token={token} web={data.web} />}
+      {section !== 'content' && <ClientDriveFolders folders={data.driveFolders} />}
+      {section !== 'content' && data.goals.length > 0 && (
         <Card title={`Objetivos de la semana del ${dm(data.weekStart)}`}>
           <div className="flex items-center gap-3 mb-3">
             <div className="flex-1 h-2 rounded-full bg-zinc-800 overflow-hidden">
@@ -105,7 +109,7 @@ export const PanelSections: React.FC<{ token: string; data: PanelSnapshot; showN
         </Card>
       )}
 
-      {data.tasks.length > 0 && (
+      {section !== 'content' && data.tasks.length > 0 && (
         <Card title="Lo que te toca">
           <ul className="space-y-2">
             {[...data.tasks].sort(byTask).map((t) => (
@@ -115,7 +119,7 @@ export const PanelSections: React.FC<{ token: string; data: PanelSnapshot; showN
         </Card>
       )}
 
-      {pending.length > 0 && (
+      {section !== 'work' && pending.length > 0 && (
         <Card title={`Para aprobar (${pending.length})`}>
           <div className="space-y-6">
             {pending.map((p) => (
@@ -125,7 +129,7 @@ export const PanelSections: React.FC<{ token: string; data: PanelSnapshot; showN
         </Card>
       )}
 
-      {reviewed.length > 0 && (
+      {section !== 'work' && reviewed.length > 0 && (
         <Card title="Ya revisadas">
           <div className="space-y-6">
             {reviewed.map((p) => (

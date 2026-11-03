@@ -6,6 +6,7 @@ import { getStorage } from 'firebase-admin/storage';
 import type { Firestore } from 'firebase-admin/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { todayLocal } from '../src/utils/dates';
+import { isPrivateIntegrationDocument } from '../src/automation/webRecipe';
 
 /**
  * LA APP SE CUIDA SOLA
@@ -82,6 +83,7 @@ export async function runBackup(db: Firestore): Promise<{ path: string; docs: nu
     const snap = await col.get();
     out[col.id] = {};
     for (const d of snap.docs) {
+      if (isPrivateIntegrationDocument(col.id, d.id) || col.id === 'automation_delivery') continue;
       out[col.id][d.id] = plain(d.data());
       docs++;
     }

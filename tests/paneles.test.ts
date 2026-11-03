@@ -75,7 +75,7 @@ describe('panel del cliente: semanas', () => {
   });
 
   it('resumen para la lista', () => {
-    expect(panelSummary(panel)).toEqual({ tasksOpen: 1, tasksDone: 1, toApprove: 1, changes: 0, goalsDone: 1, goals: 2 });
+    expect(panelSummary(panel)).toEqual({ webPending: 0, tasksOpen: 1, tasksDone: 1, toApprove: 1, changes: 0, goalsDone: 1, goals: 2 });
   });
 });
 

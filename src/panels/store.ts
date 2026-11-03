@@ -1,4 +1,4 @@
-import { collection, deleteDoc, doc, getDocs, onSnapshot, query, setDoc, where } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDocs, onSnapshot, query, where, writeBatch, runTransaction } from 'firebase/firestore';
 import { Project } from '../types';
 import { getStudentPortalUrl } from '../utils/studentPortal';
 import { db } from '../firebase';
@@ -8,6 +8,9 @@ import { toJpeg } from '../content/store';
 import { sortByFileName } from '../content/model';
 import { ClientPanel, PanelSlide, PanelSnapshot, TOKEN_RE, newToken, panelDocId, snapshotOf } from './model';
 import { startOfWeekMonday, todayLocal } from '../utils/dates';
+import { createPafPlan } from './pafPlan';
+import { emptyWeb } from './web';
+import { isWebProject } from '../automation/webRecipe';
 
 // Paneles de clientes: client_panels/{id} (tuyo) y student_portals/panel_{token} (lo que ve el cliente)
 
@@ -37,11 +40,16 @@ export function subscribePanelOfProject(projectId: string, onChanged: (p: Client
 /** Guarda el panel y publica lo que ve el cliente (si está activo) */
 export async function savePanel(p: ClientPanel): Promise<void> {
   const now = new Date().toISOString();
-  const next = { ...p, updatedAt: now };
-  await setDoc(doc(db, 'client_panels', p.id), deepSanitize(next));
-  const pub = doc(db, 'student_portals', panelDocId(p.token));
-  if (p.active) await setDoc(pub, deepSanitize(snapshotOf(next, now)));
-  else await deleteDoc(pub).catch(() => undefined);
+  await runTransaction(db, async tx => {
+    const ref = doc(db, 'client_panels', p.id);
+    const current = (await tx.get(ref)).data() as ClientPanel | undefined;
+    const next = { ...p, updatedAt: now, driveFolders: current?.driveFolders ?? p.driveFolders };
+    if (next.web) next.web = { ...next.web, materials: next.web.materials.map(m => ({ ...m, driveFolderUrl: current?.web?.materials.find(x => x.id === m.id)?.driveFolderUrl ?? m.driveFolderUrl })) };
+    tx.set(ref, deepSanitize(next));
+    const pub = doc(db, 'student_portals', panelDocId(p.token));
+    if (p.active) tx.set(pub, deepSanitize(snapshotOf(next, now)));
+    else tx.delete(pub);
+  });
 }
 
 export async function createPanel(clientName: string, extra: Partial<ClientPanel> = {}): Promise<ClientPanel> {
@@ -83,6 +91,26 @@ export const panelUrl = (token: string) => `${window.location.origin}/panel/${to
 /** El link que se le manda: el del portal PAF si es alumno, si no el del panel */
 export const panelLink = (p: ClientPanel) => (p.portal ? getStudentPortalUrl(p.token) : panelUrl(p.token));
 
+/** Alta manual desde la ficha, con el mismo ID que usa la preparación Web del servidor. */
+export async function ensureProjectPanel(project: Project): Promise<ClientPanel> {
+  const matches = await getDocs(query(collection(db, 'client_panels'), where('projectId', '==', project.id)));
+  const ref = matches.docs[0]?.ref || doc(db, 'client_panels', `web_${project.id}`);
+  return runTransaction(db, async tx => {
+    const existing = await tx.get(ref);
+    if (existing.exists()) return { ...existing.data(), id: ref.id } as ClientPanel;
+    const now = new Date().toISOString();
+    const panel: ClientPanel = {
+      id: ref.id, projectId: project.id, clientName: project.clientName,
+      phone: project.clientPhone, token: newToken(), active: true,
+      weekStart: startOfWeekMonday(todayLocal()), goals: [], tasks: [], pieces: [], createdAt: now,
+      ...(isWebProject(project) ? { web: emptyWeb() } : {}),
+    };
+    tx.set(ref, deepSanitize(panel));
+    tx.set(doc(db, 'student_portals', panelDocId(panel.token)), deepSanitize(snapshotOf(panel, now)));
+    return panel;
+  });
+}
+
 /**
  * Panel de un alumno PAF: mismo token que su portal, así ve todo en un solo link.
  * Si el alumno todavía no tiene link, se crea (y se guarda en su ficha con setPortalToken).
@@ -100,7 +128,7 @@ export async function ensurePafPanel(project: Project, existing: ClientPanel | u
     await savePanel(next);
     return next;
   }
-  return createPanel(project.clientName, { projectId: project.id, phone: project.clientPhone, token, portal: true });
+  return createPanel(project.clientName, { projectId: project.id, phone: project.clientPhone, token, portal: true, paf: createPafPlan(project) });
 }
 
 /** Cuando cambia o se desactiva el link del portal PAF, el panel lo sigue */

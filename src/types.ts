@@ -55,6 +55,7 @@ export interface AgendaTask {
 }
 
 export interface AgendaMeeting {
+  proposed?: boolean; // Sin hora confirmada: no se envía a Google Calendar.
   id: string;
   title: string; // Título o Nombre del cliente
   date: string; // YYYY-MM-DD
@@ -346,6 +347,7 @@ export interface Project {
   onboardingApplied?: boolean; // ya se usó (o se descartó) la plantilla de arranque
   clientPhone?: string; // WhatsApp comercial
   clientEmail?: string; // Mail del cliente (presupuestos y firma digital)
+  webAutomationRequested?: boolean; // Cola de alta Web; el servidor la consume.
   instagramUrl?: string; // Perfil de Instagram institucional
   googleMapsUrl?: string; // Ficha de Google Business Profile (Maps)
   websiteUrl?: string; // Sitio web oficial o URL de staging / desarrollo
@@ -376,6 +378,13 @@ export interface Project {
   pafInstallmentDates?: { number: number; dueDate: string; amount: number; paid: boolean; paidAt?: string; note?: string }[]; // Compatibilidad
   installments?: ProjectInstallment[]; // Plan de cuotas exactas
   pafStageChecklist?: Record<string, { id: string; text: string; done: boolean }[]>; // Hitos de salida por etapa
+  pafClienteId?: string; // ID del alta PAF (PAF-002, PAF-PRUEBA-001); no se reutiliza nunca
+  pafPortal?: import('./portal/model').PafPortalDraft; // Lo que Juan decide publicar en paf_portal/{pafClienteId}
+  pafDrive?: import('./portal/model').PafDriveLinks; // Carpetas pegadas a mano (si el script todavía no las devolvió)
+  pafAnuncios?: import('./portal/model').PafAnnouncement[]; // Anuncios para el estudio (ve los publicados)
+  pafResumenes?: import('./portal/model').PafMeetingSummary[]; // Acuerdos y próximos pasos de cada reunión (el estudio ve los publicados)
+  pafTareas?: import('./portal/model').PafTask[]; // Tareas del estudio: el cliente ve solo las habilitadas
+  pafEntregas?: import('./portal/model').PafDelivery[]; // Entregas (enlaces a Drive), visibles si están publicadas
   studentPortalToken?: string; // Link de solo lectura para el alumno (/alumno/{token})
   statusOverride?: 'not_started' | 'in_progress' | 'waiting_client' | 'overdue_payment' | 'completed'; // Override manual del sistema de estado visual
   // Horizonte (Línea de tiempo & Capacidad de largo plazo)
@@ -1055,6 +1064,7 @@ export interface Prospect {
 
 // Pasos del guion: pregunta → (su respuesta) → empatía → (acuerdo) → speech + link de auditoría
 export interface ProspectLogEntry {
+  action?: string;
   at: string; // ISO
   dir: 'in' | 'out' | 'nota'; // te escribió / le escribiste / nota tuya
   text: string;
@@ -1065,6 +1075,11 @@ export type ConvStep = 'pregunta' | 'esperando_respuesta' | 'empatia' | 'esperan
 export type DifusionKey = 'portales' | 'referidos' | 'anuncios' | 'redes' | 'contenido_ig' | 'agencia' | 'otro';
 
 export type ProspectEventType =
+  | 'conversation_sent'
+  | 'conversation_reply'
+  | 'deferred'
+  | 'call_rescheduled'
+  | 'note'
   | 'proposal_sent'
   | 'first_contact'
   | 'follow_up'
@@ -1078,6 +1093,8 @@ export type ProspectEventType =
   | 'lost';
 
 export interface ProspectEvent {
+  prospectName?: string;
+  action?: string;
   id: string;
   prospectId: string;
   type: ProspectEventType;

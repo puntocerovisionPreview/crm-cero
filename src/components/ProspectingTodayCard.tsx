@@ -4,6 +4,7 @@ import { useProspecting } from '../prospecting/useProspecting';
 import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
 import { pendingDayClose, pendingOutcomes } from '../prospecting/core';
 import { usePoolTakeOptions, useRecycle } from '../prospecting/actions';
+import { buildDayLog } from '../prospecting/dayLog';
 import { DayRing, usePulse } from './ProspectingVisuals';
 
 const TINT = '#34C759';
@@ -36,9 +37,12 @@ export const ProspectingTodayCard: React.FC<{ onOpen: () => void }> = ({ onOpen 
   }
   if (list.length === 0 && pool.availableCount === 0) return null;
 
+  const day = buildDayLog(list, events, today);
   const started = settings.dayStartedOn === today;
   const callToday = pulse.nextCall && pulse.nextCall.callDate === today ? pulse.nextCall : null;
   const parts = [
+    day.sent.length + ' contactados hoy',
+    day.replies.length + ' respondieron hoy',
     pulse.leftToday ? `${pulse.leftToday} para hoy` : 'Al día',
     pulse.mine ? `${pulse.mine} ${pulse.mine === 1 ? 'te espera' : 'te esperan'}` : '',
     toMark ? `${toMark} sin anotar` : '',

@@ -1,3 +1,7 @@
+import { WebClientAction, WebSection, applyWebAction, parseWebAction } from './web';
+import type { PafPlan } from './pafPlan';
+import type { ClientDriveFolder } from '../automation/webRecipe';
+
 /**
  * PANEL DEL CLIENTE
  * Un link privado por cliente (como el portal del alumno): objetivos de la semana,
@@ -17,6 +21,8 @@ export interface PanelGoal {
   id: string;
   text: string;
   done: boolean;
+  /** Quién lo hace (portal PAF: "Esta semana"). Sin dato = el estudio. */
+  quien?: 'cero' | 'estudio';
 }
 
 export interface PanelTask {
@@ -54,6 +60,8 @@ export interface PanelWeek {
 }
 
 export interface ClientPanel {
+  driveFolders?: ClientDriveFolder[];
+  paf?: PafPlan;
   id: string;
   token: string;
   active: boolean;
@@ -69,6 +77,8 @@ export interface ClientPanel {
   pastWeeks?: PanelWeek[];
   tasks: PanelTask[];
   pieces: PanelPiece[];
+  /** Desarrollo web: etapas, materiales, versión de prueba, pagos y entrega */
+  web?: WebSection;
   /** Última novedad del cliente, para mostrarte el aviso */
   lastClientAction?: { at: string; text: string };
   createdAt: string;
@@ -77,6 +87,8 @@ export interface ClientPanel {
 
 /** Lo que ve el cliente: sin ids internos ni teléfono */
 export interface PanelSnapshot {
+  driveFolders?: ClientDriveFolder[];
+  paf?: PafPlan;
   kind: 'panel';
   token: string;
   clientName: string;
@@ -86,6 +98,7 @@ export interface PanelSnapshot {
   pastWeeks: PanelWeek[];
   tasks: PanelTask[];
   pieces: PanelPiece[];
+  web?: WebSection;
   updatedAt: string;
 }
 
@@ -117,6 +130,8 @@ export const newItemId = () => `${Date.now().toString(36)}${Math.random().toStri
 
 export function snapshotOf(p: ClientPanel, now = new Date().toISOString()): PanelSnapshot {
   return {
+    driveFolders: p.driveFolders,
+    paf: p.paf,
     kind: 'panel',
     token: p.token,
     clientName: p.clientName,
@@ -126,6 +141,7 @@ export function snapshotOf(p: ClientPanel, now = new Date().toISOString()): Pane
     pastWeeks: (p.pastWeeks || []).slice(0, 8),
     tasks: [...p.tasks].sort(byTask),
     pieces: [...p.pieces].sort((a, b) => a.date.localeCompare(b.date)),
+    web: p.web || undefined,
     updatedAt: now,
   };
 }
@@ -140,7 +156,8 @@ export function byTask(a: PanelTask, b: PanelTask): number {
 
 export type ClientAction =
   | { type: 'tarea'; taskId: string; done: boolean; note?: string }
-  | { type: 'pieza'; pieceId: string; decision: 'aprobar' | 'cambios'; comment?: string };
+  | { type: 'pieza'; pieceId: string; decision: 'aprobar' | 'cambios'; comment?: string }
+  | WebClientAction;
 
 const clean = (s: unknown, max: number) => String(s ?? '').trim().slice(0, max);
 
@@ -154,7 +171,7 @@ export function parseClientAction(body: any): ClientAction | null {
     if (body.decision === 'cambios' && !comment) return null;
     return { type: 'pieza', pieceId: clean(body.pieceId, 80), decision: body.decision, comment };
   }
-  return null;
+  return parseWebAction(body);
 }
 
 /** Aplica la acción al panel. Devuelve el panel nuevo y el aviso para vos, o un error */
@@ -174,6 +191,12 @@ export function applyClientAction(
       panel: { ...p, tasks, lastClientAction: { at: now, text }, updatedAt: now },
       notice: { title: `✅ ${p.clientName} ${text}`, body: a.note ? `Dejó una nota: ${a.note}` : 'Desde su panel.' },
     };
+  }
+  if (a.type === 'material' || a.type === 'prueba' || a.type === 'pedido') {
+    if (!p.web) return { error: 'Este panel no tiene la parte web' };
+    const r = applyWebAction(p.web, a, p.clientName, now);
+    if ('error' in r) return r;
+    return { panel: { ...p, web: r.web, lastClientAction: { at: now, text: r.text }, updatedAt: now }, notice: { title: r.title, body: r.body } };
   }
   const piece = p.pieces.find((x) => x.id === a.pieceId);
   if (!piece) return { error: 'No encontramos esa pieza' };
@@ -205,6 +228,7 @@ export function startNewWeek(p: ClientPanel, weekStart: string): ClientPanel {
 /** Resumen corto para la lista de paneles */
 export function panelSummary(p: ClientPanel) {
   return {
+    webPending: p.web ? p.web.requests.filter((r) => !r.done).length + (p.web.preview?.state === 'cambios' ? 1 : 0) : 0,
     tasksOpen: p.tasks.filter((t) => !t.done).length,
     tasksDone: p.tasks.filter((t) => t.done).length,
     toApprove: p.pieces.filter((x) => x.state === 'para_aprobar').length,

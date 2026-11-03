@@ -4,6 +4,8 @@ import { deepSanitize } from '../utils/firestoreService';
 import { Prospect, ProspectEvent, ProspectingSettings } from '../types';
 import { ProspectAction, applyAction, logEntryFor, mergeProspectingSettings } from './core';
 
+import { activityEvent } from './dayLog';
+
 // Firestore de la prospección: prospects, prospect_events y settings/prospecting
 
 export function subscribeProspects(onChanged: (items: Prospect[]) => void, onError?: (err: Error) => void) {
@@ -17,11 +19,11 @@ export function subscribeProspects(onChanged: (items: Prospect[]) => void, onErr
   );
 }
 
-export function subscribeProspectEvents(onChanged: (items: ProspectEvent[]) => void) {
+export function subscribeProspectEvents(onChanged: (items: ProspectEvent[]) => void, onError?: (err: Error) => void) {
   return onSnapshot(
     collection(db, 'prospect_events'),
     (snap) => onChanged(snap.docs.map((d) => ({ ...(d.data() as ProspectEvent), id: d.id }))),
-    (err) => console.warn('subscribeProspectEvents error:', err)
+    (err) => { console.warn('subscribeProspectEvents error:', err); onError?.(err); }
   );
 }
 
@@ -66,17 +68,19 @@ export async function recordProspectAction(
   note?: string
 ): Promise<Partial<Prospect>> {
   const { updates, event } = applyAction(p, action, today, settings, note);
+  const loggedEvent = event || activityEvent(p, action, today, note);
+  const nowIso = new Date().toISOString();
   const batch = writeBatch(db);
-  const payload: Record<string, any> = { updatedAt: new Date().toISOString() };
+  const payload: Record<string, any> = { updatedAt: nowIso };
   Object.entries(updates).forEach(([k, v]) => (payload[k] = v === undefined ? null : v));
   const sanitized: Record<string, any> = deepSanitize(payload);
   // Historial de la conversación: se agrega, nunca se borra lo anterior
   const entry = logEntryFor(action, note);
-  if (entry) sanitized.log = arrayUnion({ at: new Date().toISOString(), ...entry });
+  if (entry) sanitized.log = arrayUnion({ at: nowIso, action, ...entry });
   batch.set(doc(db, 'prospects', p.id), sanitized, { merge: true });
-  if (event) {
+  if (loggedEvent) {
     const id = `pev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    batch.set(doc(db, 'prospect_events', id), deepSanitize({ ...event, id, createdAt: new Date().toISOString() }));
+    batch.set(doc(db, 'prospect_events', id), deepSanitize({ ...loggedEvent, prospectName: p.studio || p.name, action, id, createdAt: nowIso }));
   }
   await batch.commit();
   return updates;
@@ -94,19 +98,20 @@ export async function recordWithUndo(
   note?: string
 ): Promise<() => Promise<void>> {
   const { updates, event } = applyAction(p, action, today, settings, note);
+  const loggedEvent = event || activityEvent(p, action, today, note);
   const nowIso = new Date().toISOString();
   const batch = writeBatch(db);
   const payload: Record<string, any> = { updatedAt: nowIso };
   Object.entries(updates).forEach(([k, v]) => (payload[k] = v === undefined ? null : v));
   const sanitized: Record<string, any> = deepSanitize(payload);
   const entry = logEntryFor(action, note);
-  const logItem = entry ? { at: nowIso, ...entry } : null;
+  const logItem = entry ? { at: nowIso, action, ...entry } : null;
   if (logItem) sanitized.log = arrayUnion(logItem);
   batch.set(doc(db, 'prospects', p.id), sanitized, { merge: true });
   let eventId: string | null = null;
-  if (event) {
+  if (loggedEvent) {
     eventId = `pev_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-    batch.set(doc(db, 'prospect_events', eventId), deepSanitize({ ...event, id: eventId, createdAt: nowIso }));
+    batch.set(doc(db, 'prospect_events', eventId), deepSanitize({ ...loggedEvent, prospectName: p.studio || p.name, action, id: eventId, createdAt: nowIso }));
   }
   await batch.commit();
 

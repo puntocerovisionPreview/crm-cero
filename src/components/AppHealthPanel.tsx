@@ -17,6 +17,7 @@ interface Health {
 }
 
 const JOB_LABELS: Record<string, string> = {
+  'receta-web': 'Preparación de proyectos Web',
   reminders: 'Avisos (cada 10 min)',
   'calendar-sync': 'Google Calendar (cada 10 min)',
   mercadopago: 'Mercado Pago (cada 10 min)',

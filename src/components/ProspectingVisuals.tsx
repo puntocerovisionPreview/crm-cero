@@ -13,12 +13,12 @@ import { fireTaskCelebration } from '../utils/confetti';
  * - La próxima llamada, con cuánto falta.
  */
 
+import { collectProspectEvents, SENT_EVENT_TYPES } from '../prospecting/dayLog';
+
 const TINT = '#34C759'; // color de Prospección en toda la app
 const CALL = '#0A84FF';
 
 // Lo que cuenta como "le escribiste" (de los eventos y del historial nuevo)
-const OUT_EVENTS = ['first_contact', 'follow_up', 'audit_sent', 'video_sent', 'call', 'proposal_sent'];
-const OUT_LOG = /^Le (hiciste la pregunta|mandaste la empatía|contestaste)/;
 
 export interface Station {
   id: string;
@@ -44,16 +44,7 @@ const ORDER = FUNNEL_STEPS.map((s) => s.id) as string[];
 export function usePulse(prospects: Prospect[], events: ProspectEvent[], today: string, settings: ProspectingSettings) {
   return useMemo(() => {
     const outByDay = new Map<string, number>();
-    events.forEach((e) => OUT_EVENTS.includes(e.type) && outByDay.set(e.date, (outByDay.get(e.date) || 0) + 1));
-    prospects.forEach((p) =>
-      (p.log || []).forEach((l) => {
-        if (l.dir === 'out' && OUT_LOG.test(l.text)) {
-          const d = new Date(l.at);
-          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-          outByDay.set(key, (outByDay.get(key) || 0) + 1);
-        }
-      })
-    );
+    collectProspectEvents(prospects, events).forEach(e => { if (SENT_EVENT_TYPES.has(e.type)) outByDay.set(e.date, (outByDay.get(e.date) || 0) + 1); });
     const doneToday = outByDay.get(today) || 0;
     const queue = buildDailyQueue(prospects, today, settings).items;
     const leftToday = queue.filter((i) => i.kind !== 'llamada_hoy').length;

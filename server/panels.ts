@@ -35,8 +35,10 @@ export function registerPanelRoutes(app: express.Express, getDb: () => Firestore
       const result = applyClientAction({ ...panel, id: ref.id }, action);
       if ('error' in result) return res.status(404).json({ error: result.error });
       const clean = JSON.parse(JSON.stringify(result.panel));
-      await ref.set(clean);
-      await db.collection('student_portals').doc(panelDocId(token)).set(JSON.parse(JSON.stringify(snapshotOf(result.panel))));
+      const batch = db.batch();
+      batch.set(ref, clean);
+      batch.set(db.collection('student_portals').doc(panelDocId(token)), JSON.parse(JSON.stringify(snapshotOf(result.panel))));
+      await batch.commit();
       res.json({ ok: true });
       await notify(result.notice.title, result.notice.body).catch(() => undefined);
     } catch (err) {
