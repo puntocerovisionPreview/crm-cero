@@ -207,6 +207,7 @@ const CalendarView = React.lazy(() => import('./views/CalendarView').then((m) =>
 const ProjectsSimpleView = React.lazy(() => import('./views/ProjectsSimpleView').then((m) => ({ default: m.ProjectsSimpleView })));
 const IncomeView = React.lazy(() => import('./views/IncomeView').then((m) => ({ default: m.IncomeView })));
 const ClientDetailView = React.lazy(() => import('./views/ClientDetailView').then((m) => ({ default: m.ClientDetailView })));
+const ClientsListView = React.lazy(() => import('./views/ClientsListView').then((m) => ({ default: m.ClientsListView })));
 const PanelsView = React.lazy(() => import('./views/PanelsView').then((m) => ({ default: m.PanelsView })));
 const NewClientWizardView = React.lazy(() => import('./views/NewClientWizardView').then((m) => ({ default: m.NewClientWizardView })));
 const TaskDetailView = React.lazy(() => import('./views/TaskDetailView').then((m) => ({ default: m.TaskDetailView })));
@@ -3592,6 +3593,11 @@ export default function App() {
           showToast={showToast}
         />
       );
+    }
+
+    if (path === '/clientes' && currentRoute.query?.vista !== 'completa') {
+      // Lista limpia de clientes; la vista completa anterior sigue en /clientes?vista=completa
+      return <ClientsListView projects={projects} meetings={meetings} incomes={incomes} privacyMode={privacyMode} onNavigate={navigate} />;
     }
 
     if (path === '/clientes') {
