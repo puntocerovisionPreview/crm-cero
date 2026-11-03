@@ -156,6 +156,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { usePafAvisos } from './portal/usePafAvisos';
+import { republishIfPublished, unpublishPafPortal } from './portal/store';
 import { requestCalendarSync } from './utils/calendarSyncClient';
 import { inviteKey, meetingHash } from './utils/calendarKeys';
 import {
@@ -2231,6 +2232,10 @@ export default function App() {
       publishedPortalKeysRef.current.delete(projectToDelete.studentPortalToken);
       unpublishStudentPortal(projectToDelete.studentPortalToken).catch(err => console.warn(err));
     }
+    // Su portal nuevo también se despublica: un cliente borrado no puede seguir entrando
+    if (projectToDelete?.pafClienteId && projectToDelete.pafPortal?.publishedAt) {
+      unpublishPafPortal(projectToDelete.pafClienteId).catch(err => console.warn(err));
+    }
     if (projectToDelete) {
       addTrashRecord({
         id: projectToDelete.id,
@@ -2254,6 +2259,8 @@ export default function App() {
         if (projectToDelete) {
           handleAddProject(projectToDelete);
           purgeTrashRecord(projectToDelete.id);
+          // Deshacer: si tenía el portal publicado, vuelve a estar como estaba
+          republishIfPublished(projectToDelete, meetings).catch(err => console.warn(err));
         }
       });
     } catch (err) {
