@@ -44,62 +44,85 @@ type Props = {
  * Etapa, foco, correos y enlaces se guardan solos en la ficha; si difieren de lo que ve
  * el estudio, el encabezado avisa "Hay cambios sin publicar". Tareas y entregas se publican solas.
  */
+type Adding = null | 'anuncio' | 'tarea' | 'acceso' | 'entrega' | 'reunion';
+const ADD_OPTIONS: { id: Exclude<Adding, null>; label: string }[] = [
+  { id: 'anuncio', label: 'Anuncio' },
+  { id: 'tarea', label: 'Tarea' },
+  { id: 'acceso', label: 'Acceso' },
+  { id: 'entrega', label: 'Entrega' },
+  { id: 'reunion', label: 'Reunión' },
+];
+
+/**
+ * "LO QUE VE EL CLIENTE": un espejo editable de su portal, en el mismo orden
+ * (anuncios, tareas, próxima reunión, accesos, entregas). Lo que agregás o cambiás
+ * se publica solo. Los ajustes (alta, correos, WhatsApp, despublicar) quedan plegados abajo.
+ */
 export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, showAlta = true }) => {
-  const [tab, setTab] = useState<Tab>('hoy');
-  const [meetingTitle, setMeetingTitle] = useState<string | undefined>(undefined);
+  const [adding, setAdding] = useState<Adding>(null);
   const portal = usePortalDraft(project, meetings, onUpdateProject);
   const work = usePafWork(project, meetings, onUpdateProject);
   const toReview = work.tasks.filter((t) => t.estado === 'enviada');
+  const accesos = draftAccesos(portal.draft);
+  const today = new Date().toLocaleDateString('en-CA');
+  const next = nextMeeting(meetings, project.id, today);
+  const empty = !(project.pafAnuncios || []).length && !work.tasks.length && !accesos.length && !work.deliveries.length && !next;
+  const toggle = (id: Exclude<Adding, null>) => setAdding((a) => (a === id ? null : id));
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <PanelHeader portal={portal} studio={project.clientName} />
 
-      <SegmentedControl<Tab>
-        value={tab}
-        onChange={setTab}
-        className="w-full [&>button]:flex-1"
-        options={[
-          { id: 'hoy', label: 'Hoy', count: toReview.length || undefined },
-          { id: 'tareas', label: 'Tareas', count: work.tasks.length || undefined },
-          { id: 'config', label: 'Configuración' },
-        ]}
-      />
+      <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Agregar al portal">
+        {ADD_OPTIONS.map((o) => (
+          <button key={o.id} type="button" onClick={() => toggle(o.id)} aria-pressed={adding === o.id}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${adding === o.id ? 'border-zinc-100 bg-zinc-100 text-zinc-950' : 'border-zinc-700 text-zinc-300 hover:border-zinc-500'}`}>
+            + {o.label}
+          </button>
+        ))}
+      </div>
 
-      {tab === 'hoy' && (
-        <div className="space-y-5">
-          <StageTemplate project={project} hito={portal.draft.hito} work={work} onMeeting={setMeetingTitle} />
-          <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
-
-          <Block title="Esta semana" hint="El foco y 2 o 3 objetivos, con quién hace cada uno. Lo ve el estudio arriba de todo.">
-            <textarea className={input} rows={2} value={portal.draft.resumen} placeholder="Foco: esta semana cerramos a quién le hablamos." onChange={(e) => portal.set({ resumen: e.target.value })} />
-            <PafWeekGoals project={project} publishedId={portal.published?.clienteId} />
-          </Block>
-
-          <Block title="Para revisar" hint="El estudio avisó que las terminó." badge={toReview.length ? <BellRing className="w-3.5 h-3.5 text-amber-400" /> : undefined}>
-            {toReview.length ? <TaskList tasks={toReview} work={work} /> : <p className="text-[11px] text-zinc-500">Nada para revisar.</p>}
-          </Block>
-
-          <PafReunionCard project={project} meetings={meetings} onAddMeeting={onAddMeeting} suggestedTitle={meetingTitle} />
-          <PafMeetingSummaries project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
-
-          <Deliveries work={work} />
-        </div>
+      {toReview.length > 0 && (
+        <Block title={`Para revisar (${toReview.length})`} hint="El cliente avisó que las terminó. Aprobá o volvé a habilitar.">
+          <TaskList tasks={toReview} work={work} />
+        </Block>
       )}
 
-      {tab === 'tareas' && (
-        <div className="space-y-3">
-          <StageTemplate project={project} hito={portal.draft.hito} work={work} onMeeting={(t) => { setMeetingTitle(t); setTab('hoy'); }} always />
-          {!project.pafClienteId && <p className="text-[11px] text-zinc-500">Los avisos de "Terminé" llegan cuando el estudio tenga ID y portal publicado.</p>}
-          {work.tasks.length ? <TaskList tasks={work.tasks} work={work} /> : <p className="text-[11px] text-zinc-500">Todavía no hay tareas.</p>}
-          <AddTask work={work} />
-        </div>
+      {empty && !adding && <p className="rounded-xl border border-dashed border-zinc-700 p-4 text-center text-xs text-zinc-500">El cliente todavía no ve nada. Empezá con “+ Anuncio” o “+ Tarea”.</p>}
+
+      {((project.pafAnuncios || []).length > 0 || adding === 'anuncio') && (
+        <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'anuncio'} onDone={() => setAdding(null)} />
       )}
 
-      {tab === 'config' && (
-        <div className="space-y-5">
+      {(work.tasks.length > 0 || adding === 'tarea') && (
+        <Block title="Tareas" hint="Nacen ocultas: tocá Habilitar para que el cliente la vea.">
+          {adding === 'tarea' && <AddTask work={work} onDone={() => setAdding(null)} />}
+          {work.tasks.length > 0 && <TaskList tasks={work.tasks.filter((t) => t.estado !== 'enviada')} work={work} />}
+        </Block>
+      )}
+
+      {(next || adding === 'reunion') && (
+        <Block title="Próxima reunión">
+          {next && <p className="text-xs text-zinc-200">{next.fecha}{next.hora ? ` · ${next.hora} hs` : ''}</p>}
+          {adding === 'reunion' && <PafReunionCard project={project} meetings={meetings} onAddMeeting={(m) => { onAddMeeting(m); setAdding(null); }} />}
+        </Block>
+      )}
+
+      {(accesos.length > 0 || adding === 'acceso') && (
+        <Block title="Accesos directos" hint="Nombre y link (solo https). La carpeta interna y la ficha se bloquean solas.">
+          <AccessEditor items={accesos} startAdding={adding === 'acceso'} onChange={(list) => { portal.set({ accesos: list }); }} />
+        </Block>
+      )}
+
+      {(work.deliveries.length > 0 || adding === 'entrega') && <Deliveries work={work} showForm={adding === 'entrega'} onDone={() => setAdding(null)} />}
+
+      {(project.pafResumenes || []).length > 0 && <PafMeetingSummaries project={project} meetings={meetings} onUpdateProject={onUpdateProject} />}
+
+      <details className="group rounded-xl border border-zinc-800">
+        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200">Ajustes del portal</summary>
+        <div className="space-y-5 border-t border-zinc-800 p-3">
           {showAlta && <PafAltaCard project={project} onUpdateProject={onUpdateProject} />}
-          <Block title="Acceso al portal" hint="Solo entran estos correos, con su cuenta de Google. El del alta (con el que se comparte la carpeta) se agrega solo.">
+          <Block title="Quién puede entrar" hint="Solo estos correos, con su cuenta de Google. El del alta se agrega solo.">
             <label className="block text-[11px] text-zinc-400">ID del cliente
               <input className={`${input} font-mono`} value={portal.clienteId} disabled={!!portal.published} placeholder="PAF-002" onChange={(e) => portal.setClienteId(e.target.value.toUpperCase())} />
             </label>
@@ -107,20 +130,18 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
               <input className={input} value={portal.emailsText} placeholder="estudio@gmail.com, socia@gmail.com" onChange={(e) => portal.setEmailsText(e.target.value)} />
             </label>
           </Block>
-          <Block title="Accesos directos" hint="Nombre y link, en el orden que quieras (ej. «Contenido en Asana»). Solo https. La carpeta interna y la ficha se bloquean solas.">
-            <AccessEditor items={draftAccesos(portal.draft)} onChange={(accesos) => portal.set({ accesos })} />
-          </Block>
-          <Block title="Tu WhatsApp" hint="Para el botón «Hablar con Juan» del portal. Es uno solo para todos los estudios.">
+          <Block title="Tu WhatsApp" hint="Para el botón «Hablar con Juan». Es uno solo para todos los clientes.">
             <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
           </Block>
+          {(project.pafResumenes || []).length === 0 && <PafMeetingSummaries project={project} meetings={meetings} onUpdateProject={onUpdateProject} />}
           {portal.published && (
             <div className="rounded-xl border border-rose-500/20 p-3 flex items-center gap-3">
-              <p className="flex-1 text-[11px] text-zinc-400">Despublicar: el estudio deja de ver su portal. Lo podés volver a publicar cuando quieras.</p>
+              <p className="flex-1 text-[11px] text-zinc-400">Despublicar: el cliente deja de ver su portal.</p>
               <button type="button" onClick={portal.unpublish} disabled={portal.busy} className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/10">Despublicar</button>
             </div>
           )}
         </div>
-      )}
+      </details>
     </div>
   );
 };
@@ -128,9 +149,8 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 // ---------- Encabezado ----------
 
 function PanelHeader({ portal, studio }: { portal: ReturnType<typeof usePortalDraft>; studio: string }) {
-  const { published, dirty } = portal;
+  const { published } = portal;
   const status = !published ? { text: 'Sin publicar', dot: 'bg-zinc-500' }
-    : dirty ? { text: 'Hay cambios sin publicar', dot: 'bg-amber-400' }
     : { text: `Publicado · ${new Date(published.actualizadoEn).toLocaleDateString('es-AR')}`, dot: 'bg-emerald-500' };
   const viewUrl = published ? `/portal?ver=${encodeURIComponent(published.clienteId)}` : '';
 
@@ -141,16 +161,11 @@ function PanelHeader({ portal, studio }: { portal: ReturnType<typeof usePortalDr
         <span className="flex-1 text-xs font-semibold text-zinc-100">{status.text}</span>
         {published && <span className="text-[10px] font-mono text-zinc-500">{published.clienteId}</span>}
       </div>
-      <label className="flex items-center gap-2 text-[11px] text-zinc-400">
-        <span className="shrink-0">Etapa</span>
-        <select className={input} value={portal.draft.hito} onChange={(e) => portal.set({ hito: Number(e.target.value) })}>
-          {PRESENCIA_HITOS.map((t, i) => <option key={t} value={i + 1}>{i + 1}. {t}</option>)}
-        </select>
-      </label>
+
       <div className="flex flex-wrap gap-2">
-        {(!published || dirty) && (
+        {!published && (
           <button type="button" onClick={portal.publish} disabled={portal.busy} className="btn-solid-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs">
-            {portal.busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}{published ? 'Publicar cambios' : 'Publicar portal'}
+            {portal.busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}Publicar portal
           </button>
         )}
         {published && (
@@ -232,7 +247,13 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
     const t = setTimeout(() => {
       lastSaved.current = snap;
       onUpdateProject(project.id, { pafPortal: { ...current, publishedAt: project.pafPortal?.publishedAt } });
-    }, 600);
+      // Si el portal ya está publicado, el cambio se publica solo (sin "Publicar cambios")
+      if (published) {
+        const r = portalFromProject(project, meetings, current, clienteId, new Date(), privados);
+        if ('errors' in r) setErrors(r.errors);
+        else { setErrors([]); publishPafPortal(r.doc).catch(() => setErrors(['Se guardó, pero no se pudo actualizar el portal. Reintentá.'])); }
+      }
+    }, 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
@@ -390,7 +411,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
   );
 }
 
-function AddTask({ work }: { work: Work }) {
+function AddTask({ work, onDone }: { work: Work; onDone?: () => void }) {
   const [f, setF] = useState({ titulo: '', link: '', detalle: '', fecha: '' });
   const [error, setError] = useState('');
   const add = () => {
@@ -401,6 +422,7 @@ function AddTask({ work }: { work: Work }) {
     hapticFeedback.light();
     work.add({ titulo: f.titulo.trim(), ...(link ? { link } : {}), ...(f.detalle.trim() ? { detalle: f.detalle.trim() } : {}), ...(f.fecha ? { fecha: f.fecha } : {}) });
     setF({ titulo: '', link: '', detalle: '', fecha: '' });
+    onDone?.();
   };
   return (
     <div className="space-y-1.5 pt-2 border-t border-zinc-800">
@@ -417,7 +439,7 @@ function AddTask({ work }: { work: Work }) {
   );
 }
 
-function Deliveries({ work }: { work: Work }) {
+function Deliveries({ work, showForm = true, onDone }: { work: Work; showForm?: boolean; onDone?: () => void }) {
   const [f, setF] = useState({ titulo: '', enlace: '', fecha: '' });
   const [error, setError] = useState('');
   const add = () => {
@@ -427,6 +449,7 @@ function Deliveries({ work }: { work: Work }) {
     setError('');
     work.saveDeliveries([...work.deliveries, { id: newItemId(), titulo: f.titulo.trim(), publicada: false, ...(enlace ? { enlace } : {}), ...(f.fecha ? { fecha: f.fecha } : {}) }]);
     setF({ titulo: '', enlace: '', fecha: '' });
+    onDone?.();
   };
   return (
     <Block title="Entregas" hint="Nacen ocultas: marcá «La ve el estudio» cuando la quieras mostrar.">
@@ -442,15 +465,15 @@ function Deliveries({ work }: { work: Work }) {
           ))}
         </ul>
       )}
-      <div className="space-y-1.5">
+      {showForm && <div className="space-y-1.5">
         <input className={input} value={f.titulo} placeholder="Nueva entrega (ej. Guía de mensaje)" onChange={(e) => setF({ ...f, titulo: e.target.value })} />
         <div className="flex gap-1.5">
           <input className={input} value={f.enlace} placeholder="Enlace de Drive (https://)" onChange={(e) => setF({ ...f, enlace: e.target.value })} />
           <input className={`${input} w-36`} type="date" aria-label="Fecha de la entrega" value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} />
         </div>
-        <button type="button" onClick={add} className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 text-[11px] font-bold">Agregar entrega</button>
-        {(error || work.error) && <p role="alert" className="text-[11px] text-rose-300">{error || work.error}</p>}
-      </div>
+        <button type="button" onClick={add} className="btn-solid-primary px-3 py-1.5 text-xs">Agregar entrega</button>
+      </div>}
+      {(error || work.error) && <p role="alert" className="text-[11px] text-rose-300">{error || work.error}</p>}
     </Block>
   );
 }
@@ -523,7 +546,9 @@ function StageTemplate({ project, hito, work, onMeeting, always }: { project: Pr
   );
 }
 /** Editor de accesos directos: nombre y link, ordenar, sumar y borrar */
-function AccessEditor({ items, onChange }: { items: { id: string; nombre: string; url: string }[]; onChange: (items: { id: string; nombre: string; url: string }[]) => void }) {
+function AccessEditor({ items, onChange, startAdding }: { items: { id: string; nombre: string; url: string }[]; onChange: (items: { id: string; nombre: string; url: string }[]) => void; startAdding?: boolean }) {
+  // Al tocar "+ Acceso" arriba aparece una fila vacía para completar
+  useEffect(() => { if (startAdding && !items.some((a) => !a.nombre && !a.url)) onChange([...items, { id: newItemId(), nombre: '', url: '' }]); }, [startAdding]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (id: string, patch: Partial<{ nombre: string; url: string }>) => onChange(items.map((a) => (a.id === id ? { ...a, ...patch } : a)));
   const move = (i: number, d: -1 | 1) => {
     const j = i + d;

@@ -15,7 +15,9 @@ export const PafAnnouncements: React.FC<{
   project: Project;
   meetings: AgendaMeeting[];
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
-}> = ({ project, meetings, onUpdateProject }) => {
+  showForm?: boolean;
+  onDone?: () => void;
+}> = ({ project, meetings, onUpdateProject, showForm = true, onDone }) => {
   const items = [...(project.pafAnuncios || [])].sort((a, b) => Number(!!b.fijado) - Number(!!a.fijado) || b.creadoEn.localeCompare(a.creadoEn));
   const [f, setF] = useState({ texto: '', titulo: '', link: '', fijado: false });
   const [error, setError] = useState('');
@@ -36,13 +38,14 @@ export const PafAnnouncements: React.FC<{
       ...(f.titulo.trim() ? { titulo: f.titulo.trim() } : {}), ...(link ? { link } : {}), ...(f.fijado ? { fijado: true } : {}),
     }]);
     setF({ texto: '', titulo: '', link: '', fijado: false });
+    onDone?.();
   };
 
   return (
     <section className="space-y-2">
       <div>
         <h3 className="text-xs font-bold text-zinc-100">Anuncios</h3>
-        <p className="text-[11px] text-zinc-500">Lo primero que ve el estudio. No tiene que confirmar nada.</p>
+        <p className="text-[11px] text-zinc-500">Lo primero que ve el cliente.</p>
       </div>
 
       {items.length > 0 && (
@@ -67,7 +70,7 @@ export const PafAnnouncements: React.FC<{
         </ul>
       )}
 
-      <div className="space-y-1.5">
+      {showForm && <div className="space-y-1.5">
         <textarea className={input} rows={2} value={f.texto} placeholder="Ej: Esta semana arrancamos con tu web. Ya tenés el borrador en tu carpeta." onChange={(e) => setF({ ...f, texto: e.target.value })} />
         <div className="flex gap-1.5">
           <input className={input} value={f.titulo} placeholder="Título (opcional)" onChange={(e) => setF({ ...f, titulo: e.target.value })} />
@@ -78,8 +81,8 @@ export const PafAnnouncements: React.FC<{
           <label className="flex items-center gap-1 text-[11px] text-zinc-400"><input type="checkbox" checked={f.fijado} onChange={(e) => setF({ ...f, fijado: e.target.checked })} />Fijar arriba</label>
           <button type="button" onClick={() => add(false)} className="ml-auto text-[11px] text-zinc-500 hover:text-zinc-300">Guardar sin publicar</button>
         </div>
-        {error && <p role="alert" className="text-[11px] text-rose-300">{error}</p>}
-      </div>
+      </div>}
+      {error && <p role="alert" className="text-[11px] text-rose-300">{error}</p>}
     </section>
   );
 };

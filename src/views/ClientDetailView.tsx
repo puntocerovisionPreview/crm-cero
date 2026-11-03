@@ -58,6 +58,7 @@ import { playTaskDone } from '../utils/sound';
 import { PaymentPlanManager } from '../components/PaymentPlanManager';
 import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
 import { PafAdminPanel } from '../components/PafAdminPanel';
+import { ClientAdminStrip } from '../components/ClientAdminStrip';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { 
   formatProjectPrice, 
@@ -219,7 +220,7 @@ export const ClientDetailView: React.FC<Props> = ({
 
   // 5 Unified Tabs per Stage 3 spec: Resumen · Cobros · Trabajo · Notas · Horas
   type ClientTab = 'resumen' | 'historial' | 'cobros' | 'trabajo' | 'notas' | 'horas';
-  const [activeTab, setActiveTab] = useState<ClientTab>('resumen');
+  const [activeTab, setActiveTab] = useState<ClientTab>('cobros');
 
   // Collapsible sections inside Trabajo
   const [trabajoTareasOpen, setTrabajoTareasOpen] = useState(true);
@@ -703,10 +704,10 @@ export const ClientDetailView: React.FC<Props> = ({
       </div>
 
       {/* Main Container: 2-Column on Desktop (30% Left Sticky / 70% Right) */}
-      <div className="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:flex lg:gap-6 items-start">
+      <div className="max-w-3xl w-full mx-auto p-4 sm:p-6 space-y-4">
         
         {/* ================= COLUMNA IZQUIERDA (30% Sticky en Desktop) ================= */}
-        <aside className="w-full lg:w-[320px] lg:shrink-0 lg:sticky lg:top-20 space-y-4 mb-6 lg:mb-0">
+        <div className="w-full space-y-4">
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-4 shadow-xl">
             {/* 1. Header: Avatar & Client Name */}
             <div className="flex items-start gap-3">
@@ -789,65 +790,7 @@ export const ClientDetailView: React.FC<Props> = ({
               )}
             </div>
 
-            {/* 3. Fast Financial & Dates Summary */}
-            <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-xl p-3 space-y-2.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-zinc-500">Monto total acordado:</span>
-                <span className="font-mono font-bold text-zinc-100">
-                  {privacyMode
-                    ? '$ ••••••'
-                    : formatProjectPrice(project.estimatedPrice || 0, resolveProjectCurrency(project.estimatedCurrency, project.estimatedPrice))}
-                </span>
-              </div>
-
-              {isPaf && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-500">Consultoría 1:1 realizada:</span>
-                  <span className="font-mono font-bold text-[var(--accent)]">
-                    {project.pafConsultingHoursDone || 0} / {project.pafConsultingHoursTotal || 26} hs
-                  </span>
-                </div>
-              )}
-
-              {project.startDate && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-500">Fecha de inicio:</span>
-                  <span className="font-mono text-zinc-300">{project.startDate}</span>
-                </div>
-              )}
-
-              {project.deliveryDate && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-500">Entrega estimada:</span>
-                  <span className="font-mono text-zinc-300">{project.deliveryDate}</span>
-                </div>
-              )}
-            </div>
-
-            {/* 4. Fixed Actions: Registrar pago & Archivar / Eliminar */}
-            <div className="pt-2 border-t border-zinc-800/60 space-y-2">
-              <button
-                type="button"
-                onClick={() => {
-                  hapticFeedback.medium();
-                  setEditingPayment(null);
-                  setShowRegisterPaymentModal(true);
-                }}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-white text-xs font-bold transition shadow-md shadow-emerald-600/20 cursor-pointer"
-              >
-                <Plus className="w-4 h-4 stroke-[2.5]" />
-                <span>Registrar pago</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleSendSmartWhatsApp()}
-                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-emerald-400 text-xs font-semibold transition border border-zinc-700/60 cursor-pointer"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>WhatsApp de cobro</span>
-              </button>
-
+            <div className="pt-2 border-t border-zinc-800/60">
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -870,8 +813,10 @@ export const ClientDetailView: React.FC<Props> = ({
             </div>
           </div>
 
+          <ClientAdminStrip project={project} billing={billing} meetings={meetings} privacyMode={privacyMode} onRegisterPayment={() => { hapticFeedback.medium(); setEditingPayment(null); setShowRegisterPaymentModal(true); }} onWhatsappCobro={() => handleSendSmartWhatsApp()} />
+
           {(isPaf || isWebClient) && <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-3">
-            <h2 className="text-sm font-bold text-zinc-100">{isPaf ? 'Portal del estudio · Método PAF' : 'Portal del cliente'}</h2>
+            <h2 className="text-sm font-bold text-zinc-100">Lo que ve el cliente</h2>
             <PafAdminPanel
               key={project.id}
               project={project}
@@ -881,19 +826,14 @@ export const ClientDetailView: React.FC<Props> = ({
               showAlta={isPaf}
             />
           </div>}
-          {/* Key Links Card */}
-          <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4 shadow-md">
-            <ProjectKeyLinks
-              links={project.keyLinks}
-              onUpdateLinks={(links) => onUpdateProject(project.id, { keyLinks: links })}
-              clientName={project.clientName}
-            />
-          </div>
-        </aside>
+        </div>
 
         {/* ================= COLUMNA DERECHA (70% Scrollable) ================= */}
-        <main className="flex-1 min-w-0 space-y-4">
+        <details className="group rounded-2xl border border-zinc-800 bg-zinc-900/60">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-zinc-100">Más detalles: cobros, historial, trabajo, notas y horas</summary>
+        <main className="min-w-0 space-y-4 p-3 border-t border-zinc-800">
           {/* Universal Timeline de Cuotas con Chips & Barra de Progreso */}
+          {activeTab === 'cobros' && (
           <ClientInstallmentTimeline
             project={project}
             incomes={incomes}
@@ -909,6 +849,7 @@ export const ClientDetailView: React.FC<Props> = ({
             }}
             onOpenAgreementEditor={() => setIsEditingAgreement(true)}
           />
+          )}
 
           {/* Horizontal Tabs: 5 Unified Tabs per Stage 3 spec: Resumen · Cobros · Trabajo · Notas · Horas */}
           <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-1.5 sticky top-16 z-10 backdrop-blur-md">
@@ -1641,6 +1582,14 @@ export const ClientDetailView: React.FC<Props> = ({
 
             {/* 4. NOTAS & LINKS */}
             {activeTab === 'notas' && (
+            <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-4"><ProjectKeyLinks
+              links={project.keyLinks}
+              onUpdateLinks={(links) => onUpdateProject(project.id, { keyLinks: links })}
+              clientName={project.clientName}
+            />
+            </div>
+          )}
+          {activeTab === 'notas' && (
               <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-4 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1750,6 +1699,7 @@ export const ClientDetailView: React.FC<Props> = ({
             )}
           </div>
         </main>
+        </details>
       </div>
 
       {/* Confirmation Modal: Delete Project */}
