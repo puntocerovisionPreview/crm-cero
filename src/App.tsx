@@ -156,7 +156,9 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { usePafAvisos } from './portal/usePafAvisos';
-import { republishIfPublished, unpublishPafPortal } from './portal/store';
+import { publishPafPortal, republishIfPublished, unpublishPafPortal } from './portal/store';
+import { portalFromProject } from './portal/model';
+import { buildEjemplo } from './portal/ejemplo';
 import { requestCalendarSync } from './utils/calendarSyncClient';
 import { inviteKey, meetingHash } from './utils/calendarKeys';
 import {
@@ -2240,6 +2242,33 @@ export default function App() {
     return out;
   }, [pafAvisos, projects]);
 
+  // Cliente de ejemplo: un estudio ficticio con todo cargado, publicado solo para tu correo
+  const [creandoEjemplo, setCreandoEjemplo] = useState(false);
+  const handleCrearEjemplo = async () => {
+    const existing = projects.find((p) => p.ejemplo);
+    if (existing) { navigate(`/clientes/${existing.id}`); return; }
+    const email = auth.currentUser?.email;
+    if (!email || creandoEjemplo) return;
+    setCreandoEjemplo(true);
+    try {
+      const { project, meetings: ms } = buildEjemplo(email);
+      const id = await handleAddProject(project);
+      const conId = ms.map((m) => ({ ...m, projectId: id }));
+      for (const m of conId) await handleAddMeeting(m);
+      const r = portalFromProject({ ...project, id }, conId);
+      if ('doc' in r) {
+        await publishPafPortal(r.doc);
+        await handleUpdateProject(id, { pafPortal: { ...project.pafPortal!, publishedAt: r.doc.actualizadoEn } });
+      }
+      navigate(`/clientes/${id}`);
+    } catch (err) {
+      console.error('Error creando el cliente de ejemplo:', err);
+      showToast('No se pudo crear el ejemplo. Probá de nuevo.');
+    } finally {
+      setCreandoEjemplo(false);
+    }
+  };
+
   const handleDeleteProject = async (id: string) => {
     const projectToDelete = projects.find(p => p.id === id);
     if (projectToDelete?.studentPortalToken) {
@@ -3691,7 +3720,7 @@ export default function App() {
 
     if (path === '/clientes' && currentRoute.query?.vista !== 'completa') {
       // Lista limpia de clientes; la vista completa anterior sigue en /clientes?vista=completa
-      return <ClientsListView projects={projects} meetings={meetings} incomes={incomes} privacyMode={privacyMode} onNavigate={navigate} />;
+      return <ClientsListView projects={projects} meetings={meetings} incomes={incomes} privacyMode={privacyMode} onNavigate={navigate} onCrearEjemplo={handleCrearEjemplo} creandoEjemplo={creandoEjemplo} />;
     }
 
     if (path === '/clientes') {

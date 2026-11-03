@@ -31,6 +31,8 @@ export const PafMeetingsSection: React.FC<{
   onScheduling: (open: boolean) => void;
   writingSummary: boolean;
   onWritingSummary: (open: boolean) => void;
+  /** Reunión que propone un tema del plan */
+  sugerida?: import('../portal/presencia').TemaPlantilla | null;
 }> = (props) => {
   const { project, meetings } = props;
   const today = getTodayString();
@@ -53,7 +55,7 @@ export const PafMeetingsSection: React.FC<{
         </div>
         {props.scheduling && (
           <div className="rounded-xl border border-zinc-700 p-3">
-            <PafReunionCard project={project} meetings={meetings} hideUpcoming calendarConnected={isCalendarConnected}
+            <PafReunionCard key={props.sugerida?.id || 'libre'} project={project} meetings={meetings} hideUpcoming calendarConnected={isCalendarConnected} tema={props.sugerida || undefined}
               onAddMeeting={(m) => { props.onAddMeeting(m); props.onScheduling(false); }} onCancel={() => props.onScheduling(false)} />
           </div>
         )}

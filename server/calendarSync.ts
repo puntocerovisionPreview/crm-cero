@@ -80,6 +80,7 @@ interface MeetingDoc {
   invitados?: string[];
   googleInviteHash?: string;
   googleInviteError?: string | null;
+  sinCalendar?: boolean;
 }
 
 /** Pedido a Calendar como vos (para invitar): Google avisa a los invitados */
@@ -242,6 +243,7 @@ export async function runCalendarSync(db: Firestore, opts: { dryRun?: boolean } 
   // 2) CRM → Google
   for (const m of meetings.values()) {
     if (m.proposed && !m.time) continue;
+    if (m.sinCalendar) continue; // cliente de ejemplo: nunca va a tu Calendar
     if (!m.date || m.date < from || m.date > to) continue;
     const hash = meetingHash(m);
     const invite = inviteKey(m);

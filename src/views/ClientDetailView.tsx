@@ -831,6 +831,17 @@ export const ClientDetailView: React.FC<Props> = ({
             </div>
           </div>
 
+          {project.ejemplo && (
+            <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-sky-500/30 bg-sky-500/[0.06] p-4">
+              <p className="flex-1 min-w-[12rem] text-xs text-zinc-200"><span className="font-bold">Cliente de ejemplo.</span> Datos inventados para ver todo armado. Su portal lo ves solo vos (entrá a /portal con tu cuenta) y sus reuniones no van a tu Calendar.</p>
+              <button type="button" onClick={() => {
+                if (!window.confirm('¿Borrar el cliente de ejemplo, sus reuniones y su portal?')) return;
+                meetings.filter((m) => m.projectId === project.id).forEach((m) => onDeleteMeeting(m.id));
+                onDeleteProject(project.id);
+              }} className="shrink-0 rounded-lg bg-zinc-800 px-3 py-1.5 text-xs font-bold text-zinc-200 hover:bg-rose-500/15 hover:text-rose-300">Borrar el ejemplo</button>
+            </div>
+          )}
+
           {/* Una sola próxima acción: lo primero que ves */}
           {!project.archived && <ProximaAccionCard project={project} onUpdateProject={onUpdateProject} />}
 

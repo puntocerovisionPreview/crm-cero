@@ -1,6 +1,6 @@
 import type { BillingInstallment, FlexiblePaymentCommitment, PafMilestone, Project, ProjectInstallment, RecurringIncomePlan } from '../types';
 import { PAF_BASE_MILESTONES, PAF_PRO_MILESTONES } from './pafTemplates';
-import { PAF_STAGE_TEMPLATES } from '../portal/model';
+import { kitDelTema, temaPorId, type Servicio } from '../portal/presencia';
 
 /** Anuncio de bienvenida que se deja listo (sin publicar) en cada PAF nuevo */
 export const BIENVENIDA_PAF = {
@@ -43,6 +43,8 @@ export interface NewClientForm {
   /** Mensual: cantidad de meses (vacío = sin fin) */
   meses?: number;
   nota: string;
+  /** PAF: lo que contrató además de la base (contenido, Google, web) */
+  alcance?: Servicio[];
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -144,9 +146,12 @@ export function buildNewClientProject(f: NewClientForm, now = new Date()): Omit<
     pafConsultingHoursDone: isPaf ? 0 : undefined,
     pafMilestones: milestones,
     startDate: today,
-    // Arranque listo para revisar: las tareas de la etapa 1 (ocultas) y la bienvenida (sin publicar)
+    // Arranque listo para revisar: el tema Arranque empezado (tareas ocultas), el alcance y la bienvenida (sin publicar)
     ...(isPaf ? {
-      pafTareas: PAF_STAGE_TEMPLATES[1].tareas.map((t, i) => ({ ...t, id: `t_${stamp}_${i}`, estado: 'borrador' as const })),
+      pafAlcance: f.alcance || [],
+      pafTemas: { arranque: { empezado: today } },
+      pafTareas: kitDelTema(temaPorId('arranque'), { tareas: [], entregas: [] }, (() => { let i = 0; return () => `t_${stamp}_${i++}`; })()).tareas,
+      pafHistorial: [{ fecha: now.toISOString(), texto: 'Cliente creado; empezó el tema Arranque' }],
       pafAnuncios: [{ id: `a_${stamp}`, ...BIENVENIDA_PAF, publicado: false, fijado: true, creadoEn: now.toISOString() }],
     } : {}),
   };

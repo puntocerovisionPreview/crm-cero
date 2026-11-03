@@ -9,7 +9,7 @@ import { auth } from '../firebaseAuth';
 import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { formatDisplayDate } from '../utils/projectTimeline';
 import { AccessIcon } from '../components/AccessIcon';
-import { MATERIALES, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, PRESENCIA_HITO_INFO, seccionesVisibles } from '../portal/model';
+import { MATERIALES, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, hitoInfoDe, hitosDe, seccionesVisibles, type Recorrido } from '../portal/model';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
@@ -280,7 +280,9 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   const accesos = p.accesos ?? accessesFromEnlaces(p.enlaces || {});
   const anuncios = p.anuncios || [];
   const mostrarAvance = p.mostrarAvance !== false;
-  const hito = Math.min(PRESENCIA_HITOS.length, Math.max(1, p.hitoVisible || 1));
+  // Presencia (PAF) o Web: cada uno tiene sus hitos
+  const HITOS = hitosDe(p.recorrido);
+  const hito = Math.min(HITOS.length, Math.max(1, p.hitoVisible || 1));
   const hechos = p.hitosCompletados || [];
   const initial = (email[0] || '?').toUpperCase();
   const objetivos = p.objetivos || [];
@@ -341,7 +343,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
             </span>
           )}
           <div className="min-w-0">
-            <Eyebrow>Tu espacio con .CERO · Presencia</Eyebrow>
+            <Eyebrow>Tu espacio con .CERO · {p.recorrido === 'web' ? 'Tu web' : 'Presencia'}</Eyebrow>
             <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">Hola, {p.estudio}</h1>
           </div>
         </div>
@@ -350,13 +352,13 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
             <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm text-[var(--text-secondary)]">
               <span className="flex flex-wrap items-baseline gap-x-1.5">
                 <span>Ahora:</span>
-                <span className="font-serif italic text-base text-[var(--text-primary)]">{PRESENCIA_HITOS[hito - 1]}</span>
+                <span className="font-serif italic text-base text-[var(--text-primary)]">{HITOS[hito - 1]}</span>
               </span>
               <span className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]">
-                {hechos.length} de {PRESENCIA_HITOS.length} hitos completados{verRecorrido && <ArrowRight className="w-3.5 h-3.5" />}
+                {hechos.length} de {HITOS.length} hitos completados{verRecorrido && <ArrowRight className="w-3.5 h-3.5" />}
               </span>
             </span>
-            <HitosBar hito={hito} hechos={hechos} />
+            <HitosBar hito={hito} hechos={hechos} hitos={HITOS} />
           </button>
         )}
       </header>
@@ -510,7 +512,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
           </div>
         )}
 
-        {tab === 'recorrido' && <Recorrido hito={hito} hechos={hechos} />}
+        {tab === 'recorrido' && <Recorrido hito={hito} hechos={hechos} recorrido={p.recorrido} />}
 
         {tab === 'tareas' && (
           <div className="space-y-10">
@@ -714,10 +716,10 @@ function TaskList({ items, dot, muted }: { items: PortalTask[]; dot: string; mut
 }
 
 /** Barra del avance: un tramo por hito; lleno si está confirmado, marcado si es el actual */
-function HitosBar({ hito, hechos }: { hito: number; hechos: number[] }) {
+function HitosBar({ hito, hechos, hitos }: { hito: number; hechos: number[]; hitos: readonly string[] }) {
   return (
     <span className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden>
-      {PRESENCIA_HITOS.map((t, i) => (
+      {hitos.map((t, i) => (
         <span key={t} className={`block h-1.5 rounded-full ${hechos.includes(i + 1) ? 'bg-[var(--marca)]' : i + 1 === hito ? 'bg-[var(--marca)] opacity-40' : 'bg-[var(--border-strong)]'}`} />
       ))}
     </span>
@@ -725,12 +727,14 @@ function HitosBar({ hito, hechos }: { hito: number; hechos: number[] }) {
 }
 
 /** MI RECORRIDO: los cinco hitos de Presencia, qué se trabaja en cada uno y cuándo se completa */
-function Recorrido({ hito, hechos }: { hito: number; hechos: number[] }) {
+function Recorrido({ hito, hechos, recorrido }: { hito: number; hechos: number[]; recorrido?: Recorrido }) {
+  const HITOS = hitosDe(recorrido);
+  const INFO = hitoInfoDe(recorrido);
   return (
     <section>
-      <SectionTitle title="Tu recorrido en Presencia" hint={`${hechos.length} de ${PRESENCIA_HITOS.length} hitos completados. Un hito se completa cuando lo confirmamos juntos, no por la fecha.`} />
+      <SectionTitle title={recorrido === 'web' ? 'El recorrido de tu web' : 'Tu recorrido en Presencia'} hint={`${hechos.length} de ${HITOS.length} hitos completados. Un hito se completa cuando lo confirmamos juntos, no por la fecha.`} />
       <ol className="relative space-y-3">
-        {PRESENCIA_HITOS.map((titulo, i) => {
+        {HITOS.map((titulo, i) => {
           const n = i + 1;
           const state = hechos.includes(n) ? 'done' : n === hito ? 'current' : 'pending';
           return (
@@ -746,8 +750,8 @@ function Recorrido({ hito, hechos }: { hito: number; hechos: number[] }) {
                       {state === 'current' && <span className="rounded-full bg-[var(--marca)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--marca-text)]">Estamos acá</span>}
                       {state === 'done' && <span className="text-xs font-normal text-[var(--text-tertiary)]">Completado</span>}
                     </p>
-                    <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-secondary)]">{PRESENCIA_HITO_INFO[i].trabajo}</p>
-                    <p className="mt-1 text-xs text-[var(--text-tertiary)]">Se completa cuando: {PRESENCIA_HITO_INFO[i].seCompleta}</p>
+                    <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-secondary)]">{INFO[i].trabajo}</p>
+                    <p className="mt-1 text-xs text-[var(--text-tertiary)]">Se completa cuando: {INFO[i].seCompleta}</p>
                   </div>
                 </div>
               </Card>

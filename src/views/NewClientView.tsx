@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Check, Copy, Loader2, MessageCircle } from 'lucide-react';
 import type { AgendaMeeting, Project } from '../types';
 import { buildNewClientProject, validateNewClient, type BillingMode, type NewClientForm, businessDaysAfter } from '../utils/newClient';
+import { SERVICIOS, temaPorId } from '../portal/presencia';
+
+/** La reunión de arranque ya con su objetivo y preparación (del método) */
+const ARRANQUE = (() => {
+  const r = temaPorId('arranque').reunion!;
+  return { tema: 'arranque' as const, objetivo: r.objetivo, ...(r.preparar ? { preparar: r.preparar } : {}), ...(r.conCM ? { conCM: true } : {}) };
+})();
 import { buildPedidoAlta, portalFromProject, type PafPortalDraft } from '../portal/model';
 import { createPedidoAlta, publishPafPortal, suggestNextClienteId } from '../portal/store';
 import { getTodayString } from '../utils/storage';
@@ -35,6 +42,7 @@ export const NewClientView: React.FC<{
   const [f, setF] = useState<NewClientForm>({
     tipo: initialTipo, plan: 'paf_pro', estudio: '', contacto: '', email: '', whatsapp: '',
     monto: 0, moneda: initialTipo === 'paf' ? 'USD' : 'ARS', modo: 'cuotas', primerCobro: getTodayString(), cuotas: 3, nota: '',
+    alcance: ['contenido'],
   });
   const [montoText, setMontoText] = useState('');
   const [mesesText, setMesesText] = useState('');
@@ -64,10 +72,10 @@ export const NewClientView: React.FC<{
       const res: Result = { projectId, estudio: form.estudio.trim(), whatsapp: form.whatsapp.replace(/\D/g, ''), warnings };
 
       if (reunion.fecha) {
-        onAddMeeting({ title: `${isPaf ? 'Reunión de arranque' : 'Reunión'} · ${form.estudio.trim()}`, date: reunion.fecha, time: reunion.hora || undefined, durationHours: isPaf ? 1.5 : 1, completed: false, projectId, projectName: form.estudio.trim() });
+        onAddMeeting({ title: `${isPaf ? 'Reunión de arranque' : 'Reunión'} · ${form.estudio.trim()}`, date: reunion.fecha, time: reunion.hora || undefined, durationHours: isPaf ? 1.5 : 1, completed: false, projectId, projectName: form.estudio.trim(), ...(isPaf ? ARRANQUE : {}) });
       } else if (isPaf) {
         // Sin fecha: queda propuesta (no va a Calendar ni al portal hasta que le pongas día y hora)
-        onAddMeeting({ title: `Reunión de arranque · ${form.estudio.trim()}`, date: businessDaysAfter(new Date().toLocaleDateString('en-CA'), 3), durationHours: 1.5, proposed: true, completed: false, projectId, projectName: form.estudio.trim() });
+        onAddMeeting({ title: `Reunión de arranque · ${form.estudio.trim()}`, date: businessDaysAfter(new Date().toLocaleDateString('en-CA'), 3), durationHours: 1.5, proposed: true, completed: false, projectId, projectName: form.estudio.trim(), ...ARRANQUE });
       }
 
       if (isPaf) {
@@ -114,6 +122,22 @@ export const NewClientView: React.FC<{
       <Section title="Tipo">
         <Choice value={f.tipo} onChange={(tipo) => set({ tipo, moneda: tipo === 'paf' ? 'USD' : f.moneda })} options={[{ id: 'paf', label: 'PAF' }, { id: 'web', label: 'Web' }]} />
         {isPaf && <Choice value={f.plan} onChange={(plan) => set({ plan })} options={[{ id: 'paf_pro', label: 'PAF Pro' }, { id: 'paf_base', label: 'PAF Base' }]} />}
+        {isPaf && (
+          <div className="space-y-1.5">
+            <p className="text-xs text-[var(--text-secondary)]">Qué contrató además de la base (arranque, foco, mensaje y cierre)</p>
+            <div className="flex flex-wrap gap-1.5">
+              {SERVICIOS.map((s) => {
+                const on = (f.alcance || []).includes(s.id);
+                return (
+                  <button key={s.id} type="button" aria-pressed={on} onClick={() => set({ alcance: on ? (f.alcance || []).filter((x) => x !== s.id) : [...(f.alcance || []), s.id] })}
+                    className={`rounded-full border px-3 py-1.5 text-xs transition ${on ? 'border-[var(--solid-contrast-bg)] bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)]' : 'border-[var(--border-subtle)] text-[var(--text-secondary)]'}`}>
+                    {on ? '✓ ' : '+ '}{s.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </Section>
 
       <Section title="Datos">

@@ -21,7 +21,7 @@ export const PRESENCIA_HITOS = [
 ] as const;
 
 /** PAF-002, PAF-PRUEBA-001, WEB-001… Un ID no se reutiliza nunca. */
-export const CLIENTE_ID_RE = /^(PAF-(PRUEBA-)?|WEB-)\d{3,}$/;
+export const CLIENTE_ID_RE = /^(PAF-(PRUEBA-|EJEMPLO-)?|WEB-)\d{3,}$/;
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -173,6 +173,8 @@ export interface PafTask {
   paraQue?: string;
   /** Quién la hace (por defecto, el estudio) */
   responsable?: PafResponsable;
+  /** Tema del plan de Presencia al que pertenece */
+  tema?: import('./presencia').TemaId;
 }
 
 /** Hito de Presencia que Juan confirmó, con su evidencia (privada: el estudio solo ve cuáles) */
@@ -181,6 +183,19 @@ export interface PafHitoConfirmado {
   fecha: string; // YYYY-MM-DD
   evidencia: string;
 }
+
+/** Recorrido de un cliente Web: sus propios hitos (no los de Presencia) */
+export const WEB_HITOS = ['Brief', 'Diseño', 'Desarrollo', 'Revisión', 'Publicada'] as const;
+export const WEB_HITO_INFO: { trabajo: string; seCompleta: string }[] = [
+  { trabajo: 'Objetivo de la web, páginas, contenidos y lo que hay que conservar.', seCompleta: 'Brief aprobado y materiales recibidos.' },
+  { trabajo: 'Estructura, estilo y textos de cada página.', seCompleta: 'Diseño y textos aprobados.' },
+  { trabajo: 'Armado de la web con lo aprobado, formularios y contacto.', seCompleta: 'Versión completa lista para revisar.' },
+  { trabajo: 'Revisión en celular y escritorio, ajustes y pruebas.', seCompleta: 'Versión final aprobada.' },
+  { trabajo: 'Publicación en tu dominio, medición y entrega de accesos.', seCompleta: 'Web publicada, probada y medida.' },
+];
+export type Recorrido = 'presencia' | 'web';
+export const hitosDe = (r?: Recorrido) => (r === 'web' ? WEB_HITOS : PRESENCIA_HITOS);
+export const hitoInfoDe = (r?: Recorrido) => (r === 'web' ? WEB_HITO_INFO : PRESENCIA_HITO_INFO);
 
 /** Qué agrupa cada hito y cuándo se completa (de la especificación del servicio) */
 export const PRESENCIA_HITO_INFO: { trabajo: string; seCompleta: string }[] = [
@@ -211,6 +226,8 @@ export interface PafDelivery {
   /** Dónde lo confirma (mail, Asana, reunión…) */
   canal?: string;
   estado?: PafDeliveryState;
+  /** Tema del plan de Presencia al que pertenece */
+  tema?: import('./presencia').TemaId;
 }
 export type PafDeliveryState = 'en_revision' | 'aprobada' | 'ajustes';
 export const PAF_DELIVERY_STATE_LABEL: Record<PafDeliveryState, string> = { en_revision: 'Para revisar', aprobada: 'Aprobada', ajustes: 'Con ajustes' };
@@ -275,6 +292,8 @@ export interface PafPortalDoc {
   mostrarAvance?: boolean;
   /** Hitos que Juan confirmó (el avance se cuenta por estos, nunca por fechas) */
   hitosCompletados?: number[];
+  /** Presencia (PAF) o Web: cambia los hitos que ve */
+  recorrido?: Recorrido;
   /** Qué secciones se muestran */
   secciones?: Record<PortalSeccion, boolean>;
   gestionContenido?: string | null;
@@ -340,7 +359,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; recorrido?: Recorrido; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -392,6 +411,7 @@ export function buildPafPortal(
       anuncios: ver.anuncios ? input.anuncios || [] : [],
       mostrarAvance: input.draft.mostrarAvance !== false,
       hitosCompletados: hitosCompletados((input.hitosCompletados || []).map((hito) => ({ hito, fecha: '', evidencia: '' }))),
+      recorrido: input.recorrido === 'web' ? 'web' : 'presencia',
       logo: safeLogo(input.draft.logo),
       marca: safeColor(input.draft.marca),
       linkReunion: input.draft.linkReunion ? safeHttpsUrl(normalizeLinkInput(input.draft.linkReunion)) : null,
@@ -463,7 +483,7 @@ export function meetingPorConfirmar(
 }
 
 export function portalFromProject(
-  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[]; pafHitos?: PafHitoConfirmado[]; pafReportes?: PafReporte[] },
+  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[]; pafHitos?: PafHitoConfirmado[]; pafReportes?: PafReporte[]; serviceType?: string; projectType?: string },
   meetings: Parameters<typeof nextMeeting>[0],
   draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
   clienteId = project.pafClienteId,
@@ -484,6 +504,7 @@ export function portalFromProject(
       reuniones: publicSummaries(project.pafResumenes),
       anuncios: publicAnnouncements(project.pafAnuncios),
       hitosCompletados: hitosCompletados(project.pafHitos),
+      recorrido: project.serviceType === 'web' || (!project.serviceType && project.projectType === 'web') ? 'web' : 'presencia',
       reunionesHechas: (meetings as { projectId?: string; completed: boolean; proposed?: boolean }[]).filter((m) => m.projectId === project.id && m.completed && !m.proposed).length,
       reunionPorConfirmar: meetingPorConfirmar(meetings as Parameters<typeof meetingPorConfirmar>[0], project.id),
       reportes: project.pafReportes,

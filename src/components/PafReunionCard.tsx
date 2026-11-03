@@ -52,8 +52,11 @@ export const PafReunionCard: React.FC<{
   /** Si ya se sabe si Calendar está conectado (evita preguntarle otra vez al servidor) */
   calendarConnected?: boolean;
   onCancel?: () => void;
-}> = ({ project, meetings, onAddMeeting, suggestedTitle, hideUpcoming, calendarConnected, onCancel }) => {
-  const [form, setForm] = useState({ title: `Reunión PAF · ${project.clientName}`, date: getTodayString(), time: '11:00', durationHours: 1, notes: '', objetivo: '', preparar: '', conCM: false });
+  /** Tema del plan que propone esta reunión: título, objetivo, preparación y duración */
+  tema?: import('../portal/presencia').TemaPlantilla;
+}> = ({ project, meetings, onAddMeeting, suggestedTitle, hideUpcoming, calendarConnected, onCancel, tema }) => {
+  const r = tema?.reunion;
+  const [form, setForm] = useState({ title: `${r?.titulo || 'Reunión PAF'} · ${project.clientName}`, date: getTodayString(), time: '11:00', durationHours: r?.horas || 1, notes: '', objetivo: r?.objetivo || '', preparar: r?.preparar || '', conCM: !!r?.conCM });
   // A quién invitar: los correos que entran a su portal (o el del cliente)
   const clientEmails = clientInviteEmails(project);
   const [invitar, setInvitar] = useState(clientEmails.length > 0);
@@ -94,6 +97,7 @@ export const PafReunionCard: React.FC<{
       ...(form.objetivo.trim() ? { objetivo: form.objetivo.trim() } : {}),
       ...(form.preparar.trim() ? { preparar: form.preparar.trim() } : {}),
       ...(form.conCM ? { conCM: true } : {}),
+      ...(tema ? { tema: tema.id } : {}),
       completed: false,
       projectId: project.id,
       projectName: project.clientName,

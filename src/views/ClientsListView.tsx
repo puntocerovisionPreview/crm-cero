@@ -40,7 +40,10 @@ export const ClientsListView: React.FC<{
   incomes: IncomeRecord[];
   privacyMode?: boolean;
   onNavigate: (path: string) => void;
-}> = ({ projects, meetings, incomes, privacyMode, onNavigate }) => {
+  /** Crea (o abre) el cliente de ejemplo */
+  onCrearEjemplo?: () => void;
+  creandoEjemplo?: boolean;
+}> = ({ projects, meetings, incomes, privacyMode, onNavigate, onCrearEjemplo, creandoEjemplo }) => {
   const [filter, setFilter] = useState<Filter>('activos');
   const [q, setQ] = useState('');
   const today = new Date().toLocaleDateString('en-CA');
@@ -133,6 +136,13 @@ export const ClientsListView: React.FC<{
       <p className="text-center text-xs text-[var(--text-tertiary)]">
         <button type="button" onClick={() => onNavigate('/clientes?vista=completa')} className="underline underline-offset-4 hover:text-[var(--text-primary)]">Ver la vista completa (cobros, presupuestos, roadmap)</button>
       </p>
+      {onCrearEjemplo && (
+        <p className="text-center text-xs text-[var(--text-tertiary)]">
+          <button type="button" onClick={onCrearEjemplo} disabled={creandoEjemplo} className="underline underline-offset-4 hover:text-[var(--text-primary)] disabled:opacity-50">
+            {creandoEjemplo ? 'Armando el ejemplo…' : projects.some((p) => p.ejemplo) ? 'Abrir el cliente de ejemplo' : 'Ver un cliente de ejemplo completo'}
+          </button>
+        </p>
+      )}
     </div>
   );
 };

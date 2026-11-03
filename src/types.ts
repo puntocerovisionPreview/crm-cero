@@ -79,6 +79,8 @@ export interface AgendaMeeting {
   objetivo?: string; // Para qué es la reunión (lo ve el cliente)
   preparar?: string; // Qué tiene que traer o pensar el cliente (lo ve el cliente)
   conCM?: boolean; // Se suma la community manager
+  tema?: import('./portal/presencia').TemaId; // Tema del plan de Presencia
+  sinCalendar?: boolean; // No va a Google Calendar (cliente de ejemplo)
   prep?: { saleCon?: string; decide?: string; mostrar?: string; pedir?: string; ojo?: string }; // Preparación privada de Juan
 }
 
@@ -393,6 +395,10 @@ export interface Project {
   pafTareas?: import('./portal/model').PafTask[]; // Tareas del estudio: el cliente ve solo las habilitadas
   pafHitos?: import('./portal/model').PafHitoConfirmado[]; // Hitos de Presencia confirmados (con evidencia privada)
   pafReportes?: import('./portal/model').PafReporte[]; // Reportes del viernes (el estudio ve los publicados)
+  pafAlcance?: import('./portal/presencia').Servicio[]; // Qué contrató además de la base (contenido, Google, web)
+  pafTemas?: Partial<Record<import('./portal/presencia').TemaId, import('./portal/presencia').TemaEstado>>; // Plan de Presencia: cuándo empezó cada tema y su checklist
+  pafHistorial?: { fecha: string; texto: string }[]; // Qué se aprobó o confirmó y cuándo (privado)
+  ejemplo?: boolean; // Cliente de ejemplo: se borra entero con un botón
   proximaAccion?: ProximaAccion; // La única próxima acción del cliente (responsable, fecha y qué necesita)
   pafEntregas?: import('./portal/model').PafDelivery[]; // Entregas (enlaces a Drive), visibles si están publicadas
   studentPortalToken?: string; // Link de solo lectura para el alumno (/alumno/{token})

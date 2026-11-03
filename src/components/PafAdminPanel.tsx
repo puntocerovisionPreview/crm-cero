@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, CalendarDays, FileText, Star, CalendarPlus, Check, CircleAlert, Copy, ExternalLink, Eye, FolderOpen, Home, ImagePlus, Link2, ListChecks, Loader2, Megaphone, MessageCircle, NotebookPen, Package, Palette, Radio, Settings2, Smartphone, Target, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Route, CalendarDays, FileText, Star, CalendarPlus, Check, CircleAlert, Copy, ExternalLink, Eye, FolderOpen, Home, ImagePlus, Link2, ListChecks, Loader2, Megaphone, MessageCircle, NotebookPen, Package, Palette, Radio, Settings2, Smartphone, Target, Trash2, Undo2 } from 'lucide-react';
 import { shrinkLogo } from '../utils/logoImage';
 import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
@@ -19,7 +19,10 @@ import { PafAltaCard } from './PafAltaCard';
 import { PafMeetingsSection } from './PafMeetingsSection';
 import { PafWeekGoals } from './PafWeekGoals';
 import { PafAnnouncements } from './PafAnnouncements';
-import { PafHitosCard } from './PafHitosCard';
+import { PafHitosCard, confirmarHito } from './PafHitosCard';
+import { PafPlanSection } from './PafPlanSection';
+import { conHistorial } from '../portal/historial';
+import { temaPorId, type TemaPlantilla } from '../portal/presencia';
 import { PafReportes } from './PafReportes';
 import { PortalLinksEditor, PortalSectionsToggles } from './PafPortalSettings';
 
@@ -46,7 +49,7 @@ type Props = {
   showAlta?: boolean;
 };
 
-type Section = 'inicio' | 'tareas' | 'reuniones' | 'entregas' | 'archivos' | 'ajustes';
+type Section = 'plan' | 'inicio' | 'tareas' | 'reuniones' | 'entregas' | 'archivos' | 'ajustes';
 type Adding = null | 'anuncio' | 'tarea' | 'acceso' | 'entrega' | 'reunion' | 'acuerdo' | 'semana' | 'reporte';
 
 /** Acciones rápidas: cada una abre su sección con el formulario listo */
@@ -62,6 +65,7 @@ const QUICK: { id: Exclude<Adding, null>; label: string; hint: string; icon: Rea
 ];
 
 const SECTION_INFO: Record<Section, { label: string; icon: React.ElementType; hint: string }> = {
+  plan: { label: 'Plan', icon: Route, hint: 'El recorrido de Presencia: temas por hito, checklist y lo que sigue.' },
   inicio: { label: 'Inicio', icon: Home, hint: 'Avance, foco de la semana y anuncios: lo primero que ve.' },
   tareas: { label: 'Tareas', icon: ListChecks, hint: 'Lo que necesitás de tu cliente. Las ocultas no las ve hasta que las habilitás.' },
   reuniones: { label: 'Reuniones', icon: CalendarDays, hint: 'Agendar, mover y anotar acuerdos. Todo pasa a tu Google Calendar.' },
@@ -77,11 +81,16 @@ const SECTION_INFO: Record<Section, { label: string; icon: React.ElementType; hi
  */
 export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, onUpdateMeeting, onToggleMeeting, onDeleteMeeting, showAlta = true }) => {
   const [section, setSectionState] = useState<Section>(() => {
-    try { return (localStorage.getItem('paf_panel_seccion') as Section) || 'inicio'; } catch { return 'inicio'; }
+    try {
+      const s = (localStorage.getItem('paf_panel_seccion') as Section) || (showAlta ? 'plan' : 'inicio');
+      return s === 'plan' && !showAlta ? 'inicio' : s;
+    } catch { return showAlta ? 'plan' : 'inicio'; }
   });
   const setSection = (s: Section) => { setSectionState(s); try { localStorage.setItem('paf_panel_seccion', s); } catch { /* sin almacenamiento */ } };
   const [adding, setAdding] = useState<Adding>(null);
   const [showPreview, setShowPreview] = useState(false);
+  // Reunión que propone un tema del plan (título, objetivo y duración ya cargados)
+  const [sugerida, setSugerida] = useState<TemaPlantilla | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const portal = usePortalDraft(project, meetings, onUpdateProject, !showAlta);
   const work = usePafWork(project, meetings, onUpdateProject);
@@ -133,7 +142,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
       {/* Secciones del portal */}
       <div ref={sectionRef} className="scroll-mt-24 rounded-2xl border border-zinc-800 overflow-hidden">
         <nav className="grid grid-cols-3 sm:flex sm:overflow-x-auto no-scrollbar border-b border-zinc-800 bg-zinc-950/50" aria-label="Secciones">
-          {(Object.keys(SECTION_INFO) as Section[]).map((s) => {
+          {(Object.keys(SECTION_INFO) as Section[]).filter((s) => s !== 'plan' || showAlta).map((s) => {
             const SIcon = SECTION_INFO[s].icon;
             const on = section === s;
             return (
@@ -150,11 +159,25 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
         <div className="p-3 sm:p-4 space-y-5">
           <p className="flex items-center gap-2 text-[11px] text-zinc-500"><Icon className="w-3.5 h-3.5 shrink-0" />{info.hint}</p>
 
+          {section === 'plan' && (
+            <PafPlanSection project={project} meetings={meetings} onUpdateProject={onUpdateProject}
+              onAgendar={(t) => { setSugerida(t); setSection('reuniones'); setAdding('reunion'); requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}
+              onVer={(s) => setSection(s)}
+              onConfirmarHito={(n, evidencia) => {
+                const pafHitos = confirmarHito(project.pafHitos || [], n, evidencia);
+                const updates = { pafHitos, ...conHistorial(project, `Hito confirmado: ${PRESENCIA_HITOS[n - 1]} — ${evidencia}`) };
+                onUpdateProject(project.id, updates);
+                if (portal.draft.hito <= n && n < PRESENCIA_HITOS.length) portal.set({ hito: n + 1 });
+                republishIfPublished({ ...project, ...updates }, meetings).catch(() => undefined);
+                hapticFeedback.success();
+              }} />
+          )}
+
           {section === 'inicio' && (
             <>
               {showAlta && <AltaStatus pedido={portal.pedido} carpeta={project.pafDrive?.carpetaCompartida} />}
               <PafHitosCard project={project} meetings={meetings} hito={portal.draft.hito} mostrarAvance={portal.draft.mostrarAvance !== false}
-                onSetHito={(n) => portal.set({ hito: n })} onToggleAvance={(v) => portal.set({ mostrarAvance: v })} onUpdateProject={onUpdateProject} />
+                onSetHito={(n) => portal.set({ hito: n })} onToggleAvance={(v) => portal.set({ mostrarAvance: v })} onUpdateProject={onUpdateProject} recorrido={showAlta ? 'presencia' : 'web'} />
 
               {toReview.length > 0 && (
                 <Card title={`Para revisar (${toReview.length})`} hint="Avisó que las terminó. Aprobá o volvé a habilitar." tone="amber">
@@ -191,7 +214,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
                 {toReview.length > 0 && <TaskList tasks={toReview} work={work} />}
                 {work.tasks.some((t) => t.estado !== 'enviada') ? <TaskList tasks={work.tasks.filter((t) => t.estado !== 'enviada')} work={work} /> : adding !== 'tarea' && <Empty>Sin tareas todavía.</Empty>}
               </Card>
-              <StageTemplate project={project} hito={portal.draft.hito} work={work} always onMeeting={() => { setSection('reuniones'); setAdding('reunion'); }} />
+              {showAlta && <p className="text-[11px] text-zinc-500">Las tareas de cada tema del método se cargan desde <button type="button" onClick={() => setSection('plan')} className="font-bold text-zinc-300 hover:text-zinc-100">Plan → Empezar tema</button>.</p>}
             </>
           )}
 
@@ -199,7 +222,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
             <PafMeetingsSection project={project} meetings={meetings} onAddMeeting={onAddMeeting} onUpdateMeeting={onUpdateMeeting} onToggleMeeting={onToggleMeeting} onDeleteMeeting={onDeleteMeeting} onUpdateProject={onUpdateProject}
               linkReunion={portal.draft.linkReunion || ''} onLinkReunion={(v) => portal.set({ linkReunion: v })}
               reunionesAcordadas={portal.draft.reunionesAcordadas} onReunionesAcordadas={(n) => portal.set({ reunionesAcordadas: n })}
-              scheduling={adding === 'reunion'} onScheduling={(o) => setAdding(o ? 'reunion' : null)}
+              scheduling={adding === 'reunion'} onScheduling={(o) => { setAdding(o ? 'reunion' : null); if (!o) setSugerida(null); }} sugerida={sugerida}
               writingSummary={adding === 'acuerdo'} onWritingSummary={(o) => setAdding(o ? 'acuerdo' : null)} />
           )}
 
@@ -604,22 +627,38 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
   const deliveries = project.pafEntregas || [];
   const [error, setError] = useState('');
 
-  const save = (updates: Pick<Project, 'pafTareas'> | Pick<Project, 'pafEntregas'>) => {
+  const save = (updates: Partial<Project>, ...historial: string[]) => {
     setError('');
-    onUpdateProject(project.id, updates);
-    republishIfPublished({ ...project, ...updates }, meetings).catch((e: Error) => setError(e.message));
+    const all = { ...updates, ...(historial.length ? conHistorial(project, ...historial) : {}) };
+    onUpdateProject(project.id, all);
+    republishIfPublished({ ...project, ...all }, meetings).catch((e: Error) => setError(e.message));
   };
-  const saveTasks = (pafTareas: PafTask[]) => save({ pafTareas });
-  const saveDeliveries = (pafEntregas: PafDelivery[]) => save({ pafEntregas });
-  const update = (id: string, fn: (t: PafTask) => PafTask) => saveTasks(tasks.map((t) => (t.id === id ? fn(t) : t)));
+  const saveTasks = (pafTareas: PafTask[], ...historial: string[]) => save({ pafTareas }, ...historial);
+  // Entregas: queda en el historial cuando se muestra o se aprueba
+  const saveDeliveries = (pafEntregas: PafDelivery[]) => {
+    const notas = pafEntregas.flatMap((d) => {
+      const antes = deliveries.find((x) => x.id === d.id);
+      const nombre = `${d.titulo}${d.version ? ` ${d.version}` : ''}`;
+      return [
+        ...(d.publicada && antes && !antes.publicada ? [`Entrega publicada: ${nombre}`] : []),
+        ...(d.estado === 'aprobada' && antes && antes.estado !== 'aprobada' ? [`Entrega aprobada: ${nombre}`] : []),
+        ...(d.estado === 'ajustes' && antes && antes.estado !== 'ajustes' ? [`Entrega con ajustes: ${nombre}`] : []),
+      ];
+    });
+    save({ pafEntregas }, ...notas);
+  };
+  const update = (id: string, fn: (t: PafTask) => PafTask, nota?: (t: PafTask) => string) => {
+    const t = tasks.find((x) => x.id === id);
+    saveTasks(tasks.map((x) => (x.id === id ? fn(x) : x)), ...(t && nota ? [nota(t)] : []));
+  };
 
   return {
     tasks, deliveries, error, saveDeliveries,
     channel: suggestedChannel(tasks),
-    enable: (id: string) => update(id, (t) => ({ ...t, estado: 'habilitada', habilitadaEn: new Date().toISOString(), motivo: undefined })),
+    enable: (id: string) => update(id, (t) => ({ ...t, estado: 'habilitada', habilitadaEn: new Date().toISOString(), motivo: undefined }), (t) => `Tarea habilitada: ${t.titulo}`),
     hide: (id: string) => update(id, (t) => ({ ...t, estado: 'borrador' })),
-    approve: (id: string, canal: string) => update(id, (t) => approveTask(t, canal)),
-    reopen: (id: string, motivo: string) => update(id, (t) => reopenTask(t, motivo)),
+    approve: (id: string, canal: string) => update(id, (t) => approveTask(t, canal), (t) => `Tarea completada: ${t.titulo} (confirmada por ${canal})`),
+    reopen: (id: string, motivo: string) => update(id, (t) => reopenTask(t, motivo), (t) => `Pidió ajustes en ${t.titulo}: ${motivo}`),
     remove: (id: string) => saveTasks(tasks.filter((t) => t.id !== id)),
     /** Una sola prioritaria: la que va arriba del portal como "Tu próxima acción" */
     togglePrioritaria: (id: string) => saveTasks(tasks.map((t) => ({ ...t, prioritaria: t.id === id ? !t.prioritaria : false }))),
@@ -651,7 +690,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
           <span className="font-semibold">{t.titulo}</span>{t.fecha && <span className="text-zinc-500"> · {t.fecha}</span>}
           {t.paraQue && <span className="block text-[11px] text-zinc-300"><span className="text-zinc-500">Para qué: </span>{t.paraQue}</span>}
           {t.detalle && <span className="block text-[11px] text-zinc-400">{t.detalle}</span>}
-          <span className="block text-[10px] text-zinc-500">Hace: {PAF_RESPONSABLE_LABEL[t.responsable || 'estudio']}{t.prioritaria && <span className="ml-2 text-amber-300">★ Su próxima acción</span>}</span>
+          <span className="block text-[10px] text-zinc-500">Hace: {PAF_RESPONSABLE_LABEL[t.responsable || 'estudio']}{t.tema && <span className="ml-2">· {temaPorId(t.tema).titulo}</span>}{t.prioritaria && <span className="ml-2 text-amber-300">★ Su próxima acción</span>}</span>
           {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-sky-300 truncate">{t.link}</a>}
           {t.pideArchivos && <span className="block text-[10px] text-zinc-500">Pide archivos · link a Materiales</span>}
           {t.motivo && t.estado === 'habilitada' && <span className="block text-[10px] text-sky-300">Reabierta: {t.motivo}</span>}

@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 import { Check, Undo2 } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
-import { PRESENCIA_HITOS, PRESENCIA_HITO_INFO, hitosCompletados, type PafHitoConfirmado } from '../portal/model';
+import { hitoInfoDe, hitosCompletados, hitosDe, type PafHitoConfirmado, type Recorrido } from '../portal/model';
 import { republishIfPublished } from '../portal/store';
+import { conHistorial } from '../portal/historial';
 import { getTodayString } from '../utils/storage';
 import { hapticFeedback } from '../utils/haptics';
+
+/** Confirma un hito (reemplaza si ya estaba) */
+export function confirmarHito(actuales: PafHitoConfirmado[], hito: number, evidencia: string): PafHitoConfirmado[] {
+  return [...actuales.filter((h) => h.hito !== hito), { hito, fecha: getTodayString(), evidencia: evidencia.trim().slice(0, 300) }];
+}
 
 const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
 
@@ -20,22 +26,26 @@ export const PafHitosCard: React.FC<{
   onSetHito: (n: number) => void;
   onToggleAvance: (v: boolean) => void;
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
-}> = ({ project, meetings, hito, mostrarAvance, onSetHito, onToggleAvance, onUpdateProject }) => {
+  recorrido?: Recorrido;
+}> = ({ project, meetings, hito, mostrarAvance, onSetHito, onToggleAvance, onUpdateProject, recorrido }) => {
+  const PRESENCIA_HITOS = hitosDe(recorrido);
+  const PRESENCIA_HITO_INFO = hitoInfoDe(recorrido);
   const confirmados = project.pafHitos || [];
   const hechos = hitosCompletados(confirmados);
   const [abierto, setAbierto] = useState<number | null>(null);
   const [evidencia, setEvidencia] = useState('');
   const [error, setError] = useState('');
 
-  const save = (next: PafHitoConfirmado[]) => {
+  const save = (next: PafHitoConfirmado[], nota: string) => {
     setError('');
-    onUpdateProject(project.id, { pafHitos: next });
-    republishIfPublished({ ...project, pafHitos: next }, meetings).catch((e: Error) => setError(e.message));
+    const updates = { pafHitos: next, ...conHistorial(project, nota) };
+    onUpdateProject(project.id, updates);
+    republishIfPublished({ ...project, ...updates }, meetings).catch((e: Error) => setError(e.message));
   };
   const confirmar = (n: number) => {
     if (!evidencia.trim()) return;
     hapticFeedback.success();
-    save([...confirmados.filter((h) => h.hito !== n), { hito: n, fecha: getTodayString(), evidencia: evidencia.trim().slice(0, 300) }]);
+    save(confirmarHito(confirmados, n, evidencia), `Hito confirmado: ${PRESENCIA_HITOS[n - 1]} — ${evidencia.trim()}`);
     // Si era el hito actual, pasa al siguiente
     if (hito <= n && n < PRESENCIA_HITOS.length) onSetHito(n + 1);
     setAbierto(null); setEvidencia('');
@@ -84,7 +94,7 @@ export const PafHitosCard: React.FC<{
                 {abierto !== n && (
                   <div className="flex shrink-0 flex-col items-end gap-1 text-[10px] font-bold">
                     {conf
-                      ? <button type="button" onClick={() => window.confirm(`¿Desmarcar "${titulo}"?`) && save(confirmados.filter((h) => h.hito !== n))} className="inline-flex items-center gap-1 text-zinc-500 hover:text-zinc-200"><Undo2 className="w-3 h-3" />Desmarcar</button>
+                      ? <button type="button" onClick={() => window.confirm(`¿Desmarcar "${titulo}"?`) && save(confirmados.filter((h) => h.hito !== n), `Hito desmarcado: ${titulo}`)} className="inline-flex items-center gap-1 text-zinc-500 hover:text-zinc-200"><Undo2 className="w-3 h-3" />Desmarcar</button>
                       : <button type="button" onClick={() => { setAbierto(n); setEvidencia(''); }} className="rounded-md bg-zinc-800 px-2 py-1 text-zinc-200 hover:bg-zinc-700">Confirmar</button>}
                     {!conf && !actual && <button type="button" onClick={() => onSetHito(n)} className="font-normal text-zinc-500 hover:text-zinc-200">Estamos acá</button>}
                   </div>

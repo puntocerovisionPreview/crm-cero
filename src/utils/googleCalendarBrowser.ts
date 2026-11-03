@@ -403,7 +403,7 @@ export async function createGoogleCalendarEventInBrowser(
   meeting: AgendaMeeting,
   onCreatedId?: (googleEventId: string) => void
 ): Promise<{ ok: boolean; googleEventId?: string; error?: GoogleCalendarErrorInfo }> {
-  if (meeting.proposed) return { ok: true };
+  if (meeting.proposed || meeting.sinCalendar) return { ok: true };
 
   const runCreate = async () => {
     const res = await calendarFetch(GOOGLE_CALENDAR_EVENTS_ENDPOINT + NOTIFY, {
@@ -441,7 +441,7 @@ export async function updateGoogleCalendarEventInBrowser(
   meeting: AgendaMeeting,
   onCreatedId?: (googleEventId: string) => void
 ): Promise<{ ok: boolean; googleEventId?: string; error?: GoogleCalendarErrorInfo }> {
-  if (meeting.proposed) return { ok: true };
+  if (meeting.proposed || meeting.sinCalendar) return { ok: true };
 
   if (!meeting.googleEventId) {
     return createGoogleCalendarEventInBrowser(meeting, onCreatedId);
