@@ -177,13 +177,20 @@ const COLUMNAS_ALTA = {
   error: 'ERROR_ALTA',
 };
 
-/** Link de la subcarpeta "Materiales" dentro de la carpeta compartida ('' si no está) */
+/**
+ * Link de la subcarpeta de materiales dentro de la carpeta compartida ('' si no está).
+ * La real se llama "02_Materiales": acepta cualquier nombre que termine en "Materiales".
+ */
 function linkMateriales_(urlCompartida) {
   try {
     const m = String(urlCompartida).match(/folders\/([\w-]{10,})/);
     if (!m) return '';
-    const sub = DriveApp.getFolderById(m[1]).getFoldersByName('Materiales');
-    return sub.hasNext() ? sub.next().getUrl() : '';
+    const subs = DriveApp.getFolderById(m[1]).getFolders();
+    while (subs.hasNext()) {
+      const f = subs.next();
+      if (/materiales$/i.test(f.getName().trim())) return f.getUrl();
+    }
+    return '';
   } catch (e) { return ''; }
 }
 
