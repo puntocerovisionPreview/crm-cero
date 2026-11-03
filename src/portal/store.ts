@@ -1,4 +1,4 @@
-import { addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAuthHeaders } from '../utils/authAccess';
 import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, PORTAL_SEPARATE_FIELDS, clienteIdNumber, portalFromProject, suggestClienteId, suggestWebClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
@@ -116,6 +116,18 @@ export function subscribeAvisos(clienteId: string, onChanged: (items: PafAviso[]
     (snap) => onChanged(snap.docs.map((d) => toAviso(d.id, d.data())).filter((a) => a.creadoEn)),
     (err) => onError?.(err)
   );
+}
+
+// ---------- Avisos que ya viste (en cualquier dispositivo) ----------
+
+const leidosRef = () => doc(db, 'settings', 'avisos_leidos');
+
+export function subscribeAvisosLeidos(onChanged: (keys: Set<string>) => void) {
+  return onSnapshot(leidosRef(), (snap) => onChanged(new Set((snap.data()?.keys as string[]) || [])), () => onChanged(new Set()));
+}
+
+export async function markAvisosLeidos(keys: string[]): Promise<void> {
+  if (keys.length) await setDoc(leidosRef(), { keys: arrayUnion(...keys) }, { merge: true });
 }
 
 // ---------- Pedidos de alta (los procesa el Apps Script) ----------

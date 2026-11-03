@@ -167,6 +167,7 @@ import {
   getGoogleCalendarSnapshot,
 } from './utils/googleCalendarBrowser';
 import { GoogleCalendarReconnectBanner } from './components/GoogleCalendarSettingsCard';
+import { ClientAlerts, type ClientAlert } from './components/ClientAlerts';
 import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -2223,7 +2224,21 @@ export default function App() {
   };
 
   // Portal PAF: los "Terminé" de los estudios llegan a cada ficha sin tener que abrirla
-  usePafAvisos(Boolean(authToken), projects, meetings, handleUpdateProject);
+  const pafAvisos = usePafAvisos(Boolean(authToken), projects, meetings, handleUpdateProject);
+  // Avisos de clientes para mostrar en cualquier pantalla: tareas que el cliente marcó como
+  // terminadas y que todavía no revisaste (al aprobarlas o volver a habilitarlas, desaparecen)
+  const clientAlerts = useMemo<ClientAlert[]>(() => {
+    const out: ClientAlert[] = [];
+    projects.forEach((p) => {
+      if (!p.pafClienteId || p.archived) return;
+      (pafAvisos.get(p.pafClienteId) || []).forEach((a) => {
+        const t = (p.pafTareas || []).find((x) => x.id === a.tareaId);
+        if (!t || t.estado !== 'enviada') return;
+        out.push({ key: `${p.pafClienteId}/${a.id}`, projectId: p.id, estudio: p.clientName, tarea: t.titulo, creadoEn: a.creadoEn });
+      });
+    });
+    return out;
+  }, [pafAvisos, projects]);
 
   const handleDeleteProject = async (id: string) => {
     const projectToDelete = projects.find(p => p.id === id);
@@ -4475,6 +4490,15 @@ export default function App() {
             </button>
           )}
         </div>
+      )}
+
+      {/* Avisos de clientes (tareas terminadas), en cualquier pantalla */}
+      {authToken && (
+        <ClientAlerts alerts={clientAlerts} onOpen={(projectId) => {
+          // La ficha abre en Inicio, donde está "Para revisar"
+          try { localStorage.setItem('paf_panel_seccion', 'inicio'); } catch { /* sin almacenamiento */ }
+          navigate(`/clientes/${projectId}`);
+        }} />
       )}
 
       {/* Google Calendar Reconnect / Error Banner (401 token vencido, popup bloqueado, permiso rechazado, fallo API) */}

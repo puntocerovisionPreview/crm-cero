@@ -29,4 +29,6 @@ export function usePafAvisos(
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [byCliente, projects]);
+
+  return byCliente;
 }
