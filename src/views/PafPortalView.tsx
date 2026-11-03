@@ -1,14 +1,14 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  ArrowRight, ArrowUpRight, BarChart3, Check, FileText, Folder, Globe, LayoutList, Loader2, Package,
+  ArrowRight, ArrowUpRight, BarChart3, Check, ChevronDown, FileText, Folder, Globe, LayoutList, Loader2, Lock, MessageCircle, Package, Paperclip,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
 import { auth } from '../firebaseAuth';
 import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { formatDisplayDate } from '../utils/projectTimeline';
-import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
+import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, isOverdue, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
 /**
@@ -33,7 +33,7 @@ const LINK_HINT: Record<PafPortalLinkKey, string> = {
   materiales: 'Fotos, planos y lo que nos compartís',
   resultados: 'Métricas y avances',
   web: 'Tu sitio',
-  asana: 'Calendario de contenido',
+  asana: 'Qué se publica y cuándo',
 };
 
 const DEMO: PafPortalDoc = {
@@ -45,8 +45,8 @@ const DEMO: PafPortalDoc = {
   enlaces: { carpeta: 'https://drive.google.com/', materiales: 'https://drive.google.com/', resultados: 'https://drive.google.com/', web: 'https://example.com/', asana: 'https://app.asana.com/' },
   tareas: [
     { id: 'd1', titulo: 'Completar el formulario de arranque', estado: 'aprobada', aprobadaEl: '2026-10-28' },
-    { id: 'd2', titulo: 'Subir 10 fotos de obras terminadas', detalle: 'A la carpeta Materiales. Las de mejor calidad que tengas, sin editar.', fecha: '2026-11-06', estado: 'habilitada' },
-    { id: 'd3', titulo: 'Elegir 3 proyectos que te representen', detalle: 'Los que te gustaría hacer más seguido.', fecha: '2026-11-08', estado: 'habilitada' },
+    { id: 'd2', titulo: 'Subir 10 fotos de obras terminadas', detalle: 'Las de mejor calidad que tengas, sin editar.', fecha: '2026-11-06', estado: 'habilitada', pideArchivos: true },
+    { id: 'd3', titulo: 'Elegir 3 proyectos que te representen', detalle: 'Los que te gustaría hacer más seguido.', fecha: '2026-11-01', estado: 'habilitada', motivo: 'Sumá uno de vivienda, así comparamos.' },
     { id: 'd4', titulo: 'Revisar la propuesta de foco', estado: 'enviada' },
   ],
   tareasHabilitadas: ['d2', 'd3'],
@@ -55,7 +55,14 @@ const DEMO: PafPortalDoc = {
     { id: 'e2', titulo: 'Propuesta de foco', fecha: '2026-11-04', enlace: 'https://drive.google.com/' },
   ],
   proximaReunion: { fecha: '2026-11-10', hora: '10:30' },
+  semana: { actual: 3, total: 12 },
   actualizadoEn: '2026-11-02T20:00:00.000Z',
+  objetivos: [
+    { texto: 'Cerrar a quién le hablamos', hecho: true, quien: 'cero' },
+    { texto: 'Borrador del mensaje principal', hecho: false, quien: 'cero' },
+    { texto: 'Subir las fotos de obra', hecho: false, quien: 'estudio' },
+  ],
+  contacto: { whatsapp: '5491100000000' },
 };
 
 /** Claro u oscuro según el dispositivo del estudio (el CRM usa las mismas variables) */
@@ -236,6 +243,26 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
   const links = PAF_PORTAL_LINK_KEYS.filter((k) => p.enlaces?.[k]);
   const hito = Math.min(PRESENCIA_HITOS.length, Math.max(1, p.hitoVisible || 1));
   const initial = (email[0] || '?').toUpperCase();
+  const objetivos = p.objetivos || [];
+  const whatsapp = p.contacto?.whatsapp || '';
+  const [showStages, setShowStages] = useState(false);
+
+  // Bienvenida solo la primera vez en este dispositivo (no en la vista previa de Juan)
+  const welcomeKey = `paf_bienvenida_${p.clienteId}`;
+  const [showWelcome, setShowWelcome] = useState(() => {
+    if (readOnly) return false;
+    try { return !localStorage.getItem(welcomeKey); } catch { return false; }
+  });
+  const closeWelcome = () => {
+    setShowWelcome(false);
+    try { localStorage.setItem(welcomeKey, '1'); } catch { /* sin almacenamiento: se vuelve a mostrar */ }
+  };
+
+  const taskProps = {
+    today: new Date().toLocaleDateString('en-CA'),
+    uploadUrl: p.enlaces?.materiales || p.enlaces?.carpeta,
+    sending, readOnly: !!readOnly, onDone: done,
+  };
 
   const account = (
     <div className="flex items-center gap-3">
@@ -252,36 +279,30 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
       {readOnly && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista previa: así ve {p.estudio} su portal ahora. Es solo lectura: los botones no hacen nada.</p>}
       {demo && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista de ejemplo, solo en tu compu: así lo ve un estudio. Los datos son inventados.</p>}
 
-      {/* Encabezado */}
-      <header className="pt-4 sm:pt-10">
-        <Eyebrow>Método PAF · Presencia</Eyebrow>
-        <h1 className="mt-4 text-4xl sm:text-6xl font-light tracking-tight leading-[1.05] text-[var(--text-primary)] break-words">{p.estudio}</h1>
-        <p className="mt-5 max-w-xl text-base leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">
-          {p.resumenVisible || 'Un lugar para ver en qué estamos, qué necesitamos de vos y todo lo que vamos entregando.'}
-        </p>
+      {/* Encabezado corto: saludo y avance en una línea (al tocarla se abre el detalle) */}
+      <header className="pt-1 sm:pt-6">
+        <h1 className="text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">Hola, {p.estudio}</h1>
+        <button type="button" onClick={() => setShowStages((v) => !v)} aria-expanded={showStages} className="mt-4 w-full text-left group">
+          <span className="flex flex-wrap items-baseline gap-x-1.5 text-sm text-[var(--text-secondary)]">
+            <span className="font-medium text-[var(--text-primary)]">Presencia</span>
+            <span aria-hidden>·</span><span>Etapa {hito} de {PRESENCIA_HITOS.length}</span>
+            <span aria-hidden>·</span><span className="font-serif italic text-base text-[var(--text-primary)]">{PRESENCIA_HITOS[hito - 1]}</span>
+            {p.semana && <><span aria-hidden>·</span><span>Semana {p.semana.actual} de {p.semana.total}</span></>}
+            <ChevronDown className={`w-4 h-4 self-center text-[var(--text-tertiary)] transition-transform ${showStages ? 'rotate-180' : ''}`} />
+          </span>
+          <span className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden>
+            {PRESENCIA_HITOS.map((title, i) => (
+              <span key={title} className={`block h-1 rounded-full ${i + 1 < hito ? 'bg-[var(--text-primary)]' : i + 1 === hito ? 'bg-[var(--text-primary)] opacity-60' : 'bg-[var(--border-strong)]'}`} />
+            ))}
+          </span>
+        </button>
+        {showStages && <StageDetail hito={hito} />}
       </header>
 
-      {/* Etapas */}
-      <section aria-label="Etapas del programa" className="mt-10 sm:mt-12">
-        <div className="flex items-baseline justify-between gap-4">
-          <p className="text-sm text-[var(--text-secondary)]">Etapa {hito} de {PRESENCIA_HITOS.length}</p>
-          <p className="font-serif italic text-xl sm:text-2xl text-[var(--text-primary)]">{PRESENCIA_HITOS[hito - 1]}</p>
-        </div>
-        <ol className="mt-4 grid grid-cols-5 gap-1.5">
-          {PRESENCIA_HITOS.map((title, i) => {
-            const n = i + 1;
-            return (
-              <li key={title} title={title} aria-current={n === hito ? 'step' : undefined}>
-                <span className={`block h-1 rounded-full ${n < hito ? 'bg-[var(--text-primary)]' : n === hito ? 'bg-[var(--text-primary)] opacity-60' : 'bg-[var(--border-strong)]'}`} />
-                <span className={`mt-2 hidden sm:block text-[11px] leading-snug ${n === hito ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-tertiary)]'}`}>{title}</span>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
+      {showWelcome && <Welcome onClose={closeWelcome} hasWhatsapp={!!whatsapp} />}
 
       {/* Pestañas */}
-      <nav className="mt-10 sm:mt-12 -mx-4 px-4 overflow-x-auto no-scrollbar">
+      <nav className="mt-8 sm:mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
         <SegmentedControl<Tab>
           value={tab}
           onChange={setTab}
@@ -296,46 +317,50 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
 
       <main className="mt-8 animate-in fade-in duration-200" key={tab}>
         {tab === 'inicio' && (
-          <div className="space-y-6">
-            <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-8">
+            {/* Esta semana: foco y objetivos (si no hay nada cargado, no se muestra) */}
+            {(p.resumenVisible || objetivos.length > 0) && (
               <Card className="p-5 sm:p-6">
-                <Eyebrow>Ahora</Eyebrow>
-                {pendientes.length ? (
-                  <>
-                    <p className="mt-3 text-4xl font-light tracking-tight">{pendientes.length}</p>
-                    <p className="mt-1 text-sm text-[var(--text-secondary)]">{pendientes.length === 1 ? 'tarea te espera' : 'tareas te esperan'}</p>
-                    <button type="button" onClick={() => setTab('tareas')} className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] hover:gap-2.5 transition-all">Ver tareas <ArrowRight className="w-4 h-4" /></button>
-                  </>
-                ) : (
-                  <>
-                    <p className="mt-3 text-xl font-light tracking-tight">Nada pendiente de tu lado</p>
-                    <p className="mt-1 text-sm text-[var(--text-secondary)]">{enRevision.length ? `Estamos revisando ${enRevision.length === 1 ? 'lo que nos mandaste' : `${enRevision.length} cosas que nos mandaste`}.` : 'Te avisamos cuando haya algo nuevo.'}</p>
-                  </>
+                <Eyebrow>Esta semana</Eyebrow>
+                {p.resumenVisible && <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{p.resumenVisible}</p>}
+                {objetivos.length > 0 && (
+                  <div className={`grid gap-5 sm:grid-cols-2 ${p.resumenVisible ? 'mt-5 pt-5 border-t border-[var(--border-divider)]' : 'mt-4'}`}>
+                    <GoalColumn title="Hace .CERO" items={objetivos.filter((g) => g.quien === 'cero')} />
+                    <GoalColumn title="Hace tu estudio" items={objetivos.filter((g) => g.quien === 'estudio')} />
+                  </div>
                 )}
               </Card>
+            )}
 
+            <section>
+              <SectionTitle title="Lo que necesitamos de vos" hint={pendientes.length ? 'Cuando termines, tocá “Terminé”. Lo revisamos y te confirmamos.' : undefined} />
+              {pendientes.length ? (
+                <>
+                  <ul className="space-y-3">
+                    {pendientes.slice(0, 3).map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} /></li>)}
+                  </ul>
+                  {pendientes.length > 3 && <button type="button" onClick={() => setTab('tareas')} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">Ver las {pendientes.length} tareas <ArrowRight className="w-4 h-4" /></button>}
+                </>
+              ) : (
+                <p className="text-sm text-[var(--text-secondary)]">Nada pendiente de tu lado. {enRevision.length ? `Estamos revisando ${enRevision.length === 1 ? 'lo que nos mandaste' : `${enRevision.length} cosas que nos mandaste`}.` : 'Te avisamos cuando haya algo nuevo.'}</p>
+              )}
+              {error && <p role="alert" className="mt-3 text-sm text-rose-500">{error}</p>}
+            </section>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <Card className="p-5 sm:p-6">
                 <Eyebrow>Próxima reunión</Eyebrow>
                 {p.proximaReunion ? <MeetingDate fecha={p.proximaReunion.fecha} hora={p.proximaReunion.hora} /> : (
                   <p className="mt-3 text-sm text-[var(--text-secondary)]">La vas a ver acá cuando la coordinemos.</p>
                 )}
               </Card>
-            </div>
-
-            {entregas.length > 0 && (
               <Card className="p-5 sm:p-6">
                 <div className="flex items-center justify-between gap-3">
-                  <Eyebrow>Lo último que te entregamos</Eyebrow>
-                  {entregas.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver todo</button>}
+                  <Eyebrow>Última entrega</Eyebrow>
+                  {entregas.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver todas</button>}
                 </div>
-                <DeliveryRow d={latest(entregas)} />
+                {entregas.length ? <DeliveryRow d={latest(entregas)} /> : <p className="mt-3 text-sm text-[var(--text-secondary)]">Las entregas aparecen acá cuando las compartimos.</p>}
               </Card>
-            )}
-
-            <div className="grid grid-cols-3 divide-x divide-[var(--border-divider)] border-y border-[var(--border-subtle)] py-5">
-              <Metric value={pendientes.length} label="Para hacer" />
-              <Metric value={enRevision.length} label="En revisión" />
-              <Metric value={aprobadas.length} label="Aprobadas" />
             </div>
           </div>
         )}
@@ -346,23 +371,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
               <SectionTitle title="Lo que necesitamos de vos" hint="Cuando termines una, tocá “Terminé”. La revisamos y te confirmamos." />
               {pendientes.length ? (
                 <ul className="space-y-3">
-                  {pendientes.map((t) => (
-                    <li key={t.id}>
-                      <Card className="p-5">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
-                            <p className="text-[15px] font-medium text-[var(--text-primary)] break-words">{t.titulo}</p>
-                            {t.fecha && <p className="mt-1 text-xs text-[var(--text-tertiary)]">Para el {formatDisplayDate(t.fecha, 'medium')}</p>}
-                            {t.motivo && <p className="mt-3 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Te pedimos: </span>{t.motivo}</p>}
-                            {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
-                          </div>
-                          <button type="button" onClick={() => done(t.id)} disabled={sending === t.id || readOnly} title={readOnly ? 'Vista previa: el botón no hace nada' : undefined} className="btn-solid-primary shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60">
-                            {sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
-                          </button>
-                        </div>
-                      </Card>
-                    </li>
-                  ))}
+                  {pendientes.map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} /></li>)}
                 </ul>
               ) : <EmptyState icon={<Check className="w-5 h-5" />} title="Nada pendiente" description="Cuando tengamos algo para vos, aparece acá." />}
               {error && <p role="alert" className="mt-3 text-sm text-rose-500">{error}</p>}
@@ -421,10 +430,11 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
         )}
       </main>
 
-      <footer className="mt-16 pt-6 border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-tertiary)]">
+      <footer className={`mt-16 pt-6 ${whatsapp ? 'mb-16' : ''} border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-tertiary)]`}>
         <span>.CERO</span>
         <span>Actualizado {formatDisplayDate(p.actualizadoEn.slice(0, 10), 'medium')}</span>
       </footer>
+      {whatsapp && <WhatsappButton number={whatsapp} studio={p.estudio} />}
     </Shell>
   );
 }
@@ -482,11 +492,119 @@ function TaskList({ items, dot, muted }: { items: PortalTask[]; dot: string; mut
   );
 }
 
-function Metric({ value, label }: { value: number; label: string }) {
+/** Detalle de la línea de avance: los tres pilares (lo futuro, visible y bloqueado) y las 5 etapas */
+function StageDetail({ hito }: { hito: number }) {
+  const pillars = [
+    { name: 'Presencia', state: 'current' },
+    { name: 'Adquisición', state: 'locked' },
+    { name: 'Conversión', state: 'locked' },
+  ];
   return (
-    <div className="px-3 text-center">
-      <p className="text-3xl font-light tracking-tight tabular-nums">{value}</p>
-      <p className="mt-1 text-xs text-[var(--text-tertiary)]">{label}</p>
+    <div className="mt-4 card-swiss p-5 space-y-5 animate-in fade-in duration-200">
+      <ol className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs" aria-label="Pilares del método">
+        {pillars.map((x, i) => (
+          <React.Fragment key={x.name}>
+            {i > 0 && <span aria-hidden className="hidden sm:block h-px flex-1 bg-[var(--border-strong)]" />}
+            <li className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${x.state === 'current' ? 'border-[var(--text-primary)] text-[var(--text-primary)] font-medium' : 'border-[var(--border-subtle)] text-[var(--text-tertiary)]'}`} aria-current={x.state === 'current' ? 'step' : undefined}>
+              {x.state === 'locked' && <Lock className="w-3 h-3" aria-label="Próximamente" />}{x.name}
+            </li>
+          </React.Fragment>
+        ))}
+      </ol>
+      <ol className="space-y-3">
+        {PRESENCIA_HITOS.map((title, i) => {
+          const n = i + 1;
+          const state = n < hito ? 'done' : n === hito ? 'current' : 'pending';
+          return (
+            <li key={title} className="flex items-center gap-3 text-sm" aria-current={state === 'current' ? 'step' : undefined}>
+              <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold ${state === 'done' ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)]' : state === 'current' ? 'border border-[var(--text-primary)] text-[var(--text-primary)]' : 'border border-[var(--border-subtle)] text-[var(--text-tertiary)]'}`}>
+                {state === 'done' ? <Check className="w-3.5 h-3.5" /> : n}
+              </span>
+              <span className={state === 'pending' ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'}>{title}{state === 'current' && <span className="ml-2 text-xs text-[var(--text-tertiary)]">Estamos acá</span>}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="text-xs text-[var(--text-tertiary)]">Adquisición y Conversión se habilitan cuando cerremos Presencia.</p>
     </div>
+  );
+}
+
+function Welcome({ onClose, hasWhatsapp }: { onClose: () => void; hasWhatsapp: boolean }) {
+  const steps = [
+    'Arriba ves en qué etapa estamos. Tocá la línea para ver el recorrido completo.',
+    'Cuando necesitemos algo de vos, aparece en “Lo que necesitamos de vos”. Hacelo y tocá “Terminé”: lo revisamos y te confirmamos.',
+    'Tus carpetas de Drive y todo lo que te entregamos están en Archivos y Entregas.',
+  ];
+  return (
+    <Card className="mt-8 p-5 sm:p-6">
+      <Eyebrow>Bienvenido</Eyebrow>
+      <p className="mt-3 text-lg font-light tracking-tight">Así funciona tu portal</p>
+      <ol className="mt-4 space-y-3">
+        {steps.map((s, i) => (
+          <li key={i} className="flex gap-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+            <span className="w-6 h-6 shrink-0 rounded-full border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-semibold text-[var(--text-primary)]">{i + 1}</span>{s}
+          </li>
+        ))}
+      </ol>
+      {hasWhatsapp && <p className="mt-4 text-sm text-[var(--text-secondary)]">¿Dudas? Escribime por WhatsApp con el botón de abajo.</p>}
+      <button type="button" onClick={onClose} className="btn-solid-primary mt-5 px-4 py-2 text-sm">Entendido</button>
+    </Card>
+  );
+}
+
+function GoalColumn({ title, items }: { title: string; items: { texto: string; hecho: boolean }[] }) {
+  if (!items.length) return null;
+  return (
+    <div>
+      <p className="text-xs font-medium text-[var(--text-tertiary)]">{title}</p>
+      <ul className="mt-2 space-y-2">
+        {items.map((g, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm">
+            <span className={`mt-0.5 w-4 h-4 shrink-0 rounded-full flex items-center justify-center ${g.hecho ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)]' : 'border border-[var(--border-strong)]'}`}>{g.hecho && <Check className="w-3 h-3" />}</span>
+            <span className={g.hecho ? 'text-[var(--text-tertiary)] line-through' : 'text-[var(--text-primary)]'}>{g.texto}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function PendingTask({ t, today, uploadUrl, sending, readOnly, onDone }: { t: PortalTask; today: string; uploadUrl?: string; sending: string | null; readOnly: boolean; onDone: (id: string) => void }) {
+  const overdue = isOverdue(t, today);
+  return (
+    <Card className="p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-[15px] font-medium text-[var(--text-primary)] break-words">{t.titulo}</p>
+          {t.fecha && (
+            <p className="mt-1 inline-flex items-center gap-1.5 text-xs text-[var(--text-tertiary)]">
+              {overdue && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden />}
+              {overdue ? `Venció el ${formatDisplayDate(t.fecha, 'medium')}` : `Para el ${formatDisplayDate(t.fecha, 'medium')}`}
+            </p>
+          )}
+          {t.motivo && <p className="mt-3 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Te pedimos: </span>{t.motivo}</p>}
+          {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
+          {t.pideArchivos && uploadUrl && (
+            <a href={uploadUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
+              <Paperclip className="w-3.5 h-3.5" /> Subir a Materiales <ArrowUpRight className="w-3.5 h-3.5" />
+            </a>
+          )}
+        </div>
+        <button type="button" onClick={() => onDone(t.id)} disabled={sending === t.id || readOnly} title={readOnly ? 'Vista previa: el botón no hace nada' : undefined} className="btn-solid-primary shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60">
+          {sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
+        </button>
+      </div>
+    </Card>
+  );
+}
+
+/** Botón fijo para escribirle a Juan por WhatsApp */
+function WhatsappButton({ number, studio }: { number: string; studio: string }) {
+  const href = `https://wa.me/${number}?text=${encodeURIComponent(`Hola Juan, te escribo de ${studio}.`)}`;
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer" className="btn-solid-primary fixed z-40 right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm shadow-lg">
+      <MessageCircle className="w-4 h-4" /> Hablar con Juan
+    </a>
   );
 }

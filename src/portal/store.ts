@@ -1,13 +1,31 @@
 import { addDoc, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAuthHeaders } from '../utils/authAccess';
-import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, clienteIdNumber, portalFromProject, suggestClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
+import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, PORTAL_SEPARATE_FIELDS, clienteIdNumber, portalFromProject, suggestClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
 
 // Portal PAF: paf_portal/{clienteId}. Escribe solo Juan (CRM); el cliente solo lee el suyo
 // y deja avisos de "terminé" en paf_portal/{clienteId}/avisos.
 
+/** Publica todo lo que sale de la ficha. No toca objetivos ni contacto (se publican aparte). */
 export async function publishPafPortal(portal: PafPortalDoc): Promise<void> {
-  await setDoc(doc(db, PAF_PORTAL_COLLECTION, portal.clienteId), portal);
+  const own = Object.fromEntries(Object.entries(portal).filter(([k]) => !(PORTAL_SEPARATE_FIELDS as readonly string[]).includes(k)));
+  await setDoc(doc(db, PAF_PORTAL_COLLECTION, portal.clienteId), own, { mergeFields: Object.keys(own) });
+}
+
+/** Objetivos de la semana y/o WhatsApp de Juan en un portal ya publicado */
+export async function publishPortalExtras(clienteId: string, extras: Pick<PafPortalDoc, 'objetivos' | 'contacto'>): Promise<void> {
+  await setDoc(doc(db, PAF_PORTAL_COLLECTION, clienteId), extras, { merge: true });
+}
+
+// Configuración general del portal (por ahora, el WhatsApp de Juan para el botón)
+const configRef = () => doc(db, 'settings', 'paf_portal');
+
+export function subscribePafConfig(onChanged: (c: { whatsapp?: string }) => void) {
+  return onSnapshot(configRef(), (snap) => onChanged((snap.data() as { whatsapp?: string }) || {}), () => onChanged({}));
+}
+
+export async function savePafConfig(config: { whatsapp?: string }): Promise<void> {
+  await setDoc(configRef(), config, { merge: true });
 }
 
 /**

@@ -29,6 +29,7 @@ describe('portal PAF con login', () => {
       tareasHabilitadas: [],
       entregas: [],
       proximaReunion: null,
+      semana: null,
       actualizadoEn: '2026-11-02T10:00:00.000Z',
     });
   });
@@ -257,5 +258,55 @@ describe('fase 2: panel de Juan', () => {
     expect('doc' in r && r.doc.tareas[0].motivo).toBe('Faltan las de Belgrano');
     const aprobada = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft, tareas: publicTasks([{ ...t, estado: 'aprobada' }]) });
     expect('doc' in aprobada && aprobada.doc.tareas[0].motivo).toBeUndefined();
+  });
+});
+
+import { isOverdue, portalGoals, programWeek, whatsappDigits, PORTAL_SEPARATE_FIELDS, PAF_PORTAL_LINK_LABEL as PAF_PORTAL_LINK_LABEL_FOR_TEST } from '../src/portal/model';
+
+describe('fase 3: portal del cliente', () => {
+  it('semana X de 12 desde la fecha de inicio', () => {
+    expect(programWeek('2026-10-20', '2026-11-03')).toEqual({ actual: 3, total: 12 });
+    expect(programWeek('2026-10-20', '2026-10-20')).toEqual({ actual: 1, total: 12 });
+    expect(programWeek('2026-01-01', '2026-11-03')).toEqual({ actual: 12, total: 12 });
+    expect(programWeek('2026-12-01', '2026-11-03')).toBeNull();
+    expect(programWeek(undefined, '2026-11-03')).toBeNull();
+  });
+
+  it('el portal publica la semana desde la ficha', () => {
+    const r = portalFromProject({ id: 'p', clientName: 'E', pafClienteId: 'PAF-002', pafPortal: draft, pafStartDate: '2026-10-20' }, [], undefined, undefined, new Date('2026-11-03T12:00:00'));
+    expect('doc' in r && r.doc.semana).toEqual({ actual: 3, total: 12 });
+  });
+
+  it('objetivos: solo texto, hecho y quién (sin IDs); sin dato es del estudio', () => {
+    expect(portalGoals([{ text: ' Mensaje ', done: false, quien: 'cero' }, { text: 'Fotos', done: true }, { text: '  ', done: false }]))
+      .toEqual([{ texto: 'Mensaje', hecho: false, quien: 'cero' }, { texto: 'Fotos', hecho: true, quien: 'estudio' }]);
+  });
+
+  it('objetivos y WhatsApp no se pisan al republicar desde la ficha', () => {
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft });
+    expect('doc' in r && PORTAL_SEPARATE_FIELDS.every((k) => !(k in r.doc))).toBe(true);
+  });
+
+  it('vencida: habilitada, con fecha pasada y sin avisar', () => {
+    expect(isOverdue({ estado: 'habilitada', fecha: '2026-11-01' }, '2026-11-03')).toBe(true);
+    expect(isOverdue({ estado: 'habilitada', fecha: '2026-11-03' }, '2026-11-03')).toBe(false);
+    expect(isOverdue({ estado: 'enviada', fecha: '2026-11-01' }, '2026-11-03')).toBe(false);
+    expect(isOverdue({ estado: 'habilitada' }, '2026-11-03')).toBe(false);
+  });
+
+  it('las tareas que piden archivos lo publican', () => {
+    const r = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft, tareas: publicTasks([{ id: '1', titulo: 'Fotos', estado: 'habilitada', pideArchivos: true }]) });
+    expect('doc' in r && r.doc.tareas[0].pideArchivos).toBe(true);
+  });
+
+  it('WhatsApp: deja solo números y agrega 549 a celulares argentinos', () => {
+    expect(whatsappDigits('11 2345-6789')).toBe('5491123456789');
+    expect(whatsappDigits('+54 9 11 2345 6789')).toBe('5491123456789');
+    expect(whatsappDigits('+54 11 2345 6789')).toBe('5491123456789');
+    expect(whatsappDigits('')).toBe('');
+  });
+
+  it('el cliente ve "Calendario de contenido" en lugar de Asana', () => {
+    expect(PAF_PORTAL_LINK_LABEL_FOR_TEST.asana).toBe('Calendario de contenido');
   });
 });

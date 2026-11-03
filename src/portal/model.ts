@@ -31,7 +31,7 @@ export const PAF_PORTAL_LINK_LABEL: Record<PafPortalLinkKey, string> = {
   materiales: 'Materiales',
   resultados: 'Resultados',
   web: 'Tu web',
-  asana: 'Contenido en Asana',
+  asana: 'Calendario de contenido',
 };
 export const PAF_PORTAL_LINK_KEYS = Object.keys(PAF_PORTAL_LINK_LABEL) as PafPortalLinkKey[];
 
@@ -66,6 +66,8 @@ export interface PafTask {
   aprobacion?: { fecha: string; canal: string };
   /** Por qué Juan la volvió a habilitar (lo ve el estudio) */
   motivo?: string;
+  /** La tarea pide subir archivos: el portal muestra el link a Materiales */
+  pideArchivos?: boolean;
 }
 
 /** Entrega de Juan al estudio: archivo en Drive, se publica cuando él decide */
@@ -87,6 +89,14 @@ export interface PafPortalTask {
   aprobadaEl?: string; // YYYY-MM-DD
   habilitadaEn?: string; // para no mostrar como avisada una tarea que se volvió a habilitar
   motivo?: string; // por qué se volvió a habilitar
+  pideArchivos?: boolean; // muestra el link a Materiales
+}
+
+/** Objetivo de la semana (sale de los objetivos del panel del estudio) */
+export interface PafPortalGoal {
+  texto: string;
+  hecho: boolean;
+  quien: 'cero' | 'estudio';
 }
 export interface PafPortalDelivery {
   id: string;
@@ -108,7 +118,31 @@ export interface PafPortalDoc {
   tareasHabilitadas: string[];
   entregas: PafPortalDelivery[];
   proximaReunion: { fecha: string; hora?: string } | null;
+  /** Semana del programa (sale de la fecha de inicio) */
+  semana?: { actual: number; total: number } | null;
   actualizadoEn: string;
+  /** Se publican aparte (ver PORTAL_SEPARATE_FIELDS): objetivos de la semana y WhatsApp de Juan */
+  objetivos?: PafPortalGoal[];
+  contacto?: { whatsapp?: string };
+}
+
+/** Campos que no pisa la publicación general (vienen del panel del estudio y de la configuración de Juan) */
+export const PORTAL_SEPARATE_FIELDS = ['objetivos', 'contacto'] as const;
+
+/** Semana X de 12 a partir de la fecha de inicio (null si no arrancó o no hay fecha) */
+export function programWeek(start: string | undefined, today: string, total = 12): { actual: number; total: number } | null {
+  if (!start || !/^\d{4}-\d{2}-\d{2}/.test(start) || start.slice(0, 10) > today) return null;
+  const days = Math.floor((Date.parse(today) - Date.parse(start.slice(0, 10))) / 86400000);
+  return { actual: Math.min(total, Math.floor(days / 7) + 1), total };
+}
+
+/** Solo dígitos, con 549 adelante si es un celular argentino sin código */
+export function whatsappDigits(raw: string): string {
+  const d = raw.replace(/\D/g, '');
+  if (!d) return '';
+  if (d.startsWith('549')) return d;
+  if (d.startsWith('54')) return `549${d.slice(2)}`;
+  return d.length === 10 ? `549${d}` : d;
 }
 
 export function emptyPortalDraft(email?: string): PafPortalDraft {
@@ -136,7 +170,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; privados?: (string | undefined)[] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; privados?: (string | undefined)[] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -168,10 +202,11 @@ export function buildPafPortal(
       hitoVisible: hito,
       resumenVisible: input.draft.resumen.trim().slice(0, 2000),
       enlaces,
-      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}) })),
+      tareas: (input.tareas || []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo, pideArchivos }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}), ...(pideArchivos ? { pideArchivos: true } : {}) })),
       tareasHabilitadas: (input.tareas || []).filter((t) => t.estado === 'habilitada').map((t) => t.id),
       entregas: (input.entregas || []).map(({ id, titulo, fecha, enlace }) => ({ id, titulo, ...(fecha ? { fecha } : {}), ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
       proximaReunion: input.proximaReunion || null,
+      semana: input.semana || null,
       actualizadoEn: now,
     },
   };
@@ -191,6 +226,7 @@ export function publicTasks(tasks: PafTask[] = []): PafPortalTask[] {
       ...(t.fecha ? { fecha: t.fecha } : {}),
       ...(t.habilitadaEn ? { habilitadaEn: t.habilitadaEn } : {}),
       ...(t.motivo && t.estado === 'habilitada' ? { motivo: t.motivo } : {}),
+      ...(t.pideArchivos ? { pideArchivos: true } : {}),
       ...(t.estado === 'aprobada' && t.aprobacion ? { aprobadaEl: t.aprobacion.fecha.slice(0, 10) } : {}),
     }));
 }
@@ -212,7 +248,7 @@ export function nextMeeting(
 }
 
 export function portalFromProject(
-  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks },
+  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string },
   meetings: Parameters<typeof nextMeeting>[0],
   draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
   clienteId = project.pafClienteId,
@@ -229,6 +265,7 @@ export function portalFromProject(
       tareas: publicTasks(project.pafTareas),
       entregas: publicDeliveries(project.pafEntregas),
       proximaReunion: nextMeeting(meetings, project.id, today),
+      semana: programWeek(project.pafStartDate || project.startDate, today),
       privados: [project.pafDrive?.carpetaInterna, project.pafDrive?.ficha, ...privados],
     },
     now.toISOString()
@@ -435,4 +472,14 @@ export function suggestedChannel(tasks: PafTask[]): string {
 export function reopenTask(task: PafTask, motivo: string, now = new Date().toISOString()): PafTask {
   const { avisoEn: _a, aprobacion: _b, ...rest } = task;
   return { ...rest, estado: 'habilitada', habilitadaEn: now, motivo: motivo.trim().slice(0, 140) };
+}
+
+/** Objetivos del panel del estudio → lo que ve en "Esta semana" (sin IDs internos) */
+export function portalGoals(goals: { text: string; done: boolean; quien?: 'cero' | 'estudio' }[] = []): PafPortalGoal[] {
+  return goals.filter((g) => g.text.trim()).map((g) => ({ texto: g.text.trim(), hecho: !!g.done, quien: g.quien === 'cero' ? 'cero' : 'estudio' }));
+}
+
+/** Tarea habilitada con fecha pasada que el estudio todavía no avisó */
+export function isOverdue(t: Pick<PafPortalTask, 'estado' | 'fecha'>, today: string): boolean {
+  return t.estado === 'habilitada' && !!t.fecha && t.fecha < today;
 }

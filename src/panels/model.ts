@@ -21,6 +21,8 @@ export interface PanelGoal {
   id: string;
   text: string;
   done: boolean;
+  /** Quién lo hace (portal PAF: "Esta semana"). Sin dato = el estudio. */
+  quien?: 'cero' | 'estudio';
 }
 
 export interface PanelTask {

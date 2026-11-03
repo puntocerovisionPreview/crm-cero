@@ -4,14 +4,17 @@ import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
-  approveTask, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, reopenTask, safeHttpsUrl,
+  approveTask, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
   suggestedChannel, type PafDelivery, type PafPedidoAlta, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
 } from '../portal/model';
-import { publishPafPortal, republishIfPublished, subscribePafPortal, subscribePedidoDeProyecto, unpublishPafPortal } from '../portal/store';
+import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, unpublishPafPortal } from '../portal/store';
+import { subscribePanelOfProject } from '../panels/store';
+import type { ClientPanel } from '../panels/model';
 import { SegmentedControl } from '../ui';
 import { hapticFeedback } from '../utils/haptics';
 import { PafAltaCard } from './PafAltaCard';
 import { PafReunionCard } from './PafReunionCard';
+import { PafWeekGoals } from './PafWeekGoals';
 
 const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
 const STATE_STYLE: Record<PafTaskState, string> = {
@@ -62,8 +65,9 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 
       {tab === 'hoy' && (
         <div className="space-y-5">
-          <Block title="Foco de la semana" hint="Lo ve el estudio arriba de todo. Se guarda solo.">
-            <textarea className={input} rows={3} value={portal.draft.resumen} placeholder="Esta semana cerramos el foco y arrancamos con el mensaje." onChange={(e) => portal.set({ resumen: e.target.value })} />
+          <Block title="Esta semana" hint="El foco y 2 o 3 objetivos, con quién hace cada uno. Lo ve el estudio arriba de todo.">
+            <textarea className={input} rows={2} value={portal.draft.resumen} placeholder="Foco: esta semana cerramos a quién le hablamos." onChange={(e) => portal.set({ resumen: e.target.value })} />
+            <PafWeekGoals project={project} publishedId={portal.published?.clienteId} />
           </Block>
 
           <Block title="Para revisar" hint="El estudio avisó que las terminó." badge={toReview.length ? <BellRing className="w-3.5 h-3.5 text-amber-400" /> : undefined}>
@@ -103,6 +107,9 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
                 </label>
               ))}
             </div>
+          </Block>
+          <Block title="Tu WhatsApp" hint="Para el botón «Hablar con Juan» del portal. Es uno solo para todos los estudios.">
+            <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
           </Block>
           {legacy && <Block title="Portal anterior (por link)" hint="Sigue funcionando para quien ya lo usa.">{legacy}</Block>}
           {portal.published && (
@@ -190,6 +197,11 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
     return subscribePafPortal(savedId, setPublished);
   }, [savedId]);
   useEffect(() => subscribePedidoDeProyecto(project.id, setPedido), [project.id]);
+  // Para publicar junto: objetivos de la semana (panel del estudio) y tu WhatsApp
+  const [panel, setPanel] = useState<ClientPanel | null>(null);
+  const [config, setConfig] = useState<{ whatsapp?: string }>({});
+  useEffect(() => subscribePanelOfProject(project.id, setPanel), [project.id]);
+  useEffect(() => subscribePafConfig(setConfig), []);
 
   // El ID que asigna el alta llega después: si todavía no se publicó, lo toma
   useEffect(() => {
@@ -244,6 +256,7 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
     setBusy(true); setErrors([]); setNotice('');
     try {
       await publishPafPortal(result.doc);
+      await publishPortalExtras(result.doc.clienteId, { objetivos: portalGoals(panel?.goals), contacto: { whatsapp: config.whatsapp || '' } });
       onUpdateProject(project.id, { pafClienteId: result.doc.clienteId, pafPortal: { ...current, publishedAt: result.doc.actualizadoEn } });
       setNotice(published ? 'Cambios publicados.' : 'Publicado. Copiá el enlace y pasáselo por tu canal.');
     } catch {
@@ -276,6 +289,15 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   return {
     draft, set, emailsText, setEmailsText, clienteId, setClienteId, published,
     dirty: portalDirty(current, published), busy, errors, notice, publish, unpublish, copyLink,
+    whatsapp: config.whatsapp || '',
+    saveWhatsapp: async (raw: string) => {
+      const whatsapp = whatsappDigits(raw);
+      if (raw.trim() && whatsapp.length < 10) { setErrors(['El WhatsApp tiene que tener código de área (ej. 11 2345 6789).']); return; }
+      setErrors([]);
+      await savePafConfig({ whatsapp });
+      if (published) await publishPortalExtras(published.clienteId, { contacto: { whatsapp } });
+      setNotice(whatsapp ? 'WhatsApp guardado: aparece en el portal de cada estudio cuando se publica.' : 'WhatsApp quitado.');
+    },
   };
 }
 
@@ -325,6 +347,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
         <span className="flex-1 min-w-0 text-xs text-zinc-100">
           <span className="font-semibold">{t.titulo}</span>{t.fecha && <span className="text-zinc-500"> · {t.fecha}</span>}
           {t.detalle && <span className="block text-[11px] text-zinc-400">{t.detalle}</span>}
+          {t.pideArchivos && <span className="block text-[10px] text-zinc-500">Pide archivos · link a Materiales</span>}
           {t.motivo && t.estado === 'habilitada' && <span className="block text-[10px] text-sky-300">Reabierta: {t.motivo}</span>}
           {t.aprobacion && <span className="block text-[10px] text-emerald-400">Aprobada el {t.aprobacion.fecha.slice(0, 10)} por {t.aprobacion.canal}</span>}
           {t.estado === 'enviada' && t.avisoEn && <span className="block text-[10px] text-amber-300">Avisó que terminó el {t.avisoEn.slice(0, 10)}</span>}
@@ -361,12 +384,12 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
 }
 
 function AddTask({ work }: { work: Work }) {
-  const [f, setF] = useState({ titulo: '', detalle: '', fecha: '' });
+  const [f, setF] = useState({ titulo: '', detalle: '', fecha: '', pideArchivos: false });
   const add = () => {
     if (!f.titulo.trim()) return;
     hapticFeedback.light();
-    work.add({ titulo: f.titulo.trim(), ...(f.detalle.trim() ? { detalle: f.detalle.trim() } : {}), ...(f.fecha ? { fecha: f.fecha } : {}) });
-    setF({ titulo: '', detalle: '', fecha: '' });
+    work.add({ titulo: f.titulo.trim(), ...(f.detalle.trim() ? { detalle: f.detalle.trim() } : {}), ...(f.fecha ? { fecha: f.fecha } : {}), ...(f.pideArchivos ? { pideArchivos: true } : {}) });
+    setF({ titulo: '', detalle: '', fecha: '', pideArchivos: false });
   };
   return (
     <div className="space-y-1.5 pt-2 border-t border-zinc-800">
@@ -375,6 +398,7 @@ function AddTask({ work }: { work: Work }) {
         <input className={input} value={f.detalle} placeholder="Detalle (opcional)" onChange={(e) => setF({ ...f, detalle: e.target.value })} />
         <input className={`${input} w-36`} type="date" aria-label="Fecha" value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} />
       </div>
+      <label className="flex items-center gap-1.5 text-[11px] text-zinc-400"><input type="checkbox" checked={f.pideArchivos} onChange={(e) => setF({ ...f, pideArchivos: e.target.checked })} />Pide subir archivos (el estudio ve el link a Materiales)</label>
       <button type="button" onClick={add} className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 text-[11px] font-bold">Agregar (sin habilitar)</button>
       {work.error && <p role="alert" className="text-[11px] text-rose-300">{work.error}</p>}
     </div>
@@ -416,5 +440,16 @@ function Deliveries({ work }: { work: Work }) {
         {(error || work.error) && <p role="alert" className="text-[11px] text-rose-300">{error || work.error}</p>}
       </div>
     </Block>
+  );
+}
+
+function WhatsappField({ value, onSave }: { value: string; onSave: (raw: string) => Promise<void> }) {
+  const [v, setV] = useState(value);
+  useEffect(() => setV(value), [value]);
+  return (
+    <div className="flex gap-1.5">
+      <input className={input} inputMode="tel" value={v} placeholder="11 2345 6789" onChange={(e) => setV(e.target.value)} />
+      <button type="button" onClick={() => onSave(v).catch(() => undefined)} disabled={v === value} className="shrink-0 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 text-[11px] font-bold disabled:opacity-50">Guardar</button>
+    </div>
   );
 }
