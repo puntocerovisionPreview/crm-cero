@@ -87,7 +87,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
       {tab === 'config' && (
         <div className="space-y-5">
           <PafAltaCard project={project} onUpdateProject={onUpdateProject} />
-          <Block title="Acceso al portal" hint="Solo entran estos correos, con su cuenta de Google. Usá el mismo con el que se compartió su carpeta.">
+          <Block title="Acceso al portal" hint="Solo entran estos correos, con su cuenta de Google. El del alta (con el que se comparte la carpeta) se agrega solo.">
             <label className="block text-[11px] text-zinc-400">ID del cliente
               <input className={`${input} font-mono`} value={portal.clienteId} disabled={!!portal.published} placeholder="PAF-002" onChange={(e) => portal.setClienteId(e.target.value.toUpperCase())} />
             </label>
@@ -176,11 +176,7 @@ function Block({ title, hint, badge, children }: { title: string; hint?: string;
 
 function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdateProject: Props['onUpdateProject']) {
   const [clienteId, setClienteId] = useState(project.pafClienteId || '');
-  const [draft, setDraft] = useState<PafPortalDraft>(() => {
-    const d = project.pafPortal || emptyPortalDraft(project.clientEmail);
-    // La carpeta del estudio que se pegó en el alta va a "Tu carpeta" si está vacía
-    return project.pafDrive?.carpetaCompartida && !d.enlaces.carpeta ? { ...d, enlaces: { ...d.enlaces, carpeta: project.pafDrive.carpetaCompartida } } : d;
-  });
+  const [draft, setDraft] = useState<PafPortalDraft>(() => project.pafPortal || emptyPortalDraft(project.clientEmail));
   const [emailsText, setEmailsText] = useState((project.pafPortal?.emails || draft.emails).join(', '));
   const [published, setPublished] = useState<PafPortalDoc | null | undefined>(undefined);
   const [pedido, setPedido] = useState<PafPedidoAlta | null>(null);
@@ -199,6 +195,18 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   useEffect(() => {
     if (project.pafClienteId && !published) setClienteId(project.pafClienteId);
   }, [project.pafClienteId, published]);
+
+  // El correo del alta (con el que se comparte la carpeta) es el que entra al portal
+  const altaEmail = pedido?.email;
+  useEffect(() => {
+    if (altaEmail) setEmailsText((t) => (normalizeEmails(t).includes(altaEmail.toLowerCase()) ? t : [t.trim(), altaEmail].filter(Boolean).join(', ')));
+  }, [altaEmail]);
+
+  // La carpeta del estudio que pegás en el alta pasa a "Tu carpeta" si está vacía
+  const sharedFolder = project.pafDrive?.carpetaCompartida;
+  useEffect(() => {
+    if (sharedFolder) setDraft((d) => (d.enlaces.carpeta ? d : { ...d, enlaces: { ...d.enlaces, carpeta: sharedFolder } }));
+  }, [sharedFolder]);
 
   // Guardado automático en la ficha (no publica)
   const current = useMemo(() => ({ ...draft, emails: normalizeEmails(emailsText) }), [draft, emailsText]);
