@@ -17,7 +17,7 @@ export const DriveSettings: React.FC = () => {
   };
   return <section className="rounded-xl border border-[var(--border-subtle)] p-4 space-y-3">
     <h3 className="font-semibold">Google Drive · Carpetas de clientes</h3>
-    <p className="text-sm">{!status ? 'Consultando conexión…' : status.error ? `Error: ${status.error}` : status.connected ? `Conectado con ${status.email}` : 'Desconectado'}</p>
+    <p className="text-sm">{!status ? 'Consultando conexión…' : status.error ? `Error: ${status.error}` : status.connected ? `Conectado con ${status.email}${status.calendar ? ' · Drive y Calendar' : ' · solo Drive: volvé a conectar para invitar clientes a las reuniones'}` : 'Desconectado'}</p>
     <p className="text-sm text-[var(--text-secondary)]">Los nuevos proyectos Web preparan sus carpetas, panel, tareas y propuesta de arranque. Las invitaciones a las carpetas llegan por correo de Google.</p>
     {status && !status.configured && <p className="text-sm text-amber-500">Falta completar la configuración del servidor. Seguí la guía de conexión de Drive del proyecto.</p>}
     {error && <p role="alert" className="text-sm text-red-400">{error}</p>}

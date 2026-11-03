@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarCheck, CalendarX, Check, ExternalLink, Loader2, Pencil, RefreshCw, Trash2, Video } from 'lucide-react';
+import { CalendarCheck, CalendarX, Check, ExternalLink, Loader2, Pencil, RefreshCw, Trash2, UserPlus, Video } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
 import { getTodayString } from '../utils/storage';
 import { getCalendarStatus, syncCalendarNow, type CalendarStatus } from '../utils/calendarSyncClient';
-import { PafReunionCard, googleCalendarLink } from './PafReunionCard';
+import { PafReunionCard, clientInviteEmails, googleCalendarLink } from './PafReunionCard';
 import { PafMeetingSummaries } from './PafMeetingSummaries';
 
 const field = 'rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
@@ -52,7 +52,7 @@ export const PafMeetingsSection: React.FC<{
           </div>
         )}
         {upcoming.length ? (
-          <ul className="space-y-2">{upcoming.map((m, i) => <MeetingRow key={m.id} m={m} first={i === 0} connected={!!status?.connected} {...props} />)}</ul>
+          <ul className="space-y-2">{upcoming.map((m, i) => <MeetingRow key={m.id} m={m} first={i === 0} connected={!!status?.connected} clientEmails={clientInviteEmails(project)} {...props} />)}</ul>
         ) : !props.scheduling && <p className="rounded-xl border border-dashed border-zinc-700 p-3 text-center text-xs text-zinc-500">Sin reuniones agendadas. El cliente ve “La vas a ver acá cuando la coordinemos”.</p>}
         {upcoming.length > 0 && <p className="text-[11px] text-zinc-500">El cliente ve la primera, con botones para unirse, agregarla a su calendario y pedirte reprogramar.</p>}
       </section>
@@ -118,6 +118,7 @@ function CalendarStatusLine({ status }: { status: CalendarStatus | null }) {
     setMsg(err || 'Listo: tu Calendar y el CRM están al día.');
   };
   return (
+    <div className="space-y-2">
     <div className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.04] px-3 py-2">
       <CalendarCheck className="w-4 h-4 text-emerald-400" />
       <span className="flex-1 min-w-0 text-[11px] text-zinc-300">Google Calendar conectado{status.calendarId ? ` · ${status.calendarId}` : ''}. Lo que agendás acá aparece ahí en segundos.</span>
@@ -126,11 +127,17 @@ function CalendarStatusLine({ status }: { status: CalendarStatus | null }) {
       </button>
       {msg && <p role="status" className="w-full text-[11px] text-zinc-400">{msg}</p>}
     </div>
+    {!status.invites && (
+      <p className="rounded-xl border border-amber-400/30 bg-amber-400/[0.04] px-3 py-2 text-[11px] text-zinc-300">
+        Para que al cliente le llegue la invitación: andá a Ajustes → Automatizaciones → Google Drive, tocá “Volver a conectar” y aceptá también <span className="text-zinc-100">Google Calendar</span>. Es una sola vez.
+      </p>
+    )}
+    </div>
   );
 }
 
-function MeetingRow({ m, first, connected, onUpdateMeeting, onToggleMeeting, onDeleteMeeting, onWritingSummary }: {
-  m: AgendaMeeting; first: boolean; connected: boolean;
+function MeetingRow({ m, first, connected, clientEmails, onUpdateMeeting, onToggleMeeting, onDeleteMeeting, onWritingSummary }: {
+  m: AgendaMeeting; first: boolean; connected: boolean; clientEmails: string[];
   onUpdateMeeting?: (id: string, updates: Partial<AgendaMeeting>) => void;
   onToggleMeeting?: (id: string) => void;
   onDeleteMeeting?: (id: string) => void;
@@ -149,6 +156,7 @@ function MeetingRow({ m, first, connected, onUpdateMeeting, onToggleMeeting, onD
         <div className="flex-1 min-w-0">
           <p className="text-xs font-semibold text-zinc-100 truncate">{m.title}</p>
           <p className="text-[11px] text-zinc-400 capitalize">{d.toLocaleDateString('es-AR', { weekday: 'long' })}{m.time ? ` · ${m.time} hs` : ' · sin hora'}{m.durationHours ? ` · ${m.durationHours === 0.5 ? '30 min' : `${m.durationHours} h`}` : ''}</p>
+          <InviteLine m={m} clientEmails={clientEmails} onInvite={onUpdateMeeting ? () => onUpdateMeeting(m.id, { invitados: clientEmails }) : undefined} />
           <p className="mt-0.5 text-[10px]">
             {first && <span className="mr-2 text-sky-300">La ve el cliente</span>}
             {m.googleEventId ? <span className="text-emerald-400">En tu Google Calendar</span>
@@ -176,4 +184,21 @@ function MeetingRow({ m, first, connected, onUpdateMeeting, onToggleMeeting, onD
       )}
     </li>
   );
+}
+
+/** Si el cliente está invitado en Google Calendar, si falló, o el botón para invitarlo */
+function InviteLine({ m, clientEmails, onInvite }: { m: AgendaMeeting; clientEmails: string[]; onInvite?: () => void }) {
+  const invitados = m.invitados || [];
+  const key = [...invitados].map((e) => e.toLowerCase()).sort().join(',');
+  if (!invitados.length) {
+    if (!clientEmails.length || !onInvite) return null;
+    return (
+      <button type="button" onClick={onInvite} className="mt-1 inline-flex items-center gap-1 rounded-md bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-300">
+        <UserPlus className="w-3 h-3" />Invitar al cliente
+      </button>
+    );
+  }
+  if (m.googleInviteError) return <p className="mt-0.5 text-[10px] text-amber-300">{m.googleInviteError}</p>;
+  const sent = m.googleInviteHash === key;
+  return <p className={`mt-0.5 text-[10px] ${sent ? 'text-emerald-400' : 'text-zinc-500'}`}>{sent ? `Invitación enviada a ${invitados.join(', ')}` : `Invitando a ${invitados.join(', ')}…`}</p>;
 }

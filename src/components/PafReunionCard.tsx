@@ -8,6 +8,12 @@ import { hapticFeedback } from '../utils/haptics';
 const field = 'rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
 const input = `w-full ${field}`;
 
+/** Correos del cliente para invitarlo: los que entran a su portal o, si no hay, el de la ficha */
+export function clientInviteEmails(project: Pick<Project, 'pafPortal' | 'clientEmail'>): string[] {
+  const list = project.pafPortal?.emails?.length ? project.pafPortal.emails : project.clientEmail ? [project.clientEmail] : [];
+  return [...new Set(list.map((e) => e.trim().toLowerCase()).filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)))];
+}
+
 /** Tipos de reunión frecuentes: ponen el título y la duración */
 const MEETING_TYPES = [
   { label: 'Reunión de arranque', horas: 1.5 },
@@ -47,6 +53,9 @@ export const PafReunionCard: React.FC<{
   onCancel?: () => void;
 }> = ({ project, meetings, onAddMeeting, suggestedTitle, hideUpcoming, calendarConnected, onCancel }) => {
   const [form, setForm] = useState({ title: `Reunión PAF · ${project.clientName}`, date: getTodayString(), time: '11:00', durationHours: 1, notes: '' });
+  // A quién invitar: los correos que entran a su portal (o el del cliente)
+  const clientEmails = clientInviteEmails(project);
+  const [invitar, setInvitar] = useState(clientEmails.length > 0);
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (!suggestedTitle) return;
@@ -81,10 +90,11 @@ export const PafReunionCard: React.FC<{
       completed: false,
       projectId: project.id,
       projectName: project.clientName,
+      ...(invitar && clientEmails.length ? { invitados: clientEmails } : {}),
     };
     onAddMeeting(meeting);
     if (calendarSync) {
-      setNotice('Agendada. Aparece en tu Google Calendar en segundos. La invitación al estudio la mandás vos desde ahí.');
+      setNotice(invitar && clientEmails.length ? `Agendada. En segundos aparece en tu Calendar y Google le manda la invitación a ${clientEmails.join(', ')}.` : 'Agendada. Aparece en tu Google Calendar en segundos.');
     } else {
       // Se abre en el mismo clic para que el navegador no lo bloquee
       window.open(googleCalendarLink(meeting), '_blank', 'noopener');
@@ -128,6 +138,12 @@ export const PafReunionCard: React.FC<{
         </select>
       </div>
       <input className={input} value={form.notes} placeholder="Temas (opcional)" onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+      {clientEmails.length > 0 ? (
+        <label className="flex items-start gap-2 rounded-lg border border-zinc-800 p-2 text-[11px] text-zinc-300">
+          <input type="checkbox" className="mt-0.5" checked={invitar} onChange={(e) => setInvitar(e.target.checked)} />
+          <span>Invitar al cliente: Google le manda la invitación desde tu Gmail a <span className="text-zinc-100">{clientEmails.join(', ')}</span>, y le avisa si la movés o la cancelás.</span>
+        </label>
+      ) : <p className="text-[11px] text-zinc-500">Para invitar al cliente, cargá su correo en Ajustes → Quién puede entrar.</p>}
       <button type="button" onClick={schedule} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 text-zinc-950 px-3 py-1.5 text-xs font-bold">
         <CalendarPlus className="w-3.5 h-3.5" /> Agendar
       </button>

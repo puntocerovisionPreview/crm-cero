@@ -9,6 +9,8 @@ export interface CalendarStatus {
   connected: boolean;
   calendarId: string | null;
   serviceAccountEmail: string | null;
+  /** Tu cuenta de Google conectada con permiso de Calendar: se puede invitar al cliente */
+  invites: boolean;
 }
 
 let statusPromise: Promise<CalendarStatus> | null = null;
@@ -18,11 +20,16 @@ export function getCalendarStatus(refresh = false): Promise<CalendarStatus> {
   if (!statusPromise || refresh) {
     statusPromise = (async () => {
       try {
-        const res = await fetch('/api/automation/status', { headers: await getAuthHeaders() });
+        const headers = await getAuthHeaders();
+        const [res, google] = await Promise.all([
+          fetch('/api/automation/status', { headers }),
+          fetch('/api/drive/status', { headers }).catch(() => null),
+        ]);
         const data = res.ok ? await res.json() : null;
-        return { connected: Boolean(data?.calendar), calendarId: data?.calendarId || null, serviceAccountEmail: data?.serviceAccountEmail || null };
+        const g = google?.ok ? await google.json() : null;
+        return { connected: Boolean(data?.calendar), calendarId: data?.calendarId || null, serviceAccountEmail: data?.serviceAccountEmail || null, invites: Boolean(g?.calendar) };
       } catch {
-        return { connected: false, calendarId: null, serviceAccountEmail: null };
+        return { connected: false, calendarId: null, serviceAccountEmail: null, invites: false };
       }
     })();
   }

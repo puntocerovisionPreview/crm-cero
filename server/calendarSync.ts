@@ -1,6 +1,8 @@
 import { GoogleAuth, JWT } from 'google-auth-library';
 import type { Firestore } from 'firebase-admin/firestore';
+import type { OAuth2Client } from 'google-auth-library';
 import { addDays, formatLocalISO, todayLocal } from '../src/utils/dates';
+import { calendarUserClient } from './driveOAuth';
 
 /**
  * SINCRONIZACIÓN CON GOOGLE CALENDAR (en los dos sentidos)
@@ -15,6 +17,9 @@ import { addDays, formatLocalISO, todayLocal } from '../src/utils/dates';
  *   como reuniones; si movés en Google una reunión del CRM, se actualiza en el CRM.
  *   Nunca se borran reuniones del CRM desde Google (más seguro).
  * - Ventana: desde ayer hasta 60 días adelante. Los eventos de día completo se ignoran.
+ * - Invitados: una cuenta de servicio no puede invitar a nadie desde un Gmail. Si la reunión tiene
+ *   `invitados`, el evento se escribe con TU cuenta (la conexión de Google de Ajustes, con permiso
+ *   de Calendar) y Google les manda la invitación, los cambios y la cancelación desde tu Gmail.
  */
 
 const TZ = 'America/Argentina/Cordoba';
@@ -69,6 +74,22 @@ interface MeetingDoc {
   completed?: boolean;
   googleEventId?: string;
   googleSyncHash?: string;
+  invitados?: string[];
+  googleInviteHash?: string;
+  googleInviteError?: string | null;
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Invitados válidos y ordenados: también sirve de huella para saber si ya se mandó */
+export function inviteKey(m: { invitados?: string[] }): string {
+  return [...new Set((m.invitados || []).map((e) => e.trim().toLowerCase()).filter((e) => EMAIL_RE.test(e)))].sort().join(',');
+}
+
+/** Pedido a Calendar como vos (para invitar): Google avisa a los invitados */
+async function gcalAsUser(client: OAuth2Client, path: string, method: 'POST' | 'PATCH' | 'DELETE', data?: unknown): Promise<any> {
+  const sep = path.includes('?') ? '&' : '?';
+  const r = await client.request({ url: `${API}${path}${sep}sendUpdates=all`, method, data, timeout: 20000 });
+  return r.data || null;
 }
 
 export function meetingHash(m: { title: string; date: string; time?: string; durationHours?: number }): string {
@@ -144,6 +165,13 @@ export async function runCalendarSync(db: Firestore, opts: { dryRun?: boolean } 
     pageToken = page?.nextPageToken;
   } while (pageToken);
 
+  // Tu cuenta, solo si hace falta invitar a alguien
+  let userClient: OAuth2Client | null | undefined;
+  const asUser = async () => {
+    if (userClient === undefined) userClient = await calendarUserClient(db).catch(() => null);
+    return userClient;
+  };
+
   const seenCeroIds = new Set<string>();
   for (const ev of events) {
     const ceroId = ev.extendedProperties?.private?.ceroMeetingId;
@@ -200,23 +228,36 @@ export async function runCalendarSync(db: Firestore, opts: { dryRun?: boolean } 
     if (m.proposed && !m.time) continue;
     if (!m.date || m.date < from || m.date > to) continue;
     const hash = meetingHash(m);
-    if (!m.googleEventId) {
-      if (m.completed) continue;
-      stats.createdInGoogle++;
-      if (!opts.dryRun) {
-        const created = await gcal(`/calendars/${calendarId}/events`, { method: 'POST', body: JSON.stringify(meetingToEvent(m)) });
-        await db.collection('meetings').doc(m.id).set({ googleEventId: created.id, googleSyncHash: hash }, { merge: true });
+    const invite = inviteKey(m);
+    const inviteChanged = invite !== (m.googleInviteHash || '');
+    if (m.googleEventId && hash === m.googleSyncHash && !inviteChanged) continue;
+    if (!m.googleEventId && m.completed) continue;
+    if (m.googleEventId) stats.updatedInGoogle++; else stats.createdInGoogle++;
+    if (opts.dryRun) continue;
+
+    // Con invitados (o si se sacaron) va con tu cuenta; si no está conectada, se agenda igual sin invitarlos
+    const user = invite || m.googleInviteHash ? await asUser() : null;
+    const event = { ...meetingToEvent(m), ...(user ? { attendees: invite ? invite.split(',').map((email) => ({ email })) : [] } : {}) };
+    const path = `/calendars/${calendarId}/events${m.googleEventId ? `/${encodeURIComponent(m.googleEventId)}` : ''}`;
+    const method = m.googleEventId ? 'PATCH' : 'POST';
+    let saved: any;
+    let inviteError: string | null = null;
+    if (user) {
+      try {
+        saved = await gcalAsUser(user, path, method, event);
+      } catch (e: any) {
+        inviteError = `Google no dejó invitar (${e?.response?.status || 'error'}). Revisá el permiso de Calendar en Ajustes.`;
       }
-    } else if (hash !== m.googleSyncHash) {
-      stats.updatedInGoogle++;
-      if (!opts.dryRun) {
-        await gcal(`/calendars/${calendarId}/events/${encodeURIComponent(m.googleEventId)}`, {
-          method: 'PATCH',
-          body: JSON.stringify(meetingToEvent(m)),
-        });
-        await db.collection('meetings').doc(m.id).set({ googleSyncHash: hash }, { merge: true });
-      }
+    } else if (invite) {
+      inviteError = 'Para invitar al cliente, conectá tu cuenta de Google con permiso de Calendar (Ajustes → Automatizaciones).';
     }
+    if (!saved) saved = await gcal(path, { method, body: JSON.stringify(meetingToEvent(m)) });
+    await db.collection('meetings').doc(m.id).set({
+      ...(m.googleEventId ? {} : { googleEventId: saved.id }),
+      googleSyncHash: hash,
+      googleInviteHash: inviteError ? m.googleInviteHash || '' : invite,
+      googleInviteError: inviteError,
+    }, { merge: true });
   }
 
   // 3) Reuniones borradas en el CRM → borrar su evento (solo eventos creados por el CRM)
@@ -224,7 +265,12 @@ export async function runCalendarSync(db: Firestore, opts: { dryRun?: boolean } 
     const ceroId = ev.extendedProperties?.private?.ceroMeetingId;
     if (!ceroId || ev.status === 'cancelled' || meetings.has(ceroId)) continue;
     stats.deletedInGoogle++;
-    if (!opts.dryRun) await gcal(`/calendars/${calendarId}/events/${encodeURIComponent(ev.id)}`, { method: 'DELETE' });
+    if (opts.dryRun) continue;
+    // Si tenía invitados, se borra con tu cuenta para que Google les avise que se canceló
+    const user = ev.attendees?.length ? await asUser() : null;
+    const path = `/calendars/${calendarId}/events/${encodeURIComponent(ev.id)}`;
+    if (user) await gcalAsUser(user, path, 'DELETE').catch(() => gcal(path, { method: 'DELETE' }));
+    else await gcal(path, { method: 'DELETE' });
   }
 
   return stats;

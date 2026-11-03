@@ -6,6 +6,8 @@ import { decryptDriveSecret, encryptDriveSecret } from './driveCrypto';
 
 export const DRIVE_OWNER = 'puntocerovision@gmail.com';
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+/** Para invitar a los clientes a las reuniones desde tu Gmail (Google les manda la invitación) */
+export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 export const integrationRef = (db: Firestore) => db.collection('settings').doc('integrations_private');
 export class DrivePending extends Error {}
 export function appOrigin(): string {
@@ -46,13 +48,19 @@ export async function driveRequest<T = any>(db: Firestore, path: string, method:
     throw error;
   }
 }
+/** Tu cuenta de Google con permiso de Calendar (null si no está conectada o no lo aceptaste) */
+export async function calendarUserClient(db: Firestore): Promise<OAuth2Client | null> {
+  const data = (await integrationRef(db).get()).data()?.drive;
+  if (!data?.refresh || !data.calendar || data.email !== DRIVE_OWNER || !driveConfigured()) return null;
+  return driveClient(db);
+}
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 export function registerDriveOAuth(app: express.Express, requireOwner: express.RequestHandler, getDb: () => Firestore | null) {
   app.get('/api/drive/status', requireOwner, async (_req, res) => {
     try {
       const db = getDb();
       const d = db ? (await integrationRef(db).get()).data()?.drive : null;
-      res.json({ configured: driveConfigured(), connected: Boolean(d?.refresh), email: d?.email || null, error: d?.error || (!db ? 'El servidor no tiene acceso a la base.' : null) });
+      res.json({ configured: driveConfigured(), connected: Boolean(d?.refresh), calendar: Boolean(d?.refresh && d?.calendar), email: d?.email || null, error: d?.error || (!db ? 'El servidor no tiene acceso a la base.' : null) });
     } catch { res.status(503).json({ error: 'No se pudo consultar la conexión con Drive.' }); }
   });
   app.post('/api/drive/connect', requireOwner, async (_req, res) => {
@@ -64,7 +72,7 @@ export function registerDriveOAuth(app: express.Express, requireOwner: express.R
       const { codeVerifier, codeChallenge } = await client.generateCodeVerifierAsync();
       await db.collection('settings').doc(`drive_oauth_${hash(state)}`).set({ verifier: encryptDriveSecret(codeVerifier), expires: Date.now() + 10 * 60_000 });
       res.cookie('cero_drive_state', state, { httpOnly: true, secure: appOrigin().startsWith('https:'), sameSite: 'lax', path: '/api/drive/callback', maxAge: 10 * 60_000 });
-      res.json({ url: client.generateAuthUrl({ scope: [DRIVE_SCOPE, 'openid', 'email'], access_type: 'offline', prompt: 'consent', login_hint: DRIVE_OWNER, state, code_challenge: codeChallenge, code_challenge_method: 'S256' as any }) });
+      res.json({ url: client.generateAuthUrl({ scope: [DRIVE_SCOPE, CALENDAR_SCOPE, 'openid', 'email'], include_granted_scopes: true, access_type: 'offline', prompt: 'consent', login_hint: DRIVE_OWNER, state, code_challenge: codeChallenge, code_challenge_method: 'S256' as any }) });
     } catch { res.status(503).json({ error: 'Falta configurar la conexión de Drive. Revisá los Secrets y APP_URL.' }); }
   });
   app.get('/api/drive/callback', async (req, res) => {
@@ -92,7 +100,9 @@ export function registerDriveOAuth(app: express.Express, requireOwner: express.R
       if (!tokens.id_token || !tokens.refresh_token || !tokens.scope?.split(' ').includes(DRIVE_SCOPE)) throw new Error('consent');
       const identity = (await client.verifyIdToken({ idToken: tokens.id_token, audience: process.env.GOOGLE_OAUTH_CLIENT_ID })).getPayload();
       if (!identity?.email_verified || identity.email?.toLowerCase() !== DRIVE_OWNER) return res.status(400).send(`Conectá la cuenta ${DRIVE_OWNER}. Volvé a Ajustes e intentá de nuevo.`);
-      await integrationRef(db).set({ drive: { refresh: encryptDriveSecret(tokens.refresh_token), email: DRIVE_OWNER, connectedAt: new Date().toISOString(), error: null } }, { merge: true });
+      // Calendar es opcional: si no lo aceptó, Drive sigue andando y las reuniones no invitan al cliente
+      const calendar = tokens.scope.split(' ').includes(CALENDAR_SCOPE);
+      await integrationRef(db).set({ drive: { refresh: encryptDriveSecret(tokens.refresh_token), email: DRIVE_OWNER, calendar, connectedAt: new Date().toISOString(), error: null } }, { merge: true });
       res.redirect(`${appOrigin()}/ajustes/automatizaciones?drive=conectado`);
     } catch { res.status(400).send('No se pudo conectar Google Drive. Volvé a Ajustes e intentá de nuevo.'); }
   });

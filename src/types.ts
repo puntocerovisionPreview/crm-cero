@@ -72,6 +72,9 @@ export interface AgendaMeeting {
   telegramReminded?: boolean;
   googleEventId?: string; // Evento vinculado en Google Calendar
   googleSyncHash?: string; // Última versión sincronizada (evita ida y vuelta)
+  invitados?: string[]; // Correos que Google invita desde tu Gmail (el cliente recibe la invitación)
+  googleInviteHash?: string; // Invitados a los que ya se mandó
+  googleInviteError?: string | null; // Por qué no se pudo invitar (para mostrarlo en la ficha)
   durationHours?: number; // Duración de la sesión en horas (ej: 1 o 1.5) para sumar automáticamente a las horas de consultoría PAF
 }
 
