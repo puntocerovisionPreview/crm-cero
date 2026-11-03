@@ -6,7 +6,41 @@
  */
 import type { PafResponsable } from './model';
 
-export type TemaId = 'arranque' | 'cliente_ideal' | 'diagnostico' | 'mensaje' | 'contenido' | 'instagram' | 'google' | 'web' | 'cierre';
+export type TemaId =
+  | 'arranque' | 'cliente_ideal' | 'diagnostico' | 'mensaje' | 'contenido' | 'instagram' | 'google' | 'web' | 'cierre'
+  | 'a_captacion' | 'a_campanas' | 'a_embudo' | 'a_casos' | 'a_guiones' | 'a_vsl' | 'a_lanzamiento' | 'a_medicion'
+  | 'f_registro' | 'f_respuesta' | 'f_reunion' | 'f_presupuesto' | 'f_campanas' | 'f_material' | 'f_ia' | 'f_practica' | 'f_cierre';
+
+/** Las tres etapas del método. Una etapa empieza solo cuando Juan la activa (nunca por fecha o pago). */
+export type Etapa = 'presencia' | 'adquisicion' | 'conversion';
+export const ETAPAS: { id: Etapa; label: string; pregunta: string; borrador?: boolean }[] = [
+  { id: 'presencia', label: 'Presencia', pregunta: '¿Se entiende qué hacés, para quién y por qué elegirte?' },
+  { id: 'adquisicion', label: 'Adquisición', pregunta: '¿Te encuentran, todas las semanas, personas parecidas a tu cliente ideal?', borrador: true },
+  { id: 'conversion', label: 'Conversión', pregunta: 'De los que te escriben, ¿cuántos terminás reuniendo, presupuestando y cerrando?', borrador: true },
+];
+/** Hitos que ve el cliente en cada etapa */
+export const ETAPA_HITOS: Record<Etapa, { titulo: string; trabajo: string; seCompleta: string }[]> = {
+  presencia: [
+    { titulo: 'Nos organizamos', trabajo: 'Arranque, objetivo, participantes, canales, datos y materiales necesarios.', seCompleta: 'Objetivo y responsabilidades confirmados; siguiente acción acordada.' },
+    { titulo: 'Definimos el foco', trabajo: 'Cliente ideal, nicho y oferta; diagnóstico, competencia y metas.', seCompleta: 'Kit y prioridades revisados; decisiones esenciales confirmadas.' },
+    { titulo: 'Acordamos el mensaje', trabajo: 'Frase, presentación, tono y aplicaciones.', seCompleta: 'Versión del mensaje confirmada por quien decide.' },
+    { titulo: 'Lo llevamos a tus canales', trabajo: 'Contenido e Instagram con la CM; Google Business, web y medición según alcance.', seCompleta: 'Trabajo contratado aplicado y comprobado.' },
+    { titulo: 'Revisamos y cerramos', trabajo: 'Resultados, evidencias, indicadores disponibles, pendientes y continuidad.', seCompleta: 'Cierre compartido y decisión de continuidad registrada.' },
+  ],
+  adquisicion: [
+    { titulo: 'Preparamos la captación', trabajo: 'Cómo filtrar y registrar consultas, y la estrategia de campañas.', seCompleta: 'Registro y formulario funcionando; presupuesto y tope aprobados.' },
+    { titulo: 'Creamos lo que atrae', trabajo: 'Contenido para atraer, casos de éxito, guiones y video de ventas.', seCompleta: 'Piezas aprobadas y listas para publicar.' },
+    { titulo: 'Lanzamos', trabajo: 'Campañas activas y etapa de aprendizaje.', seCompleta: 'Campañas activas y consultas registradas.' },
+    { titulo: 'Medimos', trabajo: 'Primer reporte con números reales y qué ajustar.', seCompleta: 'Reporte leído y ajustes acordados.' },
+  ],
+  conversion: [
+    { titulo: 'Ordenamos las consultas', trabajo: 'Registro completo de prospectos y cómo responder.', seCompleta: 'Registro en uso y protocolo de respuesta aprobado.' },
+    { titulo: 'Reunión y propuesta', trabajo: 'Reunión comercial, presupuesto y seguimiento.', seCompleta: 'Guion, modelo de presupuesto y secuencia aprobados.' },
+    { titulo: 'Mejoramos las campañas', trabajo: 'Qué anuncios siguen y por qué, según la calidad de las consultas.', seCompleta: 'Campañas ajustadas y cambios registrados.' },
+    { titulo: 'Material y práctica', trabajo: 'Material educativo, herramientas de IA y práctica con casos reales.', seCompleta: 'Material aprobado y práctica con devoluciones.' },
+    { titulo: 'Cierre del programa', trabajo: 'Informe final y reunión de cierre.', seCompleta: 'Informe entregado y siguiente paso decidido.' },
+  ],
+};
 /** Lo que se contrata aparte: si no está en el alcance, el tema no aparece ni cuenta */
 export type Servicio = 'contenido' | 'google' | 'web';
 export const SERVICIOS: { id: Servicio; label: string; hint: string }[] = [
@@ -18,7 +52,11 @@ export const SERVICIOS: { id: Servicio; label: string; hint: string }[] = [
 export interface TemaPlantilla {
   id: TemaId;
   titulo: string;
-  hito: number; // 1 a 5
+  /** Etapa (por defecto Presencia) */
+  etapa?: Etapa;
+  /** Etapa por desarrollar: el contenido es un borrador a revisar antes de usarlo con un cliente */
+  borrador?: boolean;
+  hito: number; // dentro de su etapa
   servicio?: Servicio;
   objetivo: string;
   completoCuando: string[];
@@ -121,11 +159,113 @@ export const PRESENCIA_TEMAS: TemaPlantilla[] = [
   },
 ];
 
-export const temaPorId = (id: TemaId) => PRESENCIA_TEMAS.find((t) => t.id === id)!;
+// Adquisición y Conversión: armados con los módulos de "POR_DESARROLLAR". Son borrador.
+const A = (t: Omit<TemaPlantilla, 'etapa' | 'borrador'>): TemaPlantilla => ({ ...t, etapa: 'adquisicion', borrador: true });
+const F = (t: Omit<TemaPlantilla, 'etapa' | 'borrador'>): TemaPlantilla => ({ ...t, etapa: 'conversion', borrador: true });
 
-/** Los temas que corresponden según lo que contrató (los de base siempre) */
-export function temasDelAlcance(alcance: Servicio[] = []): TemaPlantilla[] {
-  return PRESENCIA_TEMAS.filter((t) => !t.servicio || alcance.includes(t.servicio));
+export const ADQUISICION_TEMAS: TemaPlantilla[] = [
+  A({ id: 'a_captacion', titulo: 'Calificación y registro de consultas', hito: 1,
+    objetivo: 'Que cada consulta llegue con lo necesario para saber si encaja, y quede anotada.',
+    completoCuando: ['Preguntas y reglas de calificación aprobadas', 'Formulario funcionando en la landing', 'Registro mínimo en uso'],
+    tareas: [{ titulo: 'Aprobar las preguntas del formulario y las reglas de filtro', paraQue: 'Para recibir consultas que encajan y saber cuáles priorizar.' }, { titulo: 'Anotar cada consulta en el registro', paraQue: 'Sin registro no se puede medir qué trae cada campaña.' }],
+    entregas: [{ titulo: 'Formulario y registro de consultas', decision: 'las preguntas y las reglas de filtro', canal: 'mail' }] }),
+  A({ id: 'a_campanas', titulo: 'Estrategia de campañas', hito: 1,
+    objetivo: 'Definir a quién, dónde, con qué mensaje y con qué presupuesto se pauta.',
+    completoCuando: ['Inversión anterior revisada', 'Presupuesto y tope aprobados', 'Estrategia aprobada'],
+    reunion: { titulo: 'Reunión de estrategia de campañas', objetivo: 'Acordar presupuesto, tope y anuncios', preparar: 'Lo que invertiste antes en publicidad y cómo te fue', horas: 1 },
+    tareas: [{ titulo: 'Contarnos lo que invertiste antes y cómo te fue', paraQue: 'Para no repetir lo que no funcionó.' }],
+    entregas: [{ titulo: 'Estrategia de campañas', decision: 'el presupuesto, el tope y los anuncios', canal: 'mail' }] }),
+  A({ id: 'a_embudo', titulo: 'Contenido para atraer', hito: 2,
+    objetivo: 'Que cada pieza le hable a alguien en su momento: descubrir, evaluar o decidir.',
+    completoCuando: ['Calendario del mes con objetivo de cada pieza', 'Calendario aprobado'],
+    reunion: { titulo: 'Reunión de contenido para atraer', objetivo: 'Presentar el calendario del mes por etapa del embudo', conCM: true, horas: 1 },
+    tareas: [{ titulo: 'Aprobar el calendario del mes', paraQue: 'Para publicar con objetivo y no por publicar.' }],
+    entregas: [{ titulo: 'Calendario del mes (embudo)', decision: 'el calendario', canal: 'la app de contenido' }] }),
+  A({ id: 'a_casos', titulo: 'Casos de éxito', hito: 2,
+    objetivo: 'Mostrar 2 o 3 obras reales contadas como casos: problema, solución y resultado.',
+    completoCuando: ['Obras elegidas', 'Fotos, datos y testimonios recibidos', 'Casos publicados en la web e Instagram'],
+    tareas: [{ titulo: 'Elegir las obras y pedir los testimonios', paraQue: 'Un caso real convence más que cualquier frase.', pideArchivos: true }],
+    entregas: [{ titulo: 'Casos de éxito', decision: 'los casos antes de publicarlos', canal: 'mail' }] }),
+  A({ id: 'a_guiones', titulo: 'Guiones y grabación', hito: 2,
+    objetivo: 'Videos cortos con guion, grabados por el estudio.',
+    completoCuando: ['Guiones aprobados', 'Videos grabados', 'Videos editados y publicados'],
+    tareas: [{ titulo: 'Grabar los videos con los guiones', paraQue: 'Tu cara y tu voz generan confianza.' }],
+    entregas: [{ titulo: 'Guiones de video', decision: 'los guiones', canal: 'mail' }] }),
+  A({ id: 'a_vsl', titulo: 'Video de ventas', hito: 2,
+    objetivo: 'Un video en la landing que explique la oferta y lleve a consultar.',
+    completoCuando: ['Guion aprobado', 'Video grabado', 'Versión final aprobada y publicada'],
+    tareas: [{ titulo: 'Grabar el video de ventas', paraQue: 'Es lo que ve quien llega a tu landing antes de consultar.' }],
+    entregas: [{ titulo: 'Guion del video de ventas', decision: 'el guion y la versión final', canal: 'mail' }] }),
+  A({ id: 'a_lanzamiento', titulo: 'Lanzamiento y aprendizaje', hito: 3,
+    objetivo: 'Activar las campañas y aprender de las primeras consultas.',
+    completoCuando: ['Campañas activas', 'Aviso de etapa de aprendizaje', 'Consultas respondidas y calificadas'],
+    tareas: [{ titulo: 'Responder las consultas y avisar cuáles fueron buenas', paraQue: 'Con eso ajustamos a quién le mostramos los anuncios.' }],
+    entregas: [] }),
+  A({ id: 'a_medicion', titulo: 'Medición y primer reporte', hito: 4,
+    objetivo: 'Ver los números reales y decidir qué ajustar.',
+    completoCuando: ['Reporte con números reales', 'Reporte leído con el estudio', 'Ajustes acordados'],
+    reunion: { titulo: 'Reunión del primer reporte', objetivo: 'Leer los números y decidir qué ajustar', preparar: 'Tus dudas sobre el reporte', horas: 1 },
+    tareas: [{ titulo: 'Leer el reporte y traer dudas', paraQue: 'Para decidir juntos con números reales.' }],
+    entregas: [{ titulo: 'Primer reporte de captación', decision: 'qué ajustar', canal: 'reunión' }] }),
+];
+
+export const CONVERSION_TEMAS: TemaPlantilla[] = [
+  F({ id: 'f_registro', titulo: 'Registro completo de prospectos', hito: 1,
+    objetivo: 'Un registro donde cada consulta tiene su estado y su próximo paso.',
+    completoCuando: ['Registro armado', 'En uso todos los días'],
+    tareas: [{ titulo: 'Usar el registro todos los días', paraQue: 'Para que ninguna consulta se pierda.' }],
+    entregas: [{ titulo: 'Registro de prospectos', decision: 'cómo lo vas a usar', canal: 'reunión' }] }),
+  F({ id: 'f_respuesta', titulo: 'Responder consultas', hito: 1,
+    objetivo: 'Responder rápido y bien, con mensajes modelo.',
+    completoCuando: ['Protocolo de respuesta aprobado', 'Mensajes aplicados en consultas reales'],
+    tareas: [{ titulo: 'Aplicar los mensajes en tus consultas', paraQue: 'Una buena primera respuesta define si hay reunión.' }],
+    entregas: [{ titulo: 'Protocolo de respuesta', decision: 'los mensajes modelo', canal: 'mail' }] }),
+  F({ id: 'f_reunion', titulo: 'Reunión comercial', hito: 2,
+    objetivo: 'Una reunión que entiende al cliente, muestra el valor y responde objeciones.',
+    completoCuando: ['Guion y objeciones aprobados', 'Reuniones reales practicadas'],
+    reunion: { titulo: 'Práctica de reunión comercial', objetivo: 'Ensayar el guion y las objeciones', horas: 1 },
+    tareas: [{ titulo: 'Practicar y grabar tus reuniones (con permiso)', paraQue: 'Para darte devoluciones concretas.' }],
+    entregas: [{ titulo: 'Guion de reunión comercial', decision: 'el guion y las respuestas a objeciones', canal: 'mail' }] }),
+  F({ id: 'f_presupuesto', titulo: 'Presupuesto y seguimiento', hito: 2,
+    objetivo: 'Presupuestos claros y un seguimiento que no deja propuestas sin respuesta.',
+    completoCuando: ['Modelo de presupuesto aprobado', 'Secuencia de seguimiento aprobada', 'Aplicada a presupuestos abiertos'],
+    tareas: [{ titulo: 'Aplicar la secuencia a tus presupuestos abiertos', paraQue: 'Muchos trabajos se pierden por no hacer seguimiento.' }],
+    entregas: [{ titulo: 'Modelo de presupuesto y seguimiento', decision: 'el modelo y la secuencia', canal: 'mail' }] }),
+  F({ id: 'f_campanas', titulo: 'Optimización de campañas', hito: 3,
+    objetivo: 'Seguir lo que trae consultas buenas y apagar lo que no.',
+    completoCuando: ['Campañas ajustadas', 'Registro de cambios al día'],
+    tareas: [{ titulo: 'Seguir avisando qué consultas fueron buenas', paraQue: 'Es lo que guía cada ajuste.' }],
+    entregas: [] }),
+  F({ id: 'f_material', titulo: 'Material educativo', hito: 4,
+    objetivo: '2 o 3 PDFs con tu marca que ayuden al cliente a decidir.',
+    completoCuando: ['Contenido técnico revisado', 'PDFs aprobados'],
+    tareas: [{ titulo: 'Revisar el contenido técnico', paraQue: 'Que lo que explicamos sea exacto.' }],
+    entregas: [{ titulo: 'Material educativo', decision: 'los PDFs', canal: 'mail' }] }),
+  F({ id: 'f_ia', titulo: 'Herramientas de IA', hito: 4,
+    objetivo: 'Una librería de prompts para responder, presupuestar y seguir más rápido.',
+    completoCuando: ['Librería entregada', 'Explicada en una sesión'],
+    tareas: [],
+    entregas: [{ titulo: 'Librería de prompts', decision: 'si te sirve como está', canal: 'reunión' }] }),
+  F({ id: 'f_practica', titulo: 'Práctica con casos reales', hito: 4,
+    objetivo: 'Revisar conversaciones reales y mejorar con devoluciones concretas.',
+    completoCuando: ['Casos compartidos', 'Devoluciones dadas en las sesiones'],
+    tareas: [{ titulo: 'Compartir grabaciones o capturas de conversaciones', paraQue: 'Para darte devoluciones sobre casos reales.' }],
+    entregas: [] }),
+  F({ id: 'f_cierre', titulo: 'Cierre del programa', hito: 5,
+    objetivo: 'Ver todo lo construido, los resultados y decidir cómo seguimos.',
+    completoCuando: ['Informe final enviado', 'Reunión de cierre hecha', 'Siguiente paso registrado'],
+    reunion: { titulo: 'Reunión de cierre del programa', objetivo: 'Repasar resultados y decidir cómo seguimos', horas: 1 },
+    tareas: [],
+    entregas: [{ titulo: 'Informe final del programa', decision: 'cómo seguimos', canal: 'reunión' }] }),
+];
+
+export const TODOS_LOS_TEMAS: TemaPlantilla[] = [...PRESENCIA_TEMAS, ...ADQUISICION_TEMAS, ...CONVERSION_TEMAS];
+export const temaPorId = (id: TemaId) => TODOS_LOS_TEMAS.find((t) => t.id === id)!;
+export const etapaDelTema = (t: TemaPlantilla): Etapa => t.etapa || 'presencia';
+
+/** Los temas de una etapa que corresponden según lo que contrató (los de base siempre) */
+export function temasDelAlcance(alcance: Servicio[] = [], etapa: Etapa = 'presencia'): TemaPlantilla[] {
+  return TODOS_LOS_TEMAS.filter((t) => etapaDelTema(t) === etapa && (!t.servicio || alcance.includes(t.servicio)));
 }
 
 /** Estado de un tema en la ficha de un cliente */

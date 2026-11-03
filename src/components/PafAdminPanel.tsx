@@ -5,7 +5,7 @@ import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
-  accessHost, accessIssue, accesosDelAlta, approveTask, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
+  accessHost, accessIssue, accesosDelAlta, approveTask, hitosDe, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
   missingTemplateTasks, PAF_STAGE_TEMPLATES, suggestedChannel, type PafDelivery, type PafDeliveryState, type PafPedidoAlta, type PafResponsable, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
 } from '../portal/model';
 import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
@@ -22,9 +22,9 @@ import { PafAnnouncements } from './PafAnnouncements';
 import { PafHitosCard, confirmarHito } from './PafHitosCard';
 import { PafPlanSection } from './PafPlanSection';
 import { conHistorial } from '../portal/historial';
-import { temaPorId, type TemaPlantilla } from '../portal/presencia';
+import { ETAPAS, temaPorId, type TemaPlantilla } from '../portal/presencia';
 import { PafReportes } from './PafReportes';
-import { PortalLinksEditor, PortalSectionsToggles } from './PafPortalSettings';
+import { NumerosEditor, PortalLinksEditor, PortalSectionsToggles } from './PafPortalSettings';
 
 // El portal tal cual lo ve el cliente (se carga solo al abrir la vista previa)
 const PortalPreviewScreen = lazy(() => import('../views/PafPortalView').then((m) => ({ default: m.PortalPreviewScreen })));
@@ -163,12 +163,21 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
             <PafPlanSection project={project} meetings={meetings} onUpdateProject={onUpdateProject}
               onAgendar={(t) => { setSugerida(t); setSection('reuniones'); setAdding('reunion'); requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}
               onVer={(s) => setSection(s)}
-              onConfirmarHito={(n, evidencia) => {
-                const pafHitos = confirmarHito(project.pafHitos || [], n, evidencia);
-                const updates = { pafHitos, ...conHistorial(project, `Hito confirmado: ${PRESENCIA_HITOS[n - 1]} — ${evidencia}`) };
+              onConfirmarHito={(n, evidencia, etapa) => {
+                const titulos = hitosDe('presencia', etapa);
+                const pafHitos = confirmarHito(project.pafHitos || [], n, evidencia, etapa);
+                const updates = { pafHitos, ...conHistorial(project, `Hito confirmado: ${titulos[n - 1]} — ${evidencia}`) };
                 onUpdateProject(project.id, updates);
-                if (portal.draft.hito <= n && n < PRESENCIA_HITOS.length) portal.set({ hito: n + 1 });
+                if (etapa === (project.pafEtapa || 'presencia') && portal.draft.hito <= n && n < titulos.length) portal.set({ hito: n + 1 });
                 republishIfPublished({ ...project, ...updates }, meetings).catch(() => undefined);
+                hapticFeedback.success();
+              }}
+              onActivarEtapa={(etapa) => {
+                // La etapa empieza porque vos la activás: hito 1 de esa etapa
+                const updates = { pafEtapa: etapa, pafEtapasInicio: { ...project.pafEtapasInicio, [etapa]: new Date().toLocaleDateString('en-CA') }, ...conHistorial(project, `Empezó la etapa ${ETAPAS.find((x) => x.id === etapa)!.label}`) };
+                onUpdateProject(project.id, updates);
+                portal.set({ hito: 1 });
+                republishIfPublished({ ...project, ...updates, pafPortal: { ...portal.draft, hito: 1 } }, meetings).catch(() => undefined);
                 hapticFeedback.success();
               }} />
           )}
@@ -177,7 +186,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
             <>
               {showAlta && <AltaStatus pedido={portal.pedido} carpeta={project.pafDrive?.carpetaCompartida} />}
               <PafHitosCard project={project} meetings={meetings} hito={portal.draft.hito} mostrarAvance={portal.draft.mostrarAvance !== false}
-                onSetHito={(n) => portal.set({ hito: n })} onToggleAvance={(v) => portal.set({ mostrarAvance: v })} onUpdateProject={onUpdateProject} recorrido={showAlta ? 'presencia' : 'web'} />
+                onSetHito={(n) => portal.set({ hito: n })} onToggleAvance={(v) => portal.set({ mostrarAvance: v })} onUpdateProject={onUpdateProject} recorrido={showAlta ? 'presencia' : 'web'} etapa={project.pafEtapa || 'presencia'} />
 
               {toReview.length > 0 && (
                 <Card title={`Para revisar (${toReview.length})`} hint="Avisó que las terminó. Aprobá o volvé a habilitar." tone="amber">
@@ -199,6 +208,10 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
                 {(project.pafAnuncios || []).length > 0 || adding === 'anuncio'
                   ? <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'anuncio'} onDone={done} bare />
                   : <Empty>Sin anuncios.</Empty>}
+              </Card>
+
+              <Card title="Tus números" hint="Solo los reales, con fuente y período. El cliente los ve si prendés “Tus números” en Ajustes.">
+                <NumerosEditor draft={portal.draft} onChange={portal.set} />
               </Card>
 
               <Card title="Reporte del viernes" hint="Se arma con lo que cargaste en la semana. Los números los ponés vos." action={adding !== 'reporte' && <SmallButton onClick={() => setAdding('reporte')}>Armar reporte</SmallButton>}>

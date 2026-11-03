@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  ArrowRight, ArrowUpRight, CalendarPlus, Check, ChevronDown, Folder, LayoutList, Loader2, MessageCircle, Package, Paperclip, Video,
+  ArrowRight, ArrowUpRight, CalendarPlus, Check, ChevronDown, Folder, Home, LayoutList, ListChecks, Loader2, Megaphone, Route, MessageCircle, Package, Paperclip, Video,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
@@ -9,6 +9,7 @@ import { auth } from '../firebaseAuth';
 import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { formatDisplayDate } from '../utils/projectTimeline';
 import { AccessIcon } from '../components/AccessIcon';
+import { ETAPAS, type Etapa } from '../portal/presencia';
 import { MATERIALES, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, hitoInfoDe, hitosDe, seccionesVisibles, type Recorrido } from '../portal/model';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
@@ -50,7 +51,12 @@ const DEMO: PafPortalDoc = {
   mostrarAvance: true,
   linkReunion: 'https://meet.google.com/',
   hitosCompletados: [1],
-  secciones: { novedades: true, proximaAccion: true, recorrido: true, anuncios: true, semana: true, tareas: true, reuniones: true, reunionesAcuerdo: true, acuerdos: true, entregas: true, reportes: true, materiales: true, contenido: true, cicloCM: true, accesos: true },
+  etapa: 'presencia',
+  etapas: ['presencia', 'adquisicion', 'conversion'],
+  enMarcha: [{ texto: 'Preparando: Informe de diagnóstico y metas', quien: 'cero' }, { texto: 'La propuesta de contenido del jueves', quien: 'cm' }],
+  numeros: [{ label: 'Seguidores', valor: '1.240', fuente: 'Instagram, hoy' }, { label: 'Publicaciones del mes', valor: '9', fuente: 'Instagram, últimos 30 días' }],
+  reportes: [{ id: 'rp', desde: '2026-10-27', hasta: '2026-11-02', hicimos: '- Reunión de arranque\n- Excel de cliente ideal explicado', aprobaste: '- Formulario de arranque', falta: '- Completar el Excel', viene: '- Devolución del kit', numeros: '' }],
+  secciones: { novedades: true, proximaAccion: true, enMarcha: true, tuMes: true, numeros: true, recorrido: true, anuncios: true, semana: true, tareas: true, reuniones: true, reunionesAcuerdo: true, acuerdos: true, entregas: true, reportes: true, materiales: true, contenido: true, cicloCM: true, accesos: true },
   gestionContenido: 'https://app.asana.com/',
   materiales: { proyectos: 'https://drive.google.com/', equipo: 'https://drive.google.com/', referencias: 'https://drive.google.com/', registro: 'https://drive.google.com/' },
   reunionesAcuerdo: { total: 8, hechas: 3 },
@@ -275,13 +281,16 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   // "Tu próxima acción": la que marcó Juan o, si no, la más urgente del estudio
   const principal = ver.proximaAccion ? pendientes.find((t) => t.prioritaria) || pendientes.find((t) => (t.responsable || 'estudio') === 'estudio') : undefined;
   const resto = pendientes.filter((t) => t !== principal);
+  // Entregas que esperan una decisión suya (van en "Te toca a vos" con su sello)
+  const decisiones = ver.entregas ? (p.entregas || []).filter((d) => d.decision && (d.estado || 'en_revision') === 'en_revision') : [];
   const entregas = p.entregas || [];
   // Accesos libres; los portales publicados antes traen los 5 enlaces fijos
   const accesos = p.accesos ?? accessesFromEnlaces(p.enlaces || {});
   const anuncios = p.anuncios || [];
   const mostrarAvance = p.mostrarAvance !== false;
   // Presencia (PAF) o Web: cada uno tiene sus hitos
-  const HITOS = hitosDe(p.recorrido);
+  const etapa: Etapa = p.etapa || 'presencia';
+  const HITOS = hitosDe(p.recorrido, etapa);
   const hito = Math.min(HITOS.length, Math.max(1, p.hitoVisible || 1));
   const hechos = p.hitosCompletados || [];
   const initial = (email[0] || '?').toUpperCase();
@@ -343,12 +352,13 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
             </span>
           )}
           <div className="min-w-0">
-            <Eyebrow>Tu espacio con .CERO · {p.recorrido === 'web' ? 'Tu web' : 'Presencia'}</Eyebrow>
+            <Eyebrow>Tu espacio con .CERO · {p.recorrido === 'web' ? 'Tu web' : ETAPAS.find((x) => x.id === etapa)!.label}</Eyebrow>
             <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">Hola, {p.estudio}</h1>
           </div>
         </div>
+        {mostrarAvance && p.recorrido !== 'web' && <EtapasLine etapas={p.etapas || ['presencia']} actual={etapa} />}
         {mostrarAvance && (
-          <button type="button" onClick={() => verRecorrido && setTab('recorrido')} className="mt-6 w-full text-left group">
+          <button type="button" onClick={() => verRecorrido && setTab('recorrido')} className="mt-5 w-full text-left group">
             <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm text-[var(--text-secondary)]">
               <span className="flex flex-wrap items-baseline gap-x-1.5">
                 <span>Ahora:</span>
@@ -370,50 +380,92 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
 
       {/* Pestañas */}
       {tabs.length > 1 && (
-        <nav className="mt-8 sm:mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
-          <SegmentedControl<Tab> value={tab} onChange={setTab} options={tabs} />
-        </nav>
+        <>
+          <nav className="hidden sm:block mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
+            <SegmentedControl<Tab> value={tab} onChange={setTab} options={tabs} />
+          </nav>
+          <BottomNav tabs={tabs} tab={tab} onChange={(t) => { setTab(t); window.scrollTo({ top: 0 }); }} />
+        </>
       )}
 
-      <main className="mt-8 animate-in fade-in duration-200" key={tab}>
+      <main className="mt-6 sm:mt-8 animate-in fade-in duration-200" key={tab}>
         {tab === 'inicio' && (
-          <div className="space-y-8">
-            {/* Tu próxima acción y la reunión: lo primero, también en el celular */}
-            {(principal || (ver.proximaAccion && !pendientes.length && enRevision.length > 0)) && (
-              principal ? <NextAction t={principal} {...taskProps} nuevo={isNew(`t:${principal.id}:${principal.habilitadaEn || ''}`)} /> : (
-                <Card className="p-5 sm:p-6"><Eyebrow>Tu próxima acción</Eyebrow><p className="mt-3 text-[15px] text-[var(--text-primary)]">Nada pendiente de tu lado. Estamos revisando lo que nos mandaste.</p></Card>
-              )
-            )}
+          <div className="space-y-6 sm:space-y-8">
+            {/* 1 · HOY: lo que le toca ahora y la próxima reunión, en un bloque que se distingue de todo */}
+            <HoyHero
+              principal={principal} taskProps={taskProps} nuevo={principal ? isNew(`t:${principal.id}:${principal.habilitadaEn || ''}`) : false}
+              verReunion={ver.reuniones} reunion={p.proximaReunion} porConfirmar={p.reunionPorConfirmar} acuerdo={p.reunionesAcuerdo}
+              link={p.linkReunion} estudio={p.estudio} whatsapp={whatsapp}
+              trabajando={(p.enMarcha || [])[0]?.texto} enRevision={enRevision.length}
+            />
             {error && <p role="alert" className="text-sm text-rose-500">{error}</p>}
 
-            {ver.reuniones && (
-              <Card className="p-5 sm:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <Eyebrow>Próxima reunión</Eyebrow>
-                  {p.reunionesAcuerdo && <span className="text-xs text-[var(--text-tertiary)]">Llevamos {p.reunionesAcuerdo.hechas} de {p.reunionesAcuerdo.total} reuniones del acuerdo</span>}
-                </div>
-                {p.proximaReunion ? <MeetingDate {...p.proximaReunion} link={p.linkReunion} estudio={p.estudio} whatsapp={whatsapp} />
-                  : p.reunionPorConfirmar ? (
-                    <div className="mt-3">
-                      <span className="inline-flex rounded-full border border-[var(--border-strong)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)]">Por confirmar</span>
-                      {p.reunionPorConfirmar.objetivo && <p className="mt-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Objetivo: </span>{p.reunionPorConfirmar.objetivo}</p>}
-                      <p className="mt-1 text-sm text-[var(--text-secondary)]">La fecha la acordamos con vos.</p>
-                    </div>
-                  ) : <p className="mt-3 text-sm text-[var(--text-secondary)]">La vas a ver acá cuando la coordinemos.</p>}
-              </Card>
+            {/* 2 · EN MARCHA: lo de cada lado */}
+            {ver.enMarcha ? (
+              (resto.length > 0 || decisiones.length > 0 || (p.enMarcha || []).length > 0) && (
+                <section className="grid gap-4 sm:grid-cols-2">
+                  <Card className="p-5">
+                    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--marca)]"><span className="w-2 h-2 rounded-full bg-[var(--marca)]" aria-hidden />Te toca a vos</p>
+                    {decisiones.length + resto.length ? (
+                      <ul className="mt-3 space-y-2.5">
+                        {decisiones.map((d) => (
+                          <li key={d.id}>
+                            <button type="button" onClick={() => setTab('entregas')} className="w-full text-left rounded-[var(--radius-control)] border border-amber-300 bg-amber-50 px-3 py-2.5">
+                              <span className="inline-flex rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Decidís vos{d.hasta ? ` · hasta el ${formatDisplayDate(d.hasta, 'short')}` : ''}</span>
+                              <span className="mt-1.5 block text-sm font-medium text-[var(--text-primary)]">{d.titulo}{d.version ? ` ${d.version}` : ''}</span>
+                              {d.decision && <span className="block text-xs text-[var(--text-secondary)]">{d.decision}</span>}
+                            </button>
+                          </li>
+                        ))}
+                        {resto.slice(0, 4).map((t) => (
+                          <li key={t.id}>
+                            <button type="button" onClick={() => setTab('tareas')} className="flex w-full items-start gap-2.5 text-left">
+                              <span className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${isOverdue(t, taskProps.today) ? 'bg-rose-500' : 'bg-[var(--marca)]'}`} aria-hidden />
+                              <span className="min-w-0">
+                                <span className="block text-sm text-[var(--text-primary)]">{t.titulo}</span>
+                                {t.fecha && <span className={`block text-xs ${isOverdue(t, taskProps.today) ? 'text-rose-600' : 'text-[var(--text-tertiary)]'}`}>{isOverdue(t, taskProps.today) ? 'Venció el ' : 'Para el '}{formatDisplayDate(t.fecha, 'medium')}</span>}
+                              </span>
+                            </button>
+                          </li>
+                        ))}
+                        {resto.length > 4 && <li><button type="button" onClick={() => setTab('tareas')} className="text-xs font-medium text-[var(--text-primary)] underline underline-offset-4">Ver las {pendientes.length} tareas</button></li>}
+                      </ul>
+                    ) : <p className="mt-3 text-sm text-[var(--text-secondary)]">{principal ? 'Solo lo de arriba.' : 'Nada más por ahora.'}</p>}
+                  </Card>
+                  <div className="card-swiss p-5 bg-[var(--bg-surface-muted)]">
+                    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]"><span className="w-2 h-2 rounded-full bg-[var(--text-primary)]" aria-hidden />Nos toca a nosotros</p>
+                    {(p.enMarcha || []).length ? (
+                      <ul className="mt-3 space-y-2.5">
+                        {(p.enMarcha || []).map((x, i) => (
+                          <li key={i} className="flex items-start gap-2.5">
+                            <span className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${x.quien === 'cm' ? 'bg-white text-[var(--text-secondary)] border border-[var(--border-subtle)]' : 'bg-[var(--text-primary)] text-white'}`}>{x.quien === 'cm' ? 'CM' : '.CERO'}</span>
+                            <span className="text-sm text-[var(--text-primary)]">{x.texto}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : <p className="mt-3 text-sm text-[var(--text-secondary)]">Te avisamos acá cuando estemos preparando algo para vos.</p>}
+                  </div>
+                </section>
+              )
+            ) : ver.tareas && resto.length > 0 && (
+              <section>
+                <SectionTitle title="También te toca" hint="Cuando termines, tocá “Terminé”. Lo revisamos y te confirmamos." />
+                <ul className="space-y-3">{resto.slice(0, 3).map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} nuevo={isNew(`t:${t.id}:${t.habilitadaEn || ''}`)} /></li>)}</ul>
+              </section>
             )}
 
-            {/* Anuncios de Juan */}
+            {/* 3 · Anuncios: información, más liviana */}
             {anuncios.length > 0 && (
               <ul className="space-y-3" aria-label="Anuncios">
                 {anuncios.map((a) => (
-                  <li key={a.id}>
-                    <Card className={`p-5 ${a.fijado ? 'border-l-[3px] border-l-[var(--marca)]' : ''}`}>
-                      {isNew(`a:${a.id}`) && <NewBadge className="mb-2" />}
-                      {a.titulo && <p className="text-[15px] font-medium text-[var(--text-primary)]">{a.titulo}</p>}
-                      <p className={`${a.titulo ? 'mt-1.5' : ''} text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-line`}>{a.texto}</p>
-                      {a.link && <a href={a.link} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">Abrir <ArrowUpRight className="w-3.5 h-3.5" /></a>}
-                    </Card>
+                  <li key={a.id} className={`flex gap-3 rounded-[var(--radius-card)] px-4 py-3.5 ${a.fijado ? 'bg-white border border-[var(--border-subtle)]' : 'bg-transparent border border-dashed border-[var(--border-strong)]'}`}>
+                    <Megaphone className="mt-0.5 w-4 h-4 shrink-0 text-[var(--marca)]" />
+                    <div className="min-w-0">
+                      {isNew(`a:${a.id}`) && <NewBadge className="mb-1.5" />}
+                      {a.titulo && <p className="text-sm font-medium text-[var(--text-primary)]">{a.titulo}</p>}
+                      <p className="text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{a.texto}</p>
+                      {a.link && <a href={a.link} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">Abrir <ArrowUpRight className="w-3.5 h-3.5" /></a>}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -439,7 +491,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </Card>
             )}
 
-            {/* Esta semana: foco y objetivos (si no hay nada cargado, no se muestra) */}
+            {/* Esta semana: foco y objetivos */}
             {ver.semana && (p.resumenVisible || objetivos.length > 0) && (
               <Card className="p-5 sm:p-6">
                 <Eyebrow>Esta semana</Eyebrow>
@@ -453,66 +505,72 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </Card>
             )}
 
-            {ver.tareas && resto.length > 0 && (
+            {/* Tus números (los carga Juan, con su fuente) */}
+            {(p.numeros || []).length > 0 && (
               <section>
-                <SectionTitle title={principal ? 'También te toca' : 'Lo que necesitamos de vos'} hint="Cuando termines, tocá “Terminé”. Lo revisamos y te confirmamos." />
-                <ul className="space-y-3">
-                  {resto.slice(0, 3).map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} nuevo={isNew(`t:${t.id}:${t.habilitadaEn || ''}`)} /></li>)}
-                </ul>
-                {resto.length > 3 && <button type="button" onClick={() => setTab('tareas')} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">Ver las {pendientes.length} tareas <ArrowRight className="w-4 h-4" /></button>}
-              </section>
-            )}
-            {ver.tareas && !pendientes.length && !enRevision.length && !principal && (
-              <p className="text-sm text-[var(--text-secondary)]">Nada pendiente de tu lado. Te avisamos cuando haya algo nuevo.</p>
-            )}
-
-            {(ver.entregas && entregas.length > 0) && (
-              <Card className="p-5 sm:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <Eyebrow>Última entrega</Eyebrow>
-                  {entregas.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver todas</button>}
-                </div>
-                <DeliveryRow d={latest(entregas)} nuevo={isNew(`e:${latest(entregas).id}`)} />
-              </Card>
-            )}
-
-            {reuniones.length > 0 && (
-              <Card className="p-5 sm:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="flex items-center gap-2"><Eyebrow>Lo que acordamos · {formatDisplayDate(reuniones[0].fecha, 'medium')}</Eyebrow>{isNew(`r:${reuniones[0].fecha}`) && <NewBadge />}</span>
-                  {reuniones.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver anteriores</button>}
-                </div>
-                <MeetingSummary s={reuniones[0]} />
-              </Card>
-            )}
-
-            {reportes.length > 0 && <ReportCard r={reportes[0]} />}
-
-            {/* Accesos a mano desde el inicio: gestión de contenido y los primeros accesos */}
-            {(accesos.length > 0 || (ver.contenido && !ver.cicloCM && p.gestionContenido)) && (
-              <section>
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <Eyebrow>Tus accesos</Eyebrow>
-                  {accesos.length > 4 && <button type="button" onClick={() => setTab('archivos')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver los {accesos.length}</button>}
-                </div>
-                {ver.contenido && !ver.cicloCM && p.gestionContenido && <ContentButton url={p.gestionContenido} className="mb-3" />}
-                <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {accesos.slice(0, 4).map((a, i) => (
-                    <li key={`${a.url}-${i}`}>
-                      <a href={a.url} target="_blank" rel="noopener noreferrer" className="card-swiss group relative flex h-full flex-col gap-3 p-4 transition hover:-translate-y-0.5">
-                        {isNew(`l:${a.url}`) && <NewBadge className="absolute right-3 top-3" />}
-                        <span className="w-9 h-9 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--marca)]"><AccessIcon nombre={a.nombre} url={a.url} /></span>
-                        <span className="text-sm font-medium leading-snug text-[var(--text-primary)] break-words">{a.nombre}</span>
-                      </a>
+                <Eyebrow>Tus números</Eyebrow>
+                <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {(p.numeros || []).map((n, i) => (
+                    <li key={i} className="card-swiss p-4">
+                      <p className="text-2xl font-light tracking-tight text-[var(--text-primary)] tabular-nums">{n.valor}</p>
+                      <p className="mt-1 text-xs font-medium text-[var(--text-secondary)]">{n.label}</p>
+                      {n.fuente && <p className="mt-0.5 text-[10px] text-[var(--text-tertiary)]">{n.fuente}</p>}
                     </li>
                   ))}
                 </ul>
               </section>
             )}
+
+            {/* Tu mes: lo hecho en el mes, armado con los reportes */}
+            {ver.tuMes && reportes.length > 0 && <TuMes reportes={reportes} />}
+
+            {/* 4 · PARA CONSULTAR: lo de referencia, más chico y plegado */}
+            {(entregas.length > 0 || reuniones.length > 0 || accesos.length > 0) && (
+              <details className="group card-swiss" open={!principal && !resto.length}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                  <span className="text-sm font-medium text-[var(--text-primary)]">Para consultar</span>
+                  <span className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">Entregas, acuerdos y accesos<ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" /></span>
+                </summary>
+                <div className="space-y-6 border-t border-[var(--border-divider)] px-5 pb-5 pt-4">
+                  {ver.entregas && entregas.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <Eyebrow>Última entrega</Eyebrow>
+                        {entregas.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver todas</button>}
+                      </div>
+                      <DeliveryRow d={latest(entregas)} nuevo={isNew(`e:${latest(entregas).id}`)} />
+                    </div>
+                  )}
+                  {reuniones.length > 0 && (
+                    <div>
+                      <span className="flex items-center gap-2"><Eyebrow>Lo que acordamos · {formatDisplayDate(reuniones[0].fecha, 'medium')}</Eyebrow>{isNew(`r:${reuniones[0].fecha}`) && <NewBadge />}</span>
+                      <MeetingSummary s={reuniones[0]} />
+                    </div>
+                  )}
+                  {accesos.length > 0 && (
+                    <div>
+                      <Eyebrow>Tus accesos</Eyebrow>
+                      <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                        {accesos.slice(0, 4).map((a, i) => (
+                          <li key={`${a.url}-${i}`}>
+                            <a href={a.url} target="_blank" rel="noopener noreferrer" className="group relative flex h-full items-center gap-2.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] p-3 transition hover:border-[var(--border-strong)]">
+                              {isNew(`l:${a.url}`) && <NewBadge className="absolute -right-1 -top-2" />}
+                              <AccessIcon nombre={a.nombre} url={a.url} className="w-4 h-4 shrink-0 text-[var(--marca)]" />
+                              <span className="text-sm leading-snug text-[var(--text-primary)] break-words">{a.nombre}</span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                      {ver.contenido && !ver.cicloCM && p.gestionContenido && <ContentButton url={p.gestionContenido} className="mt-3" />}
+                    </div>
+                  )}
+                </div>
+              </details>
+            )}
           </div>
         )}
 
-        {tab === 'recorrido' && <Recorrido hito={hito} hechos={hechos} recorrido={p.recorrido} />}
+        {tab === 'recorrido' && <Recorrido hito={hito} hechos={hechos} recorrido={p.recorrido} etapa={etapa} etapas={p.etapas || ['presencia']} />}
 
         {tab === 'tareas' && (
           <div className="space-y-10">
@@ -625,7 +683,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
         )}
       </main>
 
-      <footer className={`mt-16 pt-6 ${whatsapp ? 'mb-16' : ''} border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-tertiary)]`}>
+      <footer className={`mt-16 pt-6 mb-20 ${whatsapp ? 'sm:mb-16' : 'sm:mb-0'} border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-tertiary)]`}>
         <BrandLogo size="sm" />
         <span>Actualizado {formatDisplayDate(p.actualizadoEn.slice(0, 10), 'medium')}</span>
       </footer>
@@ -718,7 +776,7 @@ function TaskList({ items, dot, muted }: { items: PortalTask[]; dot: string; mut
 /** Barra del avance: un tramo por hito; lleno si está confirmado, marcado si es el actual */
 function HitosBar({ hito, hechos, hitos }: { hito: number; hechos: number[]; hitos: readonly string[] }) {
   return (
-    <span className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden>
+    <span className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${hitos.length}, minmax(0, 1fr))` }} aria-hidden>
       {hitos.map((t, i) => (
         <span key={t} className={`block h-1.5 rounded-full ${hechos.includes(i + 1) ? 'bg-[var(--marca)]' : i + 1 === hito ? 'bg-[var(--marca)] opacity-40' : 'bg-[var(--border-strong)]'}`} />
       ))}
@@ -727,12 +785,13 @@ function HitosBar({ hito, hechos, hitos }: { hito: number; hechos: number[]; hit
 }
 
 /** MI RECORRIDO: los cinco hitos de Presencia, qué se trabaja en cada uno y cuándo se completa */
-function Recorrido({ hito, hechos, recorrido }: { hito: number; hechos: number[]; recorrido?: Recorrido }) {
-  const HITOS = hitosDe(recorrido);
-  const INFO = hitoInfoDe(recorrido);
+function Recorrido({ hito, hechos, recorrido, etapa = 'presencia', etapas = ['presencia'] }: { hito: number; hechos: number[]; recorrido?: Recorrido; etapa?: Etapa; etapas?: Etapa[] }) {
+  const HITOS = hitosDe(recorrido, etapa);
+  const INFO = hitoInfoDe(recorrido, etapa);
+  const idx = etapas.indexOf(etapa);
   return (
     <section>
-      <SectionTitle title={recorrido === 'web' ? 'El recorrido de tu web' : 'Tu recorrido en Presencia'} hint={`${hechos.length} de ${HITOS.length} hitos completados. Un hito se completa cuando lo confirmamos juntos, no por la fecha.`} />
+      <SectionTitle title={recorrido === 'web' ? 'El recorrido de tu web' : `Ahora: ${ETAPAS.find((x) => x.id === etapa)!.label}`} hint={`${hechos.length} de ${HITOS.length} hitos completados. Un hito se completa cuando lo confirmamos juntos, no por la fecha.`} />
       <ol className="relative space-y-3">
         {HITOS.map((titulo, i) => {
           const n = i + 1;
@@ -759,6 +818,20 @@ function Recorrido({ hito, hechos, recorrido }: { hito: number; hechos: number[]
           );
         })}
       </ol>
+      {recorrido !== 'web' && etapas.length > 1 && (
+        <ol className="mt-8 grid gap-3 sm:grid-cols-2">
+          {etapas.filter((e) => e !== etapa).map((e) => {
+            const info = ETAPAS.find((x) => x.id === e)!;
+            const antes = etapas.indexOf(e) < idx;
+            return (
+              <li key={e} className={`rounded-[var(--radius-card)] p-4 ${antes ? 'bg-[var(--bg-surface)] border border-[var(--border-subtle)]' : 'border border-dashed border-[var(--border-strong)]'}`}>
+                <p className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">{antes && <Check className="w-4 h-4 text-[var(--marca)]" />}{info.label}<span className="text-xs font-normal text-[var(--text-tertiary)]">{antes ? 'Completada' : 'Próxima etapa'}</span></p>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">{info.pregunta}</p>
+              </li>
+            );
+          })}
+        </ol>
+      )}
     </section>
   );
 }
@@ -969,7 +1042,7 @@ function PendingTask({ t, today, uploadUrl, sending, readOnly, onDone, nuevo, ba
 function WhatsappButton({ number, studio }: { number: string; studio: string }) {
   const href = `https://wa.me/${number}?text=${encodeURIComponent(`Hola Juan, te escribo de ${studio}.`)}`;
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className="btn-solid-primary fixed z-40 right-4 bottom-[max(1rem,env(safe-area-inset-bottom))] inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm shadow-lg">
+    <a href={href} target="_blank" rel="noopener noreferrer" className="btn-solid-primary fixed z-40 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] sm:bottom-[max(1rem,env(safe-area-inset-bottom))] inline-flex items-center gap-2 rounded-full px-4 py-3 text-sm shadow-lg">
       <MessageCircle className="w-4 h-4" /> Hablar con Juan
     </a>
   );
@@ -980,5 +1053,152 @@ function MeetingSummary({ s }: { s: { acuerdos: string; proximosPasos: string } 
       {s.acuerdos && <div><p className="text-xs font-medium text-[var(--text-tertiary)]">Acuerdos</p><p className="mt-1 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{s.acuerdos}</p></div>}
       {s.proximosPasos && <div><p className="text-xs font-medium text-[var(--text-tertiary)]">Próximos pasos</p><p className="mt-1 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{s.proximosPasos}</p></div>}
     </div>
+  );
+}
+
+/** HOY: el bloque oscuro de arriba. Lo que le toca ahora (o que no le toca nada) y la próxima reunión. */
+function HoyHero({ principal, taskProps, nuevo, verReunion, reunion, porConfirmar, acuerdo, link, estudio, whatsapp, trabajando, enRevision }: {
+  principal?: PortalTask; taskProps: { today: string; uploadUrl?: string; sending: string | null; readOnly: boolean; onDone: (id: string) => void }; nuevo: boolean;
+  verReunion: boolean; reunion: PafPortalDoc['proximaReunion']; porConfirmar?: PafPortalDoc['reunionPorConfirmar']; acuerdo?: PafPortalDoc['reunionesAcuerdo'];
+  link?: string | null; estudio: string; whatsapp: string; trabajando?: string; enRevision: number;
+}) {
+  const t = principal;
+  const vencida = t ? isOverdue(t, taskProps.today) : false;
+  const conReunion = verReunion && (reunion || porConfirmar);
+  return (
+    <section className="overflow-hidden rounded-[22px] bg-[#191B20] text-white shadow-lg">
+      <div className={`grid ${conReunion ? 'sm:grid-cols-[1.4fr_1fr]' : ''}`}>
+        <div className="p-5 sm:p-7">
+          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">Hoy · te toca{nuevo && <span className="rounded-full bg-[var(--marca)] px-2 py-0.5 text-[9px] tracking-wide text-white">Nuevo</span>}</p>
+          {t ? (
+            <>
+              <h2 className="mt-3 text-2xl sm:text-[28px] font-light leading-tight tracking-tight break-words">{t.titulo}</h2>
+              {t.paraQue && <p className="mt-2 text-sm leading-relaxed text-white/70">{t.paraQue}</p>}
+              {t.motivo && <p className="mt-3 rounded-lg bg-amber-400/15 px-3 py-2 text-sm text-amber-200"><span className="text-amber-300/80">Requiere ajustes: </span>{t.motivo}</p>}
+              {t.detalle && <p className="mt-3 text-sm leading-relaxed text-white/60 whitespace-pre-line">{t.detalle}</p>}
+              {t.fecha && <p className={`mt-3 text-xs ${vencida ? 'text-rose-300' : 'text-white/50'}`}>{vencida ? 'Venció el ' : 'Para el '}{formatDisplayDate(t.fecha, 'medium')}</p>}
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button type="button" onClick={() => taskProps.onDone(t.id)} disabled={taskProps.sending === t.id || taskProps.readOnly} title={taskProps.readOnly ? 'Vista previa: el botón no hace nada' : 'Avisanos que lo terminaste: lo revisamos y te confirmamos'}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--marca)] px-5 py-2.5 text-sm font-medium text-[var(--marca-text)] disabled:opacity-60">
+                  {taskProps.sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
+                </button>
+                {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-4 py-2.5 text-sm text-white hover:border-white/50">Abrir <ArrowUpRight className="w-4 h-4" /></a>}
+                {t.pideArchivos && taskProps.uploadUrl && <a href={taskProps.uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-4 py-2.5 text-sm text-white hover:border-white/50"><Paperclip className="w-4 h-4" />Subir a Materiales</a>}
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="mt-3 text-2xl sm:text-[28px] font-light leading-tight tracking-tight">Nada de tu lado por ahora.</h2>
+              <p className="mt-2 text-sm leading-relaxed text-white/70">
+                {enRevision ? `Estamos revisando ${enRevision === 1 ? 'lo que nos mandaste' : `${enRevision} cosas que nos mandaste`}. ` : ''}
+                {trabajando ? `Estamos con: ${trabajando.replace(/^Preparando: /, 'preparando ')}.` : 'Te avisamos acá cuando haya algo para vos.'}
+              </p>
+            </>
+          )}
+        </div>
+        {conReunion && (
+          <div className="border-t border-white/10 bg-white/[0.04] p-5 sm:border-l sm:border-t-0 sm:p-7">
+            <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-white/50">Próxima reunión</p>
+            {reunion ? (
+              <>
+                <div className="mt-3 flex items-center gap-3">
+                  <div className="w-14 shrink-0 overflow-hidden rounded-xl bg-white text-center text-[#191B20]">
+                    <p className="bg-[var(--marca)] py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</p>
+                    <p className="py-1 text-2xl font-light">{new Date(`${reunion.fecha}T12:00:00`).getDate()}</p>
+                  </div>
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium capitalize">{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long' })}</p>
+                    <p className="text-white/60">{reunion.hora ? `${reunion.hora} hs · Argentina` : 'Horario a confirmar'}</p>
+                  </div>
+                </div>
+                {reunion.objetivo && <p className="mt-3 text-sm text-white/80"><span className="text-white/45">Para qué: </span>{reunion.objetivo}</p>}
+                {reunion.preparar && <p className="mt-1 text-sm text-white/80"><span className="text-white/45">Traé: </span>{reunion.preparar}</p>}
+                <p className="mt-1 text-xs text-white/45">Con Juan{reunion.conCM ? ' y la community manager' : ''}</p>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-medium text-[#191B20]"><Video className="w-3.5 h-3.5" />Entrar</a>}
+                  <a href={calendarLink({ fecha: reunion.fecha, hora: reunion.hora }, `Reunión .CERO · ${estudio}`, link)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-3 py-1.5 text-white"><CalendarPlus className="w-3.5 h-3.5" />A mi calendario</a>
+                  {whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola Juan, soy de ${estudio}. ¿Podemos mover la reunión del ${formatDisplayDate(reunion.fecha, 'medium')}?`)}`} target="_blank" rel="noopener noreferrer" className="px-1 py-1.5 text-white/55 underline underline-offset-4">Reprogramar</a>}
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="mt-3 inline-flex rounded-full border border-white/25 px-2.5 py-0.5 text-xs text-white/70">Por confirmar</span>
+                {porConfirmar?.objetivo && <p className="mt-2 text-sm text-white/80"><span className="text-white/45">Para qué: </span>{porConfirmar.objetivo}</p>}
+                <p className="mt-1 text-sm text-white/55">La fecha la acordamos con vos.</p>
+              </>
+            )}
+            {acuerdo && <p className="mt-4 text-[11px] text-white/40">Reunión {Math.min(acuerdo.hechas + 1, acuerdo.total)} de {acuerdo.total} del acuerdo</p>}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Línea de etapas del programa: las contratadas, con la actual marcada */
+function EtapasLine({ etapas, actual }: { etapas: Etapa[]; actual: Etapa }) {
+  if (etapas.length < 2) return null;
+  const idx = etapas.indexOf(actual);
+  return (
+    <ol className="mt-6 flex items-center gap-1.5 text-xs" aria-label="Etapas del programa">
+      {etapas.map((e, i) => (
+        <React.Fragment key={e}>
+          {i > 0 && <span aria-hidden className={`h-px flex-1 ${i <= idx ? 'bg-[var(--marca)]' : 'bg-[var(--border-strong)]'}`} />}
+          <li className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 ${e === actual ? 'bg-[var(--marca)] text-[var(--marca-text)] font-medium' : i < idx ? 'bg-[var(--bg-surface)] border border-[var(--border-subtle)] text-[var(--text-primary)]' : 'border border-dashed border-[var(--border-strong)] text-[var(--text-tertiary)]'}`} aria-current={e === actual ? 'step' : undefined}>
+            {i < idx && <Check className="w-3 h-3" />}{ETAPAS.find((x) => x.id === e)!.label}
+          </li>
+        </React.Fragment>
+      ))}
+    </ol>
+  );
+}
+
+/** TU MES: lo hecho y aprobado en el mes, juntando los reportes publicados */
+function TuMes({ reportes }: { reportes: NonNullable<PafPortalDoc['reportes']> }) {
+  const mes = reportes[0].hasta.slice(0, 7);
+  const delMes = reportes.filter((r) => r.hasta.slice(0, 7) === mes);
+  const lineas = (k: 'hicimos' | 'aprobaste') => [...new Set(delMes.flatMap((r) => r[k].split('\n').map((l) => l.replace(/^[-•]\s*/, '').trim()).filter(Boolean)))];
+  const hicimos = lineas('hicimos');
+  const aprobaste = lineas('aprobaste');
+  const viene = reportes[0].viene.split('\n').map((l) => l.replace(/^[-•]\s*/, '').trim()).filter(Boolean);
+  const nombre = new Date(`${mes}-15T12:00:00`).toLocaleDateString('es-AR', { month: 'long' });
+  const col = (titulo: string, items: string[]) => items.length > 0 && (
+    <div>
+      <p className="text-xs font-medium text-[var(--text-tertiary)]">{titulo}</p>
+      <ul className="mt-1.5 space-y-1">{items.slice(0, 6).map((x) => <li key={x} className="flex gap-2 text-sm text-[var(--text-primary)]"><Check className="mt-0.5 w-3.5 h-3.5 shrink-0 text-[var(--marca)]" />{x}</li>)}</ul>
+    </div>
+  );
+  return (
+    <Card className="p-5 sm:p-6">
+      <Eyebrow>Tu mes · <span className="capitalize">{nombre}</span></Eyebrow>
+      <div className="mt-4 grid gap-5 sm:grid-cols-3">
+        {col('Lo que hicimos', hicimos)}
+        {col('Lo que aprobaste', aprobaste)}
+        {col('Lo que viene', viene)}
+      </div>
+    </Card>
+  );
+}
+
+/** Navegación de abajo en el celular, como una app */
+function BottomNav({ tabs, tab, onChange }: { tabs: { id: Tab; label: string; count?: number }[]; tab: Tab; onChange: (t: Tab) => void }) {
+  const ICON: Record<Tab, React.ElementType> = { inicio: Home, recorrido: Route, tareas: ListChecks, entregas: Package, archivos: Folder };
+  return (
+    <nav className="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]" aria-label="Secciones">
+      <ul className="flex">
+        {tabs.map((x) => {
+          const Icon = ICON[x.id];
+          const on = tab === x.id;
+          return (
+            <li key={x.id} className="flex-1">
+              <button type="button" onClick={() => onChange(x.id)} aria-current={on ? 'page' : undefined} className={`relative flex w-full flex-col items-center gap-0.5 py-2.5 text-[10px] ${on ? 'text-[var(--marca)] font-semibold' : 'text-[var(--text-tertiary)]'}`}>
+                <Icon className="w-5 h-5" />{x.label.replace('Mi recorrido', 'Recorrido')}
+                {!!x.count && <span className="absolute right-[calc(50%-18px)] top-1.5 min-w-[16px] rounded-full bg-[var(--marca)] px-1 text-[9px] leading-4 text-white">{x.count}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
   );
 }

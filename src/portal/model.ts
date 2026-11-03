@@ -61,15 +61,20 @@ export interface PafPortalDraft {
   materiales?: Partial<Record<MaterialKey, string>>;
   /** Reuniones que incluye el acuerdo (si lo define) */
   reunionesAcordadas?: number;
+  /** Tus números: los carga Juan con su fuente */
+  numeros?: { id: string; label: string; valor: string; fuente: string }[];
   publishedAt?: string;
 }
 
 /** Secciones del portal que Juan puede mostrar u ocultar */
-export type PortalSeccion = 'novedades' | 'proximaAccion' | 'recorrido' | 'anuncios' | 'semana' | 'tareas' | 'reuniones' | 'reunionesAcuerdo' | 'acuerdos' | 'entregas' | 'reportes' | 'materiales' | 'contenido' | 'cicloCM' | 'accesos';
+export type PortalSeccion = 'novedades' | 'proximaAccion' | 'enMarcha' | 'tuMes' | 'numeros' | 'recorrido' | 'anuncios' | 'semana' | 'tareas' | 'reuniones' | 'reunionesAcuerdo' | 'acuerdos' | 'entregas' | 'reportes' | 'materiales' | 'contenido' | 'cicloCM' | 'accesos';
 export const PORTAL_SECCIONES: { id: PortalSeccion; label: string; hint: string; porDefecto: boolean }[] = [
   { id: 'novedades', label: 'Desde tu última visita', hint: 'Resumen de lo nuevo arriba de todo', porDefecto: true },
   { id: 'proximaAccion', label: 'Tu próxima acción', hint: 'La tarea prioritaria, grande, arriba', porDefecto: true },
-  { id: 'recorrido', label: 'Mi recorrido', hint: 'Los 5 hitos explicados', porDefecto: true },
+  { id: 'enMarcha', label: 'Te toca / Nos toca', hint: 'Lo que hace él y lo que estamos haciendo nosotros', porDefecto: true },
+  { id: 'recorrido', label: 'Mi recorrido', hint: 'Las etapas y sus hitos explicados', porDefecto: true },
+  { id: 'tuMes', label: 'Tu mes', hint: 'Resumen del mes armado con tus reportes', porDefecto: true },
+  { id: 'numeros', label: 'Tus números', hint: 'Consultas, reuniones, propuestas… los cargás vos', porDefecto: false },
   { id: 'anuncios', label: 'Anuncios', hint: 'Lo que fijás arriba', porDefecto: true },
   { id: 'semana', label: 'Esta semana', hint: 'Foco y objetivos de la semana', porDefecto: true },
   { id: 'tareas', label: 'Tareas', hint: 'Lo que necesitamos de su lado', porDefecto: true },
@@ -179,6 +184,8 @@ export interface PafTask {
 
 /** Hito de Presencia que Juan confirmó, con su evidencia (privada: el estudio solo ve cuáles) */
 export interface PafHitoConfirmado {
+  /** Etapa del hito (por defecto Presencia) */
+  etapa?: import('./presencia').Etapa;
   hito: number; // 1 a 5
   fecha: string; // YYYY-MM-DD
   evidencia: string;
@@ -194,8 +201,8 @@ export const WEB_HITO_INFO: { trabajo: string; seCompleta: string }[] = [
   { trabajo: 'Publicación en tu dominio, medición y entrega de accesos.', seCompleta: 'Web publicada, probada y medida.' },
 ];
 export type Recorrido = 'presencia' | 'web';
-export const hitosDe = (r?: Recorrido) => (r === 'web' ? WEB_HITOS : PRESENCIA_HITOS);
-export const hitoInfoDe = (r?: Recorrido) => (r === 'web' ? WEB_HITO_INFO : PRESENCIA_HITO_INFO);
+export const hitosDe = (r?: Recorrido, etapa: Etapa = 'presencia'): readonly string[] => (r === 'web' ? WEB_HITOS : ETAPA_HITOS[etapa].map((h) => h.titulo));
+export const hitoInfoDe = (r?: Recorrido, etapa: Etapa = 'presencia'): { trabajo: string; seCompleta: string }[] => (r === 'web' ? WEB_HITO_INFO : ETAPA_HITOS[etapa]);
 
 /** Qué agrupa cada hito y cuándo se completa (de la especificación del servicio) */
 export const PRESENCIA_HITO_INFO: { trabajo: string; seCompleta: string }[] = [
@@ -207,8 +214,8 @@ export const PRESENCIA_HITO_INFO: { trabajo: string; seCompleta: string }[] = [
 ];
 
 /** Hitos confirmados, sin repetir y en orden (lo único que se publica de los hitos) */
-export function hitosCompletados(items: PafHitoConfirmado[] = []): number[] {
-  return [...new Set(items.map((h) => h.hito).filter((n) => Number.isInteger(n) && n >= 1 && n <= PRESENCIA_HITOS.length))].sort((a, b) => a - b);
+export function hitosCompletados(items: PafHitoConfirmado[] = [], etapa: import('./presencia').Etapa = 'presencia'): number[] {
+  return [...new Set(items.filter((h) => (h.etapa || 'presencia') === etapa).map((h) => h.hito).filter((n) => Number.isInteger(n) && n >= 1 && n <= PRESENCIA_HITOS.length))].sort((a, b) => a - b);
 }
 
 /** Entrega de Juan al estudio: archivo en Drive, se publica cuando él decide */
@@ -294,6 +301,13 @@ export interface PafPortalDoc {
   hitosCompletados?: number[];
   /** Presencia (PAF) o Web: cambia los hitos que ve */
   recorrido?: Recorrido;
+  /** Etapa del método en la que está y las que contrató (en orden) */
+  etapa?: Etapa;
+  etapas?: Etapa[];
+  /** Lo que está haciendo .CERO o la CM ahora ("Nos toca a nosotros") */
+  enMarcha?: { texto: string; quien: 'cero' | 'cm' }[];
+  /** Números que carga Juan, con su fuente (nunca calculados) */
+  numeros?: { label: string; valor: string; fuente: string }[];
   /** Qué secciones se muestran */
   secciones?: Record<PortalSeccion, boolean>;
   gestionContenido?: string | null;
@@ -359,7 +373,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; recorrido?: Recorrido; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; recorrido?: Recorrido; etapa?: Etapa; etapas?: Etapa[]; enMarcha?: PafPortalDoc['enMarcha']; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -412,6 +426,10 @@ export function buildPafPortal(
       mostrarAvance: input.draft.mostrarAvance !== false,
       hitosCompletados: hitosCompletados((input.hitosCompletados || []).map((hito) => ({ hito, fecha: '', evidencia: '' }))),
       recorrido: input.recorrido === 'web' ? 'web' : 'presencia',
+      etapa: input.etapa || 'presencia',
+      etapas: input.etapas?.length ? input.etapas : ['presencia'],
+      enMarcha: ver.enMarcha ? (input.enMarcha || []).slice(0, 8) : [],
+      numeros: ver.numeros ? (input.draft.numeros || []).filter((n) => n.label.trim() && n.valor.trim()).map(({ label, valor, fuente }) => ({ label: label.trim().slice(0, 60), valor: valor.trim().slice(0, 30), fuente: fuente.trim().slice(0, 120) })) : [],
       logo: safeLogo(input.draft.logo),
       marca: safeColor(input.draft.marca),
       linkReunion: input.draft.linkReunion ? safeHttpsUrl(normalizeLinkInput(input.draft.linkReunion)) : null,
@@ -483,7 +501,7 @@ export function meetingPorConfirmar(
 }
 
 export function portalFromProject(
-  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[]; pafHitos?: PafHitoConfirmado[]; pafReportes?: PafReporte[]; serviceType?: string; projectType?: string },
+  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[]; pafHitos?: PafHitoConfirmado[]; pafReportes?: PafReporte[]; serviceType?: string; projectType?: string; pafEtapa?: Etapa; pafEtapasContratadas?: Etapa[] },
   meetings: Parameters<typeof nextMeeting>[0],
   draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
   clienteId = project.pafClienteId,
@@ -503,7 +521,10 @@ export function portalFromProject(
       semana: programWeek(project.pafStartDate || project.startDate, today),
       reuniones: publicSummaries(project.pafResumenes),
       anuncios: publicAnnouncements(project.pafAnuncios),
-      hitosCompletados: hitosCompletados(project.pafHitos),
+      hitosCompletados: hitosCompletados(project.pafHitos, project.pafEtapa || 'presencia'),
+      etapa: project.pafEtapa || 'presencia',
+      etapas: (['presencia', 'adquisicion', 'conversion'] as Etapa[]).filter((e) => e === 'presencia' || (project.pafEtapasContratadas || []).includes(e) || project.pafEtapa === e),
+      enMarcha: enMarchaDe(project),
       recorrido: project.serviceType === 'web' || (!project.serviceType && project.projectType === 'web') ? 'web' : 'presencia',
       reunionesHechas: (meetings as { projectId?: string; completed: boolean; proposed?: boolean }[]).filter((m) => m.projectId === project.id && m.completed && !m.proposed).length,
       reunionPorConfirmar: meetingPorConfirmar(meetings as Parameters<typeof meetingPorConfirmar>[0], project.id),
@@ -1047,4 +1068,19 @@ export function accesosDelAlta(actuales: PafAccess[], alta: { carpetaCompartida?
   ].filter((a): a is { nombre: string; url: string } => !!a.url && !!safeHttpsUrl(a.url))
     .filter((a) => !actuales.some((x) => x.url && driveKey(x.url) === driveKey(a.url)));
   return nuevos.length ? [...actuales, ...nuevos.map((a) => ({ id: newId(), nombre: a.nombre, url: safeHttpsUrl(a.url)! }))] : null;
+}
+
+import type { Etapa } from './presencia';
+import { ETAPA_HITOS, temaPorId } from './presencia';
+
+/**
+ * "Nos toca a nosotros": lo que .CERO o la CM tienen entre manos, en palabras para el cliente.
+ * Sale de las tareas que hacen ellos y de las entregas que se están preparando (nada privado).
+ */
+export function enMarchaDe(project: { pafTareas?: PafTask[]; pafEntregas?: PafDelivery[] }): { texto: string; quien: 'cero' | 'cm' }[] {
+  const tareas = (project.pafTareas || []).filter((t) => t.estado === 'habilitada' && t.responsable && t.responsable !== 'estudio')
+    .map((t) => ({ texto: t.titulo, quien: t.responsable as 'cero' | 'cm' }));
+  const entregas = (project.pafEntregas || []).filter((e) => !e.publicada && e.tema)
+    .map((e) => ({ texto: `Preparando: ${e.titulo}`, quien: (temaPorId(e.tema!)?.servicio === 'contenido' ? 'cm' : 'cero') as 'cero' | 'cm' }));
+  return [...entregas, ...tareas];
 }

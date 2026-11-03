@@ -395,6 +395,9 @@ export interface Project {
   pafTareas?: import('./portal/model').PafTask[]; // Tareas del estudio: el cliente ve solo las habilitadas
   pafHitos?: import('./portal/model').PafHitoConfirmado[]; // Hitos de Presencia confirmados (con evidencia privada)
   pafReportes?: import('./portal/model').PafReporte[]; // Reportes del viernes (el estudio ve los publicados)
+  pafEtapa?: import('./portal/presencia').Etapa; // Etapa del método en la que está (la activa Juan)
+  pafEtapasContratadas?: import('./portal/presencia').Etapa[]; // Además de Presencia: Adquisición, Conversión
+  pafEtapasInicio?: Partial<Record<import('./portal/presencia').Etapa, string>>; // Cuándo empezó cada etapa (YYYY-MM-DD)
   pafAlcance?: import('./portal/presencia').Servicio[]; // Qué contrató además de la base (contenido, Google, web)
   pafTemas?: Partial<Record<import('./portal/presencia').TemaId, import('./portal/presencia').TemaEstado>>; // Plan de Presencia: cuándo empezó cada tema y su checklist
   pafHistorial?: { fecha: string; texto: string }[]; // Qué se aprobó o confirmó y cuándo (privado)

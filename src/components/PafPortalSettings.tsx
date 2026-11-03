@@ -52,3 +52,22 @@ export const PortalLinksEditor: React.FC<{ draft: PafPortalDraft; onChange: (pat
     </div>
   </div>
 );
+
+/** Tus números: los cargás vos, con su fuente. El cliente los ve si “Tus números” está prendido. */
+export const NumerosEditor: React.FC<{ draft: PafPortalDraft; onChange: (patch: Partial<PafPortalDraft>) => void }> = ({ draft, onChange }) => {
+  const items = draft.numeros || [];
+  const set = (id: string, patch: Partial<{ label: string; valor: string; fuente: string }>) => onChange({ numeros: items.map((n) => (n.id === id ? { ...n, ...patch } : n)) });
+  return (
+    <div className="space-y-1.5">
+      {items.map((n) => (
+        <div key={n.id} className="flex flex-wrap items-center gap-1.5">
+          <input className={`${input} w-24`} value={n.valor} placeholder="1.240" aria-label="Valor" onChange={(e) => set(n.id, { valor: e.target.value })} />
+          <input className={`${input} flex-1 min-w-[8rem]`} value={n.label} placeholder="Qué es (ej. Consultas del mes)" aria-label="Qué es" onChange={(e) => set(n.id, { label: e.target.value })} />
+          <input className={`${input} flex-1 min-w-[8rem]`} value={n.fuente} placeholder="Fuente y período (ej. Registro, octubre)" aria-label="Fuente" onChange={(e) => set(n.id, { fuente: e.target.value })} />
+          <button type="button" aria-label="Borrar" onClick={() => onChange({ numeros: items.filter((x) => x.id !== n.id) })} className="text-xs text-zinc-500 hover:text-rose-300">✕</button>
+        </div>
+      ))}
+      <button type="button" onClick={() => onChange({ numeros: [...items, { id: `${Date.now().toString(36)}`, label: '', valor: '', fuente: '' }] })} className="rounded-lg bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 text-[11px] font-bold text-zinc-200">+ Número</button>
+    </div>
+  );
+};

@@ -73,3 +73,35 @@ describe('cliente de ejemplo', () => {
     expect(json).not.toContain('Hito confirmado'); // historial privado
   });
 });
+
+import { ADQUISICION_TEMAS, CONVERSION_TEMAS, ETAPA_HITOS } from '../src/portal/presencia';
+import { enMarchaDe, hitosCompletados, hitosDe } from '../src/portal/model';
+import { confirmarHito } from '../src/components/PafHitosCard';
+
+describe('programa en tres etapas', () => {
+  it('Adquisición y Conversión van en borrador, con sus hitos', () => {
+    expect(ADQUISICION_TEMAS.every((t) => t.borrador && t.etapa === 'adquisicion')).toBe(true);
+    expect(CONVERSION_TEMAS.every((t) => t.borrador && t.etapa === 'conversion')).toBe(true);
+    expect(temasDelAlcance([], 'adquisicion')).toHaveLength(8);
+    expect(temasDelAlcance([], 'conversion')).toHaveLength(9);
+    ADQUISICION_TEMAS.forEach((t) => expect(t.hito).toBeLessThanOrEqual(ETAPA_HITOS.adquisicion.length));
+    expect(hitosDe('presencia', 'conversion')[4]).toBe('Cierre del programa');
+  });
+  it('los hitos confirmados son de cada etapa', () => {
+    let hs = confirmarHito([], 1, 'ok');
+    hs = confirmarHito(hs, 1, 'listo', 'adquisicion');
+    expect(hitosCompletados(hs, 'presencia')).toEqual([1]);
+    expect(hitosCompletados(hs, 'adquisicion')).toEqual([1]);
+    expect(hitosCompletados(hs, 'conversion')).toEqual([]);
+  });
+  it('el portal muestra la etapa, las contratadas y lo que hacemos nosotros', () => {
+    const { project } = buildEjemplo('juan@gmail.com', new Date('2026-11-03T12:00:00'));
+    const p = { ...project, id: 'p', pafEtapa: 'adquisicion' as const, pafEtapasContratadas: ['adquisicion' as const] };
+    const r = portalFromProject(p, []);
+    if (!('doc' in r)) throw new Error('sin doc');
+    expect(r.doc.etapa).toBe('adquisicion');
+    expect(r.doc.etapas).toEqual(['presencia', 'adquisicion']);
+    expect(r.doc.hitosCompletados).toEqual([]); // los de Presencia no cuentan en Adquisición
+    expect(enMarchaDe(project)).toEqual([{ texto: 'Preparando: Informe de diagnóstico y metas', quien: 'cero' }]);
+  });
+});

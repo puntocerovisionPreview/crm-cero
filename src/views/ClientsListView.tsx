@@ -3,6 +3,7 @@ import { ChevronRight, Plus, Search } from 'lucide-react';
 import { AgendaMeeting, IncomeRecord, Project, getServiceType } from '../types';
 import { calculateProjectBilling } from '../utils/paymentPlans';
 import { nextMeeting } from '../portal/model';
+import { ClientsBoard, TuSemana } from './ClientsBoard';
 import { RESPONSABLE_ACCION, estadoCliente, type EstadoCliente } from '../components/ProximaAccionCard';
 
 type Filter = 'activos' | 'mi_accion' | 'esperando' | 'bloqueado' | 'paf' | 'web' | 'archivados';
@@ -45,6 +46,10 @@ export const ClientsListView: React.FC<{
   creandoEjemplo?: boolean;
 }> = ({ projects, meetings, incomes, privacyMode, onNavigate, onCrearEjemplo, creandoEjemplo }) => {
   const [filter, setFilter] = useState<Filter>('activos');
+  // Tres formas de ver a tus clientes: lista, tablero por etapa y tu semana
+  type Vista = 'lista' | 'tablero' | 'semana';
+  const [vista, setVistaState] = useState<Vista>(() => { try { return (localStorage.getItem('clientes_vista') as Vista) || 'lista'; } catch { return 'lista'; } });
+  const setVista = (v: Vista) => { setVistaState(v); try { localStorage.setItem('clientes_vista', v); } catch { /* sin almacenamiento */ } };
   const [q, setQ] = useState('');
   const today = new Date().toLocaleDateString('en-CA');
 
@@ -78,11 +83,22 @@ export const ClientsListView: React.FC<{
   [projects, meetings, incomes, filter, q, privacyMode, today]);
 
   return (
-    <div className="max-w-3xl w-full mx-auto px-4 sm:px-6 pb-28 pt-2 space-y-5">
+    <div className={`${vista === 'tablero' ? 'max-w-6xl' : 'max-w-3xl'} w-full mx-auto px-4 sm:px-6 pb-28 pt-2 space-y-5`}>
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Clientes</h1>
         <button type="button" onClick={() => onNavigate('/clientes/nuevo')} className="btn-solid-primary inline-flex items-center gap-1.5 px-3 py-2 text-sm"><Plus className="w-4 h-4" />Nuevo cliente</button>
       </header>
+
+      <div className="inline-flex rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] p-0.5" role="tablist" aria-label="Vista">
+        {([['lista', 'Lista'], ['tablero', 'Tablero'], ['semana', 'Tu semana']] as [Vista, string][]).map(([id, label]) => (
+          <button key={id} type="button" role="tab" aria-selected={vista === id} onClick={() => setVista(id)}
+            className={`rounded-[calc(var(--radius-control)-2px)] px-3 py-1.5 text-xs font-medium transition ${vista === id ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>{label}</button>
+        ))}
+      </div>
+
+      {vista === 'tablero' && <ClientsBoard projects={projects} meetings={meetings} onNavigate={onNavigate} />}
+      {vista === 'semana' && <TuSemana projects={projects} meetings={meetings} onNavigate={onNavigate} />}
+      {vista === 'lista' && <>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex max-w-full gap-1 overflow-x-auto no-scrollbar" role="tablist" aria-label="Filtro">
@@ -143,6 +159,7 @@ export const ClientsListView: React.FC<{
           </button>
         </p>
       )}
+      </>}
     </div>
   );
 };
