@@ -156,7 +156,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { usePafAvisos } from './portal/usePafAvisos';
-import { unpublishStudentPortal } from './utils/studentPortal';
+import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { PomodoroModal } from './components/PomodoroModal';
@@ -207,6 +207,7 @@ const CalendarView = React.lazy(() => import('./views/CalendarView').then((m) =>
 const ProjectsSimpleView = React.lazy(() => import('./views/ProjectsSimpleView').then((m) => ({ default: m.ProjectsSimpleView })));
 const IncomeView = React.lazy(() => import('./views/IncomeView').then((m) => ({ default: m.IncomeView })));
 const ClientDetailView = React.lazy(() => import('./views/ClientDetailView').then((m) => ({ default: m.ClientDetailView })));
+const PanelsView = React.lazy(() => import('./views/PanelsView').then((m) => ({ default: m.PanelsView })));
 const NewClientWizardView = React.lazy(() => import('./views/NewClientWizardView').then((m) => ({ default: m.NewClientWizardView })));
 const TaskDetailView = React.lazy(() => import('./views/TaskDetailView').then((m) => ({ default: m.TaskDetailView })));
 const AyudaView = React.lazy(() => import('./views/AyudaView').then((m) => ({ default: m.AyudaView })));
@@ -1465,8 +1466,23 @@ export default function App() {
     hapticFeedback.success();
   }, [mpAlert]);
 
-  // Portal del alumno (viejo): ya no se publica; solo se borra su copia si se borra el cliente
+  // Portal del alumno (viejo, /alumno): se sigue actualizando para quienes todavía lo usan
   const publishedPortalKeysRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (!authToken) return;
+    projects.forEach(project => {
+      const token = project.studentPortalToken;
+      if (!token) return;
+      const snapshot = buildStudentPortalSnapshot(project, token, meetings);
+      const key = portalSnapshotKey(snapshot);
+      if (publishedPortalKeysRef.current.get(token) === key) return;
+      publishedPortalKeysRef.current.set(token, key);
+      publishStudentPortal(snapshot).catch(err => {
+        publishedPortalKeysRef.current.delete(token);
+        console.warn('Error publicando portal del alumno:', err);
+      });
+    });
+  }, [authToken, projects, meetings]);
 
   const handleForceSync = async () => {
     setSyncStatus('syncing');
@@ -3526,9 +3542,8 @@ export default function App() {
     }
 
     if (path === '/paneles') {
-      // El panel viejo ya no existe: cada cliente se administra desde su ficha
-      setTimeout(() => navigate('/clientes'), 0);
-      return null;
+      // Panel anterior: sin menú, se entra desde la ficha (Más detalles) mientras se migra
+      return <PanelsView projects={projects} onUpdateProject={handleUpdateProject} />;
     }
 
     if (path === '/documentos') {

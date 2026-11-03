@@ -36,6 +36,7 @@ describe('portal PAF con login', () => {
         { nombre: 'Calendario de contenido', url: 'https://app.asana.com/0/1' },
       ],
       anuncios: [],
+      mostrarAvance: true,
       actualizadoEn: '2026-11-02T10:00:00.000Z',
     });
   });
@@ -428,5 +429,14 @@ describe('portal libre (fase 2): anuncios, tareas simples y accesos', () => {
     if (!('doc' in r)) throw new Error(r.errors.join());
     const json = JSON.stringify(r.doc);
     for (const k of ['monto', 'amount', 'price', 'payments', 'installments', 'billing', 'currency', 'nota privada']) expect(json.toLowerCase()).not.toContain(k.toLowerCase());
+  });
+});
+
+describe('portal restaurado: mostrar avance', () => {
+  it('por defecto se muestra; si Juan lo apaga, el portal lo oculta', () => {
+    const on = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft });
+    expect('doc' in on && on.doc.mostrarAvance).toBe(true);
+    const off = buildPafPortal({ clienteId: 'PAF-002', estudio: 'E', draft: { ...draft, mostrarAvance: false } });
+    expect('doc' in off && off.doc.mostrarAvance).toBe(false);
   });
 });

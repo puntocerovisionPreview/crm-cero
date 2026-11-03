@@ -43,6 +43,8 @@ export interface PafPortalDraft {
   enlaces: Partial<Record<PafPortalLinkKey, string>>;
   /** Accesos directos libres (nombre y link, en este orden). Si no hay, salen de `enlaces`. */
   accesos?: PafAccess[];
+  /** Mostrar la etapa, la barra y el paso a paso en el portal (por defecto sí) */
+  mostrarAvance?: boolean;
   publishedAt?: string;
 }
 
@@ -159,6 +161,8 @@ export interface PafPortalDoc {
   accesos?: { nombre: string; url: string }[];
   /** Anuncios publicados: fijados primero, después los más nuevos */
   anuncios?: PafPortalAnnouncement[];
+  /** Si es false, el portal oculta la etapa, la barra y el paso a paso */
+  mostrarAvance?: boolean;
   actualizadoEn: string;
   /** Se publican aparte (ver PORTAL_SEPARATE_FIELDS): objetivos de la semana y WhatsApp de Juan */
   objetivos?: PafPortalGoal[];
@@ -266,6 +270,7 @@ export function buildPafPortal(
       reuniones: input.reuniones || [],
       accesos,
       anuncios: input.anuncios || [],
+      mostrarAvance: input.draft.mostrarAvance !== false,
       actualizadoEn: now,
     },
   };

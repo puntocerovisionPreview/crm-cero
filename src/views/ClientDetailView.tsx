@@ -59,6 +59,9 @@ import { PaymentPlanManager } from '../components/PaymentPlanManager';
 import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
 import { PafAdminPanel } from '../components/PafAdminPanel';
 import { ClientAdminStrip } from '../components/ClientAdminStrip';
+import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
+import { PafPanelButton } from '../components/PafPanelButton';
+import { ProjectPanelCard } from '../components/ProjectPanelCard';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { 
   formatProjectPrice, 
@@ -832,6 +835,18 @@ export const ClientDetailView: React.FC<Props> = ({
         <details className="group rounded-2xl border border-zinc-800 bg-zinc-900/60">
           <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-zinc-300 hover:text-zinc-100">Más detalles: cobros, historial, trabajo, notas y horas</summary>
         <main className="min-w-0 space-y-4 p-3 border-t border-zinc-800">
+          {/* Portal anterior por link: queda a mano hasta que todos pasen al portal nuevo */}
+          {(project.studentPortalToken || isWebClient) && (
+            <div className="rounded-xl border border-zinc-800 p-3 space-y-2">
+              <p className="text-[11px] text-zinc-500">Portal anterior (por link). Sigue funcionando para quien ya lo usa.</p>
+              {isPaf ? (
+                <>
+                  <StudentPortalLinkButton project={project} phone={project.clientPhone} onUpdateProject={onUpdateProject} />
+                  <PafPanelButton project={project} onUpdateProject={onUpdateProject} />
+                </>
+              ) : <ProjectPanelCard project={project} onUpdateProject={onUpdateProject} />}
+            </div>
+          )}
           {/* Universal Timeline de Cuotas con Chips & Barra de Progreso */}
           {activeTab === 'cobros' && (
           <ClientInstallmentTimeline

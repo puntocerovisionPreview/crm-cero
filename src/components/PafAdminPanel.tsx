@@ -130,6 +130,10 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
               <input className={input} value={portal.emailsText} placeholder="estudio@gmail.com, socia@gmail.com" onChange={(e) => portal.setEmailsText(e.target.value)} />
             </label>
           </Block>
+          <label className="flex items-start gap-2 text-xs text-zinc-200">
+            <input type="checkbox" className="mt-0.5" checked={portal.draft.mostrarAvance !== false} onChange={(e) => portal.set({ mostrarAvance: e.target.checked })} />
+            <span>Mostrar avance<span className="block text-[11px] text-zinc-500">La etapa, la barra y el paso a paso arriba de su portal.</span></span>
+          </label>
           <Block title="Tu WhatsApp" hint="Para el botón «Hablar con Juan». Es uno solo para todos los clientes.">
             <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
           </Block>
@@ -239,7 +243,7 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   // Guardado automático en la ficha (no publica)
   const current = useMemo(() => ({ ...draft, emails: normalizeEmails(emailsText) }), [draft, emailsText]);
   // Solo guarda si algo cambió de verdad (abrir la ficha no escribe nada)
-  const snapshot = (d: PafPortalDraft) => JSON.stringify([d.emails, d.hito, d.resumen, d.enlaces]);
+  const snapshot = (d: PafPortalDraft) => JSON.stringify([d.emails, d.hito, d.resumen, d.enlaces, d.accesos ?? null, d.mostrarAvance ?? null]);
   const lastSaved = useRef(snapshot(current));
   useEffect(() => {
     const snap = snapshot(current);
