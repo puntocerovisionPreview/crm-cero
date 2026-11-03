@@ -207,6 +207,7 @@ const CalendarView = React.lazy(() => import('./views/CalendarView').then((m) =>
 const ProjectsSimpleView = React.lazy(() => import('./views/ProjectsSimpleView').then((m) => ({ default: m.ProjectsSimpleView })));
 const IncomeView = React.lazy(() => import('./views/IncomeView').then((m) => ({ default: m.IncomeView })));
 const ClientDetailView = React.lazy(() => import('./views/ClientDetailView').then((m) => ({ default: m.ClientDetailView })));
+const NewClientView = React.lazy(() => import('./views/NewClientView').then((m) => ({ default: m.NewClientView })));
 const ClientsListView = React.lazy(() => import('./views/ClientsListView').then((m) => ({ default: m.ClientsListView })));
 const PanelsView = React.lazy(() => import('./views/PanelsView').then((m) => ({ default: m.PanelsView })));
 const NewClientWizardView = React.lazy(() => import('./views/NewClientWizardView').then((m) => ({ default: m.NewClientWizardView })));
@@ -3233,6 +3234,20 @@ export default function App() {
     }
 
     // 2. New Client Wizard
+    if (path === '/clientes/nuevo' && currentRoute.query?.vista !== 'completa') {
+      // Alta en una sola pantalla (el asistente anterior sigue en /clientes/nuevo?vista=completa)
+      return (
+        <NewClientView
+          initialTipo={currentRoute.query?.tipo === 'web' ? 'web' : 'paf'}
+          onAddProject={handleAddProject}
+          onUpdateProject={handleUpdateProject}
+          onAddMeeting={handleAddMeeting}
+          onNavigate={navigate}
+          onBack={() => goBack()}
+        />
+      );
+    }
+
     if (path === '/clientes/nuevo') {
       return (
         <NewClientWizardView

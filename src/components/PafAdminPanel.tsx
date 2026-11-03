@@ -77,6 +77,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
   return (
     <div className="space-y-5">
       <PanelHeader portal={portal} studio={project.clientName} />
+      {showAlta && <AltaStatus pedido={portal.pedido} carpeta={project.pafDrive?.carpetaCompartida} />}
 
       {/* Avance: etapa y si el cliente lo ve, en una línea */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -336,7 +337,7 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
 
   return {
     draft, set, emailsText, setEmailsText, clienteId, setClienteId, published,
-    dirty: portalDirty(current, published), busy, errors, notice, publish, unpublish, copyLink,
+    pedido, dirty: portalDirty(current, published), busy, errors, notice, publish, unpublish, copyLink,
     whatsapp: config.whatsapp || '',
     saveWhatsapp: async (raw: string) => {
       const whatsapp = whatsappDigits(raw);
@@ -598,5 +599,30 @@ function AccessEditor({ items, onChange, startAdding }: { items: { id: string; n
       ))}
       <button type="button" onClick={() => onChange([...items, { id: newItemId(), nombre: '', url: '' }])} className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 text-[11px] font-bold">+ Agregar acceso</button>
     </div>
+  );
+}
+
+/** Estado del alta en una línea: Esperando formulario → Respondió → Carpetas listas */
+function AltaStatus({ pedido, carpeta }: { pedido: PafPedidoAlta | null; carpeta?: string }) {
+  if (!pedido?.enlaceFormulario) {
+    return <p className="text-[11px] text-zinc-500">Alta: todavía sin link de Tally (Ajustes del portal → Alta del estudio).</p>;
+  }
+  const respondio = !!pedido.alta?.fechaRespuesta;
+  const carpetas = !!(pedido.alta?.carpetaCompartida || carpeta);
+  const steps = [
+    { label: 'Esperando formulario', done: true, current: !respondio && !carpetas },
+    { label: 'Respondió', done: respondio || carpetas, current: respondio && !carpetas },
+    { label: 'Carpetas listas', done: carpetas, current: carpetas },
+  ];
+  return (
+    <ol className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]" aria-label="Estado del alta">
+      <span className="text-zinc-500">Alta</span>
+      {steps.map((st, i) => (
+        <li key={st.label} className={`inline-flex items-center gap-1.5 ${st.current ? 'text-zinc-100 font-semibold' : st.done ? 'text-zinc-400' : 'text-zinc-600'}`}>
+          {i > 0 && <span aria-hidden className="text-zinc-700">→</span>}
+          <span className={`w-1.5 h-1.5 rounded-full ${st.done ? 'bg-emerald-500' : 'bg-zinc-700'}`} aria-hidden />{st.label}
+        </li>
+      ))}
+    </ol>
   );
 }

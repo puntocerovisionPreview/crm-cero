@@ -47,7 +47,8 @@ export const ClientsListView: React.FC<{
       const billing = calculateProjectBilling(p, incomes);
       const money = (n: number) => (privacyMode ? '••••' : `${billing.currency === 'USD' ? 'US$' : '$'} ${Math.round(n).toLocaleString('es-AR')}`);
       const cuota = [...(p.installments || [])].filter((i) => !i.paid).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
-      const next = cuota ? { fecha: cuota.dueDate, monto: cuota.amount } : billing.nextCommitment ? { fecha: billing.nextCommitment.dueDate, monto: billing.nextCommitment.amount } : null;
+      const abono = (p.recurringPlans || []).find((r) => r.active);
+      const next = cuota ? { fecha: cuota.dueDate, monto: cuota.amount } : billing.nextCommitment ? { fecha: billing.nextCommitment.dueDate, monto: billing.nextCommitment.amount } : abono ? { fecha: abono.nextDueDate, monto: abono.amount } : null;
       const cobro = next ? { fecha: next.fecha, monto: money(next.monto), vencido: next.fecha < today } : null;
       const revisar = (p.pafTareas || []).filter((t) => t.estado === 'enviada').length;
       const service = getServiceType(p.projectType);

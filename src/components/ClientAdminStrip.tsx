@@ -21,7 +21,8 @@ export const ClientAdminStrip: React.FC<{
 
   // Próximo cobro: la primera cuota sin pagar, o el próximo compromiso
   const cuota = [...(project.installments || [])].filter((i) => !i.paid).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
-  const proximo = cuota ? { fecha: cuota.dueDate, monto: cuota.amount } : billing.nextCommitment ? { fecha: billing.nextCommitment.dueDate, monto: billing.nextCommitment.amount } : null;
+  const abono = (project.recurringPlans || []).find((r) => r.active);
+  const proximo = cuota ? { fecha: cuota.dueDate, monto: cuota.amount } : billing.nextCommitment ? { fecha: billing.nextCommitment.dueDate, monto: billing.nextCommitment.amount } : abono ? { fecha: abono.nextDueDate, monto: abono.amount } : null;
   const vencido = !!proximo && proximo.fecha < today;
   const reunion = nextMeeting(meetings, project.id, today);
   const fmt = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
@@ -29,7 +30,7 @@ export const ClientAdminStrip: React.FC<{
   return (
     <section className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-4" aria-label="Administración">
       <div className="grid grid-cols-3 gap-3">
-        <Figure label="Precio" value={billing.montoAcordado ? money(billing.montoAcordado) : 'Sin precio'} />
+        <Figure label="Precio" value={billing.montoAcordado ? money(billing.montoAcordado) : abono ? `${privacyMode ? '••••' : `${abono.currency === 'USD' ? 'US$' : '$'} ${Math.round(abono.amount).toLocaleString('es-AR')}`}/mes` : 'Sin precio'} />
         <Figure label="Cobrado" value={money(billing.totalCobrado)} />
         <Figure label="Falta" value={money(billing.saldoPendiente)} />
       </div>
