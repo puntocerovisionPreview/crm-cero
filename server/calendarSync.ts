@@ -3,6 +3,9 @@ import type { Firestore } from 'firebase-admin/firestore';
 import type { OAuth2Client } from 'google-auth-library';
 import { addDays, formatLocalISO, todayLocal } from '../src/utils/dates';
 import { calendarUserClient } from './driveOAuth';
+import { inviteKey, meetingHash } from '../src/utils/calendarKeys';
+
+export { inviteKey, meetingHash };
 
 /**
  * SINCRONIZACIÓN CON GOOGLE CALENDAR (en los dos sentidos)
@@ -79,12 +82,6 @@ interface MeetingDoc {
   googleInviteError?: string | null;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-/** Invitados válidos y ordenados: también sirve de huella para saber si ya se mandó */
-export function inviteKey(m: { invitados?: string[] }): string {
-  return [...new Set((m.invitados || []).map((e) => e.trim().toLowerCase()).filter((e) => EMAIL_RE.test(e)))].sort().join(',');
-}
-
 /** Pedido a Calendar como vos (para invitar): Google avisa a los invitados */
 async function gcalAsUser(client: OAuth2Client, path: string, method: 'POST' | 'PATCH' | 'DELETE', data?: unknown): Promise<any> {
   const sep = path.includes('?') ? '&' : '?';
@@ -92,9 +89,6 @@ async function gcalAsUser(client: OAuth2Client, path: string, method: 'POST' | '
   return r.data || null;
 }
 
-export function meetingHash(m: { title: string; date: string; time?: string; durationHours?: number }): string {
-  return [m.title || '', m.date || '', m.time || '', m.durationHours || 1].join('|');
-}
 
 function addMinutesToTime(date: string, time: string, minutes: number): { date: string; time: string } {
   const [h, m] = time.split(':').map(Number);

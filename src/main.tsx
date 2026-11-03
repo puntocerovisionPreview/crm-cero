@@ -7,6 +7,18 @@ import { installGlobalErrorReporting } from './utils/errorReporting';
 // Errores de las pantallas: se guardan y te avisan (ver Ajustes → Estado de la app)
 installGlobalErrorReporting();
 
+// Después de publicar una versión nueva, una pestaña abierta pide pantallas que ya no existen:
+// se recarga una vez (como mucho cada 30 s) para tomar la versión nueva en vez de romperse
+window.addEventListener('vite:preloadError', (event) => {
+  try {
+    const last = Number(sessionStorage.getItem('cero_recarga_version') || 0);
+    if (Date.now() - last < 30_000) return;
+    sessionStorage.setItem('cero_recarga_version', String(Date.now()));
+  } catch { /* sin almacenamiento: se recarga igual */ }
+  event.preventDefault();
+  window.location.reload();
+});
+
 // El portal del alumno es público: se muestra solo, sin el resto del CRM.
 // Cada uno se descarga por separado: un alumno nunca baja el código del CRM.
 const App = lazy(() => import('./App.tsx'));

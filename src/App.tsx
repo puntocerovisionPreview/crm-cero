@@ -157,6 +157,7 @@ import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { usePafAvisos } from './portal/usePafAvisos';
 import { requestCalendarSync } from './utils/calendarSyncClient';
+import { inviteKey, meetingHash } from './utils/calendarKeys';
 import {
   createGoogleCalendarEventInBrowser,
   updateGoogleCalendarEventInBrowser,
@@ -2051,14 +2052,22 @@ export default function App() {
     }
   };
 
-  const syncBrowserGoogleEventId = useCallback((meetingId: string, googleEventId: string) => {
+  // El navegador ya escribió el evento: se guardan sus huellas para que el servidor no lo vuelva
+  // a escribir (y Google no le mande un segundo correo al cliente)
+  const markBrowserCalendar = useCallback((meeting: AgendaMeeting, googleEventId?: string) => {
+    const synced: Partial<AgendaMeeting> = {
+      ...(googleEventId ? { googleEventId } : {}),
+      googleSyncHash: meetingHash(meeting),
+      googleInviteHash: inviteKey(meeting),
+      googleInviteError: null,
+    };
     setMeetings(prev => {
-      const updated = prev.map(m => (m.id === meetingId ? { ...m, googleEventId } : m));
+      const updated = prev.map(m => (m.id === meeting.id ? { ...m, ...synced } : m));
       saveStoredMeetings(updated);
       return updated;
     });
-    updateMeetingInFirestore(meetingId, { googleEventId }).catch(err =>
-      console.error('Error saving googleEventId to Firestore:', err)
+    updateMeetingInFirestore(meeting.id, synced).catch(err =>
+      console.error('Error saving Google Calendar sync to Firestore:', err)
     );
   }, []);
 
@@ -2079,9 +2088,8 @@ export default function App() {
     try {
       await updateMeetingInFirestore(meetingId, { date: targetDate });
       if (merged && shouldUseBrowserCalendar()) {
-        void updateGoogleCalendarEventInBrowser(merged, (eventId) =>
-          syncBrowserGoogleEventId(meetingId, eventId)
-        );
+        void updateGoogleCalendarEventInBrowser(merged, (eventId) => markBrowserCalendar(merged, eventId))
+          .then((r) => { if (r.ok && r.googleEventId) markBrowserCalendar(merged, r.googleEventId); });
       }
       requestCalendarSync();
       showToast('Reunión postergada a mañana');
@@ -2135,9 +2143,8 @@ export default function App() {
     try {
       await updateMeetingInFirestore(meetingId, updates);
       if (merged && shouldUseBrowserCalendar()) {
-        void updateGoogleCalendarEventInBrowser(merged, (eventId) =>
-          syncBrowserGoogleEventId(meetingId, eventId)
-        );
+        void updateGoogleCalendarEventInBrowser(merged, (eventId) => markBrowserCalendar(merged, eventId))
+          .then((r) => { if (r.ok && r.googleEventId) markBrowserCalendar(merged, r.googleEventId); });
       }
       requestCalendarSync();
       showToast('Reunión actualizada');
@@ -2161,9 +2168,7 @@ export default function App() {
     try {
       await saveMeetingToFirestore(newMeeting);
       if (shouldUseBrowserCalendar()) {
-        void createGoogleCalendarEventInBrowser(newMeeting, (eventId) =>
-          syncBrowserGoogleEventId(newMeeting.id, eventId)
-        );
+        void createGoogleCalendarEventInBrowser(newMeeting, (eventId) => markBrowserCalendar(newMeeting, eventId));
       }
       requestCalendarSync();
       showToast('Reunión agendada');
