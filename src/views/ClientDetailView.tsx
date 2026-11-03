@@ -122,6 +122,7 @@ interface Props {
   onAddMeeting: (meeting: Omit<AgendaMeeting, 'id' | 'createdAt'>) => void;
   onToggleMeeting: (meetingId: string) => void;
   onDeleteMeeting: (meetingId: string) => void;
+  onUpdateMeeting?: (meetingId: string, updates: Partial<AgendaMeeting>) => void;
   onAddIncome: (income: Omit<IncomeRecord, 'id' | 'createdAt'>) => void;
   onOpenQuickIncome?: () => void;
   onAddTimeLog?: (log: Omit<TimeLog, 'id' | 'createdAt'>) => void;
@@ -158,6 +159,7 @@ export const ClientDetailView: React.FC<Props> = ({
   onAddMeeting,
   onToggleMeeting,
   onDeleteMeeting,
+  onUpdateMeeting,
   onAddIncome,
   onOpenQuickIncome,
   onAddTimeLog,
@@ -826,6 +828,9 @@ export const ClientDetailView: React.FC<Props> = ({
               meetings={meetings}
               onUpdateProject={onUpdateProject}
               onAddMeeting={onAddMeeting}
+              onUpdateMeeting={onUpdateMeeting}
+              onToggleMeeting={onToggleMeeting}
+              onDeleteMeeting={onDeleteMeeting}
               showAlta={isPaf}
             />
           </div>}

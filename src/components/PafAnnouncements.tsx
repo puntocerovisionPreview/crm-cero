@@ -5,6 +5,15 @@ import { newItemId } from '../panels/model';
 import { safeHttpsUrl, type PafAnnouncement } from '../portal/model';
 import { republishIfPublished } from '../portal/store';
 
+/** Para no escribir siempre lo mismo: se completan y se editan antes de publicar */
+const ANNOUNCEMENT_TEMPLATES = [
+  { titulo: 'Bienvenida', texto: '¡Bienvenido a tu portal! Acá vas a ver en qué estamos, lo que necesitamos de vos y todo lo que te entregamos.' },
+  { titulo: 'Entrega lista', texto: 'Ya tenés una entrega nueva. Mirala con calma y anotá lo que cambiarías: lo vemos en la próxima reunión.' },
+  { titulo: 'Recordatorio', texto: 'Te recuerdo que tenemos tareas pendientes de tu lado. Cuando las termines, tocá “Terminé”.' },
+  { titulo: 'Reunión confirmada', texto: 'Confirmamos nuestra próxima reunión. La tenés abajo con el botón para agregarla a tu calendario.' },
+  { titulo: 'Cerramos etapa', texto: '¡Cerramos esta etapa! Gracias por el trabajo. En la próxima reunión arrancamos con lo que sigue.' },
+];
+
 const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
 
 /**
@@ -17,7 +26,9 @@ export const PafAnnouncements: React.FC<{
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
   showForm?: boolean;
   onDone?: () => void;
-}> = ({ project, meetings, onUpdateProject, showForm = true, onDone }) => {
+  /** Sin título propio (cuando va dentro de una sección que ya lo tiene) */
+  bare?: boolean;
+}> = ({ project, meetings, onUpdateProject, showForm = true, onDone, bare }) => {
   const items = [...(project.pafAnuncios || [])].sort((a, b) => Number(!!b.fijado) - Number(!!a.fijado) || b.creadoEn.localeCompare(a.creadoEn));
   const [f, setF] = useState({ texto: '', titulo: '', link: '', fijado: false });
   const [error, setError] = useState('');
@@ -43,10 +54,10 @@ export const PafAnnouncements: React.FC<{
 
   return (
     <section className="space-y-2">
-      <div>
+      {!bare && <div>
         <h3 className="text-xs font-bold text-zinc-100">Anuncios</h3>
         <p className="text-[11px] text-zinc-500">Lo primero que ve el cliente.</p>
-      </div>
+      </div>}
 
       {items.length > 0 && (
         <ul className="space-y-1.5">
@@ -71,6 +82,11 @@ export const PafAnnouncements: React.FC<{
       )}
 
       {showForm && <div className="space-y-1.5">
+        <div className="flex flex-wrap gap-1.5" aria-label="Plantillas">
+          {ANNOUNCEMENT_TEMPLATES.map((t) => (
+            <button key={t.titulo} type="button" onClick={() => setF({ ...f, titulo: t.titulo, texto: t.texto })} className="rounded-full border border-zinc-700 px-2.5 py-1 text-[11px] text-zinc-300 hover:border-zinc-500">{t.titulo}</button>
+          ))}
+        </div>
         <textarea className={input} rows={2} value={f.texto} placeholder="Ej: Esta semana arrancamos con tu web. Ya tenés el borrador en tu carpeta." onChange={(e) => setF({ ...f, texto: e.target.value })} />
         <div className="flex gap-1.5">
           <input className={input} value={f.titulo} placeholder="Título (opcional)" onChange={(e) => setF({ ...f, titulo: e.target.value })} />

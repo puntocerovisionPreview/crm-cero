@@ -1,12 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CalendarPlus, ExternalLink } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
-import { getAuthHeaders } from '../utils/authAccess';
+import { getCalendarStatus } from '../utils/calendarSyncClient';
 import { getTodayString } from '../utils/storage';
 import { hapticFeedback } from '../utils/haptics';
 
 const field = 'rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
 const input = `w-full ${field}`;
+
+/** Tipos de reunión frecuentes: ponen el título y la duración */
+const MEETING_TYPES = [
+  { label: 'Reunión de arranque', horas: 1.5 },
+  { label: 'Seguimiento', horas: 1 },
+  { label: 'Revisión de entrega', horas: 1 },
+  { label: 'Llamada corta', horas: 0.5 },
+  { label: 'Cierre de etapa', horas: 1 },
+];
 
 /** Evento prellenado en Google Calendar (sin invitados: la invitación la mandás vos) */
 export function googleCalendarLink(m: { title: string; date: string; time?: string; durationHours?: number; notes?: string }): string {
@@ -31,7 +40,12 @@ export const PafReunionCard: React.FC<{
   onAddMeeting: (meeting: Omit<AgendaMeeting, 'id' | 'createdAt'>) => void;
   /** Título que propone la plantilla de la etapa (ej. "Reunión de arranque") */
   suggestedTitle?: string;
-}> = ({ project, meetings, onAddMeeting, suggestedTitle }) => {
+  /** La lista de próximas ya se muestra afuera */
+  hideUpcoming?: boolean;
+  /** Si ya se sabe si Calendar está conectado (evita preguntarle otra vez al servidor) */
+  calendarConnected?: boolean;
+  onCancel?: () => void;
+}> = ({ project, meetings, onAddMeeting, suggestedTitle, hideUpcoming, calendarConnected, onCancel }) => {
   const [form, setForm] = useState({ title: `Reunión PAF · ${project.clientName}`, date: getTodayString(), time: '11:00', durationHours: 1, notes: '' });
   const titleRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -40,22 +54,15 @@ export const PafReunionCard: React.FC<{
     titleRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
     titleRef.current?.focus();
   }, [suggestedTitle, project.clientName]);
-  const [calendarSync, setCalendarSync] = useState<boolean | null>(null);
+  const [calendarSync, setCalendarSync] = useState<boolean | null>(calendarConnected ?? null);
   const [notice, setNotice] = useState('');
 
   useEffect(() => {
+    if (calendarConnected !== undefined) { setCalendarSync(calendarConnected); return; }
     let alive = true;
-    (async () => {
-      try {
-        const res = await fetch('/api/automation/status', { headers: await getAuthHeaders() });
-        const data = res.ok ? await res.json() : null;
-        if (alive) setCalendarSync(Boolean(data?.calendar));
-      } catch {
-        if (alive) setCalendarSync(false);
-      }
-    })();
+    getCalendarStatus().then((st) => { if (alive) setCalendarSync(st.connected); });
     return () => { alive = false; };
-  }, []);
+  }, [calendarConnected]);
 
   const upcoming = meetings
     .filter((m) => m.projectId === project.id && !m.completed && m.date >= getTodayString())
@@ -77,7 +84,7 @@ export const PafReunionCard: React.FC<{
     };
     onAddMeeting(meeting);
     if (calendarSync) {
-      setNotice('Agendada. Aparece en tu Google Calendar en unos minutos. La invitación al estudio la mandás vos desde ahí.');
+      setNotice('Agendada. Aparece en tu Google Calendar en segundos. La invitación al estudio la mandás vos desde ahí.');
     } else {
       // Se abre en el mismo clic para que el navegador no lo bloquee
       window.open(googleCalendarLink(meeting), '_blank', 'noopener');
@@ -93,7 +100,7 @@ export const PafReunionCard: React.FC<{
         {calendarSync !== null && <span className="text-[10px] text-zinc-500">{calendarSync ? 'Calendar sincronizado' : 'Se abre Google Calendar'}</span>}
       </div>
 
-      {upcoming.length > 0 && (
+      {!hideUpcoming && upcoming.length > 0 && (
         <ul className="space-y-1">
           {upcoming.map((m) => (
             <li key={m.id} className="flex items-center gap-2 text-[11px] text-zinc-300">
@@ -106,6 +113,12 @@ export const PafReunionCard: React.FC<{
         </ul>
       )}
 
+      <div className="flex flex-wrap gap-1.5" aria-label="Tipo de reunión">
+        {MEETING_TYPES.map((t) => (
+          <button key={t.label} type="button" onClick={() => setForm((f) => ({ ...f, title: `${t.label} · ${project.clientName}`, durationHours: t.horas }))}
+            className={`rounded-full border px-2.5 py-1 text-[11px] ${form.title.startsWith(t.label) ? 'border-zinc-100 bg-zinc-100 text-zinc-950' : 'border-zinc-700 text-zinc-300 hover:border-zinc-500'}`}>{t.label}</button>
+        ))}
+      </div>
       <input ref={titleRef} className={input} value={form.title} aria-label="Título" onChange={(e) => setForm({ ...form, title: e.target.value })} />
       <div className="flex flex-wrap gap-1.5">
         <input className={`${field} flex-1 min-w-[9.5rem]`} type="date" aria-label="Fecha" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
@@ -118,6 +131,7 @@ export const PafReunionCard: React.FC<{
       <button type="button" onClick={schedule} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 text-zinc-950 px-3 py-1.5 text-xs font-bold">
         <CalendarPlus className="w-3.5 h-3.5" /> Agendar
       </button>
+      {onCancel && <button type="button" onClick={onCancel} className="ml-2 text-[11px] text-zinc-400 hover:text-zinc-200">Cancelar</button>}
       {notice && <p role="status" className="text-[11px] text-emerald-300">{notice}</p>}
     </div>
   );

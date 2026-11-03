@@ -156,6 +156,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { usePafAvisos } from './portal/usePafAvisos';
+import { requestCalendarSync } from './utils/calendarSyncClient';
 import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -2051,6 +2052,7 @@ export default function App() {
     playPostpone();
     try {
       await updateMeetingInFirestore(meetingId, { date: targetDate });
+      requestCalendarSync();
       showToast('Reunión postergada a mañana');
     } catch (err) {
       console.error('Error moving meeting:', err);
@@ -2076,6 +2078,7 @@ export default function App() {
     playItemDeleted();
     try {
       await deleteMeetingFromFirestore(meetingId);
+      requestCalendarSync();
       showToast('Reunión enviada a la papelera', () => {
         if (meetingToDelete) {
           handleAddMeeting(meetingToDelete);
@@ -2095,6 +2098,7 @@ export default function App() {
     });
     try {
       await updateMeetingInFirestore(meetingId, updates);
+      requestCalendarSync();
       showToast('Reunión actualizada');
     } catch (err) {
       console.error('Error updating meeting:', err);
@@ -2115,6 +2119,7 @@ export default function App() {
     playItemCreated();
     try {
       await saveMeetingToFirestore(newMeeting);
+      requestCalendarSync();
       showToast('Reunión agendada');
     } catch (err) {
       console.error('Error adding meeting:', err);
@@ -3394,6 +3399,7 @@ export default function App() {
           onAddMeeting={handleAddMeeting}
           onToggleMeeting={handleToggleMeeting}
           onDeleteMeeting={handleDeleteMeeting}
+          onUpdateMeeting={handleUpdateMeeting}
           onAddIncome={handleAddIncome}
           onOpenQuickIncome={() => {
             setQuickAddModal({

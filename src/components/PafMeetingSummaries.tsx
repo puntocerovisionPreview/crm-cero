@@ -19,7 +19,9 @@ export const PafMeetingSummaries: React.FC<{
   /** Mostrar el formulario para anotar (si no, solo la lista) */
   showForm?: boolean;
   onDone?: () => void;
-}> = ({ project, meetings, onUpdateProject, showForm = true, onDone }) => {
+  /** Sin título propio (cuando va dentro de una sección que ya lo tiene) */
+  bare?: boolean;
+}> = ({ project, meetings, onUpdateProject, showForm = true, onDone, bare }) => {
   const items = [...(project.pafResumenes || [])].sort((a, b) => b.fecha.localeCompare(a.fecha));
   const today = getTodayString();
   // Por defecto, la última reunión del estudio que ya pasó
@@ -41,11 +43,11 @@ export const PafMeetingSummaries: React.FC<{
   };
 
   return (
-    <section className="space-y-2 pt-3 border-t border-zinc-800">
-      <div>
+    <section className={bare ? 'space-y-2' : 'space-y-2 pt-3 border-t border-zinc-800'}>
+      {!bare && <div>
         <h3 className="flex items-center gap-1.5 text-xs font-bold text-zinc-100"><NotebookPen className="w-3.5 h-3.5 text-zinc-400" />Lo que acordamos</h3>
         <p className="text-[11px] text-zinc-500">Acuerdos y próximos pasos que ve el cliente. Tus notas privadas no se publican.</p>
-      </div>
+      </div>}
 
       {items.length > 0 && (
         <ul className="space-y-1.5">

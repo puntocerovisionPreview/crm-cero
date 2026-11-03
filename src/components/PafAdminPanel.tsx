@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Check, CircleAlert, Copy, ExternalLink, Eye, ImagePlus, Loader2, Package, Radio, Smartphone, Trash2, Undo2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarDays, CalendarPlus, Check, CircleAlert, Copy, ExternalLink, Eye, FolderOpen, Home, ImagePlus, Link2, ListChecks, Loader2, Megaphone, MessageCircle, NotebookPen, Package, Palette, Radio, Settings2, Smartphone, Target, Trash2, Undo2 } from 'lucide-react';
 import { shrinkLogo } from '../utils/logoImage';
 import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
@@ -15,9 +15,8 @@ import type { ClientPanel } from '../panels/model';
 import { SegmentedControl } from '../ui';
 import { hapticFeedback } from '../utils/haptics';
 import { PafAltaCard } from './PafAltaCard';
-import { PafReunionCard } from './PafReunionCard';
+import { PafMeetingsSection } from './PafMeetingsSection';
 import { PafWeekGoals } from './PafWeekGoals';
-import { PafMeetingSummaries } from './PafMeetingSummaries';
 import { PafAnnouncements } from './PafAnnouncements';
 
 // El portal tal cual lo ve el cliente (se carga solo al abrir la vista previa)
@@ -31,160 +30,245 @@ const STATE_STYLE: Record<PafTaskState, string> = {
   aprobada: 'bg-emerald-500/15 text-emerald-300',
 };
 
-type Tab = 'hoy' | 'tareas' | 'config';
 type Props = {
   project: Project;
   meetings: AgendaMeeting[];
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
   onAddMeeting: (meeting: Omit<AgendaMeeting, 'id' | 'createdAt'>) => void;
+  onUpdateMeeting?: (id: string, updates: Partial<AgendaMeeting>) => void;
+  onToggleMeeting?: (id: string) => void;
+  onDeleteMeeting?: (id: string) => void;
   /** Alta con Tally (solo PAF) */
   showAlta?: boolean;
 };
 
-/**
- * PANEL DEL ESTUDIO (ficha PAF). Encabezado fijo con estado, etapa y accesos; debajo:
- * - Hoy: foco de la semana, tareas para revisar, próxima reunión y entregas.
- * - Tareas: la lista completa.
- * - Configuración: alta, acceso, enlaces y, al final, despublicar.
- * Etapa, foco, correos y enlaces se guardan solos en la ficha; si difieren de lo que ve
- * el estudio, el encabezado avisa "Hay cambios sin publicar". Tareas y entregas se publican solas.
- */
-type Adding = null | 'anuncio' | 'tarea' | 'acceso' | 'entrega' | 'reunion' | 'acuerdo';
-const ADD_OPTIONS: { id: Exclude<Adding, null | 'acuerdo'>; label: string }[] = [
-  { id: 'anuncio', label: 'Anuncio' },
-  { id: 'tarea', label: 'Tarea' },
-  { id: 'acceso', label: 'Acceso' },
-  { id: 'entrega', label: 'Entrega' },
-  { id: 'reunion', label: 'Reunión' },
+type Section = 'inicio' | 'tareas' | 'reuniones' | 'entregas' | 'archivos' | 'ajustes';
+type Adding = null | 'anuncio' | 'tarea' | 'acceso' | 'entrega' | 'reunion' | 'acuerdo' | 'semana';
+
+/** Acciones rápidas: cada una abre su sección con el formulario listo */
+const QUICK: { id: Exclude<Adding, null> | 'marca'; label: string; hint: string; icon: React.ElementType; section: Section }[] = [
+  { id: 'anuncio', label: 'Anuncio', hint: 'Lo primero que lee', icon: Megaphone, section: 'inicio' },
+  { id: 'tarea', label: 'Tarea', hint: 'Algo que tiene que hacer', icon: ListChecks, section: 'tareas' },
+  { id: 'reunion', label: 'Reunión', hint: 'Va a tu Calendar', icon: CalendarPlus, section: 'reuniones' },
+  { id: 'acuerdo', label: 'Acuerdos', hint: 'Lo que hablamos', icon: NotebookPen, section: 'reuniones' },
+  { id: 'entrega', label: 'Entrega', hint: 'Algo que le mandás', icon: Package, section: 'entregas' },
+  { id: 'acceso', label: 'Acceso', hint: 'Drive, Asana, web…', icon: Link2, section: 'archivos' },
+  { id: 'semana', label: 'Foco semanal', hint: 'Foco y objetivos', icon: Target, section: 'inicio' },
+  { id: 'marca', label: 'Marca', hint: 'Logo y color', icon: Palette, section: 'ajustes' },
 ];
 
+const SECTION_INFO: Record<Section, { label: string; icon: React.ElementType; hint: string }> = {
+  inicio: { label: 'Inicio', icon: Home, hint: 'Avance, foco de la semana y anuncios: lo primero que ve.' },
+  tareas: { label: 'Tareas', icon: ListChecks, hint: 'Lo que necesitás de tu cliente. Las ocultas no las ve hasta que las habilitás.' },
+  reuniones: { label: 'Reuniones', icon: CalendarDays, hint: 'Agendar, mover y anotar acuerdos. Todo pasa a tu Google Calendar.' },
+  entregas: { label: 'Entregas', icon: Package, hint: 'Lo que le mandás. Nacen ocultas: las mostrás cuando quieras.' },
+  archivos: { label: 'Archivos', icon: FolderOpen, hint: 'Accesos directos con ícono: Drive, calendario de contenido, su web…' },
+  ajustes: { label: 'Ajustes', icon: Settings2, hint: 'Marca, quién entra, tu WhatsApp y el alta.' },
+};
+
 /**
- * "LO QUE VE EL CLIENTE": un espejo editable de su portal, en el mismo orden que lo ve él:
- * avance, anuncios, esta semana, tareas, próxima reunión y lo que acordamos, entregas y archivos.
- * Cada sección aparece solo si tiene algo (o si la estás agregando). Todo se publica solo.
- * Los ajustes (alta, correos, WhatsApp, despublicar) quedan plegados abajo.
+ * "LO QUE VE EL CLIENTE", ordenado en secciones: arriba el estado del portal y las acciones
+ * rápidas; abajo una sección por vez (Inicio, Tareas, Reuniones, Entregas, Archivos, Ajustes).
+ * Todo se guarda solo y, si el portal está publicado, le llega al cliente en segundos.
  */
-export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, showAlta = true }) => {
+export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, onUpdateMeeting, onToggleMeeting, onDeleteMeeting, showAlta = true }) => {
+  const [section, setSectionState] = useState<Section>(() => {
+    try { return (localStorage.getItem('paf_panel_seccion') as Section) || 'inicio'; } catch { return 'inicio'; }
+  });
+  const setSection = (s: Section) => { setSectionState(s); try { localStorage.setItem('paf_panel_seccion', s); } catch { /* sin almacenamiento */ } };
   const [adding, setAdding] = useState<Adding>(null);
-  const [editWeek, setEditWeek] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
   const portal = usePortalDraft(project, meetings, onUpdateProject, !showAlta);
   const work = usePafWork(project, meetings, onUpdateProject);
   const toReview = work.tasks.filter((t) => t.estado === 'enviada');
   const accesos = draftAccesos(portal.draft);
   const today = new Date().toLocaleDateString('en-CA');
-  const next = nextMeeting(meetings, project.id, today);
-  const resumenes = project.pafResumenes || [];
+  const upcoming = meetings.filter((m) => m.projectId === project.id && !m.completed && m.date >= today).length;
   const hasWeek = !!portal.draft.resumen.trim();
-  const empty = !(project.pafAnuncios || []).length && !work.tasks.length && !accesos.length && !work.deliveries.length && !next && !hasWeek;
-  const toggle = (id: Exclude<Adding, null>) => setAdding((a) => (a === id ? null : id));
   const done = () => setAdding(null);
 
+  const quick = (q: (typeof QUICK)[number]) => {
+    hapticFeedback.light();
+    setSection(q.section);
+    setAdding(q.id === 'marca' ? null : q.id);
+    requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  };
+
+  const counts: Partial<Record<Section, number>> = {
+    inicio: toReview.length || undefined,
+    tareas: work.tasks.filter((t) => t.estado === 'habilitada').length || undefined,
+    reuniones: upcoming || undefined,
+    entregas: work.deliveries.length || undefined,
+    archivos: accesos.length || undefined,
+  };
+  const info = SECTION_INFO[section];
+  const Icon = info.icon;
+
   return (
-    <div className="space-y-5">
-      <PanelHeader portal={portal} studio={project.clientName} preview={showPreview} onTogglePreview={() => setShowPreview((v) => !v)} />
+    <div className="space-y-4">
+      <PanelHeader portal={portal} studio={project.clientName} phone={project.clientPhone} preview={showPreview} onTogglePreview={() => setShowPreview((v) => !v)} />
       {showPreview && portal.published && <PortalPreview portal={portal.published} />}
-      <BrandBlock portal={portal} studio={project.clientName} />
-      {showAlta && <AltaStatus pedido={portal.pedido} carpeta={project.pafDrive?.carpetaCompartida} />}
 
-      {/* Avance: etapa y si el cliente lo ve, en una línea */}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-zinc-500">Avance</span>
-        <select aria-label="Etapa" className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1 text-xs text-zinc-100" value={portal.draft.hito} onChange={(e) => portal.set({ hito: Number(e.target.value) })}>
-          {PRESENCIA_HITOS.map((t, i) => <option key={t} value={i + 1}>{i + 1}. {t}</option>)}
-        </select>
-        <label className="ml-auto inline-flex items-center gap-1.5 text-zinc-400">
-          <input type="checkbox" checked={portal.draft.mostrarAvance !== false} onChange={(e) => portal.set({ mostrarAvance: e.target.checked })} />
-          Mostrar avance
-        </label>
+      {/* Acciones rápidas: lo que más hacés, a un toque */}
+      <div className="grid grid-cols-4 gap-2" role="toolbar" aria-label="Agregar al portal">
+        {QUICK.map((q) => {
+          const QIcon = q.icon;
+          const active = adding === q.id;
+          return (
+            <button key={q.id} type="button" onClick={() => quick(q)} aria-pressed={active}
+              className={`group flex flex-col items-center gap-1.5 rounded-xl border px-1.5 py-2.5 text-center transition ${active ? 'border-zinc-100 bg-zinc-100 text-zinc-950' : 'border-zinc-800 bg-zinc-950/40 text-zinc-200 hover:border-zinc-600 hover:bg-white/[0.03]'}`}>
+              <QIcon className={`w-4 h-4 ${active ? '' : 'text-zinc-400 group-hover:text-zinc-100'}`} />
+              <span className="text-[11px] font-semibold leading-tight">{q.label}</span>
+              <span className={`hidden sm:block text-[10px] leading-tight ${active ? 'text-zinc-600' : 'text-zinc-500'}`}>{q.hint}</span>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Agregar al portal">
-        {ADD_OPTIONS.map((o) => (
-          <button key={o.id} type="button" onClick={() => toggle(o.id)} aria-pressed={adding === o.id}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${adding === o.id ? 'border-zinc-100 bg-zinc-100 text-zinc-950' : 'border-zinc-700 text-zinc-300 hover:border-zinc-500'}`}>
-            + {o.label}
-          </button>
-        ))}
-      </div>
+      {/* Secciones del portal */}
+      <div ref={sectionRef} className="scroll-mt-24 rounded-2xl border border-zinc-800 overflow-hidden">
+        <nav className="flex overflow-x-auto no-scrollbar border-b border-zinc-800 bg-zinc-950/50" aria-label="Secciones">
+          {(Object.keys(SECTION_INFO) as Section[]).map((s) => {
+            const SIcon = SECTION_INFO[s].icon;
+            const on = section === s;
+            return (
+              <button key={s} type="button" onClick={() => { setSection(s); setAdding(null); }} aria-current={on ? 'page' : undefined}
+                className={`relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-xs font-semibold transition ${on ? 'text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}>
+                <SIcon className="w-3.5 h-3.5" />{SECTION_INFO[s].label}
+                {counts[s] ? <span className={`rounded-full px-1.5 text-[10px] tabular-nums ${s === 'inicio' ? 'bg-amber-400/20 text-amber-300' : 'bg-zinc-800 text-zinc-400'}`}>{counts[s]}</span> : null}
+                {on && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-zinc-100" aria-hidden />}
+              </button>
+            );
+          })}
+        </nav>
 
-      {toReview.length > 0 && (
-        <Block title={`Para revisar (${toReview.length})`} hint="El cliente avisó que las terminó. Aprobá o volvé a habilitar.">
-          <TaskList tasks={toReview} work={work} />
-        </Block>
-      )}
+        <div className="p-3 sm:p-4 space-y-5">
+          <p className="flex items-center gap-2 text-[11px] text-zinc-500"><Icon className="w-3.5 h-3.5 shrink-0" />{info.hint}</p>
 
-      {empty && !adding && <p className="rounded-xl border border-dashed border-zinc-700 p-4 text-center text-xs text-zinc-500">El cliente todavía no ve nada. Empezá con “+ Anuncio” o “+ Tarea”.</p>}
+          {section === 'inicio' && (
+            <>
+              {showAlta && <AltaStatus pedido={portal.pedido} carpeta={project.pafDrive?.carpetaCompartida} />}
+              <Card title="Avance">
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <select aria-label="Etapa" className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1 text-xs text-zinc-100" value={portal.draft.hito} onChange={(e) => portal.set({ hito: Number(e.target.value) })}>
+                    {PRESENCIA_HITOS.map((t, i) => <option key={t} value={i + 1}>Etapa {i + 1} · {t}</option>)}
+                  </select>
+                  <label className="ml-auto inline-flex items-center gap-1.5 text-zinc-400">
+                    <input type="checkbox" checked={portal.draft.mostrarAvance !== false} onChange={(e) => portal.set({ mostrarAvance: e.target.checked })} />
+                    Que lo vea
+                  </label>
+                </div>
+              </Card>
 
-      {((project.pafAnuncios || []).length > 0 || adding === 'anuncio') && (
-        <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'anuncio'} onDone={done} />
-      )}
+              {toReview.length > 0 && (
+                <Card title={`Para revisar (${toReview.length})`} hint="Avisó que las terminó. Aprobá o volvé a habilitar." tone="amber">
+                  <TaskList tasks={toReview} work={work} />
+                </Card>
+              )}
 
-      {/* Esta semana: una línea si no hay nada; se abre para editar */}
-      <Block title="Esta semana" badge={!editWeek && <button type="button" onClick={() => setEditWeek(true)} className="ml-auto text-[11px] font-normal text-zinc-400 hover:text-zinc-200">{hasWeek ? 'Editar' : 'Agregar foco u objetivos'}</button>}>
-        {editWeek ? (
-          <div className="space-y-2">
-            <textarea className={input} rows={2} value={portal.draft.resumen} placeholder="Foco de la semana (lo lee arriba de todo)" onChange={(e) => portal.set({ resumen: e.target.value })} />
-            <PafWeekGoals project={project} publishedId={portal.published?.clienteId} />
-            <button type="button" onClick={() => setEditWeek(false)} className="text-[11px] text-zinc-400 hover:text-zinc-200">Listo</button>
-          </div>
-        ) : hasWeek ? <p className="text-xs text-zinc-300 whitespace-pre-line line-clamp-2">{portal.draft.resumen}</p> : null}
-      </Block>
+              <Card title="Esta semana" action={adding !== 'semana' && <SmallButton onClick={() => setAdding('semana')}>{hasWeek ? 'Editar' : '+ Foco y objetivos'}</SmallButton>}>
+                {adding === 'semana' ? (
+                  <div className="space-y-2">
+                    <textarea className={input} rows={2} value={portal.draft.resumen} placeholder="Foco de la semana (lo lee arriba de todo)" onChange={(e) => portal.set({ resumen: e.target.value })} />
+                    <PafWeekGoals project={project} publishedId={portal.published?.clienteId} />
+                    <SmallButton onClick={done}>Listo</SmallButton>
+                  </div>
+                ) : hasWeek ? <p className="text-xs text-zinc-300 whitespace-pre-line line-clamp-3">{portal.draft.resumen}</p> : <Empty>Sin foco cargado: no se muestra.</Empty>}
+              </Card>
 
-      {(work.tasks.length > 0 || adding === 'tarea') && (
-        <Block title="Lo que necesitamos de vos" hint="Tareas del cliente. Las ocultas no las ve hasta que tocás Habilitar.">
-          {adding === 'tarea' && <AddTask work={work} onDone={done} />}
-          {work.tasks.length > 0 && <TaskList tasks={work.tasks.filter((t) => t.estado !== 'enviada')} work={work} />}
-        </Block>
-      )}
+              <Card title="Anuncios" hint="Fijá arriba lo importante." action={adding !== 'anuncio' && <SmallButton onClick={() => setAdding('anuncio')}>+ Anuncio</SmallButton>}>
+                {(project.pafAnuncios || []).length > 0 || adding === 'anuncio'
+                  ? <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'anuncio'} onDone={done} bare />
+                  : <Empty>Sin anuncios.</Empty>}
+              </Card>
+            </>
+          )}
 
-      {(next || adding === 'reunion' || resumenes.length > 0 || adding === 'acuerdo') && (
-        <Block title="Próxima reunión" badge={adding !== 'acuerdo' && <button type="button" onClick={() => setAdding('acuerdo')} className="ml-auto text-[11px] font-normal text-zinc-400 hover:text-zinc-200">Anotar lo que acordamos</button>}>
-          {next ? <p className="text-xs text-zinc-200">{next.fecha}{next.hora ? ` · ${next.hora} hs` : ''}</p> : !adding && <p className="text-xs text-zinc-500">Sin reunión agendada.</p>}
-          {adding === 'reunion' && <PafReunionCard project={project} meetings={meetings} onAddMeeting={(m) => { onAddMeeting(m); done(); }} />}
-          {(resumenes.length > 0 || adding === 'acuerdo') && <PafMeetingSummaries project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'acuerdo'} onDone={done} />}
-        </Block>
-      )}
+          {section === 'tareas' && (
+            <>
+              <Card title="Lo que necesitamos de vos" action={adding !== 'tarea' && <SmallButton onClick={() => setAdding('tarea')}>+ Tarea</SmallButton>}>
+                {adding === 'tarea' && <AddTask work={work} onDone={done} />}
+                {toReview.length > 0 && <TaskList tasks={toReview} work={work} />}
+                {work.tasks.some((t) => t.estado !== 'enviada') ? <TaskList tasks={work.tasks.filter((t) => t.estado !== 'enviada')} work={work} /> : adding !== 'tarea' && <Empty>Sin tareas todavía.</Empty>}
+              </Card>
+              <StageTemplate project={project} hito={portal.draft.hito} work={work} always onMeeting={() => { setSection('reuniones'); setAdding('reunion'); }} />
+            </>
+          )}
 
-      {(work.deliveries.length > 0 || adding === 'entrega') && <Deliveries work={work} showForm={adding === 'entrega'} onDone={done} />}
+          {section === 'reuniones' && (
+            <PafMeetingsSection project={project} meetings={meetings} onAddMeeting={onAddMeeting} onUpdateMeeting={onUpdateMeeting} onToggleMeeting={onToggleMeeting} onDeleteMeeting={onDeleteMeeting} onUpdateProject={onUpdateProject}
+              linkReunion={portal.draft.linkReunion || ''} onLinkReunion={(v) => portal.set({ linkReunion: v })}
+              scheduling={adding === 'reunion'} onScheduling={(o) => setAdding(o ? 'reunion' : null)}
+              writingSummary={adding === 'acuerdo'} onWritingSummary={(o) => setAdding(o ? 'acuerdo' : null)} />
+          )}
 
-      {(accesos.length > 0 || adding === 'acceso') && (
-        <Block title="Archivos" hint="Accesos directos: nombre y link. El ícono sale solo según lo que es. La carpeta interna y la ficha nunca se publican.">
-          <AccessEditor items={accesos} privados={portal.privados} startAdding={adding === 'acceso'} onChange={(list) => { portal.set({ accesos: list }); }} />
-        </Block>
-      )}
+          {section === 'entregas' && (
+            <Card title="Entregas" action={adding !== 'entrega' && <SmallButton onClick={() => setAdding('entrega')}>+ Entrega</SmallButton>}>
+              {work.deliveries.length || adding === 'entrega' ? <Deliveries work={work} showForm={adding === 'entrega'} onDone={done} /> : <Empty>Sin entregas todavía.</Empty>}
+            </Card>
+          )}
 
-      <details className="group rounded-xl border border-zinc-800">
-        <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200">Ajustes del portal</summary>
-        <div className="space-y-5 border-t border-zinc-800 p-3">
-          {showAlta && <PafAltaCard project={project} onUpdateProject={onUpdateProject} />}
-          <Block title="Quién puede entrar" hint="Solo estos correos, con su cuenta de Google. El del alta se agrega solo.">
-            <label className="block text-[11px] text-zinc-400">ID del cliente
-              <input className={`${input} font-mono`} value={portal.clienteId} disabled={!!portal.published} placeholder="PAF-002" onChange={(e) => portal.setClienteId(e.target.value.toUpperCase())} />
-            </label>
-            <label className="block text-[11px] text-zinc-400 mt-2">Correos autorizados
-              <input className={input} value={portal.emailsText} placeholder="estudio@gmail.com, socia@gmail.com" onChange={(e) => portal.setEmailsText(e.target.value)} />
-            </label>
-          </Block>
-          <Block title="Link de las reuniones" hint="Si usás siempre la misma sala de Meet o Zoom: el cliente la ve con un botón «Unirme».">
-            <input className={input} value={portal.draft.linkReunion || ''} placeholder="https://meet.google.com/abc-defg-hij" onChange={(e) => portal.set({ linkReunion: e.target.value })} />
-          </Block>
-          <Block title="Tu WhatsApp" hint="Para el botón «Hablar con Juan». Es uno solo para todos los clientes.">
-            <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
-          </Block>
-          {portal.published && (
-            <div className="rounded-xl border border-rose-500/20 p-3 flex items-center gap-3">
-              <p className="flex-1 text-[11px] text-zinc-400">Despublicar: el cliente deja de ver su portal.</p>
-              <button type="button" onClick={portal.unpublish} disabled={portal.busy} className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/10">Despublicar</button>
-            </div>
+          {section === 'archivos' && (
+            <Card title="Accesos" hint="Pegá el link: el https, el nombre y el ícono se completan solos. La carpeta interna y la ficha nunca se publican.">
+              <AccessEditor items={accesos} privados={portal.privados} startAdding={adding === 'acceso'} onChange={(list) => { portal.set({ accesos: list }); }} />
+            </Card>
+          )}
+
+          {section === 'ajustes' && (
+            <>
+              <BrandBlock portal={portal} studio={project.clientName} />
+              <Card title="Quién puede entrar" hint="Solo estos correos, con su cuenta de Google. El del alta se agrega solo.">
+                <label className="block text-[11px] text-zinc-400">ID del cliente
+                  <input className={`${input} font-mono`} value={portal.clienteId} disabled={!!portal.published} placeholder={showAlta ? 'PAF-002' : 'Se asigna solo al publicar (WEB-001)'} onChange={(e) => portal.setClienteId(e.target.value.toUpperCase())} />
+                </label>
+                <label className="block text-[11px] text-zinc-400 mt-2">Correos autorizados
+                  <input className={input} value={portal.emailsText} placeholder="estudio@gmail.com, socia@gmail.com" onChange={(e) => portal.setEmailsText(e.target.value)} />
+                </label>
+              </Card>
+              <Card title="Tu WhatsApp" hint="Para el botón «Hablar con Juan». Es uno solo para todos los clientes.">
+                <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
+              </Card>
+              {showAlta && <Card title="Alta del estudio"><PafAltaCard project={project} onUpdateProject={onUpdateProject} /></Card>}
+              {portal.published && (
+                <div className="rounded-xl border border-rose-500/20 p-3 flex items-center gap-3">
+                  <p className="flex-1 text-[11px] text-zinc-400">Despublicar: el cliente deja de ver su portal.</p>
+                  <button type="button" onClick={portal.unpublish} disabled={portal.busy} className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-bold text-rose-300 hover:bg-rose-500/10">Despublicar</button>
+                </div>
+              )}
+            </>
           )}
         </div>
-      </details>
+      </div>
 
       <SaveBar portal={portal} />
     </div>
   );
 };
+
+/** Bloque de una sección: título, ayuda corta y la acción a la derecha */
+function Card({ title, hint, action, tone, children }: { title: string; hint?: string; action?: React.ReactNode; tone?: 'amber'; children: React.ReactNode }) {
+  return (
+    <section className={`rounded-xl border p-3 space-y-2.5 ${tone === 'amber' ? 'border-amber-400/30 bg-amber-400/[0.04]' : 'border-zinc-800 bg-zinc-950/30'}`}>
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xs font-bold text-zinc-100">{title}</h3>
+          {hint && <p className="text-[11px] text-zinc-500">{hint}</p>}
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function SmallButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" onClick={onClick} className="shrink-0 rounded-lg bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1 text-[11px] font-bold text-zinc-200">{children}</button>;
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="text-[11px] text-zinc-500">{children}</p>;
+}
 
 // ---------- Guardar y publicar ----------
 
@@ -274,7 +358,7 @@ function PortalPreview({ portal }: { portal: PafPortalDoc }) {
 
 // ---------- Encabezado ----------
 
-function PanelHeader({ portal, studio, preview, onTogglePreview }: { portal: ReturnType<typeof usePortalDraft>; studio: string; preview: boolean; onTogglePreview: () => void }) {
+function PanelHeader({ portal, studio, phone, preview, onTogglePreview }: { portal: ReturnType<typeof usePortalDraft>; studio: string; phone?: string; preview: boolean; onTogglePreview: () => void }) {
   const { published } = portal;
   const viewUrl = published ? `/portal?ver=${encodeURIComponent(published.clienteId)}` : '';
   const updated = published ? new Date(published.actualizadoEn) : null;
@@ -326,6 +410,12 @@ function PanelHeader({ portal, studio, preview, onTogglePreview }: { portal: Ret
           <button type="button" onClick={onTogglePreview} aria-pressed={preview} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${preview ? 'bg-zinc-100 text-zinc-950' : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'}`}>
             <Smartphone className="w-3.5 h-3.5" /> {preview ? 'Cerrar vista previa' : 'Vista previa'}
           </button>
+        )}
+        {published && phone && whatsappDigits(phone).length >= 10 && (
+          <a href={`https://wa.me/${whatsappDigits(phone)}?text=${encodeURIComponent(novedades(published, studio, window.location.origin))}`} target="_blank" rel="noopener noreferrer" title="Abre WhatsApp con el mensaje armado: lo mandás vos"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 text-xs font-bold">
+            <MessageCircle className="w-3.5 h-3.5" /> Avisarle
+          </a>
         )}
         <button type="button" onClick={portal.copyLink} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-3 py-1.5 text-xs font-bold">
           <Copy className="w-3.5 h-3.5" /> Copiar enlace
@@ -759,7 +849,7 @@ function AccessEditor({ items, onChange, startAdding, privados }: { items: Acces
 /** Estado del alta en una línea: Esperando formulario → Respondió → Carpetas listas */
 function AltaStatus({ pedido, carpeta }: { pedido: PafPedidoAlta | null; carpeta?: string }) {
   if (!pedido?.enlaceFormulario) {
-    return <p className="text-[11px] text-zinc-500">Alta: todavía sin link de Tally (Ajustes del portal → Alta del estudio).</p>;
+    return <p className="text-[11px] text-zinc-500">Alta: todavía sin link de Tally (Ajustes → Alta del estudio).</p>;
   }
   const respondio = !!pedido.alta?.fechaRespuesta;
   const carpetas = !!(pedido.alta?.carpetaCompartida || carpeta);
@@ -779,4 +869,14 @@ function AltaStatus({ pedido, carpeta }: { pedido: PafPedidoAlta | null; carpeta
       ))}
     </ol>
   );
+}
+/** Mensaje para avisarle por WhatsApp que tiene novedades (lo manda Juan, nunca el CRM solo) */
+function novedades(p: PafPortalDoc, studio: string, origin: string): string {
+  const lines: string[] = [];
+  const pendientes = (p.tareas || []).filter((t) => t.estado === 'habilitada').length;
+  if (p.anuncios?.[0]) lines.push(`• ${p.anuncios[0].titulo || p.anuncios[0].texto.slice(0, 80)}`);
+  if (pendientes) lines.push(`• ${pendientes === 1 ? 'Una tarea' : `${pendientes} tareas`} para vos`);
+  if (p.proximaReunion) lines.push(`• Nuestra próxima reunión: ${new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}${p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}`);
+  if (p.entregas?.length) lines.push(`• Nueva entrega: ${[...p.entregas].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0].titulo}`);
+  return [`¡Hola ${studio}! Te dejé novedades en tu portal:`, ...lines, '', `Entrás acá con tu cuenta de Google: ${origin}/portal`].join('\n');
 }
