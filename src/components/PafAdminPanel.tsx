@@ -44,8 +44,8 @@ type Props = {
  * Etapa, foco, correos y enlaces se guardan solos en la ficha; si difieren de lo que ve
  * el estudio, el encabezado avisa "Hay cambios sin publicar". Tareas y entregas se publican solas.
  */
-type Adding = null | 'anuncio' | 'tarea' | 'acceso' | 'entrega' | 'reunion';
-const ADD_OPTIONS: { id: Exclude<Adding, null>; label: string }[] = [
+type Adding = null | 'anuncio' | 'tarea' | 'acceso' | 'entrega' | 'reunion' | 'acuerdo';
+const ADD_OPTIONS: { id: Exclude<Adding, null | 'acuerdo'>; label: string }[] = [
   { id: 'anuncio', label: 'Anuncio' },
   { id: 'tarea', label: 'Tarea' },
   { id: 'acceso', label: 'Acceso' },
@@ -54,24 +54,41 @@ const ADD_OPTIONS: { id: Exclude<Adding, null>; label: string }[] = [
 ];
 
 /**
- * "LO QUE VE EL CLIENTE": un espejo editable de su portal, en el mismo orden
- * (anuncios, tareas, próxima reunión, accesos, entregas). Lo que agregás o cambiás
- * se publica solo. Los ajustes (alta, correos, WhatsApp, despublicar) quedan plegados abajo.
+ * "LO QUE VE EL CLIENTE": un espejo editable de su portal, en el mismo orden que lo ve él:
+ * avance, anuncios, esta semana, tareas, próxima reunión y lo que acordamos, entregas y archivos.
+ * Cada sección aparece solo si tiene algo (o si la estás agregando). Todo se publica solo.
+ * Los ajustes (alta, correos, WhatsApp, despublicar) quedan plegados abajo.
  */
 export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, showAlta = true }) => {
   const [adding, setAdding] = useState<Adding>(null);
+  const [editWeek, setEditWeek] = useState(false);
   const portal = usePortalDraft(project, meetings, onUpdateProject);
   const work = usePafWork(project, meetings, onUpdateProject);
   const toReview = work.tasks.filter((t) => t.estado === 'enviada');
   const accesos = draftAccesos(portal.draft);
   const today = new Date().toLocaleDateString('en-CA');
   const next = nextMeeting(meetings, project.id, today);
-  const empty = !(project.pafAnuncios || []).length && !work.tasks.length && !accesos.length && !work.deliveries.length && !next;
+  const resumenes = project.pafResumenes || [];
+  const hasWeek = !!portal.draft.resumen.trim();
+  const empty = !(project.pafAnuncios || []).length && !work.tasks.length && !accesos.length && !work.deliveries.length && !next && !hasWeek;
   const toggle = (id: Exclude<Adding, null>) => setAdding((a) => (a === id ? null : id));
+  const done = () => setAdding(null);
 
   return (
     <div className="space-y-5">
       <PanelHeader portal={portal} studio={project.clientName} />
+
+      {/* Avance: etapa y si el cliente lo ve, en una línea */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-zinc-500">Avance</span>
+        <select aria-label="Etapa" className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1 text-xs text-zinc-100" value={portal.draft.hito} onChange={(e) => portal.set({ hito: Number(e.target.value) })}>
+          {PRESENCIA_HITOS.map((t, i) => <option key={t} value={i + 1}>{i + 1}. {t}</option>)}
+        </select>
+        <label className="ml-auto inline-flex items-center gap-1.5 text-zinc-400">
+          <input type="checkbox" checked={portal.draft.mostrarAvance !== false} onChange={(e) => portal.set({ mostrarAvance: e.target.checked })} />
+          Mostrar avance
+        </label>
+      </div>
 
       <div className="flex flex-wrap gap-1.5" role="toolbar" aria-label="Agregar al portal">
         {ADD_OPTIONS.map((o) => (
@@ -91,32 +108,42 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
       {empty && !adding && <p className="rounded-xl border border-dashed border-zinc-700 p-4 text-center text-xs text-zinc-500">El cliente todavía no ve nada. Empezá con “+ Anuncio” o “+ Tarea”.</p>}
 
       {((project.pafAnuncios || []).length > 0 || adding === 'anuncio') && (
-        <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'anuncio'} onDone={() => setAdding(null)} />
+        <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'anuncio'} onDone={done} />
       )}
 
+      {/* Esta semana: una línea si no hay nada; se abre para editar */}
+      <Block title="Esta semana" badge={!editWeek && <button type="button" onClick={() => setEditWeek(true)} className="ml-auto text-[11px] font-normal text-zinc-400 hover:text-zinc-200">{hasWeek ? 'Editar' : 'Agregar foco u objetivos'}</button>}>
+        {editWeek ? (
+          <div className="space-y-2">
+            <textarea className={input} rows={2} value={portal.draft.resumen} placeholder="Foco de la semana (lo lee arriba de todo)" onChange={(e) => portal.set({ resumen: e.target.value })} />
+            <PafWeekGoals project={project} publishedId={portal.published?.clienteId} />
+            <button type="button" onClick={() => setEditWeek(false)} className="text-[11px] text-zinc-400 hover:text-zinc-200">Listo</button>
+          </div>
+        ) : hasWeek ? <p className="text-xs text-zinc-300 whitespace-pre-line line-clamp-2">{portal.draft.resumen}</p> : null}
+      </Block>
+
       {(work.tasks.length > 0 || adding === 'tarea') && (
-        <Block title="Tareas" hint="Nacen ocultas: tocá Habilitar para que el cliente la vea.">
-          {adding === 'tarea' && <AddTask work={work} onDone={() => setAdding(null)} />}
+        <Block title="Lo que necesitamos de vos" hint="Tareas del cliente. Las ocultas no las ve hasta que tocás Habilitar.">
+          {adding === 'tarea' && <AddTask work={work} onDone={done} />}
           {work.tasks.length > 0 && <TaskList tasks={work.tasks.filter((t) => t.estado !== 'enviada')} work={work} />}
         </Block>
       )}
 
-      {(next || adding === 'reunion') && (
-        <Block title="Próxima reunión">
-          {next && <p className="text-xs text-zinc-200">{next.fecha}{next.hora ? ` · ${next.hora} hs` : ''}</p>}
-          {adding === 'reunion' && <PafReunionCard project={project} meetings={meetings} onAddMeeting={(m) => { onAddMeeting(m); setAdding(null); }} />}
+      {(next || adding === 'reunion' || resumenes.length > 0 || adding === 'acuerdo') && (
+        <Block title="Próxima reunión" badge={adding !== 'acuerdo' && <button type="button" onClick={() => setAdding('acuerdo')} className="ml-auto text-[11px] font-normal text-zinc-400 hover:text-zinc-200">Anotar lo que acordamos</button>}>
+          {next ? <p className="text-xs text-zinc-200">{next.fecha}{next.hora ? ` · ${next.hora} hs` : ''}</p> : !adding && <p className="text-xs text-zinc-500">Sin reunión agendada.</p>}
+          {adding === 'reunion' && <PafReunionCard project={project} meetings={meetings} onAddMeeting={(m) => { onAddMeeting(m); done(); }} />}
+          {(resumenes.length > 0 || adding === 'acuerdo') && <PafMeetingSummaries project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'acuerdo'} onDone={done} />}
         </Block>
       )}
 
+      {(work.deliveries.length > 0 || adding === 'entrega') && <Deliveries work={work} showForm={adding === 'entrega'} onDone={done} />}
+
       {(accesos.length > 0 || adding === 'acceso') && (
-        <Block title="Accesos directos" hint="Nombre y link (solo https). La carpeta interna y la ficha se bloquean solas.">
+        <Block title="Archivos" hint="Accesos directos: nombre y link (solo https). La carpeta interna y la ficha se bloquean solas.">
           <AccessEditor items={accesos} startAdding={adding === 'acceso'} onChange={(list) => { portal.set({ accesos: list }); }} />
         </Block>
       )}
-
-      {(work.deliveries.length > 0 || adding === 'entrega') && <Deliveries work={work} showForm={adding === 'entrega'} onDone={() => setAdding(null)} />}
-
-      {(project.pafResumenes || []).length > 0 && <PafMeetingSummaries project={project} meetings={meetings} onUpdateProject={onUpdateProject} />}
 
       <details className="group rounded-xl border border-zinc-800">
         <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-zinc-400 hover:text-zinc-200">Ajustes del portal</summary>
@@ -130,14 +157,9 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
               <input className={input} value={portal.emailsText} placeholder="estudio@gmail.com, socia@gmail.com" onChange={(e) => portal.setEmailsText(e.target.value)} />
             </label>
           </Block>
-          <label className="flex items-start gap-2 text-xs text-zinc-200">
-            <input type="checkbox" className="mt-0.5" checked={portal.draft.mostrarAvance !== false} onChange={(e) => portal.set({ mostrarAvance: e.target.checked })} />
-            <span>Mostrar avance<span className="block text-[11px] text-zinc-500">La etapa, la barra y el paso a paso arriba de su portal.</span></span>
-          </label>
           <Block title="Tu WhatsApp" hint="Para el botón «Hablar con Juan». Es uno solo para todos los clientes.">
             <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
           </Block>
-          {(project.pafResumenes || []).length === 0 && <PafMeetingSummaries project={project} meetings={meetings} onUpdateProject={onUpdateProject} />}
           {portal.published && (
             <div className="rounded-xl border border-rose-500/20 p-3 flex items-center gap-3">
               <p className="flex-1 text-[11px] text-zinc-400">Despublicar: el cliente deja de ver su portal.</p>
@@ -351,7 +373,7 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
     approve: (id: string, canal: string) => update(id, (t) => approveTask(t, canal)),
     reopen: (id: string, motivo: string) => update(id, (t) => reopenTask(t, motivo)),
     remove: (id: string) => saveTasks(tasks.filter((t) => t.id !== id)),
-    add: (t: Omit<PafTask, 'id' | 'estado'>) => saveTasks([...tasks, { ...t, id: newItemId(), estado: 'borrador' }]),
+    add: (t: Omit<PafTask, 'id' | 'estado'>, visible = false) => saveTasks([...tasks, { ...t, id: newItemId(), estado: visible ? 'habilitada' : 'borrador', ...(visible ? { habilitadaEn: new Date().toISOString() } : {}) }]),
     /** Varias de una (plantilla de la etapa): ocultas o ya habilitadas */
     addMany: (list: Omit<PafTask, 'id' | 'estado'>[], enable: boolean) => {
       const now = new Date().toISOString();
@@ -417,6 +439,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
 
 function AddTask({ work, onDone }: { work: Work; onDone?: () => void }) {
   const [f, setF] = useState({ titulo: '', link: '', detalle: '', fecha: '' });
+  const [visible, setVisible] = useState(false);
   const [error, setError] = useState('');
   const add = () => {
     if (!f.titulo.trim()) return;
@@ -424,7 +447,7 @@ function AddTask({ work, onDone }: { work: Work; onDone?: () => void }) {
     if (f.link.trim() && !link) { setError('El link tiene que empezar con https://'); return; }
     setError('');
     hapticFeedback.light();
-    work.add({ titulo: f.titulo.trim(), ...(link ? { link } : {}), ...(f.detalle.trim() ? { detalle: f.detalle.trim() } : {}), ...(f.fecha ? { fecha: f.fecha } : {}) });
+    work.add({ titulo: f.titulo.trim(), ...(link ? { link } : {}), ...(f.detalle.trim() ? { detalle: f.detalle.trim() } : {}), ...(f.fecha ? { fecha: f.fecha } : {}) }, visible);
     setF({ titulo: '', link: '', detalle: '', fecha: '' });
     onDone?.();
   };
@@ -437,7 +460,8 @@ function AddTask({ work, onDone }: { work: Work; onDone?: () => void }) {
         <input className={`${input} w-36`} type="date" aria-label="Fecha (opcional)" value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} />
       </div>
       {error && <p role="alert" className="text-[11px] text-rose-300">{error}</p>}
-      <button type="button" onClick={add} className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 text-[11px] font-bold">Agregar (sin habilitar)</button>
+      <button type="button" onClick={add} className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-2.5 py-1 text-[11px] font-bold">{visible ? 'Agregar y publicar' : 'Agregar (oculta)'}</button>
+      <label className="ml-2 inline-flex items-center gap-1.5 text-[11px] text-zinc-400"><input type="checkbox" checked={visible} onChange={(e) => setVisible(e.target.checked)} />Que el cliente la vea ya</label>
       {work.error && <p role="alert" className="text-[11px] text-rose-300">{work.error}</p>}
     </div>
   );
