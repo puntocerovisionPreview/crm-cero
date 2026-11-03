@@ -156,7 +156,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebaseAuth';
 import { isAllowedUser, signOutUser } from './utils/authAccess';
 import { usePafAvisos } from './portal/usePafAvisos';
-import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
+import { unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
 import { PomodoroModal } from './components/PomodoroModal';
@@ -233,7 +233,6 @@ const PersonalFinanceRecurringView = React.lazy(() => import('./views/personal-f
 const PersonalFinanceSettingsView = React.lazy(() => import('./views/personal-finance/PersonalFinanceSettingsView').then((m) => ({ default: m.PersonalFinanceSettingsView })));
 const ProspectingView = React.lazy(() => import('./views/ProspectingView').then((m) => ({ default: m.ProspectingView })));
 const ContentView = React.lazy(() => import('./views/ContentView').then((m) => ({ default: m.ContentView })));
-const PanelsView = React.lazy(() => import('./views/PanelsView').then((m) => ({ default: m.PanelsView })));
 const GeminiCopilotDrawer = React.lazy(() => import('./components/GeminiCopilotDrawer').then((m) => ({ default: m.GeminiCopilotDrawer })));
 const IosWidgetsModal = React.lazy(() => import('./components/IosWidgetsModal').then((m) => ({ default: m.IosWidgetsModal })));
 
@@ -1466,23 +1465,8 @@ export default function App() {
     hapticFeedback.success();
   }, [mpAlert]);
 
-  // Portal del alumno: mantiene publicada la "foto" de cada alumno PAF con link activo
+  // Portal del alumno (viejo): ya no se publica; solo se borra su copia si se borra el cliente
   const publishedPortalKeysRef = useRef<Map<string, string>>(new Map());
-  useEffect(() => {
-    if (!authToken) return;
-    projects.forEach(project => {
-      const token = project.studentPortalToken;
-      if (!token) return;
-      const snapshot = buildStudentPortalSnapshot(project, token, meetings);
-      const key = portalSnapshotKey(snapshot);
-      if (publishedPortalKeysRef.current.get(token) === key) return;
-      publishedPortalKeysRef.current.set(token, key);
-      publishStudentPortal(snapshot).catch(err => {
-        publishedPortalKeysRef.current.delete(token);
-        console.warn('Error publicando portal del alumno:', err);
-      });
-    });
-  }, [authToken, projects, meetings]);
 
   const handleForceSync = async () => {
     setSyncStatus('syncing');
@@ -3542,7 +3526,9 @@ export default function App() {
     }
 
     if (path === '/paneles') {
-      return <PanelsView projects={projects} onUpdateProject={handleUpdateProject} />;
+      // El panel viejo ya no existe: cada cliente se administra desde su ficha
+      setTimeout(() => navigate('/clientes'), 0);
+      return null;
     }
 
     if (path === '/documentos') {

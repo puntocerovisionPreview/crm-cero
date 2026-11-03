@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { taskBelongsToProject } from '../utils/taskProject';
 import { ProjectDriveCard } from '../components/ProjectDriveCard';
-import { ProjectPanelCard } from '../components/ProjectPanelCard';
 import { 
   Project, 
   AgendaTask, 
@@ -58,8 +57,6 @@ import { getTodayString } from '../utils/storage';
 import { playTaskDone } from '../utils/sound';
 import { PaymentPlanManager } from '../components/PaymentPlanManager';
 import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
-import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
-import { PafPanelButton } from '../components/PafPanelButton';
 import { PafAdminPanel } from '../components/PafAdminPanel';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { 
@@ -173,6 +170,7 @@ export const ClientDetailView: React.FC<Props> = ({
   onNewDocument,
 }) => {
   const isPaf = project.serviceType === 'paf' || project.projectType === 'paf_pro' || project.projectType === 'paf_base';
+  const isWebClient = !isPaf && (project.serviceType === 'web' || project.projectType === 'web');
 
   // Dynamic Billing Calculation from Real Payments
   const billing = calculateProjectBilling(project, incomes);
@@ -705,9 +703,6 @@ export const ClientDetailView: React.FC<Props> = ({
       </div>
 
       {/* Main Container: 2-Column on Desktop (30% Left Sticky / 70% Right) */}
-      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 pt-4">
-        <ProjectPanelCard project={project} onUpdateProject={onUpdateProject} />
-      </div>
       <div className="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:flex lg:gap-6 items-start">
         
         {/* ================= COLUMNA IZQUIERDA (30% Sticky en Desktop) ================= */}
@@ -875,18 +870,15 @@ export const ClientDetailView: React.FC<Props> = ({
             </div>
           </div>
 
-          {isPaf && <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-3">
-            <h2 className="text-sm font-bold text-zinc-100">Portal del estudio · Método PAF</h2>
+          {(isPaf || isWebClient) && <div className="rounded-2xl border border-zinc-800 bg-zinc-900/90 p-4 space-y-3">
+            <h2 className="text-sm font-bold text-zinc-100">{isPaf ? 'Portal del estudio · Método PAF' : 'Portal del cliente'}</h2>
             <PafAdminPanel
               key={project.id}
               project={project}
               meetings={meetings}
               onUpdateProject={onUpdateProject}
               onAddMeeting={onAddMeeting}
-              legacy={<div className="space-y-2">
-                <StudentPortalLinkButton project={project} phone={project.clientPhone} onUpdateProject={onUpdateProject} />
-                <PafPanelButton project={project} onUpdateProject={onUpdateProject} />
-              </div>}
+              showAlta={isPaf}
             />
           </div>}
           {/* Key Links Card */}

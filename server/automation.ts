@@ -347,7 +347,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
   // Paneles de clientes: lo que marca o aprueba el cliente desde su link
   registerPanelRoutes(app, getAdminDb, async (title, body) => {
     const db = getAdminDb();
-    if (db) await notifyAll(db, title, body, '/paneles', 'panel');
+    if (db) await notifyAll(db, title, body, '/clientes', 'panel');
   });
   // Portal PAF: el estudio avisa "Terminé" en una tarea
   registerPafPortalRoutes(app, getAdminDb, async (title, body, url) => {

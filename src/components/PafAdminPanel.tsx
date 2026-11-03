@@ -32,8 +32,8 @@ type Props = {
   meetings: AgendaMeeting[];
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
   onAddMeeting: (meeting: Omit<AgendaMeeting, 'id' | 'createdAt'>) => void;
-  /** Accesos del portal anterior por link (siguen funcionando) */
-  legacy?: React.ReactNode;
+  /** Alta con Tally (solo PAF) */
+  showAlta?: boolean;
 };
 
 /**
@@ -44,7 +44,7 @@ type Props = {
  * Etapa, foco, correos y enlaces se guardan solos en la ficha; si difieren de lo que ve
  * el estudio, el encabezado avisa "Hay cambios sin publicar". Tareas y entregas se publican solas.
  */
-export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, legacy }) => {
+export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, showAlta = true }) => {
   const [tab, setTab] = useState<Tab>('hoy');
   const [meetingTitle, setMeetingTitle] = useState<string | undefined>(undefined);
   const portal = usePortalDraft(project, meetings, onUpdateProject);
@@ -98,7 +98,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
 
       {tab === 'config' && (
         <div className="space-y-5">
-          <PafAltaCard project={project} onUpdateProject={onUpdateProject} />
+          {showAlta && <PafAltaCard project={project} onUpdateProject={onUpdateProject} />}
           <Block title="Acceso al portal" hint="Solo entran estos correos, con su cuenta de Google. El del alta (con el que se comparte la carpeta) se agrega solo.">
             <label className="block text-[11px] text-zinc-400">ID del cliente
               <input className={`${input} font-mono`} value={portal.clienteId} disabled={!!portal.published} placeholder="PAF-002" onChange={(e) => portal.setClienteId(e.target.value.toUpperCase())} />
@@ -113,7 +113,6 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
           <Block title="Tu WhatsApp" hint="Para el botón «Hablar con Juan» del portal. Es uno solo para todos los estudios.">
             <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
           </Block>
-          {legacy && <Block title="Portal anterior (por link)" hint="Sigue funcionando para quien ya lo usa.">{legacy}</Block>}
           {portal.published && (
             <div className="rounded-xl border border-rose-500/20 p-3 flex items-center gap-3">
               <p className="flex-1 text-[11px] text-zinc-400">Despublicar: el estudio deja de ver su portal. Lo podés volver a publicar cuando quieras.</p>
