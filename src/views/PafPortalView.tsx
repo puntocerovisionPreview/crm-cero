@@ -1,18 +1,15 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  ArrowRight, ArrowUpRight, BarChart3, Check, ChevronDown, FileText, Folder, Globe, LayoutList, Loader2, Lock, MessageCircle, Package, Paperclip,
+  ArrowRight, ArrowUpRight, BarChart3, Check, FileText, Folder, Globe, LayoutList, Loader2, MessageCircle, Package, Paperclip,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
 import { auth } from '../firebaseAuth';
 import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAccess';
 import { formatDisplayDate } from '../utils/projectTimeline';
-import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, isOverdue, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
-import { sendPiezaDecision, sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
-import { AssetImg } from '../content/AssetImg';
-import { PANEL_STATE_LABEL } from '../panels/model';
-import type { PafPortalPiece } from '../portal/model';
+import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, isOverdue, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
+import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
 /**
  * /portal: el estudio entra con su cuenta de Google (el mismo correo con el que se
@@ -21,7 +18,7 @@ import type { PafPortalPiece } from '../portal/model';
  * En desarrollo, /portal?demo muestra un ejemplo sin login para revisar el diseño.
  */
 
-type Tab = 'inicio' | 'tareas' | 'contenido' | 'entregas' | 'archivos';
+type Tab = 'inicio' | 'tareas' | 'entregas' | 'archivos';
 type PortalTask = PafPortalDoc['tareas'][number];
 
 const LINK_ICON: Record<PafPortalLinkKey, React.ElementType> = {
@@ -67,11 +64,6 @@ const DEMO: PafPortalDoc = {
   ],
   contacto: { whatsapp: '5491100000000' },
   reuniones: [{ fecha: '2026-10-30', acuerdos: 'El foco es vivienda unifamiliar en zona norte. El tono: cercano y técnico.', proximosPasos: 'Ustedes: subir fotos de obra. Nosotros: borrador del mensaje para el martes.' }],
-  piezas: [
-    { id: 'c1', fecha: '2026-11-05', soporte: 'carrusel', titulo: 'Cómo trabajamos una vivienda desde cero', caption: 'Cinco pasos, del primer boceto a la llave.', estado: 'para_aprobar',
-      slides: ['Del boceto', 'a la obra', 'a la llave'].map((t) => { const svg = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 500"><rect width="400" height="500" fill="#e5e5e5"/><text x="200" y="260" font-family="sans-serif" font-size="32" text-anchor="middle" fill="#171717">${t}</text></svg>`)}`; return { display: svg, thumb: svg }; }) },
-    { id: 'c2', fecha: '2026-11-08', soporte: 'reel', titulo: 'Recorrido por la casa Belgrano', estado: 'aprobada', slides: [] },
-  ],
 };
 
 /** Claro u oscuro según el dispositivo del estudio (el CRM usa las mismas variables) */
@@ -250,19 +242,19 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
   const aprobadas = tareas.filter((t) => t.estado === 'aprobada');
   const entregas = p.entregas || [];
   const links = PAF_PORTAL_LINK_KEYS.filter((k) => p.enlaces?.[k]);
-  const hito = Math.min(PRESENCIA_HITOS.length, Math.max(1, p.hitoVisible || 1));
   const initial = (email[0] || '?').toUpperCase();
   const objetivos = p.objetivos || [];
   const reuniones = p.reuniones || [];
-  const [piezas, setPiezas] = useState<PafPortalPiece[]>(p.piezas || []);
-  useEffect(() => setPiezas(p.piezas || []), [p.piezas]);
-  const paraAprobar = piezas.filter((x) => x.estado === 'para_aprobar').length;
-  const decidePieza = async (pieceId: string, decision: 'aprobar' | 'cambios', comment?: string) => {
-    if (demo) { setPiezas((list) => list.map((x) => (x.id === pieceId ? { ...x, estado: decision === 'aprobar' ? 'aprobada' : 'cambios', comentario: comment } : x))); return; }
-    await sendPiezaDecision(p.clienteId, pieceId, decision, comment);
-  };
   const whatsapp = p.contacto?.whatsapp || '';
-  const [showStages, setShowStages] = useState(false);
+
+  // Solo las pestañas que tienen algo; Inicio siempre
+  const tabs: { id: Tab; label: string; count?: number }[] = [
+    { id: 'inicio', label: 'Inicio' },
+    ...(tareas.length ? [{ id: 'tareas' as Tab, label: 'Tareas', count: pendientes.length || undefined }] : []),
+    ...(entregas.length || reuniones.length ? [{ id: 'entregas' as Tab, label: 'Entregas', count: entregas.length || undefined }] : []),
+    ...(links.length ? [{ id: 'archivos' as Tab, label: 'Archivos' }] : []),
+  ];
+  const inicioVacio = !p.resumenVisible && !objetivos.length && !pendientes.length && !enRevision.length && !p.proximaReunion && !entregas.length && !reuniones.length;
 
   // Bienvenida solo la primera vez en este dispositivo (no en la vista previa de Juan)
   const welcomeKey = `paf_bienvenida_${p.clienteId}`;
@@ -296,42 +288,18 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
       {readOnly && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista previa: así ve {p.estudio} su portal ahora. Es solo lectura: los botones no hacen nada.</p>}
       {demo && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista de ejemplo, solo en tu compu: así lo ve un estudio. Los datos son inventados.</p>}
 
-      {/* Encabezado corto: saludo y avance en una línea (al tocarla se abre el detalle) */}
       <header className="pt-1 sm:pt-6">
         <h1 className="text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">Hola, {p.estudio}</h1>
-        <button type="button" onClick={() => setShowStages((v) => !v)} aria-expanded={showStages} className="mt-4 w-full text-left group">
-          <span className="flex flex-wrap items-baseline gap-x-1.5 text-sm text-[var(--text-secondary)]">
-            <span className="font-medium text-[var(--text-primary)]">Presencia</span>
-            <span aria-hidden>·</span><span>Etapa {hito} de {PRESENCIA_HITOS.length}</span>
-            <span aria-hidden>·</span><span className="font-serif italic text-base text-[var(--text-primary)]">{PRESENCIA_HITOS[hito - 1]}</span>
-            {p.semana && <><span aria-hidden>·</span><span>Semana {p.semana.actual} de {p.semana.total}</span></>}
-            <ChevronDown className={`w-4 h-4 self-center text-[var(--text-tertiary)] transition-transform ${showStages ? 'rotate-180' : ''}`} />
-          </span>
-          <span className="mt-3 grid grid-cols-5 gap-1.5" aria-hidden>
-            {PRESENCIA_HITOS.map((title, i) => (
-              <span key={title} className={`block h-1 rounded-full ${i + 1 < hito ? 'bg-[var(--text-primary)]' : i + 1 === hito ? 'bg-[var(--text-primary)] opacity-60' : 'bg-[var(--border-strong)]'}`} />
-            ))}
-          </span>
-        </button>
-        {showStages && <StageDetail hito={hito} />}
       </header>
 
       {showWelcome && <Welcome onClose={closeWelcome} hasWhatsapp={!!whatsapp} />}
 
-      {/* Pestañas */}
-      <nav className="mt-8 sm:mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
-        <SegmentedControl<Tab>
-          value={tab}
-          onChange={setTab}
-          options={[
-            { id: 'inicio', label: 'Inicio' },
-            { id: 'tareas', label: 'Tareas', count: pendientes.length || undefined },
-            { id: 'entregas', label: 'Entregas', count: entregas.length || undefined },
-            ...(piezas.length ? [{ id: 'contenido' as Tab, label: 'Contenido', count: paraAprobar || undefined }] : []),
-            { id: 'archivos', label: 'Archivos' },
-          ]}
-        />
-      </nav>
+      {/* Pestañas: solo las que tienen algo. Si queda solo Inicio, no se muestran. */}
+      {tabs.length > 1 && (
+        <nav className="mt-8 sm:mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
+          <SegmentedControl<Tab> value={tab} onChange={setTab} options={tabs} />
+        </nav>
+      )}
 
       <main className="mt-8 animate-in fade-in duration-200" key={tab}>
         {tab === 'inicio' && (
@@ -350,14 +318,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
               </Card>
             )}
 
-            <section>
+            {(pendientes.length > 0 || enRevision.length > 0) && <section>
               <SectionTitle title="Lo que necesitamos de vos" hint={pendientes.length ? 'Cuando termines, tocá “Terminé”. Lo revisamos y te confirmamos.' : undefined} />
-              {paraAprobar > 0 && (
-                <button type="button" onClick={() => setTab('contenido')} className="card-swiss mb-3 w-full flex items-center gap-3 p-4 text-left">
-                  <span className="flex-1 text-sm text-[var(--text-primary)]">{paraAprobar === 1 ? 'Tenés 1 pieza de contenido para revisar' : `Tenés ${paraAprobar} piezas de contenido para revisar`}</span>
-                  <ArrowRight className="w-4 h-4 text-[var(--text-tertiary)]" />
-                </button>
-              )}
               {pendientes.length ? (
                 <>
                   <ul className="space-y-3">
@@ -366,26 +328,32 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
                   {pendientes.length > 3 && <button type="button" onClick={() => setTab('tareas')} className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)]">Ver las {pendientes.length} tareas <ArrowRight className="w-4 h-4" /></button>}
                 </>
               ) : (
-                <p className="text-sm text-[var(--text-secondary)]">Nada pendiente de tu lado. {enRevision.length ? `Estamos revisando ${enRevision.length === 1 ? 'lo que nos mandaste' : `${enRevision.length} cosas que nos mandaste`}.` : 'Te avisamos cuando haya algo nuevo.'}</p>
+                <p className="text-sm text-[var(--text-secondary)]">Nada pendiente de tu lado. Estamos revisando {enRevision.length === 1 ? 'lo que nos mandaste' : `${enRevision.length} cosas que nos mandaste`}.</p>
               )}
               {error && <p role="alert" className="mt-3 text-sm text-rose-500">{error}</p>}
-            </section>
+            </section>}
 
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Card className="p-5 sm:p-6">
-                <Eyebrow>Próxima reunión</Eyebrow>
-                {p.proximaReunion ? <MeetingDate fecha={p.proximaReunion.fecha} hora={p.proximaReunion.hora} /> : (
-                  <p className="mt-3 text-sm text-[var(--text-secondary)]">La vas a ver acá cuando la coordinemos.</p>
+            {(p.proximaReunion || entregas.length > 0) && (
+              <div className={`grid gap-4 ${p.proximaReunion && entregas.length ? 'sm:grid-cols-2' : ''}`}>
+                {p.proximaReunion && (
+                  <Card className="p-5 sm:p-6">
+                    <Eyebrow>Próxima reunión</Eyebrow>
+                    <MeetingDate fecha={p.proximaReunion.fecha} hora={p.proximaReunion.hora} />
+                  </Card>
                 )}
-              </Card>
-              <Card className="p-5 sm:p-6">
-                <div className="flex items-center justify-between gap-3">
-                  <Eyebrow>Última entrega</Eyebrow>
-                  {entregas.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver todas</button>}
-                </div>
-                {entregas.length ? <DeliveryRow d={latest(entregas)} /> : <p className="mt-3 text-sm text-[var(--text-secondary)]">Las entregas aparecen acá cuando las compartimos.</p>}
-              </Card>
-            </div>
+                {entregas.length > 0 && (
+                  <Card className="p-5 sm:p-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <Eyebrow>Última entrega</Eyebrow>
+                      {entregas.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver todas</button>}
+                    </div>
+                    <DeliveryRow d={latest(entregas)} />
+                  </Card>
+                )}
+              </div>
+            )}
+
+            {inicioVacio && <p className="text-sm text-[var(--text-secondary)]">Por ahora no hay nada nuevo. Te avisamos cuando haya algo.</p>}
 
             {reuniones.length > 0 && (
               <Card className="p-5 sm:p-6">
@@ -445,15 +413,6 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
                 </ul>
               </div>
             )}
-          </section>
-        )}
-
-        {tab === 'contenido' && (
-          <section>
-            <SectionTitle title="Contenido para revisar" hint="Mirá cada pieza y aprobala o contanos qué cambiar." />
-            <ul className="space-y-6">
-              {piezas.map((x) => <li key={x.id}><PieceCard piece={x} readOnly={!!readOnly} onDecide={decidePieza} /></li>)}
-            </ul>
           </section>
         )}
 
@@ -545,63 +504,14 @@ function TaskList({ items, dot, muted }: { items: PortalTask[]; dot: string; mut
   );
 }
 
-/** Detalle de la línea de avance: los tres pilares (lo futuro, visible y bloqueado) y las 5 etapas */
-function StageDetail({ hito }: { hito: number }) {
-  const pillars = [
-    { name: 'Presencia', state: 'current' },
-    { name: 'Adquisición', state: 'locked' },
-    { name: 'Conversión', state: 'locked' },
-  ];
-  return (
-    <div className="mt-4 card-swiss p-5 space-y-5 animate-in fade-in duration-200">
-      <ol className="flex flex-wrap items-center gap-1.5 sm:gap-2 text-xs" aria-label="Pilares del método">
-        {pillars.map((x, i) => (
-          <React.Fragment key={x.name}>
-            {i > 0 && <span aria-hidden className="hidden sm:block h-px flex-1 bg-[var(--border-strong)]" />}
-            <li className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 ${x.state === 'current' ? 'border-[var(--text-primary)] text-[var(--text-primary)] font-medium' : 'border-[var(--border-subtle)] text-[var(--text-tertiary)]'}`} aria-current={x.state === 'current' ? 'step' : undefined}>
-              {x.state === 'locked' && <Lock className="w-3 h-3" aria-label="Próximamente" />}{x.name}
-            </li>
-          </React.Fragment>
-        ))}
-      </ol>
-      <ol className="space-y-3">
-        {PRESENCIA_HITOS.map((title, i) => {
-          const n = i + 1;
-          const state = n < hito ? 'done' : n === hito ? 'current' : 'pending';
-          return (
-            <li key={title} className="flex items-center gap-3 text-sm" aria-current={state === 'current' ? 'step' : undefined}>
-              <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[11px] font-semibold ${state === 'done' ? 'bg-[var(--solid-contrast-bg)] text-[var(--solid-contrast-text)]' : state === 'current' ? 'border border-[var(--text-primary)] text-[var(--text-primary)]' : 'border border-[var(--border-subtle)] text-[var(--text-tertiary)]'}`}>
-                {state === 'done' ? <Check className="w-3.5 h-3.5" /> : n}
-              </span>
-              <span className={state === 'pending' ? 'text-[var(--text-tertiary)]' : 'text-[var(--text-primary)]'}>{title}{state === 'current' && <span className="ml-2 text-xs text-[var(--text-tertiary)]">Estamos acá</span>}</span>
-            </li>
-          );
-        })}
-      </ol>
-      <p className="text-xs text-[var(--text-tertiary)]">Adquisición y Conversión se habilitan cuando cerremos Presencia.</p>
-    </div>
-  );
-}
-
+/** Bienvenida corta, solo la primera vez */
 function Welcome({ onClose, hasWhatsapp }: { onClose: () => void; hasWhatsapp: boolean }) {
-  const steps = [
-    'Arriba ves en qué etapa estamos. Tocá la línea para ver el recorrido completo.',
-    'Cuando necesitemos algo de vos, aparece en “Lo que necesitamos de vos”. Hacelo y tocá “Terminé”: lo revisamos y te confirmamos.',
-    'Tus carpetas de Drive y todo lo que te entregamos están en Archivos y Entregas.',
-  ];
   return (
-    <Card className="mt-8 p-5 sm:p-6">
-      <Eyebrow>Bienvenido</Eyebrow>
-      <p className="mt-3 text-lg font-light tracking-tight">Así funciona tu portal</p>
-      <ol className="mt-4 space-y-3">
-        {steps.map((s, i) => (
-          <li key={i} className="flex gap-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-            <span className="w-6 h-6 shrink-0 rounded-full border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-semibold text-[var(--text-primary)]">{i + 1}</span>{s}
-          </li>
-        ))}
-      </ol>
-      {hasWhatsapp && <p className="mt-4 text-sm text-[var(--text-secondary)]">¿Dudas? Escribime por WhatsApp con el botón de abajo.</p>}
-      <button type="button" onClick={onClose} className="btn-solid-primary mt-5 px-4 py-2 text-sm">Entendido</button>
+    <Card className="mt-6 p-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+      <p className="flex-1 text-sm leading-relaxed text-[var(--text-secondary)]">
+        Bienvenido a tu portal. Acá vas a encontrar lo que necesitamos de vos, tus reuniones y tus accesos.{hasWhatsapp ? ' Cualquier duda, escribime.' : ''}
+      </p>
+      <button type="button" onClick={onClose} className="btn-solid-primary shrink-0 self-start px-4 py-2 text-sm">Entendido</button>
     </Card>
   );
 }
@@ -667,69 +577,5 @@ function MeetingSummary({ s }: { s: { acuerdos: string; proximosPasos: string } 
       {s.acuerdos && <div><p className="text-xs font-medium text-[var(--text-tertiary)]">Acuerdos</p><p className="mt-1 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{s.acuerdos}</p></div>}
       {s.proximosPasos && <div><p className="text-xs font-medium text-[var(--text-tertiary)]">Próximos pasos</p><p className="mt-1 text-sm leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{s.proximosPasos}</p></div>}
     </div>
-  );
-}
-const SOPORTE_LABEL: Record<PafPortalPiece['soporte'], string> = { carrusel: 'Carrusel', reel: 'Reel', estatico: 'Estático' };
-
-/** Una pieza de contenido: imágenes, texto y, si está para revisar, aprobar o pedir cambios */
-function PieceCard({ piece: x, readOnly, onDecide }: { piece: PafPortalPiece; readOnly: boolean; onDecide: (id: string, decision: 'aprobar' | 'cambios', comment?: string) => Promise<void> }) {
-  const [mode, setMode] = useState<'idle' | 'cambios'>('idle');
-  const [comment, setComment] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const open = x.estado === 'para_aprobar' || x.estado === 'cambios';
-  const dot = x.estado === 'aprobada' || x.estado === 'publicada' ? 'bg-emerald-500' : x.estado === 'cambios' ? 'bg-sky-500' : 'bg-amber-500';
-
-  const decide = async (decision: 'aprobar' | 'cambios') => {
-    setBusy(true); setError('');
-    try {
-      await onDecide(x.id, decision, decision === 'cambios' ? comment.trim() : undefined);
-      setMode('idle'); setComment('');
-    } catch (e) {
-      setError((e as Error).message || 'No se pudo guardar. Probá de nuevo.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <Card className="overflow-hidden">
-      {x.slides.length > 0 && (
-        <div className="flex overflow-x-auto snap-x snap-mandatory bg-[var(--bg-surface-muted)] [scrollbar-width:none]">
-          {x.slides.map((s, k) => (
-            <div key={k} className="shrink-0 w-full snap-center aspect-[4/5]">
-              <AssetImg src={s.display} alt={`${x.titulo} · ${k + 1} de ${x.slides.length}`} className="w-full h-full object-contain" />
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="p-5 space-y-3">
-        <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-          <span>{formatDisplayDate(x.fecha, 'medium')} · {SOPORTE_LABEL[x.soporte]}{x.slides.length > 1 ? ` · ${x.slides.length} imágenes` : ''}</span>
-          <span className="ml-auto inline-flex items-center gap-1.5 text-[var(--text-secondary)]"><span className={`w-1.5 h-1.5 rounded-full ${dot}`} aria-hidden />{PANEL_STATE_LABEL[x.estado]}</span>
-        </div>
-        <p className="text-[15px] font-medium text-[var(--text-primary)]">{x.titulo}</p>
-        {x.caption && <p className="text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{x.caption}</p>}
-        {x.estado === 'cambios' && x.comentario && <p className="rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm"><span className="text-[var(--text-tertiary)]">Pediste: </span>{x.comentario}</p>}
-        {open && mode === 'idle' && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button type="button" onClick={() => decide('aprobar')} disabled={busy || readOnly} className="btn-solid-primary inline-flex items-center gap-1.5 px-4 py-2 text-sm disabled:opacity-60">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Aprobar
-            </button>
-            <button type="button" onClick={() => setMode('cambios')} disabled={busy || readOnly} className="rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-4 py-2 text-sm text-[var(--text-primary)] disabled:opacity-60">Pedir cambios</button>
-          </div>
-        )}
-        {mode === 'cambios' && (
-          <div className="space-y-2">
-            <textarea autoFocus rows={3} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="¿Qué cambiarías?" className="w-full rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)]" />
-            <div className="flex gap-2">
-              <button type="button" onClick={() => decide('cambios')} disabled={busy || !comment.trim()} className="btn-solid-primary px-4 py-2 text-sm disabled:opacity-60">Enviar</button>
-              <button type="button" onClick={() => setMode('idle')} className="px-3 py-2 text-sm text-[var(--text-secondary)]">Cancelar</button>
-            </div>
-          </div>
-        )}
-        {error && <p role="alert" className="text-sm text-rose-500">{error}</p>}
-      </div>
-    </Card>
   );
 }
