@@ -180,9 +180,14 @@ export const PafPortalView: React.FC = () => {
 
 // ---------- Estructura ----------
 
-function Shell({ children, right, marca }: { children: React.ReactNode; right?: React.ReactNode; marca?: string | null }) {
+/** El portal dentro de la ficha de Juan: mismos datos en vivo, solo lectura, sin login ni marco aparte */
+export function PortalPreviewScreen({ portal }: { portal: PafPortalDoc }) {
+  return <PortalScreen portal={portal} email="vista previa" readOnly embedded onLogout={() => undefined} />;
+}
+
+function Shell({ children, right, marca, embedded }: { children: React.ReactNode; right?: React.ReactNode; marca?: string | null; embedded?: boolean }) {
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)]" style={marca ? ({ '--marca': marca, '--marca-text': '#fff' } as React.CSSProperties) : undefined}>
+    <div className={`${embedded ? 'min-h-full' : 'min-h-screen'} bg-[var(--bg-app)] text-[var(--text-primary)]`} style={marca ? ({ '--marca': marca, '--marca-text': '#fff' } as React.CSSProperties) : undefined}>
       <div className="mx-auto max-w-3xl px-4 sm:px-8 pb-16">
         <div className="flex items-center justify-between gap-3 py-5 sm:py-7"><BrandLogo size="sm" />{right}</div>
         {children}
@@ -218,7 +223,7 @@ function GoogleMark() {
 
 // ---------- Portal ----------
 
-function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: { portal: PafPortalDoc; email: string; demo?: boolean; readOnly?: boolean; onLogout: () => void; switcher?: React.ReactNode }) {
+function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, switcher }: { portal: PafPortalDoc; email: string; demo?: boolean; readOnly?: boolean; embedded?: boolean; onLogout: () => void; switcher?: React.ReactNode }) {
   const [tab, setTab] = useState<Tab>('inicio');
   const [avisos, setAvisos] = useState<PafAviso[]>([]);
   const [sending, setSending] = useState<string | null>(null);
@@ -259,7 +264,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
   const whatsapp = p.contacto?.whatsapp || '';
   const [showStages, setShowStages] = useState(false);
   const isNew = useNewItems(p, !readOnly && !demo);
-  useBrandHead(p);
+  useBrandHead(p, !embedded);
 
   // Bienvenida solo la primera vez en este dispositivo (no en la vista previa de Juan)
   const welcomeKey = `paf_bienvenida_${p.clienteId}`;
@@ -289,8 +294,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, onLogout, switcher }: 
   );
 
   return (
-    <Shell right={readOnly ? undefined : account} marca={p.marca}>
-      {readOnly && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista previa: así ve {p.estudio} su portal ahora. Es solo lectura: los botones no hacen nada.</p>}
+    <Shell right={readOnly ? undefined : account} marca={p.marca} embedded={embedded}>
+      {readOnly && !embedded && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista previa: así ve {p.estudio} su portal ahora. Es solo lectura: los botones no hacen nada.</p>}
       {demo && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista de ejemplo, solo en tu compu: así lo ve un estudio. Los datos son inventados.</p>}
 
       {/* Encabezado de marca: logo del estudio, saludo y avance del programa */}
@@ -671,8 +676,9 @@ function useNewItems(p: PafPortalDoc, enabled: boolean): (key: string) => boolea
 }
 
 /** Pestaña del navegador con el nombre y el logo del estudio */
-function useBrandHead(p: PafPortalDoc) {
+function useBrandHead(p: PafPortalDoc, enabled = true) {
   useEffect(() => {
+    if (!enabled) return;
     const prevTitle = document.title;
     document.title = `${p.estudio} · Tu portal`;
     const icon = document.querySelector<HTMLLinkElement>('link[rel~="icon"]');
@@ -682,7 +688,7 @@ function useBrandHead(p: PafPortalDoc) {
       document.title = prevTitle;
       if (icon && prevIcon) icon.href = prevIcon;
     };
-  }, [p.estudio, p.logo]);
+  }, [p.estudio, p.logo, enabled]);
 }
 
 function PortalSkeleton() {

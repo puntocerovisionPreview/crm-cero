@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Check, CircleAlert, Copy, ExternalLink, Eye, ImagePlus, Loader2, Package, Radio, Smartphone, Trash2, Undo2 } from 'lucide-react';
 import { shrinkLogo } from '../utils/logoImage';
 import { AgendaMeeting, Project } from '../types';
@@ -19,6 +19,9 @@ import { PafReunionCard } from './PafReunionCard';
 import { PafWeekGoals } from './PafWeekGoals';
 import { PafMeetingSummaries } from './PafMeetingSummaries';
 import { PafAnnouncements } from './PafAnnouncements';
+
+// El portal tal cual lo ve el cliente (se carga solo al abrir la vista previa)
+const PortalPreviewScreen = lazy(() => import('../views/PafPortalView').then((m) => ({ default: m.PortalPreviewScreen })));
 
 const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
 const STATE_STYLE: Record<PafTaskState, string> = {
@@ -80,7 +83,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
   return (
     <div className="space-y-5">
       <PanelHeader portal={portal} studio={project.clientName} preview={showPreview} onTogglePreview={() => setShowPreview((v) => !v)} />
-      {showPreview && portal.published && <PortalPreview clienteId={portal.published.clienteId} />}
+      {showPreview && portal.published && <PortalPreview portal={portal.published} />}
       <BrandBlock portal={portal} studio={project.clientName} />
       {showAlta && <AltaStatus pedido={portal.pedido} carpeta={project.pafDrive?.carpetaCompartida} />}
 
@@ -251,12 +254,21 @@ function BrandBlock({ portal, studio }: { portal: ReturnType<typeof usePortalDra
   );
 }
 
-/** El portal tal como lo ve el cliente, en vivo, dentro de la ficha */
-function PortalPreview({ clienteId }: { clienteId: string }) {
+/**
+ * El portal tal como lo ve el cliente, en vivo, dentro de la ficha. Se dibuja acá mismo con lo
+ * publicado (sin marco aparte: así no pide login). El transform hace que el botón fijo de
+ * WhatsApp quede dentro del celular y no flotando sobre el CRM.
+ */
+function PortalPreview({ portal }: { portal: PafPortalDoc }) {
   return (
-    <div className="mx-auto w-full max-w-[400px] overflow-hidden rounded-[28px] border-[6px] border-zinc-800 bg-black shadow-2xl">
-      <iframe title="Vista previa del portal" src={`/portal?ver=${encodeURIComponent(clienteId)}&marco=1`} className="block w-full h-[640px] bg-white" />
-    </div>
+    <figure className="mx-auto w-full max-w-[400px]">
+      <div className="h-[640px] overflow-y-auto overscroll-contain rounded-[28px] border-[6px] border-zinc-800 bg-[var(--bg-app)] shadow-2xl [transform:translateZ(0)]">
+        <Suspense fallback={<div className="flex h-full items-center justify-center"><Loader2 className="w-4 h-4 animate-spin text-zinc-500" /></div>}>
+          <PortalPreviewScreen portal={portal} />
+        </Suspense>
+      </div>
+      <figcaption className="mt-2 text-center text-[11px] text-zinc-500">Así lo ve ahora. Se actualiza solo; los botones no hacen nada acá.</figcaption>
+    </figure>
   );
 }
 
