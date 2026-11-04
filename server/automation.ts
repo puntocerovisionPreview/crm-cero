@@ -26,6 +26,7 @@ import { eveningCallsReminder } from './prospectReminders';
 import { contentReminders } from './contentReminders';
 import { buildClientesHoy, buildClientesSemana, meetingNudges, reportesQueFaltan } from '../src/automation/clientes';
 import { contentMorningNotice } from '../src/content/reminders';
+import { recordatorioCobros, recordatorioPagos, recordatorioTareas } from '../src/automation/recordatorios';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 import { registerDriveOAuth, driveConfigured, integrationRef } from './driveOAuth';
 import { registerWebAutomationRoutes } from './webAutomationRoutes';
@@ -307,6 +308,10 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
     if (d.getDay() === 5 && now >= 16 * 60) {
       const faltan = reportesQueFaltan(data.projects, today);
       if (faltan.length) nudges.push({ key: `reportes_${today}`, title: `Te ${faltan.length === 1 ? 'falta 1 reporte' : `faltan ${faltan.length} reportes`} del viernes`, body: faltan.map((p) => p.clientName).join(', ') + '. Se arman solos con la semana: Inicio → Reporte del viernes.', url: '/clientes' });
+    }
+    // Durante el día: tareas que quedan, pagos que vencen y cobros
+    for (const r of [recordatorioTareas(data.tasks, today, now), recordatorioPagos(data.fixedExpenses, today, now), recordatorioCobros(data, today, now)]) {
+      if (r) nudges.push(r);
     }
     if (options.dryRun) return { job, detail: nudges };
     const ya = ((((await healthDoc(db).get()).data() as any)?.avisos) || {}) as Record<string, string>;
