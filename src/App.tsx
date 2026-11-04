@@ -170,6 +170,7 @@ import {
 } from './utils/googleCalendarBrowser';
 import { GoogleCalendarReconnectBanner } from './components/GoogleCalendarSettingsCard';
 import { ClientAlerts, type ClientAlert } from './components/ClientAlerts';
+import { AvisosHealth } from './components/AvisosHealth';
 import { buildStudentPortalSnapshot, portalSnapshotKey, publishStudentPortal, unpublishStudentPortal } from './utils/studentPortal';
 import { CommandPaletteModal } from './components/CommandPaletteModal';
 import { KeyboardShortcutsModal } from './components/KeyboardShortcutsModal';
@@ -4520,6 +4521,9 @@ export default function App() {
           )}
         </div>
       )}
+
+      {/* Si los avisos no te pueden llegar, lo dice (en vez de fallar en silencio) */}
+      {authToken && <AvisosHealth onOpen={() => navigate('/ajustes/automatizaciones')} />}
 
       {/* Avisos de clientes (tareas terminadas), en cualquier pantalla */}
       {authToken && (

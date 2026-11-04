@@ -24,6 +24,8 @@ import { recordError, recordJobRun, registerHealthRoutes, runBackupIfDue } from 
 import { documentFollowups } from './contractsServer';
 import { eveningCallsReminder } from './prospectReminders';
 import { contentReminders } from './contentReminders';
+import { buildClientesHoy, buildClientesSemana, meetingNudges, reportesQueFaltan } from '../src/automation/clientes';
+import { contentMorningNotice } from '../src/content/reminders';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 import { registerDriveOAuth, driveConfigured, integrationRef } from './driveOAuth';
 import { registerWebAutomationRoutes } from './webAutomationRoutes';
@@ -246,14 +248,21 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
     const top3 = buildTop3Section(data, today);
     const brief = buildDailyBrief(data, today);
     // "Tus 3 de hoy" va arriba de todo, después del saludo
-    const text = top3 ? brief.replace(/^(.*\n)/, `$1\n${top3}\n`) : brief;
+    let text = top3 ? brief.replace(/^(.*\n)/, `$1\n${top3}\n`) : brief;
+    // Tus clientes de hoy y lo que se publica, sumados al resumen
+    const clientes = buildClientesHoy(data.projects, data.meetings, today);
+    const piezas = await db.collection('content_pieces').where('date', '>=', addDays(today, -7)).where('date', '<=', today).get()
+      .then((snap) => snap.docs.map((x) => ({ slides: [], resources: [], ...(x.data() as any), id: x.id }))).catch(() => []);
+    const contenido = contentMorningNotice(piezas as any, today);
+    const extra = [contenido ? `<b>Contenido</b>\n${escapeTelegram(contenido.title)}\n${escapeTelegram(contenido.body)}` : '', clientes].filter(Boolean).join('\n\n');
+    if (extra) text = text.replace(/\n\nNo hay nada agendado\. Buen día para avanzar en lo importante\.$/, '') + `\n\n${extra}`;
     if (options.dryRun) return { job, detail: text };
     return { job, sent: await deliver(text, htmlToPush(text, 'Tu día', '/agenda', 'resumen-diario')) };
   }
 
   if (job === 'weekly') {
     const prospectingWeekText = buildProspectingWeek(data, today);
-    const text = [buildWeeklyPlan(data, nextMonday(today), today), prospectingWeekText].filter(Boolean).join('\n\n');
+    const text = [buildWeeklyPlan(data, nextMonday(today), today), buildClientesSemana(data.projects, data.meetings, nextMonday(today)), prospectingWeekText].filter(Boolean).join('\n\n');
     if (options.dryRun) return { job, detail: text };
     return { job, sent: await deliver(text, htmlToPush(text, 'Tu semana', '/semana', 'plan-semanal')) };
   }
@@ -291,6 +300,25 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
     return { job, sent: await deliver(text, htmlToPush(text, 'Cierre de prospección', '/prospeccion', 'cierre-prospeccion')) };
   }
 
+  if (job === 'clientes') {
+    const now = nowMinutesLocal();
+    const nudges = meetingNudges(data.projects, data.meetings, today, now);
+    const d = new Date(`${today}T12:00:00`);
+    if (d.getDay() === 5 && now >= 16 * 60) {
+      const faltan = reportesQueFaltan(data.projects, today);
+      if (faltan.length) nudges.push({ key: `reportes_${today}`, title: `Te ${faltan.length === 1 ? 'falta 1 reporte' : `faltan ${faltan.length} reportes`} del viernes`, body: faltan.map((p) => p.clientName).join(', ') + '. Se arman solos con la semana: Inicio → Reporte del viernes.', url: '/clientes' });
+    }
+    if (options.dryRun) return { job, detail: nudges };
+    const ya = ((((await healthDoc(db).get()).data() as any)?.avisos) || {}) as Record<string, string>;
+    let sent = 0;
+    for (const n of nudges.filter((x) => !ya[x.key])) {
+      await notifyAll(db, n.title, n.body, n.url, n.key);
+      await healthDoc(db).set({ avisos: { [n.key]: today } }, { merge: true });
+      sent++;
+    }
+    return { job, sent };
+  }
+
   if (job === 'reminders') {
     const due = getDueReminders(data, today, nowMinutesLocal());
     if (options.dryRun) return { job, detail: due };
@@ -323,7 +351,33 @@ function cronSecretOk(req: express.Request): boolean {
   return timingSafeEqual(Buffer.from(given), Buffer.from(expected));
 }
 
-const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prospecting-close', 'mercadopago', 'weekly-collections', 'paf-report', 'month-close', 'day-close'];
+const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prospecting-close', 'mercadopago', 'weekly-collections', 'paf-report', 'month-close', 'day-close', 'clientes'];
+
+/**
+ * UN SOLO RELOJ: con la tarea "frecuente" cada 10 minutos alcanza. Las tareas de cada día y
+ * de cada semana salen solas a su hora (una vez por día). Si además tenés cargada la tarea
+ * propia en cron-job.org, no se repite: la que corre primero la marca como hecha.
+ */
+const PROGRAMADAS: { job: string; dias?: number[]; diaDelMes?: number; desde: number; hasta: number }[] = [
+  { job: 'daily-brief', desde: 8 * 60, hasta: 13 * 60 },
+  { job: 'weekly-collections', dias: [1], desde: 9 * 60, hasta: 14 * 60 },
+  { job: 'paf-report', dias: [5], desde: 17 * 60, hasta: 22 * 60 },
+  { job: 'prospecting-close', dias: [1, 2, 3, 4, 5], desde: 19 * 60, hasta: 23 * 60 },
+  { job: 'day-close', dias: [1, 2, 3, 4, 5], desde: 19 * 60 + 30, hasta: 23 * 60 + 30 },
+  { job: 'weekly', dias: [0], desde: 19 * 60, hasta: 23 * 60 + 30 },
+  { job: 'month-close', diaDelMes: 1, desde: 9 * 60, hasta: 14 * 60 },
+];
+const healthDoc = (db: Firestore) => db.collection('settings').doc('system_health');
+async function marcarProgramada(db: Firestore, job: string) {
+  await healthDoc(db).set({ programado: { [job]: todayLocal() } }, { merge: true }).catch(() => undefined);
+}
+async function programadasPendientes(db: Firestore): Promise<string[]> {
+  const today = todayLocal();
+  const now = nowMinutesLocal();
+  const d = new Date(`${today}T12:00:00`);
+  const hechas = (((await healthDoc(db).get()).data() as any)?.programado || {}) as Record<string, string>;
+  return PROGRAMADAS.filter((x) => (!x.dias || x.dias.includes(d.getDay())) && (!x.diaDelMes || d.getDate() === x.diaDelMes) && now >= x.desde && now <= x.hasta && hechas[x.job] !== today).map((x) => x.job);
+}
 
 export function registerAutomationRoutes(app: express.Express, requireOwner: express.RequestHandler) {
   const automationNotice = async (title: string, body: string) => {
@@ -365,7 +419,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
   app.all('/api/cron/:job', async (req, res) => {
     if (!cronSecretOk(req)) return res.status(401).json({ error: 'Clave de cron inválida o no configurada' });
     const job = req.params.job;
-    const jobs = job === 'frequent' ? ['reminders', 'calendar-sync', 'mercadopago'] : CRON_JOBS.includes(job) ? [job] : [];
+    const jobs = job === 'frequent' ? ['reminders', 'calendar-sync', 'mercadopago', 'clientes'] : CRON_JOBS.includes(job) ? [job] : [];
     if (jobs.length === 0) return res.status(404).json({ error: 'Tarea desconocida' });
     const results: JobResult[] = [];
     const db = getAdminDb();
@@ -376,6 +430,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
       try {
         const r = await runJob(j);
         results.push(r);
+        if (db && PROGRAMADAS.some((x) => x.job === j)) await marcarProgramada(db, j);
         if (db) await recordJobRun(db, j, true, r.skipped || (typeof r.detail === 'string' ? r.detail : r.sent !== undefined ? `${r.sent} enviados` : ''));
       } catch (err) {
         console.error(`[automation] ${j} falló:`, err);
@@ -383,6 +438,19 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
         if (db) {
           await recordJobRun(db, j, false, (err as Error).message);
           await recordError(db, { source: j, message: (err as Error).message, stack: (err as Error).stack }, notify);
+        }
+      }
+    }
+    // Las tareas de cada día y de cada semana, a su hora (un solo reloj alcanza)
+    if (job === 'frequent' && db) {
+      for (const j of await programadasPendientes(db).catch(() => [] as string[])) {
+        await marcarProgramada(db, j);
+        try {
+          const r = await runJob(j);
+          results.push(r);
+          await recordJobRun(db, j, true, r.skipped || (r.sent !== undefined ? `${r.sent} enviados` : ''));
+        } catch (err) {
+          await recordJobRun(db, j, false, (err as Error).message);
         }
       }
     }
@@ -520,4 +588,8 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
       res.status(500).json({ error: (err as Error).message });
     }
   });
+}
+
+function escapeTelegram(t: string): string {
+  return String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

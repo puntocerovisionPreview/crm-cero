@@ -206,7 +206,7 @@ export const AutomationSettings: React.FC = () => {
             {status.telegramChat && <p>Conectado con {status.telegramChatName || 'tu chat'}.</p>}
           </Step>
 
-          <Step done={status.cronSecret} title="3. Reloj automático (solo si usás Telegram o Google Calendar)">
+          <Step done={status.cronSecret} title="3. Reloj automático (sin esto no sale ningún aviso)">
             {!status.cronSecret ? (
               <p>
                 Inventá una clave larga (mínimo 16 caracteres, sin espacios) y guardala en los Secrets como{' '}
@@ -215,14 +215,12 @@ export const AutomationSettings: React.FC = () => {
             ) : (
               <>
                 <p>
-                  Creá una cuenta gratis en <b>cron-job.org</b> (o usá Google Cloud Scheduler) y agregá estas 4 tareas,
-                  reemplazando <code>TU_CLAVE</code> por tu CRON_SECRET:
+                  Creá una cuenta gratis en <b>cron-job.org</b> y agregá <b>una sola tarea</b>, cada 10 minutos, reemplazando{' '}
+                  <code>TU_CLAVE</code> por tu CRON_SECRET. Con esa alcanza: el resumen de las 8, el plan del domingo, la cobranza,
+                  los avisos de reuniones, de contenido y de clientes salen solos a su hora.
                 </p>
                 <ul className="space-y-1.5">
                   {[
-                    ['diario', 'Todos los días 8:00', `${origin}/api/cron/daily-brief?key=TU_CLAVE`],
-                    ['semanal', 'Domingos 19:00', `${origin}/api/cron/weekly?key=TU_CLAVE`],
-                    ['cierre', 'Lun a vie 19:00', `${origin}/api/cron/prospecting-close?key=TU_CLAVE`],
                     ['frecuente', 'Cada 10 minutos', `${origin}/api/cron/frequent?key=TU_CLAVE`],
                   ].map(([id, when, url]) => (
                     <li key={id} className="flex items-center gap-2 p-2 rounded-[var(--radius-control)] bg-[var(--bg-app)] border border-[var(--border-subtle)]">

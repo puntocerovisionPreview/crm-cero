@@ -42,7 +42,16 @@ export const ClientAlerts: React.FC<{ alerts: ClientAlert[]; onOpen: (projectId:
   useEffect(() => {
     if (!leidos) return;
     if (known.current) {
-      if (unread.some((a) => !known.current!.has(a.key))) playTaskDone();
+      const nuevos = unread.filter((a) => !known.current!.has(a.key));
+      if (nuevos.length) {
+        playTaskDone();
+        // Con la pestaña en segundo plano en la PC: aviso del sistema (si diste permiso)
+        try {
+          if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
+            nuevos.forEach((a) => new Notification(`${a.estudio} terminó una tarea`, { body: a.tarea, tag: a.key }));
+          }
+        } catch { /* el navegador no deja: queda la tarjeta en la app */ }
+      }
     }
     known.current = new Set(unread.map((a) => a.key));
   }, [unread, leidos]);
