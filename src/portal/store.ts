@@ -2,6 +2,7 @@ import { addDoc, arrayUnion, collection, collectionGroup, deleteDoc, doc, getDoc
 import { db } from '../firebase';
 import { getAuthHeaders } from '../utils/authAccess';
 import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, PORTAL_SEPARATE_FIELDS, clienteIdNumber, portalFromProject, suggestClienteId, suggestWebClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
+import { PAF_VISITAS_COLLECTION, type PortalVisita } from './salud';
 
 // Portal PAF: paf_portal/{clienteId}. Escribe solo Juan (CRM); el cliente solo lee el suyo
 // y deja avisos de "terminé" en paf_portal/{clienteId}/avisos.
@@ -88,6 +89,22 @@ export async function sendTaskDone(clienteId: string, tareaId: string, email: st
   getAuthHeaders()
     .then((headers) => fetch('/api/paf/terminado', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId, tareaId }) }))
     .catch(() => undefined);
+}
+
+/** El estudio entró a su portal: el servidor guarda la fecha (una vez por hora como mucho) */
+export function sendVisita(clienteId: string): void {
+  getAuthHeaders()
+    .then((headers) => fetch('/api/paf/visita', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId }), keepalive: true }))
+    .catch(() => undefined);
+}
+
+/** Para el CRM: cuándo entró cada estudio a su portal, por clienteId */
+export function subscribeVisitas(onChanged: (visitas: Map<string, PortalVisita>) => void) {
+  return onSnapshot(
+    collection(db, PAF_VISITAS_COLLECTION),
+    (snap) => onChanged(new Map(snap.docs.map((d) => [d.id, { ...(d.data() as Omit<PortalVisita, 'id'>), id: d.id }]))),
+    () => onChanged(new Map())
+  );
 }
 
 /** Para el CRM: los avisos de todos los portales, agrupados por clienteId */

@@ -36,8 +36,27 @@ export function tareasDeSuLado(txt: string, year = new Date().getFullYear()): { 
   });
 }
 
-export type MensajeId = 'novedades' | 'hoyAcordamos' | 'bienvenida' | 'pedirMaterial' | 'confirmarRecepcion' | 'devolucion';
+/**
+ * Recordatorio amable de lo que tiene pendiente en su portal (lo manda Juan, nunca el CRM solo).
+ * Las vencidas primero; si no hay pendientes devuelve ''.
+ */
+export function recordatorioPendientes(nombre: string, tareas: { titulo: string; fecha?: string }[], portal: string, today: string): string {
+  if (!tareas.length) return '';
+  const dia = (f: string) => new Date(`${f}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const orden = [...tareas].sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999'));
+  const lineas = orden.map((t) => `• ${t.titulo}${t.fecha ? (t.fecha < today ? ` (era para el ${dia(t.fecha)})` : ` (para el ${dia(t.fecha)})`) : ''}`);
+  return [
+    `¡Hola ${nombre}! ¿Cómo va? Te escribo para recordarte lo que tenés pendiente en tu portal:`,
+    ...lineas,
+    '',
+    `Cuando lo tengas, tocá "Terminé" ahí mismo y me llega el aviso: ${portal}`,
+    'Si algo te traba o necesitás más tiempo, decime y lo acomodamos.',
+  ].join('\n');
+}
+
+export type MensajeId = 'recordatorio' | 'novedades' | 'hoyAcordamos' | 'bienvenida' | 'pedirMaterial' | 'confirmarRecepcion' | 'devolucion';
 export const MENSAJES: { id: MensajeId; label: string }[] = [
+  { id: 'recordatorio', label: 'Recordarle lo pendiente' },
   { id: 'novedades', label: 'Tiene novedades en su portal' },
   { id: 'hoyAcordamos', label: 'Hoy acordamos (última reunión)' },
   { id: 'bienvenida', label: 'Bienvenida a su espacio' },
@@ -46,7 +65,7 @@ export const MENSAJES: { id: MensajeId; label: string }[] = [
   { id: 'devolucion', label: 'Presentar una entrega para revisar' },
 ];
 
-export function mensaje(id: Exclude<MensajeId, 'novedades' | 'hoyAcordamos'>, d: {
+export function mensaje(id: Exclude<MensajeId, 'recordatorio' | 'novedades' | 'hoyAcordamos'>, d: {
   nombre: string;
   portal: string;
   materiales?: string;

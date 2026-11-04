@@ -5,10 +5,14 @@ import { calculateProjectBilling } from '../utils/paymentPlans';
 import { nextMeeting } from '../portal/model';
 import { ClientsBoard, TuSemana } from './ClientsBoard';
 import { RESPONSABLE_ACCION, estadoCliente, type EstadoCliente } from '../components/ProximaAccionCard';
+import { SALUD_DOT } from '../components/ClienteSalud';
+import { saludCliente, textoVisita, type SaludCliente } from '../portal/salud';
+import { useVisitas } from '../portal/useVisitas';
 
-type Filter = 'activos' | 'mi_accion' | 'esperando' | 'bloqueado' | 'paf' | 'web' | 'archivados';
+type Filter = 'activos' | 'atencion' | 'mi_accion' | 'esperando' | 'bloqueado' | 'paf' | 'web' | 'archivados';
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'activos', label: 'Activos' },
+  { id: 'atencion', label: 'Necesitan atención' },
   { id: 'mi_accion', label: 'Necesitan mi acción' },
   { id: 'esperando', label: 'Esperando al cliente' },
   { id: 'bloqueado', label: 'Bloqueados' },
@@ -25,10 +29,13 @@ interface Row {
   reunion: { fecha: string; hora?: string } | null;
   dot: string; // punto de estado: lo único con color
   estado: EstadoCliente;
+  salud: SaludCliente;
+  visita: string | null;
 }
 
 const fmt = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const ORDEN: Record<EstadoCliente, number> = { bloqueado: 0, mi_accion: 1, esperando: 2, sin_accion: 3 };
+const NIVEL = { riesgo: 0, atencion: 1, ok: 2 } as const;
 
 /**
  * CLIENTES: una lista limpia. Por fila: estudio, tipo y estado; próximo cobro y
@@ -52,6 +59,7 @@ export const ClientsListView: React.FC<{
   const setVista = (v: Vista) => { setVistaState(v); try { localStorage.setItem('clientes_vista', v); } catch { /* sin almacenamiento */ } };
   const [q, setQ] = useState('');
   const today = new Date().toLocaleDateString('en-CA');
+  const visitas = useVisitas();
 
   const rows = useMemo<Row[]>(() => projects
     .filter((p) => (filter === 'archivados' ? p.archived : !p.archived))
@@ -59,6 +67,8 @@ export const ClientsListView: React.FC<{
     .filter((p) => (['mi_accion', 'esperando', 'bloqueado'] as Filter[]).includes(filter) ? estadoCliente(p, today) === filter : true)
     .filter((p) => !q.trim() || `${p.clientName} ${p.ownerName || ''} ${p.clientEmail || ''}`.toLowerCase().includes(q.trim().toLowerCase()))
     .map((p) => {
+      const visita = p.pafClienteId ? visitas.get(p.pafClienteId) : undefined;
+      const salud = saludCliente(p, { meetings, visita, today });
       const billing = calculateProjectBilling(p, incomes);
       const money = (n: number) => (privacyMode ? '••••' : `${billing.currency === 'USD' ? 'US$' : '$'} ${Math.round(n).toLocaleString('es-AR')}`);
       const cuota = [...(p.installments || [])].filter((i) => !i.paid).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
@@ -73,14 +83,18 @@ export const ClientsListView: React.FC<{
         revisar,
         cobro,
         reunion: nextMeeting(meetings, p.id, today),
-        dot: estadoCliente(p, today) === 'bloqueado' || cobro?.vencido ? 'bg-rose-500' : estadoCliente(p, today) === 'mi_accion' ? 'bg-amber-500' : p.archived ? 'bg-zinc-600' : 'bg-emerald-500',
+        dot: p.archived ? 'bg-zinc-600' : cobro?.vencido ? SALUD_DOT.riesgo : SALUD_DOT[salud.nivel],
         estado: estadoCliente(p, today),
+        salud,
+        visita: textoVisita(p, visita, today),
       };
     })
+    .filter((r) => filter !== 'atencion' || r.salud.nivel !== 'ok')
     // Lo que pide atención, arriba
     // Primero bloqueos y lo que necesita una acción tuya; después cobros vencidos y revisiones
-    .sort((a, b) => ORDEN[a.estado] - ORDEN[b.estado] || Number(!!b.cobro?.vencido) - Number(!!a.cobro?.vencido) || b.revisar - a.revisar || a.project.clientName.localeCompare(b.project.clientName)),
-  [projects, meetings, incomes, filter, q, privacyMode, today]);
+    .sort((a, b) => (a.project.archived ? 0 : NIVEL[a.salud.nivel]) - (b.project.archived ? 0 : NIVEL[b.salud.nivel]) || ORDEN[a.estado] - ORDEN[b.estado] || Number(!!b.cobro?.vencido) - Number(!!a.cobro?.vencido) || b.revisar - a.revisar || a.project.clientName.localeCompare(b.project.clientName)),
+  [projects, meetings, incomes, filter, q, privacyMode, today, visitas]);
+  const enRiesgo = rows.filter((r) => !r.project.archived && r.salud.nivel === 'riesgo');
 
   return (
     <div className={`${vista === 'tablero' ? 'max-w-6xl' : 'max-w-3xl'} w-full mx-auto px-4 sm:px-6 pb-28 pt-2 space-y-5`}>
@@ -115,6 +129,14 @@ export const ClientsListView: React.FC<{
         </label>
       </div>
 
+      {filter === 'activos' && !q && enRiesgo.length > 0 && (
+        <button type="button" onClick={() => setFilter('atencion')} className="w-full flex items-center gap-2 rounded-[var(--radius-card)] border border-rose-500/30 bg-rose-500/[0.06] px-4 py-2.5 text-left text-xs text-[var(--text-primary)]">
+          <span className={`w-2 h-2 shrink-0 rounded-full ${SALUD_DOT.riesgo}`} aria-hidden />
+          <span className="flex-1"><b>{enRiesgo.length === 1 ? `${enRiesgo[0].project.clientName} necesita` : `${enRiesgo.length} clientes necesitan`} atención ya</b>{enRiesgo.length === 1 ? `: ${enRiesgo[0].salud.motivos[0].texto}` : ''}</span>
+          <ChevronRight className="w-4 h-4 shrink-0 text-[var(--text-tertiary)]" />
+        </button>
+      )}
+
       {rows.length ? (
         <ul className="card-swiss divide-y divide-[var(--border-divider)]">
           {rows.map((r) => (
@@ -132,10 +154,14 @@ export const ClientsListView: React.FC<{
                       <span className="text-[var(--text-tertiary)]"> · {RESPONSABLE_ACCION[r.project.proximaAccion.responsable]}{r.project.proximaAccion.fecha ? ` · ${fmt(r.project.proximaAccion.fecha)}` : ''}{r.estado === 'esperando' && r.project.proximaAccion.necesita ? ` · espera: ${r.project.proximaAccion.necesita}` : ''}</span>
                     </span>
                   ) : !r.project.archived && <span className="mt-0.5 block text-xs text-amber-600">Sin próxima acción definida</span>}
+                  {!r.project.archived && r.salud.motivos.filter((m) => m.texto !== 'Sin próxima acción definida' && !m.texto.startsWith('Bloqueado')).slice(0, 1).map((m) => (
+                    <span key={m.texto} className={`mt-0.5 block truncate text-xs ${m.nivel === 'riesgo' ? 'text-rose-500' : 'text-amber-600'}`}>{m.texto}{r.salud.motivos.length > 2 ? ` · y ${r.salud.motivos.length - 1} más` : ''}</span>
+                  ))}
                   <span className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-[var(--text-secondary)]">
                     <span>{r.cobro ? <>Cobro {r.cobro.monto} · {fmt(r.cobro.fecha)}{r.cobro.vencido && <span className="text-rose-500"> vencido</span>}</> : 'Sin cobro pendiente'}</span>
                     <span>{r.reunion ? `Reunión ${fmt(r.reunion.fecha)}${r.reunion.hora ? ` ${r.reunion.hora}` : ''}` : 'Sin reunión'}</span>
                     {r.revisar > 0 && <span className="text-[var(--text-primary)]">{r.revisar} para revisar</span>}
+                    {r.visita && <span>{r.visita}</span>}
                   </span>
                 </span>
                 <ChevronRight className="w-4 h-4 shrink-0 text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]" />
@@ -145,7 +171,7 @@ export const ClientsListView: React.FC<{
         </ul>
       ) : (
         <p className="rounded-[var(--radius-card)] border border-dashed border-[var(--border-subtle)] p-6 text-center text-sm text-[var(--text-secondary)]">
-          {q ? 'No hay clientes con ese nombre.' : filter === 'archivados' ? 'No hay clientes archivados.' : filter === 'mi_accion' ? 'Nada espera una acción tuya.' : filter === 'esperando' ? 'No estás esperando a ningún cliente.' : filter === 'bloqueado' ? 'Ningún cliente bloqueado.' : 'Todavía no hay clientes acá.'}
+          {q ? 'No hay clientes con ese nombre.' : filter === 'archivados' ? 'No hay clientes archivados.' : filter === 'atencion' ? 'Todos tus clientes están en orden.' : filter === 'mi_accion' ? 'Nada espera una acción tuya.' : filter === 'esperando' ? 'No estás esperando a ningún cliente.' : filter === 'bloqueado' ? 'Ningún cliente bloqueado.' : 'Todavía no hay clientes acá.'}
         </p>
       )}
 

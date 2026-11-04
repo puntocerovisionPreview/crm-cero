@@ -1,4 +1,5 @@
-import type { ExpenseRecord, ProspectEvent } from '../types';
+import type { ExpenseRecord, PersonalRecurring, ProspectEvent } from '../types';
+import type { PortalVisita } from '../portal/salud';
 import type { AutomationData } from './messages';
 import { escapeHtml, formatMoney, longDate } from './messages';
 import { monthClose, pafReport, pickTop3, prospectingWeek, weekSummary, weeklyCollections } from '../utils/periodic';
@@ -16,6 +17,9 @@ import { addMonths } from '../utils/dates';
 export interface PeriodicData extends AutomationData {
   expenses?: ExpenseRecord[];
   prospectEvents?: ProspectEvent[];
+  personalRecurrings?: PersonalRecurring[];
+  /** Última vez que cada cliente entró a su portal (paf_visitas) */
+  visitas?: PortalVisita[];
 }
 
 const shortDay = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;

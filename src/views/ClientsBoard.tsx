@@ -4,6 +4,8 @@ import { AgendaMeeting, Project, getServiceType } from '../types';
 import { hitosDe, nextMeeting } from '../portal/model';
 import { ETAPAS, type Etapa } from '../portal/presencia';
 import { RESPONSABLE_ACCION, estadoCliente } from '../components/ProximaAccionCard';
+import { saludCliente, textoVisita } from '../portal/salud';
+import { useVisitas } from '../portal/useVisitas';
 
 const fmt = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const CAPACIDAD = 4; // estudios activos a la vez (lo que declara la oferta)
@@ -25,6 +27,7 @@ function diasSinMovimiento(p: Project, meetings: AgendaMeeting[], today: string)
  */
 export const ClientsBoard: React.FC<{ projects: Project[]; meetings: AgendaMeeting[]; onNavigate: (path: string) => void }> = ({ projects, meetings, onNavigate }) => {
   const today = new Date().toLocaleDateString('en-CA');
+  const visitas = useVisitas();
   const activos = projects.filter((p) => !p.archived && !p.isLead);
   const pafActivos = activos.filter((p) => esPaf(p) && !p.ejemplo);
   const columnas: { id: Etapa | 'web'; label: string; items: Project[] }[] = [
@@ -58,6 +61,10 @@ export const ClientsBoard: React.FC<{ projects: Project[]; meetings: AgendaMeeti
               const dias = diasSinMovimiento(p, meetings, today);
               const hechas = meetings.filter((m) => m.projectId === p.id && m.completed && !m.proposed).length;
               const acordadas = p.pafPortal?.reunionesAcordadas;
+              const visita = p.pafClienteId ? visitas.get(p.pafClienteId) : undefined;
+              const salud = saludCliente(p, { meetings, visita, today });
+              const alerta = salud.motivos.find((m) => m.texto !== 'Sin próxima acción definida' && !m.texto.startsWith('Bloqueado'));
+              const vio = textoVisita(p, visita, today);
               return (
                 <button key={p.id} type="button" onClick={() => onNavigate(`/clientes/${p.id}`)} className="card-swiss block w-full p-3 text-left transition hover:-translate-y-0.5">
                   <span className="flex items-center gap-2">
@@ -69,10 +76,12 @@ export const ClientsBoard: React.FC<{ projects: Project[]; meetings: AgendaMeeti
                     ? <span className="mt-2 block text-xs text-[var(--text-primary)]">→ {p.proximaAccion.texto}<span className="text-[var(--text-tertiary)]"> · {RESPONSABLE_ACCION[p.proximaAccion.responsable]}{p.proximaAccion.fecha ? ` · ${fmt(p.proximaAccion.fecha)}` : ''}</span></span>
                     : <span className="mt-2 block text-xs text-amber-600">Sin próxima acción</span>}
                   {estado === 'esperando' && p.proximaAccion?.necesita && <span className="mt-1 block text-[11px] text-sky-600">Espera: {p.proximaAccion.necesita}</span>}
+                  {alerta && <span className={`mt-1 block text-[11px] ${alerta.nivel === 'riesgo' ? 'text-rose-500' : 'text-amber-600'}`}>{alerta.texto}</span>}
                   <span className="mt-2 flex flex-wrap gap-x-2 gap-y-0.5 text-[11px] text-[var(--text-tertiary)]">
                     <span>{reunion ? `Reunión ${fmt(reunion.fecha)}` : 'Sin reunión'}</span>
                     {acordadas ? <span>{hechas}/{acordadas} reuniones</span> : null}
                     {dias >= 7 && <span className="text-amber-600">{dias} días sin movimiento</span>}
+                    {vio && <span>{vio}</span>}
                   </span>
                 </button>
               );

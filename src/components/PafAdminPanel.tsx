@@ -10,7 +10,7 @@ import {
 } from '../portal/model';
 import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
 import { AccessIcon } from './AccessIcon';
-import { MENSAJES, hoyAcordamos, mensaje, type MensajeId } from '../portal/mensajes';
+import { MENSAJES, hoyAcordamos, mensaje, recordatorioPendientes, type MensajeId } from '../portal/mensajes';
 import { subscribePanelOfProject } from '../panels/store';
 import type { ClientPanel } from '../panels/model';
 import { SegmentedControl } from '../ui';
@@ -1017,7 +1017,10 @@ function AvisarleMenu({ project, published, phone }: { project: Project; publish
   const portalUrl = `${window.location.origin}/portal`;
   const ultimo = [...(project.pafResumenes || [])].sort((a, b) => b.fecha.localeCompare(a.fecha))[0];
   const entrega = [...(project.pafEntregas || [])].filter((e) => e.publicada).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0];
+  const today = new Date().toLocaleDateString('en-CA');
+  const pendientes = (project.pafTareas || []).filter((t) => t.estado === 'habilitada' && (t.responsable || 'estudio') === 'estudio');
   const texto = (id: MensajeId): string => {
+    if (id === 'recordatorio') return recordatorioPendientes(nombre, pendientes, portalUrl, today);
     if (id === 'novedades') return novedades(published, project.clientName, window.location.origin);
     if (id === 'hoyAcordamos') {
       const parte = (titulo: string) => (ultimo?.proximosPasos.split(/\n(?=De )/).find((x) => x.startsWith(titulo)) || '').replace(`${titulo}:`, '').trim();
@@ -1034,7 +1037,7 @@ function AvisarleMenu({ project, published, phone }: { project: Project; publish
         <>
           <span className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
           <span className="absolute left-0 top-full z-40 mt-1 w-64 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-2xl">
-            {MENSAJES.filter((m) => m.id !== 'hoyAcordamos' || ultimo).map((m) => (
+            {MENSAJES.filter((m) => (m.id !== 'hoyAcordamos' || ultimo) && (m.id !== 'recordatorio' || pendientes.length)).map((m) => (
               <a key={m.id} href={`https://wa.me/${phone}?text=${encodeURIComponent(texto(m.id))}`} target="_blank" rel="noopener noreferrer" onClick={() => setOpen(false)}
                 className="block rounded-lg px-2.5 py-2 text-xs text-zinc-200 hover:bg-zinc-800">{m.label}</a>
             ))}

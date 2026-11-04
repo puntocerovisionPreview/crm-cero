@@ -3,7 +3,7 @@
  * Funciones puras: el servidor las corre cada 10 minutos y cada aviso sale una sola vez
  * (por su `key`). Agrupan todo en un aviso por momento, para no llenarte de notificaciones.
  */
-import type { AgendaTask, StudioFixedExpense } from '../types';
+import type { AgendaTask, PersonalRecurring, StudioFixedExpense } from '../types';
 import { formatMoney, getDueCollections, type AutomationData } from './messages';
 
 export interface Recordatorio { key: string; title: string; body: string; url: string }
@@ -42,26 +42,34 @@ export function recordatorioTareas(tasks: AgendaTask[], today: string, nowMin: n
 }
 
 /**
- * Pagos fijos (hosting, dominios, suscripciones…). Se dan por pagos cuando registrás el pago
+ * Pagos fijos (hosting, dominios, suscripciones…) y personales (alquiler, servicios, tarjeta…).
+ * Se dan por pagos cuando registrás el pago
  * (su próximo vencimiento pasa al siguiente período). Avisa:
  * - 9:00: lo que vence hoy, mañana y pasado, y lo vencido sin registrar
  * - 17:00: lo de hoy que todavía no registraste, y lo vencido
  */
-export function recordatorioPagos(fixed: StudioFixedExpense[], today: string, nowMin: number): Recordatorio | null {
-  const activos = fixed.filter((f) => f.active && f.nextDueDate);
+export function recordatorioPagos(fixed: StudioFixedExpense[], today: string, nowMin: number, personales: PersonalRecurring[] = []): Recordatorio | null {
+  // Los del estudio y los personales (Mis finanzas → Recurrentes: alquiler, servicios, tarjeta…)
+  const activos: Pago[] = [
+    ...fixed.filter((f) => f.active && f.nextDueDate).map((f) => ({ name: f.name, amount: f.amount, currency: f.currency, due: f.nextDueDate, autoRenew: !!f.autoRenew, personal: false })),
+    ...personales.filter((r) => r.active && r.type === 'gasto' && r.nextDate).map((r) => ({ name: r.title, amount: r.amount, currency: r.currency, due: r.nextDate, autoRenew: false, personal: true })),
+  ];
   const manana = nowMin >= 9 * 60 && nowMin < 13 * 60;
   const tarde = nowMin >= 17 * 60 && nowMin < 21 * 60;
   if (!manana && !tarde) return null;
-  const vencidos = activos.filter((f) => f.nextDueDate < today);
-  const hoy = activos.filter((f) => f.nextDueDate === today);
-  const proximos = manana ? activos.filter((f) => f.nextDueDate > today && f.nextDueDate <= addDays(today, 2)) : [];
+  const vencidos = activos.filter((f) => f.due < today);
+  const hoy = activos.filter((f) => f.due === today);
+  const proximos = manana ? activos.filter((f) => f.due > today && f.due <= addDays(today, 2)) : [];
   if (!vencidos.length && !hoy.length && !proximos.length) return null;
-  const linea = (f: StudioFixedExpense) => `• ${f.name}: ${formatMoney(f.amount, f.currency)}${f.autoRenew ? ' (se debita solo: registralo igual)' : ''}`;
+  const linea = (f: Pago) => `• ${f.name}: ${formatMoney(f.amount, f.currency)}${f.personal ? ' (personal)' : ''}${f.autoRenew ? ' (se debita solo: registralo igual)' : ''}`;
   const lines: string[] = [];
-  if (vencidos.length) lines.push('Vencidos sin registrar:', ...vencidos.sort((a, b) => a.nextDueDate.localeCompare(b.nextDueDate)).map((f) => `${linea(f)} · venció el ${ddmm(f.nextDueDate)}`));
+  if (vencidos.length) lines.push('Vencidos sin registrar:', ...vencidos.sort((a, b) => a.due.localeCompare(b.due)).map((f) => `${linea(f)} · venció el ${ddmm(f.due)}`));
   if (hoy.length) lines.push(`${vencidos.length ? '\n' : ''}Vencen hoy:`, ...hoy.map(linea));
-  if (proximos.length) lines.push(`${vencidos.length || hoy.length ? '\n' : ''}Próximos:`, ...proximos.map((f) => `${linea(f)} · ${f.nextDueDate === addDays(today, 1) ? 'mañana' : `el ${ddmm(f.nextDueDate)}`}`));
-  lines.push('\nCuando pagues, registralo en Dinero y deja de avisarte.');
+  if (proximos.length) lines.push(`${vencidos.length || hoy.length ? '\n' : ''}Próximos:`, ...proximos.map((f) => `${linea(f)} · ${f.due === addDays(today, 1) ? 'mañana' : `el ${ddmm(f.due)}`}`));
+  const relevantes = [...vencidos, ...hoy, ...proximos];
+  const soloPersonales = relevantes.every((f) => f.personal);
+  const hayPersonales = relevantes.some((f) => f.personal);
+  lines.push(`\nCuando pagues, registralo en ${soloPersonales ? 'Mis finanzas → Recurrentes' : hayPersonales ? 'Dinero (los del estudio) o Mis finanzas (los personales)' : 'Dinero'} y deja de avisarte.`);
   const total = vencidos.length + hoy.length;
   return {
     key: `pagos_${today}_${manana ? 'manana' : 'tarde'}`,
@@ -69,9 +77,11 @@ export function recordatorioPagos(fixed: StudioFixedExpense[], today: string, no
       ? `💳 ${tarde ? '¿Ya pagaste? ' : ''}${total === 1 ? `${(vencidos[0] || hoy[0]).name} ${vencidos.length ? 'está vencido' : 'vence hoy'}` : `${total} pagos ${vencidos.length ? 'vencidos o de hoy' : 'vencen hoy'}`}`
       : `💳 ${proximos.length === 1 ? `${proximos[0].name} vence pronto` : `${proximos.length} pagos vencen pronto`}`,
     body: lines.join('\n'),
-    url: '/dinero',
+    url: soloPersonales ? '/mis-finanzas/recurrentes' : '/dinero',
   };
 }
+
+interface Pago { name: string; amount: number; currency: string; due: string; autoRenew: boolean; personal: boolean }
 
 /** Cobros a clientes que vencen hoy o están atrasados: a las 10, con el recordatorio de mandar el WhatsApp */
 export function recordatorioCobros(data: AutomationData, today: string, nowMin: number): Recordatorio | null {

@@ -26,6 +26,7 @@ import { eveningCallsReminder } from './prospectReminders';
 import { contentReminders } from './contentReminders';
 import { buildClientesHoy, buildClientesSemana, meetingNudges, reportesQueFaltan } from '../src/automation/clientes';
 import { contentMorningNotice } from '../src/content/reminders';
+import { clientesSinEntrar } from '../src/portal/salud';
 import { recordatorioCobros, recordatorioPagos, recordatorioTareas } from '../src/automation/recordatorios';
 import { PeriodicData, buildDayCloseNudge, buildMonthClose, buildPafReport, buildProspectingWeek, buildTop3Section, buildWeeklyCollections } from '../src/automation/periodicMessages';
 import { registerDriveOAuth, driveConfigured, integrationRef } from './driveOAuth';
@@ -143,7 +144,7 @@ function plainDates<T extends Record<string, any>>(items: T[]): T[] {
 }
 
 export async function loadAutomationData(db: Firestore): Promise<PeriodicData> {
-  const [tasks, meetings, projects, incomes, fixedExpenses, routine, prospects, prospectingDoc, expenses, prospectEvents] = await Promise.all([
+  const [tasks, meetings, projects, incomes, fixedExpenses, routine, prospects, prospectingDoc, expenses, prospectEvents, personalRecurrings, visitas] = await Promise.all([
     readCollection<any>(db, 'tasks'),
     readCollection<any>(db, 'meetings'),
     readCollection<any>(db, 'projects'),
@@ -154,6 +155,8 @@ export async function loadAutomationData(db: Firestore): Promise<PeriodicData> {
     db.collection('settings').doc('prospecting').get(),
     readCollection<any>(db, 'expenses'),
     readCollection<any>(db, 'prospect_events'),
+    readCollection<any>(db, 'personal_recurrings'),
+    readCollection<any>(db, 'paf_visitas'),
   ]);
   const savedSettings = (prospectingDoc.exists ? prospectingDoc.data() : {}) as any;
   return {
@@ -167,6 +170,8 @@ export async function loadAutomationData(db: Firestore): Promise<PeriodicData> {
     prospectingSettings: mergeProspectingSettings(savedSettings),
     expenses: plainDates(expenses),
     prospectEvents: plainDates(prospectEvents),
+    personalRecurrings: plainDates(personalRecurrings),
+    visitas: plainDates(visitas),
   };
 }
 
@@ -309,8 +314,13 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
       const faltan = reportesQueFaltan(data.projects, today);
       if (faltan.length) nudges.push({ key: `reportes_${today}`, title: `Te ${faltan.length === 1 ? 'falta 1 reporte' : `faltan ${faltan.length} reportes`} del viernes`, body: faltan.map((p) => p.clientName).join(', ') + '. Se arman solos con la semana: Inicio → Reporte del viernes.', url: '/clientes' });
     }
+    // Lunes 10 hs: estudios que no entran a su portal y tienen tareas pendientes
+    if (d.getDay() === 1 && now >= 10 * 60 && now < 14 * 60) {
+      const sin = clientesSinEntrar(data.projects, data.visitas, today);
+      if (sin.length) nudges.push({ key: `sin_entrar_${today}`, title: sin.length === 1 ? `${sin[0].project.clientName} no está entrando a su portal` : `${sin.length} clientes no están entrando a su portal`, body: `${sin.map((x) => `• ${x.texto}`).join('\n')}\n\nEscribiles: desde su ficha, Avisarle → Recordarle lo pendiente.`, url: sin.length === 1 ? `/clientes/${sin[0].project.id}` : '/clientes' });
+    }
     // Durante el día: tareas que quedan, pagos que vencen y cobros
-    for (const r of [recordatorioTareas(data.tasks, today, now), recordatorioPagos(data.fixedExpenses, today, now), recordatorioCobros(data, today, now)]) {
+    for (const r of [recordatorioTareas(data.tasks, today, now), recordatorioPagos(data.fixedExpenses, today, now, data.personalRecurrings), recordatorioCobros(data, today, now)]) {
       if (r) nudges.push(r);
     }
     if (options.dryRun) return { job, detail: nudges };

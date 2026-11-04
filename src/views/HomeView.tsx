@@ -231,7 +231,7 @@ export const HomeView: React.FC<Props> = ({
       {/* Tus 3 del día */}
       <Top3Card tasks={tasks} today={today} onToggleTask={onToggleTask} onOpenTask={id => go(`/agenda/tarea/${id}`)} />
 
-      {/* PAF hoy: una fila por estudio (para revisar, reunión, etapa y días sin novedades) */}
+      {/* Tus clientes hoy: lo que te piden y cómo está cada estudio */}
       <PafTodayBoard projects={projects} meetings={meetings} onOpen={go} />
 
       {/* Contenido: hoy se publica / mañana toca */}

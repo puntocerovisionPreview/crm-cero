@@ -2,6 +2,7 @@ import type express from 'express';
 import type { Firestore } from 'firebase-admin/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 import { CLIENTE_ID_RE, PAF_PORTAL_COLLECTION, checkPieza, checkTerminado, portalPieces } from '../src/portal/model';
+import { PAF_VISITAS_COLLECTION } from '../src/portal/salud';
 import { ClientPanel, applyClientAction, panelDocId, parseClientAction, snapshotOf } from '../src/panels/model';
 
 /**
@@ -9,6 +10,9 @@ import { ClientPanel, applyClientAction, panelDocId, parseClientAction, snapshot
  * y además llama acá para que te llegue el aviso (push / Telegram) aunque el CRM esté cerrado.
  * Solo avisa: no cambia nada. Verifica la cuenta, el portal, la tarea y que el aviso exista.
  */
+
+// Las cuentas de Juan (mismas que ALLOWED_EMAILS): sus entradas al portal no cuentan como visita
+const OWNER_EMAILS = ['puntocerovision@gmail.com', 'liendojuan070@gmail.com'];
 
 const hits = new Map<string, number[]>();
 function tooMany(key: string): boolean {
@@ -68,6 +72,34 @@ export function registerPafPortalRoutes(
     } catch (err) {
       console.error('[portal PAF] terminado:', (err as Error).message);
       res.status(500).json({ error: 'No se pudo avisar' });
+    }
+  });
+
+  /**
+   * El estudio entró a su portal: se guarda solo la fecha (para que Juan sepa si vio las
+   * novedades). Una vez por hora como mucho. Las entradas de Juan no cuentan.
+   */
+  app.post('/api/paf/visita', async (req, res) => {
+    const clienteId = String(req.body?.clienteId || '');
+    if (!CLIENTE_ID_RE.test(clienteId)) return res.status(400).json({ error: 'Pedido inválido' });
+    const email = await verifiedEmail(req);
+    if (!email) return res.status(401).json({ error: 'Iniciá sesión' });
+    if (OWNER_EMAILS.includes(email)) return res.json({ ok: true, ignorada: true });
+    if (tooMany(email)) return res.status(429).json({ error: 'Demasiados pedidos' });
+    const db = getDb();
+    if (!db) return res.status(503).json({ error: 'No disponible' });
+    try {
+      const portal = (await db.collection(PAF_PORTAL_COLLECTION).doc(clienteId).get()).data() as any;
+      if (!portal || !(portal.emailsAutorizados || []).includes(email)) return res.status(403).json({ error: 'Sin acceso' });
+      const ref = db.collection(PAF_VISITAS_COLLECTION).doc(clienteId);
+      const prev = (await ref.get()).data() as { ultima?: string; total?: number } | undefined;
+      const now = new Date().toISOString();
+      if (prev?.ultima && Date.now() - Date.parse(prev.ultima) < 3600_000) return res.json({ ok: true });
+      await ref.set({ ultima: now, primera: (prev as any)?.primera || now, total: (prev?.total || 0) + 1, email }, { merge: true });
+      res.json({ ok: true });
+    } catch (err) {
+      console.error('[portal PAF] visita:', (err as Error).message);
+      res.status(500).json({ error: 'No se pudo guardar' });
     }
   });
 

@@ -23,32 +23,48 @@ export function acuerdosSinAnotar(projects: Project[], meetings: AgendaMeeting[]
     .map((m) => ({ project: byId.get(m.projectId!)!, meeting: m }));
 }
 
-/** Sección "Tus clientes hoy" del resumen de las 8 (HTML de Telegram; vacío si no hay nada) */
-export function buildClientesHoy(projects: Project[], meetings: AgendaMeeting[], today: string): string {
-  const ps = activos(projects);
-  const lines: string[] = [];
-  const add = (texto: string) => lines.push(`• ${texto}`);
+export interface ItemClienteHoy {
+  /** Cliente al que lleva (si es de uno solo) */
+  projectId?: string;
+  tipo: 'revisar' | 'reunion' | 'acuerdos' | 'decision' | 'accion' | 'bloqueado' | 'vencidas' | 'reportes';
+  texto: string;
+  /** Detalle chico (ej. "sin preparar") */
+  nota?: string;
+}
 
-  ps.forEach((p) => (p.pafTareas || []).filter((t) => t.estado === 'enviada').forEach((t) => add(`${escapeHtml(p.clientName)} terminó «${escapeHtml(t.titulo)}»: revisala`)));
+/** Lo que tus clientes necesitan de vos hoy, en orden (lo usan el Inicio y el resumen de las 8) */
+export function itemsClientesHoy(projects: Project[], meetings: AgendaMeeting[], today: string): ItemClienteHoy[] {
+  const ps = activos(projects);
+  const out: ItemClienteHoy[] = [];
+  ps.forEach((p) => (p.pafTareas || []).filter((t) => t.estado === 'enviada').forEach((t) => out.push({ projectId: p.id, tipo: 'revisar', texto: `${p.clientName} terminó «${t.titulo}»: revisala` })));
   const byId = new Map(ps.map((p) => [p.id, p]));
   meetings.filter((m) => m.projectId && byId.has(m.projectId) && m.date === today && !m.completed && !m.proposed)
     .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
-    .forEach((m) => add(`${m.time ? `${m.time} ` : ''}reunión con ${escapeHtml(byId.get(m.projectId!)!.clientName)}${prepListas(m) < 3 ? ' · <i>sin preparar</i>' : ''}`));
-  acuerdosSinAnotar(projects, meetings, today).forEach(({ project, meeting }) => add(`Anotá lo que acordaron con ${escapeHtml(project.clientName)} (reunión del ${ddmm(meeting.date)})`));
+    .forEach((m) => out.push({ projectId: m.projectId, tipo: 'reunion', texto: `${m.time ? `${m.time} ` : ''}reunión con ${byId.get(m.projectId!)!.clientName}`, ...(prepListas(m) < 3 ? { nota: 'sin preparar' } : {}) }));
+  acuerdosSinAnotar(projects, meetings, today).forEach(({ project, meeting }) => out.push({ projectId: project.id, tipo: 'acuerdos', texto: `Anotá lo que acordaron con ${project.clientName} (reunión del ${ddmm(meeting.date)})` }));
   ps.forEach((p) => (p.pafEntregas || []).filter((e) => e.publicada && (e.estado || 'en_revision') === 'en_revision' && e.hasta && e.hasta <= addDays(today, 1))
-    .forEach((e) => add(`${escapeHtml(p.clientName)} tiene que decidir «${escapeHtml(e.titulo)}» ${e.hasta! < today ? `(venció el ${ddmm(e.hasta!)})` : e.hasta === today ? '(hoy)' : '(mañana)'}`)));
+    .forEach((e) => out.push({ projectId: p.id, tipo: 'decision', texto: `${p.clientName} tiene que decidir «${e.titulo}» ${e.hasta! < today ? `(venció el ${ddmm(e.hasta!)})` : e.hasta === today ? '(hoy)' : '(mañana)'}` })));
   ps.forEach((p) => {
     const a = p.proximaAccion;
-    if (a?.responsable === 'yo' && a.fecha && a.fecha <= today) add(`${escapeHtml(p.clientName)}: ${escapeHtml(a.texto)}${a.fecha < today ? ` (venció el ${ddmm(a.fecha)})` : ''}`);
-    if (a?.bloqueado) add(`${escapeHtml(p.clientName)} está bloqueado: ${escapeHtml(a.texto)}`);
+    if (a?.responsable === 'yo' && a.fecha && a.fecha <= today) out.push({ projectId: p.id, tipo: 'accion', texto: `${p.clientName}: ${a.texto}${a.fecha < today ? ` (venció el ${ddmm(a.fecha)})` : ''}` });
+    if (a?.bloqueado) out.push({ projectId: p.id, tipo: 'bloqueado', texto: `${p.clientName} está bloqueado: ${a.texto}` });
   });
-  const vencidas = ps.flatMap((p) => (p.pafTareas || []).filter((t) => t.estado === 'habilitada' && (t.responsable || 'estudio') === 'estudio' && t.fecha && t.fecha < today).map(() => p.clientName));
-  if (vencidas.length) add(`${vencidas.length} ${vencidas.length === 1 ? 'tarea vencida' : 'tareas vencidas'} de clientes (${[...new Set(vencidas)].map(escapeHtml).join(', ')}): mandales un recordatorio`);
+  const vencidas = ps.flatMap((p) => (p.pafTareas || []).filter((t) => t.estado === 'habilitada' && (t.responsable || 'estudio') === 'estudio' && t.fecha && t.fecha < today).map(() => p));
+  if (vencidas.length) {
+    const quienes = [...new Map(vencidas.map((p) => [p.id, p])).values()];
+    out.push({ ...(quienes.length === 1 ? { projectId: quienes[0].id } : {}), tipo: 'vencidas', texto: `${vencidas.length} ${vencidas.length === 1 ? 'tarea vencida' : 'tareas vencidas'} de clientes (${quienes.map((p) => p.clientName).join(', ')}): mandales un recordatorio` });
+  }
   if (new Date(`${today}T12:00:00`).getDay() === 5) {
     const faltan = reportesQueFaltan(projects, today);
-    if (faltan.length) add(`Hoy es viernes: faltan los reportes de ${faltan.map((p) => escapeHtml(p.clientName)).join(', ')}`);
+    if (faltan.length) out.push({ ...(faltan.length === 1 ? { projectId: faltan[0].id } : {}), tipo: 'reportes', texto: `Hoy es viernes: faltan los reportes de ${faltan.map((p) => p.clientName).join(', ')}` });
   }
-  return lines.length ? ['<b>Tus clientes hoy</b>', ...lines].join('\n') : '';
+  return out;
+}
+
+/** Sección "Tus clientes hoy" del resumen de las 8 (HTML de Telegram; vacío si no hay nada) */
+export function buildClientesHoy(projects: Project[], meetings: AgendaMeeting[], today: string): string {
+  const items = itemsClientesHoy(projects, meetings, today);
+  return items.length ? ['<b>Tus clientes hoy</b>', ...items.map((i) => `• ${escapeHtml(i.texto)}${i.nota ? ` · <i>${escapeHtml(i.nota)}</i>` : ''}`)].join('\n') : '';
 }
 
 /** Clientes PAF activos sin reporte de esta semana (lunes a hoy) */

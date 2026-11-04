@@ -59,6 +59,9 @@ import { PaymentPlanManager } from '../components/PaymentPlanManager';
 import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
 import { PafAdminPanel } from '../components/PafAdminPanel';
 import { ProximaAccionCard } from '../components/ProximaAccionCard';
+import { ClienteSaludCard } from '../components/ClienteSalud';
+import { saludCliente, textoVisita } from '../portal/salud';
+import { useVisitas } from '../portal/useVisitas';
 import { ClientAdminStrip } from '../components/ClientAdminStrip';
 import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
 import { PafPanelButton } from '../components/PafPanelButton';
@@ -182,6 +185,10 @@ export const ClientDetailView: React.FC<Props> = ({
   // Dynamic Billing Calculation from Real Payments
   const billing = calculateProjectBilling(project, incomes);
   const realPayments = getProjectPayments(project, incomes);
+  const visitas = useVisitas();
+  const todayStr = getTodayString();
+  const visita = project.pafClienteId ? visitas.get(project.pafClienteId) : undefined;
+  const salud = useMemo(() => saludCliente(project, { meetings, visita, today: todayStr }), [project, meetings, visita, todayStr]);
 
   // Cuota detail & Agreement editor sub-screens (Dedicated screens, zero popups)
   const [selectedCuotaId, setSelectedCuotaId] = useState<string | null>(null);
@@ -844,6 +851,8 @@ export const ClientDetailView: React.FC<Props> = ({
 
           {/* Una sola próxima acción: lo primero que ves */}
           {!project.archived && <ProximaAccionCard project={project} onUpdateProject={onUpdateProject} />}
+          {/* Cómo está: lo que pide atención y si entra a su portal */}
+          {!project.archived && !project.isLead && <ClienteSaludCard salud={salud} visita={textoVisita(project, visita, todayStr)} />}
 
           {/* Las tres partes de la ficha */}
           <nav className="sticky top-[calc(env(safe-area-inset-top,0px)+3.75rem)] z-10 grid grid-cols-3 gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/95 p-1 backdrop-blur-md" aria-label="Partes de la ficha">

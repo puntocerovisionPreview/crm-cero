@@ -12,7 +12,7 @@ import { AccessIcon } from '../components/AccessIcon';
 import { ETAPAS, type Etapa } from '../portal/presencia';
 import { MATERIALES, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, hitoInfoDe, hitosDe, seccionesVisibles, type Recorrido } from '../portal/model';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
-import { sendTaskDone, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
+import { sendTaskDone, sendVisita, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
 /**
  * /portal: el estudio entra con su cuenta de Google (el mismo correo con el que se
@@ -256,6 +256,10 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
     if (demo) return;
     return subscribeAvisos(p.clienteId, setAvisos);
   }, [p.clienteId, demo]);
+  // Le cuenta a Juan que entraste (solo la fecha: así sabe si viste las novedades)
+  useEffect(() => {
+    if (!demo && !readOnly && !embedded) sendVisita(p.clienteId);
+  }, [p.clienteId, demo, readOnly, embedded]);
 
   const done = async (tareaId: string) => {
     setSending(tareaId); setError('');
