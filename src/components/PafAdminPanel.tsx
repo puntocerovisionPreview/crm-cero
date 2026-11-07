@@ -5,10 +5,10 @@ import { AgendaMeeting, AgendaTask, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
-  accessHost, accessIssue, accesosDelAlta, approveTask, hitosDe, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
+  accessHost, accessIssue, buildPedidoAlta, accesosDelAlta, approveTask, hitosDe, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, defaultAccessName, normalizeLinkInput, draftAccesos, emptyPortalDraft, nextMeeting, normalizeEmails, portalDirty, portalFromProject, portalGoals, reopenTask, safeHttpsUrl, whatsappDigits,
   missingTemplateTasks, PAF_STAGE_TEMPLATES, suggestedChannel, type PafDelivery, type PafDeliveryState, type PafPedidoAlta, type PafResponsable, type PafPortalDoc, type PafPortalDraft, type PafTask, type PafTaskState,
 } from '../portal/model';
-import { publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
+import { createPedidoAlta, publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextClienteId, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
 import { AccessIcon } from './AccessIcon';
 import { MENSAJES, hoyAcordamos, mensaje, recordatorioPendientes, type MensajeId } from '../portal/mensajes';
 import { subscribePanelOfProject } from '../panels/store';
@@ -511,6 +511,10 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   useEffect(() => {
     if (project.pafClienteId && !published) setClienteId(project.pafClienteId);
   }, [project.pafClienteId, published]);
+  // Alta hecha pero el ID no quedó en la ficha: lo toma del pedido
+  useEffect(() => {
+    if (!project.pafClienteId && pedido?.clienteId) setClienteId((c) => (CLIENTE_ID_RE.test(c) ? c : pedido.clienteId!));
+  }, [project.pafClienteId, pedido?.clienteId]);
 
   // El correo del alta (con el que se comparte la carpeta) es el que entra al portal
   const altaEmail = pedido?.email;
@@ -585,14 +589,30 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
     try {
       // Cliente Web sin ID: se le da el próximo WEB-### (no pasa por el alta de Tally)
       let id = clienteId.trim().toUpperCase();
+      let altaNueva = false;
       if (webId && !CLIENTE_ID_RE.test(id)) { id = await suggestNextWebClienteId(); setClienteId(id); }
+      // PAF sin ID: se hace el alta como al crear un cliente (ID + link de Tally + registro en la Sheet)
+      else if (!webId && !CLIENTE_ID_RE.test(id)) {
+        if (pedido?.clienteId) id = pedido.clienteId;
+        else {
+          const nuevo = await suggestNextClienteId(false);
+          const email = normalizeEmails(emailsText)[0] || project.clientEmail || '';
+          const built = buildPedidoAlta({ projectId: project.id, clienteId: nuevo, estudio: project.clientName, contacto: project.ownerName || project.clientName, email, zonaHoraria: 'America/Argentina/Buenos_Aires', prueba: false });
+          if ('errors' in built) { setErrors(built.errors.map((e) => `Para darle su ID: ${e}`)); return; }
+          await createPedidoAlta(built.pedido);
+          id = nuevo; altaNueva = true;
+        }
+        setClienteId(id);
+      }
       const result = portalFromProject(project, meetings, current, id, new Date(), privados);
       if ('errors' in result) { setErrors(result.errors); return; }
       await publishPafPortal(result.doc);
       await publishPortalExtras(result.doc.clienteId, { objetivos: portalGoals(panel?.goals), contacto: { whatsapp: config.whatsapp || '' } });
       onUpdateProject(project.id, { pafClienteId: result.doc.clienteId, pafPortal: { ...current, publishedAt: result.doc.actualizadoEn } });
       lastSaved.current = snapshot(current); setPending(false); setSavedAt(new Date());
-      setNotice(published ? '' : 'Publicado. Copiá el enlace y pasáselo por tu canal.');
+      setNotice(altaNueva
+        ? `Publicado con el ID ${result.doc.clienteId}. También quedó su link de Tally: lo mandás desde Ajustes → Alta, y al responder se crean sus carpetas.`
+        : published ? '' : 'Publicado. Copiá el enlace y pasáselo por tu canal.');
     } catch {
       setErrors(['No se pudo publicar. Revisá la conexión y reintentá.']);
     } finally {
