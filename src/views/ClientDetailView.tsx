@@ -60,7 +60,11 @@ import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
 import { PafAdminPanel } from '../components/PafAdminPanel';
 import { ProximaAccionCard } from '../components/ProximaAccionCard';
 import { ClienteSaludCard } from '../components/ClienteSalud';
-import { saludCliente, textoVisita } from '../portal/salud';
+import { comoViene, saludCliente, textoVisita } from '../portal/salud';
+import { colorDe, iniciales } from '../utils/clientLook';
+import { itemsClientesHoy } from '../automation/clientes';
+import { ETAPAS, ETAPA_HITOS } from '../portal/presencia';
+import { inicioPrograma, semanaDelPrograma } from '../portal/presenciaAuto';
 import { useVisitas } from '../portal/useVisitas';
 import { ClientAdminStrip } from '../components/ClientAdminStrip';
 import { StudentPortalLinkButton } from '../components/StudentPortalLinkButton';
@@ -189,6 +193,19 @@ export const ClientDetailView: React.FC<Props> = ({
   const todayStr = getTodayString();
   const visita = project.pafClienteId ? visitas.get(project.pafClienteId) : undefined;
   const salud = useMemo(() => saludCliente(project, { meetings, visita, today: todayStr }), [project, meetings, visita, todayStr]);
+  const [masOpciones, setMasOpciones] = useState(false);
+  const fraseComoViene = useMemo(() => {
+    const paf = project.serviceType === 'paf' || (project.projectType || '').startsWith('paf');
+    const etapa = project.pafEtapa || 'presencia';
+    const inicio = inicioPrograma(project);
+    return comoViene(project, salud, {
+      meetings, today: todayStr,
+      semana: paf && inicio ? semanaDelPrograma(inicio, todayStr) : null,
+      etapa: paf ? ETAPAS.find((e) => e.id === etapa)!.label : undefined,
+      hitoTitulo: paf ? ETAPA_HITOS[etapa][(project.pafPortal?.hito || 1) - 1]?.titulo : undefined,
+    });
+  }, [project, salud, meetings, todayStr]);
+  const paraHoy = useMemo(() => itemsClientesHoy([project], meetings, todayStr).filter((i) => i.tipo !== 'vencidas'), [project, meetings, todayStr]);
 
   // Cuota detail & Agreement editor sub-screens (Dedicated screens, zero popups)
   const [selectedCuotaId, setSelectedCuotaId] = useState<string | null>(null);
@@ -733,110 +750,48 @@ export const ClientDetailView: React.FC<Props> = ({
         
         {/* ================= COLUMNA IZQUIERDA (30% Sticky en Desktop) ================= */}
         <div className="w-full space-y-4">
-          <div className="bg-zinc-900/90 border border-zinc-800/80 rounded-2xl p-5 space-y-4 shadow-xl">
-            {/* 1. Header: Avatar & Client Name */}
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 flex items-center justify-center text-[var(--accent)] text-lg font-black shrink-0">
-                {project.clientName.charAt(0).toUpperCase()}
+          {/* Encabezado: quién es, cómo contactarlo y cómo viene, en una frase */}
+          <header className="space-y-5 pt-2">
+            <div className="flex items-start gap-4">
+              <span className="flex w-16 h-16 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: colorDe(project), color: '#fff' }} aria-hidden>{iniciales(project.clientName)}</span>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-3xl sm:text-4xl font-light tracking-tight leading-tight text-zinc-100 break-words">{project.clientName}</h1>
+                <p className="mt-1 text-sm text-zinc-400">
+                  {[project.ownerName, isPaf ? 'Programa PAF' : isWebClient ? 'Web' : null, project.isLead ? 'Posible cliente' : null, (project.startDate || project.createdAt) ? `desde el ${(project.startDate || project.createdAt)!.slice(0, 10).split('-').reverse().slice(0, 2).join('/')}` : null].filter(Boolean).join(' · ')}
+                </p>
               </div>
-              <div className="flex-1 min-w-0">
-                <h2 className="text-base sm:text-lg font-extrabold text-zinc-100 tracking-tight leading-snug truncate">
-                  {project.clientName}
-                </h2>
-                {project.ownerName && (
-                  <p className="text-xs text-zinc-400 font-medium truncate flex items-center gap-1 mt-0.5">
-                    <User className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                    <span>{project.ownerName}</span>
-                  </p>
-                )}
-                <div className="flex items-center gap-1.5 mt-2">
-                  <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 border border-zinc-700/60 font-mono">
-                    {isPaf ? 'Programa PAF' : 'Desarrollo Web'}
-                  </span>
-                  {project.isLead && (
-                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-mono">
-                      Lead / Prospecto
+              <div className="relative shrink-0">
+                <button type="button" onClick={() => setMasOpciones((v) => !v)} aria-label="Más opciones: archivar o eliminar" aria-expanded={masOpciones} className="flex w-10 h-10 items-center justify-center rounded-full border border-zinc-700 text-zinc-300 hover:bg-zinc-800">⋯</button>
+                {masOpciones && (
+                  <>
+                    <span className="fixed inset-0 z-30" onClick={() => setMasOpciones(false)} aria-hidden />
+                    <span className="absolute right-0 top-full z-40 mt-1 w-48 rounded-xl border border-zinc-700 bg-zinc-900 p-1 shadow-2xl">
+                      <button type="button" onClick={() => { setMasOpciones(false); setConfirmArchive(true); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-zinc-200 hover:bg-zinc-800"><Archive className="w-3.5 h-3.5" />{project.archived ? 'Desarchivar' : 'Archivar'}</button>
+                      <button type="button" onClick={() => { setMasOpciones(false); setConfirmDelete(true); }} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-rose-300 hover:bg-rose-500/10"><Trash2 className="w-3.5 h-3.5" />Eliminar cliente</button>
                     </span>
-                  )}
-                </div>
+                  </>
+                )}
               </div>
             </div>
 
+            <div className="flex flex-wrap gap-2">
+              {project.clientPhone ? <>
+                <a href={formatWhatsAppUrl(project.clientPhone, `Hola ${project.ownerName || project.clientName}, te escribo desde .Cero…`)} target="_blank" rel="noreferrer" className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full bg-zinc-100 px-4 text-sm font-medium text-zinc-950"><MessageCircle className="w-4 h-4" />WhatsApp</a>
+                <a href={formatTelUrl(project.clientPhone)} className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-zinc-700 px-4 text-sm text-zinc-200 hover:bg-zinc-800"><Phone className="w-4 h-4" />Llamar</a>
+              </> : <span className="inline-flex min-h-[40px] items-center text-xs text-zinc-500">Sin teléfono cargado</span>}
+              {project.websiteUrl && <a href={project.websiteUrl.startsWith('http') ? project.websiteUrl : `https://${project.websiteUrl}`} target="_blank" rel="noreferrer" className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-zinc-700 px-4 text-sm text-zinc-200 hover:bg-zinc-800"><Globe className="w-4 h-4" />Su web</a>}
+              {project.instagramUrl && <a href={project.instagramUrl.startsWith('http') ? project.instagramUrl : `https://instagram.com/${project.instagramUrl.replace('@', '')}`} target="_blank" rel="noreferrer" className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-zinc-700 px-4 text-sm text-zinc-200 hover:bg-zinc-800"><Instagram className="w-4 h-4" />Instagram</a>}
+              {(isPaf || isWebClient) && <button type="button" onClick={() => setFichaSection('portal')} className="inline-flex min-h-[40px] items-center gap-1.5 rounded-full border border-zinc-700 px-4 text-sm text-zinc-200 hover:bg-zinc-800"><Globe className="w-4 h-4" />Su portal</button>}
+            </div>
+
+            {!project.archived && !project.isLead && (
+              <section aria-label="Cómo viene" className="space-y-1">
+                <p className="text-xs text-zinc-500">Cómo viene</p>
+                <p className="text-xl sm:text-2xl font-light leading-snug tracking-tight text-zinc-100">{fraseComoViene}</p>
+              </section>
+            )}
             <ProjectDriveCard project={project} />
-            {/* 2. Direct Quick Contacts (WhatsApp, Call, Web, Instagram) */}
-            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-800/60">
-              {project.clientPhone ? (
-                <>
-                  <a
-                    href={formatWhatsAppUrl(project.clientPhone, `Hola ${project.ownerName || project.clientName}, te escribo desde .Cero…`)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 text-xs font-bold transition active:scale-95"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    <span>WhatsApp</span>
-                  </a>
-                  <a
-                    href={formatTelUrl(project.clientPhone)}
-                    className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-medium transition active:scale-95"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    <span>Llamar</span>
-                  </a>
-                </>
-              ) : (
-                <div className="col-span-2 py-1 text-center text-xs text-zinc-500 italic">
-                  Sin teléfono registrado
-                </div>
-              )}
-
-              {project.websiteUrl && (
-                <a
-                  href={project.websiteUrl.startsWith('http') ? project.websiteUrl : `https://${project.websiteUrl}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="col-span-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/60 hover:bg-zinc-700 text-zinc-300 text-xs transition"
-                >
-                  <Globe className="w-3 h-3 text-zinc-400" />
-                  <span className="truncate">Sitio Web</span>
-                </a>
-              )}
-
-              {project.instagramUrl && (
-                <a
-                  href={project.instagramUrl.startsWith('http') ? project.instagramUrl : `https://instagram.com/${project.instagramUrl.replace('@', '')}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="col-span-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/60 hover:bg-zinc-700 text-zinc-300 text-xs transition"
-                >
-                  <Instagram className="w-3 h-3 text-pink-400" />
-                  <span className="truncate">Instagram</span>
-                </a>
-              )}
-            </div>
-
-            <div className="pt-2 border-t border-zinc-800/60">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setConfirmArchive(true)}
-                  className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl bg-zinc-800/70 hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 text-xs transition cursor-pointer"
-                >
-                  <Archive className="w-3.5 h-3.5" />
-                  <span>{project.archived ? 'Desarchivar' : 'Archivar'}</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(true)}
-                  className="p-1.5 rounded-xl bg-zinc-800/70 hover:bg-red-500/15 text-zinc-500 hover:text-red-400 transition cursor-pointer"
-                  title="Eliminar cliente"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </div>
+          </header>
 
           {project.ejemplo && (
             <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-sky-500/30 bg-sky-500/[0.06] p-4">
@@ -853,6 +808,22 @@ export const ClientDetailView: React.FC<Props> = ({
           {!project.archived && <ProximaAccionCard project={project} onUpdateProject={onUpdateProject} />}
           {/* Cómo está: lo que pide atención y si entra a su portal */}
           {!project.archived && !project.isLead && <ClienteSaludCard salud={salud} visita={textoVisita(project, visita, todayStr)} />}
+          {/* Lo de hoy con este cliente: cada cosa lleva a donde se resuelve */}
+          {paraHoy.length > 0 && (
+            <section aria-label="Para hoy" className="space-y-1">
+              <p className="text-xs text-zinc-500">Para hoy con {project.clientName}</p>
+              <ul className="divide-y divide-zinc-800 border-y border-zinc-800">
+                {paraHoy.map((it, i) => (
+                  <li key={`${it.tipo}-${i}`} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+                    <p className="min-w-[14rem] flex-1 text-sm text-zinc-100">{(() => { const t = it.texto.replace(`${project.clientName}: `, ''); return t.charAt(0).toUpperCase() + t.slice(1); })()}{it.nota && <span className="text-orange-400"> · {it.nota}</span>}</p>
+                    <button type="button" onClick={() => setFichaSection('portal')} className="shrink-0 rounded-full border border-zinc-600 px-3.5 py-1 text-xs text-zinc-200 hover:bg-zinc-800">
+                      {it.tipo === 'revisar' ? 'Revisarla' : it.tipo === 'reunion' ? 'Prepararla' : it.tipo === 'acuerdos' ? 'Anotar' : it.tipo === 'plan' ? 'Ir al plan' : it.tipo === 'accesos' ? 'Ver accesos' : 'Abrir'}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Las tres partes de la ficha */}
           <nav className="sticky top-[calc(env(safe-area-inset-top,0px)+3.75rem)] z-10 grid grid-cols-3 gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/95 p-1 backdrop-blur-md" aria-label="Partes de la ficha">

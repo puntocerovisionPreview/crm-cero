@@ -357,9 +357,15 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
           )}
           <div className="min-w-0">
             <Eyebrow>Tu espacio con .CERO · {p.recorrido === 'web' ? 'Tu web' : ETAPAS.find((x) => x.id === etapa)!.label}</Eyebrow>
-            <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">Hola, {p.estudio}</h1>
+            <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">Hola, {p.estudio}.</h1>
           </div>
         </div>
+        {/* La semana en una frase: qué trabajamos, qué le toca y cuándo nos vemos */}
+        <p className="mt-5 max-w-2xl text-lg sm:text-2xl font-light leading-snug tracking-tight text-[var(--text-primary)]">
+          {mostrarAvance && p.recorrido !== 'web' && HITOS[hito - 1] ? <>Ahora estamos en <span className="font-medium">{HITOS[hito - 1].charAt(0).toLowerCase() + HITOS[hito - 1].slice(1)}</span>. </> : null}
+          {pendientes.length ? <>De tu lado hay {pendientes.length === 1 ? 'una sola cosa' : `${pendientes.length} cosas`}</> : <>De tu lado no hay nada por ahora</>}
+          {ver.reuniones && p.proximaReunion ? <>, y nos vemos <span className="font-medium">{p.proximaReunion.fecha === new Date().toLocaleDateString('en-CA') ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}{p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}</span>.</> : '.'}
+        </p>
         {mostrarAvance && p.recorrido !== 'web' && <EtapasLine etapas={p.etapas || ['presencia']} actual={etapa} />}
         {mostrarAvance && (
           <button type="button" onClick={() => verRecorrido && setTab('recorrido')} className="mt-5 w-full text-left group">
@@ -436,8 +442,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                       </ul>
                     ) : <p className="mt-3 text-sm text-[var(--text-secondary)]">{principal ? 'Solo lo de arriba.' : 'Nada más por ahora.'}</p>}
                   </Card>
-                  <div className="card-swiss p-5 bg-[var(--bg-surface-muted)]">
-                    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]"><span className="w-2 h-2 rounded-full bg-[var(--text-primary)]" aria-hidden />Nos toca a nosotros</p>
+                  <div className="p-1 sm:p-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]">Mientras tanto, nosotros</p>
                     {(p.enMarcha || []).length ? (
                       <ul className="mt-3 space-y-2.5">
                         {(p.enMarcha || []).map((x, i) => (
@@ -1070,30 +1076,30 @@ function HoyHero({ principal, taskProps, nuevo, verReunion, reunion, porConfirma
   const vencida = t ? isOverdue(t, taskProps.today) : false;
   const conReunion = verReunion && (reunion || porConfirmar);
   return (
-    <section className="overflow-hidden rounded-[22px] bg-[#191B20] text-white shadow-lg">
+    <section className="overflow-hidden rounded-[28px] bg-white text-[var(--text-primary)] shadow-sm border border-[var(--border-subtle)]">
       <div className={`grid ${conReunion ? 'sm:grid-cols-[1.4fr_1fr]' : ''}`}>
         <div className="p-5 sm:p-7">
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">Hoy · te toca{nuevo && <span className="rounded-full bg-[var(--marca)] px-2 py-0.5 text-[9px] tracking-wide text-white">Nuevo</span>}</p>
+          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">Te toca a vos{t?.fecha ? ` · ${isOverdue(t, taskProps.today) ? "venció el" : "para el"} ${formatDisplayDate(t.fecha, "medium")}` : ""}{nuevo && <span className="rounded-full bg-[var(--marca)] px-2 py-0.5 text-[9px] tracking-wide text-white">Nuevo</span>}</p>
           {t ? (
             <>
-              <h2 className="mt-3 text-2xl sm:text-[28px] font-light leading-tight tracking-tight break-words">{t.titulo}</h2>
-              {t.paraQue && <p className="mt-2 text-sm leading-relaxed text-white/70">{t.paraQue}</p>}
-              {t.motivo && <p className="mt-3 rounded-lg bg-amber-400/15 px-3 py-2 text-sm text-amber-200"><span className="text-amber-300/80">Requiere ajustes: </span>{t.motivo}</p>}
-              {t.detalle && <p className="mt-3 text-sm leading-relaxed text-white/60 whitespace-pre-line">{t.detalle}</p>}
-              {t.fecha && <p className={`mt-3 text-xs ${vencida ? 'text-rose-300' : 'text-white/50'}`}>{vencida ? 'Venció el ' : 'Para el '}{formatDisplayDate(t.fecha, 'medium')}</p>}
+              <h2 className="mt-3 text-2xl sm:text-[32px] font-normal leading-tight tracking-tight break-words">{t.titulo}</h2>
+              {t.paraQue && <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-secondary)]"><span className="font-medium text-[var(--text-primary)]">Para qué sirve: </span>{t.paraQue}</p>}
+              {t.motivo && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><span className="text-amber-700">Requiere ajustes: </span>{t.motivo}</p>}
+              {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
+              {vencida && <p className="mt-3 text-xs text-rose-600">Se pasó la fecha: si necesitás más tiempo, avisanos.</p>}
               <div className="mt-5 flex flex-wrap gap-2">
                 <button type="button" onClick={() => taskProps.onDone(t.id)} disabled={taskProps.sending === t.id || taskProps.readOnly} title={taskProps.readOnly ? 'Vista previa: el botón no hace nada' : 'Avisanos que lo terminaste: lo revisamos y te confirmamos'}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--marca)] px-5 py-2.5 text-sm font-medium text-[var(--marca-text)] disabled:opacity-60">
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--marca)] px-6 py-3 text-[15px] font-medium text-[var(--marca-text)] disabled:opacity-60">
                   {taskProps.sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
                 </button>
-                {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-4 py-2.5 text-sm text-white hover:border-white/50">Abrir <ArrowUpRight className="w-4 h-4" /></a>}
-                {t.pideArchivos && taskProps.uploadUrl && <a href={taskProps.uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-4 py-2.5 text-sm text-white hover:border-white/50"><Paperclip className="w-4 h-4" />Subir a Materiales</a>}
+                {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-5 py-3 text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]">Abrir <ArrowUpRight className="w-4 h-4" /></a>}
+                {t.pideArchivos && taskProps.uploadUrl && <a href={taskProps.uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-5 py-3 text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]"><Paperclip className="w-4 h-4" />Subir a Materiales</a>}
               </div>
             </>
           ) : (
             <>
-              <h2 className="mt-3 text-2xl sm:text-[28px] font-light leading-tight tracking-tight">Nada de tu lado por ahora.</h2>
-              <p className="mt-2 text-sm leading-relaxed text-white/70">
+              <h2 className="mt-3 text-2xl sm:text-[32px] font-light leading-tight tracking-tight">Nada de tu lado por ahora.</h2>
+              <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-secondary)]">
                 {enRevision ? `Estamos revisando ${enRevision === 1 ? 'lo que nos mandaste' : `${enRevision} cosas que nos mandaste`}. ` : ''}
                 {trabajando ? `Estamos con: ${trabajando.replace(/^Preparando: /, 'preparando ')}.` : 'Te avisamos acá cuando haya algo para vos.'}
               </p>
@@ -1101,37 +1107,37 @@ function HoyHero({ principal, taskProps, nuevo, verReunion, reunion, porConfirma
           )}
         </div>
         {conReunion && (
-          <div className="border-t border-white/10 bg-white/[0.04] p-5 sm:border-l sm:border-t-0 sm:p-7">
-            <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-white/50">Próxima reunión</p>
+          <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-muted)] p-5 sm:border-l sm:border-t-0 sm:p-7">
+            <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--text-tertiary)]">Nos vemos</p>
             {reunion ? (
               <>
                 <div className="mt-3 flex items-center gap-3">
-                  <div className="w-14 shrink-0 overflow-hidden rounded-xl bg-white text-center text-[#191B20]">
+                  <div className="w-14 shrink-0 overflow-hidden rounded-xl bg-white text-center text-[#191B20] border border-[var(--border-subtle)]">
                     <p className="bg-[var(--marca)] py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</p>
                     <p className="py-1 text-2xl font-light">{new Date(`${reunion.fecha}T12:00:00`).getDate()}</p>
                   </div>
                   <div className="min-w-0 text-sm">
                     <p className="font-medium capitalize">{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long' })}</p>
-                    <p className="text-white/60">{reunion.hora ? `${reunion.hora} hs · Argentina` : 'Horario a confirmar'}</p>
+                    <p className="text-[var(--text-secondary)]">{reunion.hora ? `${reunion.hora} hs · Argentina` : 'Horario a confirmar'}</p>
                   </div>
                 </div>
-                {reunion.objetivo && <p className="mt-3 text-sm text-white/80"><span className="text-white/45">Para qué: </span>{reunion.objetivo}</p>}
-                {reunion.preparar && <p className="mt-1 text-sm text-white/80"><span className="text-white/45">Traé: </span>{reunion.preparar}</p>}
-                <p className="mt-1 text-xs text-white/45">Con Juan{reunion.conCM ? ' y la community manager' : ''}</p>
+                {reunion.objetivo && <p className="mt-3 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué: </span>{reunion.objetivo}</p>}
+                {reunion.preparar && <p className="mt-1 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Traé o pensá: </span>{reunion.preparar}</p>}
+                <p className="mt-1 text-xs text-[var(--text-tertiary)]">Con Juan{reunion.conCM ? ' y la community manager' : ''}</p>
                 <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                  {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 font-medium text-[#191B20]"><Video className="w-3.5 h-3.5" />Entrar</a>}
-                  <a href={calendarLink({ fecha: reunion.fecha, hora: reunion.hora }, `Reunión .CERO · ${estudio}`, link)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-white/25 px-3 py-1.5 text-white"><CalendarPlus className="w-3.5 h-3.5" />A mi calendario</a>
-                  {whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola Juan, soy de ${estudio}. ¿Podemos mover la reunión del ${formatDisplayDate(reunion.fecha, 'medium')}?`)}`} target="_blank" rel="noopener noreferrer" className="px-1 py-1.5 text-white/55 underline underline-offset-4">Reprogramar</a>}
+                  {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[#191B20] px-3 py-1.5 font-medium text-white"><Video className="w-3.5 h-3.5" />Entrar</a>}
+                  <a href={calendarLink({ fecha: reunion.fecha, hora: reunion.hora }, `Reunión .CERO · ${estudio}`, link)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-[var(--text-primary)]"><CalendarPlus className="w-3.5 h-3.5" />A mi calendario</a>
+                  {whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola Juan, soy de ${estudio}. ¿Podemos mover la reunión del ${formatDisplayDate(reunion.fecha, 'medium')}?`)}`} target="_blank" rel="noopener noreferrer" className="px-1 py-1.5 text-[var(--text-secondary)] underline underline-offset-4">Reprogramar</a>}
                 </div>
               </>
             ) : (
               <>
-                <span className="mt-3 inline-flex rounded-full border border-white/25 px-2.5 py-0.5 text-xs text-white/70">Por confirmar</span>
-                {porConfirmar?.objetivo && <p className="mt-2 text-sm text-white/80"><span className="text-white/45">Para qué: </span>{porConfirmar.objetivo}</p>}
-                <p className="mt-1 text-sm text-white/55">La fecha la acordamos con vos.</p>
+                <span className="mt-3 inline-flex rounded-full border border-[var(--border-strong)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)]">Por confirmar</span>
+                {porConfirmar?.objetivo && <p className="mt-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué: </span>{porConfirmar.objetivo}</p>}
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">La fecha la acordamos con vos.</p>
               </>
             )}
-            {acuerdo && <p className="mt-4 text-[11px] text-white/40">Reunión {Math.min(acuerdo.hechas + 1, acuerdo.total)} de {acuerdo.total} del acuerdo</p>}
+            {acuerdo && <p className="mt-4 text-[11px] text-[var(--text-tertiary)]">Es la reunión {Math.min(acuerdo.hechas + 1, acuerdo.total)} de {acuerdo.total} del acuerdo</p>}
           </div>
         )}
       </div>

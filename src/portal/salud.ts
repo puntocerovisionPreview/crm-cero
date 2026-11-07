@@ -110,3 +110,32 @@ export function clientesSinEntrar(projects: Project[], visitas: PortalVisita[] =
     })
     .filter((x): x is { project: Project; texto: string } => !!x);
 }
+
+/**
+ * Cómo está el cliente en UNA frase, como se lo contarías a alguien (lista y ficha).
+ * Primero lo que te pide algo, después lo que está esperando y si no, que está en orden.
+ */
+export function resumenCliente(p: Project, salud: SaludCliente, ctx: { meetings: AgendaMeeting[]; today: string }): string {
+  const revisar = (p.pafTareas || []).filter((t) => t.estado === 'enviada');
+  const a = p.proximaAccion;
+  const partes: string[] = [];
+  if (revisar.length) partes.push(revisar.length === 1 ? `Terminó «${revisar[0].titulo}»: revisala` : `Terminó ${revisar.length} tareas: revisalas`);
+  else if (a?.bloqueado) partes.push(`Está trabado: ${a.texto}`);
+  else if (a?.responsable === 'yo') partes.push(`Te toca: ${a.texto}${a.fecha ? (a.fecha < ctx.today ? ` (venció el ${ddmm(a.fecha)})` : ` para el ${ddmm(a.fecha)}`) : ''}`);
+  else if (a) partes.push(`Esperando ${a.responsable === 'cm' ? 'a la CM' : 'que te mande'}: ${a.necesita || a.texto}`);
+  const motivo = salud.motivos.find((m) => !m.texto.startsWith('Bloqueado') && m.texto !== 'Sin próxima acción definida');
+  if (motivo) partes.push(partes.length ? motivo.texto.charAt(0).toLowerCase() + motivo.texto.slice(1) : motivo.texto);
+  if (!partes.length) {
+    const proxima = ctx.meetings.filter((m) => m.projectId === p.id && !m.completed && !m.proposed && m.date >= ctx.today).map((m) => m.date).sort()[0];
+    return !a ? 'Le falta definir la próxima acción.' : proxima ? `Todo en orden. Próxima reunión el ${ddmm(proxima)}.` : 'Todo en orden.';
+  }
+  return `${partes.join('. Además, ')}.`;
+}
+
+/** "Cómo viene" de la ficha: en qué parte del programa está y su frase de estado */
+export function comoViene(p: Project, salud: SaludCliente, ctx: { meetings: AgendaMeeting[]; today: string; semana?: number | null; etapa?: string; hitoTitulo?: string }): string {
+  const donde = ctx.etapa
+    ? `${ctx.semana ? `Va por la semana ${ctx.semana}, en` : 'Está en'} ${ctx.etapa}${ctx.hitoTitulo ? `: ${ctx.hitoTitulo.charAt(0).toLowerCase()}${ctx.hitoTitulo.slice(1)}` : ''}. `
+    : '';
+  return `${donde}${resumenCliente(p, salud, ctx)}`;
+}
