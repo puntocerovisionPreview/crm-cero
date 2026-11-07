@@ -8,6 +8,9 @@ import { conHistorial } from '../portal/historial';
 import { republishIfPublished } from '../portal/store';
 import { getTodayString } from '../utils/storage';
 import { hapticFeedback } from '../utils/haptics';
+import { PafPlanAuto } from './PafPlanAuto';
+import { tareasNuestras } from '../portal/presenciaAuto';
+import type { AgendaTask } from '../types';
 
 const FASE_STYLE: Record<TemaFase, string> = {
   sin_empezar: 'bg-zinc-800 text-zinc-400',
@@ -31,7 +34,9 @@ export const PafPlanSection: React.FC<{
   onVer: (section: 'tareas' | 'entregas') => void;
   onConfirmarHito: (hito: number, evidencia: string, etapa: Etapa) => void;
   onActivarEtapa: (etapa: Etapa) => void;
-}> = ({ project, meetings, onUpdateProject, onAgendar, onVer, onConfirmarHito, onActivarEtapa }) => {
+  /** Para mandar lo tuyo de cada tema a tu agenda */
+  onAddTask?: (task: Omit<AgendaTask, 'id' | 'createdAt'>) => void;
+}> = ({ project, meetings, onUpdateProject, onAgendar, onVer, onConfirmarHito, onActivarEtapa, onAddTask }) => {
   const actual: Etapa = project.pafEtapa || 'presencia';
   const contratadas: Etapa[] = (['presencia', 'adquisicion', 'conversion'] as Etapa[]).filter((e) => e === 'presencia' || e === actual || (project.pafEtapasContratadas || []).includes(e));
   const [vista, setVista] = useState<Etapa>(actual);
@@ -61,15 +66,40 @@ export const PafPlanSection: React.FC<{
     save({ pafEtapasContratadas: cont.includes(e) ? cont.filter((x) => x !== e) : [...cont, e] });
   };
 
-  const empezar = (t: TemaPlantilla) => {
+  /** Empieza uno o varios temas: sus tareas (ocultas) y entregas, y lo tuyo a tu agenda */
+  const empezarVarios = (ts: TemaPlantilla[]) => {
+    if (!ts.length) return;
     hapticFeedback.light();
-    const kit = kitDelTema(t, { tareas, entregas }, newItemId);
-    save({
-      pafTemas: { ...estados, [t.id]: { ...estados[t.id], empezado: getTodayString() } },
-      pafTareas: [...tareas, ...kit.tareas],
-      pafEntregas: [...entregas, ...kit.entregas],
-      ...conHistorial(project, `Empezó el tema ${t.titulo}`),
+    const hoy = getTodayString();
+    let nTareas = [...tareas];
+    let nEntregas = [...entregas];
+    const nTemas = { ...estados };
+    ts.forEach((t) => {
+      const kit = kitDelTema(t, { tareas: nTareas, entregas: nEntregas }, newItemId);
+      nTareas = [...nTareas, ...kit.tareas];
+      nEntregas = [...nEntregas, ...kit.entregas];
+      nTemas[t.id] = { ...nTemas[t.id], empezado: hoy, ...(onAddTask ? { agendado: hoy } : {}) };
+      if (onAddTask) tareasNuestras(t, project, hoy, hoy).forEach(onAddTask);
     });
+    save({
+      pafTemas: nTemas,
+      pafTareas: nTareas,
+      pafEntregas: nEntregas,
+      ...conHistorial(project, `Empezó ${ts.length === 1 ? 'el tema' : 'los temas'} ${ts.map((t) => t.titulo).join(', ')}`),
+    });
+  };
+  const empezar = (t: TemaPlantilla) => empezarVarios([t]);
+  /** Temas ya empezados: lo tuyo a la agenda, desde el día en que empezaron (nunca antes de hoy) */
+  const agendar = (ts: TemaPlantilla[]) => {
+    if (!onAddTask) return;
+    const hoy = getTodayString();
+    const nTemas = { ...estados };
+    ts.forEach((t) => {
+      tareasNuestras(t, project, estados[t.id]?.empezado || hoy, hoy).forEach(onAddTask);
+      nTemas[t.id] = { ...nTemas[t.id], agendado: hoy };
+    });
+    onUpdateProject(project.id, { pafTemas: nTemas });
+    hapticFeedback.success();
   };
 
   const toggleCheck = (t: TemaPlantilla, i: number) => {
@@ -89,6 +119,7 @@ export const PafPlanSection: React.FC<{
 
   return (
     <div className="space-y-4">
+      {actual === 'presencia' && <PafPlanAuto project={project} onUpdateProject={onUpdateProject} onEmpezar={empezarVarios} onAgendar={onAddTask ? agendar : undefined} />}
       <ClientTimeline project={project} meetings={meetings} />
 
       <section className="rounded-xl border border-zinc-800 bg-zinc-950/30 p-3 space-y-3">

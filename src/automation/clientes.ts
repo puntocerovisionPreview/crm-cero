@@ -5,6 +5,7 @@
  */
 import type { AgendaMeeting, Project } from '../types';
 import { escapeHtml } from './messages';
+import { accesosDemorados, temasParaEmpezar } from '../portal/presenciaAuto';
 
 const ddmm = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 const addDays = (d: string, n: number) => { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() + n); return x.toLocaleDateString('en-CA'); };
@@ -26,7 +27,7 @@ export function acuerdosSinAnotar(projects: Project[], meetings: AgendaMeeting[]
 export interface ItemClienteHoy {
   /** Cliente al que lleva (si es de uno solo) */
   projectId?: string;
-  tipo: 'revisar' | 'reunion' | 'acuerdos' | 'decision' | 'accion' | 'bloqueado' | 'vencidas' | 'reportes';
+  tipo: 'revisar' | 'reunion' | 'acuerdos' | 'decision' | 'accion' | 'bloqueado' | 'vencidas' | 'reportes' | 'plan' | 'accesos';
   texto: string;
   /** Detalle chico (ej. "sin preparar") */
   nota?: string;
@@ -48,6 +49,13 @@ export function itemsClientesHoy(projects: Project[], meetings: AgendaMeeting[],
     const a = p.proximaAccion;
     if (a?.responsable === 'yo' && a.fecha && a.fecha <= today) out.push({ projectId: p.id, tipo: 'accion', texto: `${p.clientName}: ${a.texto}${a.fecha < today ? ` (venció el ${ddmm(a.fecha)})` : ''}` });
     if (a?.bloqueado) out.push({ projectId: p.id, tipo: 'bloqueado', texto: `${p.clientName} está bloqueado: ${a.texto}` });
+  });
+  // Presencia: temas que ya toca empezar y accesos pedidos que no llegan
+  ps.filter(esPaf).forEach((p) => {
+    const toca = temasParaEmpezar(p, today);
+    if (toca.length) out.push({ projectId: p.id, tipo: 'plan', texto: `${p.clientName}: ya toca empezar ${toca.map((t) => t.titulo).join(', ')}` });
+    const demorados = accesosDemorados(p, today);
+    if (demorados.length) out.push({ projectId: p.id, tipo: 'accesos', texto: `${p.clientName} todavía no te dio acceso a ${demorados.map((a) => a.label).join(', ')}: recordáselo` });
   });
   const vencidas = ps.flatMap((p) => (p.pafTareas || []).filter((t) => t.estado === 'habilitada' && (t.responsable || 'estudio') === 'estudio' && t.fecha && t.fecha < today).map(() => p));
   if (vencidas.length) {

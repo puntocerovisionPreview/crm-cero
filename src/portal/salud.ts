@@ -4,6 +4,7 @@
  * el tablero, la ficha, el Inicio y los avisos. Funciones puras.
  */
 import type { AgendaMeeting, Project } from '../types';
+import { accesosDemorados } from './presenciaAuto';
 
 export const PAF_VISITAS_COLLECTION = 'paf_visitas';
 
@@ -76,6 +77,9 @@ export function saludCliente(p: Project, ctx: { meetings: AgendaMeeting[]; visit
     if (ultima && diasEntre(ultima, today) >= 30) add('riesgo', `Sin reunión hace ${diasEntre(ultima, today)} días y nada agendado`);
     else if (ultima && diasEntre(ultima, today) >= 21) add('atencion', `Sin reunión hace ${diasEntre(ultima, today)} días y nada agendado`);
   }
+
+  const demorados = accesosDemorados(p, today);
+  if (demorados.length) add('atencion', `Faltan accesos que pediste: ${demorados.map((a) => a.label).join(', ')}`);
 
   const fin = p.deliveryDate;
   if (fin && fin >= today && diasEntre(today, fin) <= 14) add('atencion', `Termina el programa el ${ddmm(fin)}: hablá de cómo sigue`);

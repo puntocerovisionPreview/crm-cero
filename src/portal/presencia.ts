@@ -271,6 +271,8 @@ export function temasDelAlcance(alcance: Servicio[] = [], etapa: Etapa = 'presen
 /** Estado de un tema en la ficha de un cliente */
 export interface TemaEstado {
   empezado?: string; // YYYY-MM-DD
+  /** Cuándo se sumó a tu agenda lo tuyo de este tema (YYYY-MM-DD) */
+  agendado?: string;
   checks?: boolean[];
 }
 export type TemaFase = 'sin_empezar' | 'en_curso' | 'esperando' | 'completo';

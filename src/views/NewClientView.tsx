@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Check, Copy, Loader2, MessageCircle } from 'lucide-react';
-import type { AgendaMeeting, Project } from '../types';
+import type { AgendaMeeting, AgendaTask, Project } from '../types';
 import { buildNewClientProject, validateNewClient, type BillingMode, type NewClientForm, businessDaysAfter } from '../utils/newClient';
 import { SERVICIOS, temaPorId } from '../portal/presencia';
+import { tareasNuestras } from '../portal/presenciaAuto';
 
 /** La reunión de arranque ya con su objetivo y preparación (del método) */
 const ARRANQUE = (() => {
@@ -36,9 +37,11 @@ export const NewClientView: React.FC<{
   onAddProject: (p: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => Promise<string>;
   onUpdateProject: (id: string, updates: Partial<Project>) => void;
   onAddMeeting: (m: Omit<AgendaMeeting, 'id' | 'createdAt'>) => void;
+  /** Lo tuyo del Arranque va directo a tu agenda */
+  onAddTask?: (task: Omit<AgendaTask, 'id' | 'createdAt'>) => void;
   onNavigate: (path: string) => void;
   onBack: () => void;
-}> = ({ initialTipo = 'paf', onAddProject, onUpdateProject, onAddMeeting, onNavigate, onBack }) => {
+}> = ({ initialTipo = 'paf', onAddProject, onUpdateProject, onAddMeeting, onAddTask, onNavigate, onBack }) => {
   const [f, setF] = useState<NewClientForm>({
     tipo: initialTipo, plan: 'paf_pro', estudio: '', contacto: '', email: '', whatsapp: '',
     monto: 0, moneda: initialTipo === 'paf' ? 'USD' : 'ARS', modo: 'cuotas', primerCobro: getTodayString(), cuotas: 3, nota: '',
@@ -68,7 +71,11 @@ export const NewClientView: React.FC<{
     const warnings: string[] = [];
     try {
       const data = buildNewClientProject(form);
+      const hoy = new Date().toLocaleDateString('en-CA');
+      if (isPaf && onAddTask && data.pafTemas?.arranque) data.pafTemas = { ...data.pafTemas, arranque: { ...data.pafTemas.arranque, agendado: hoy } };
       const projectId = await onAddProject(data);
+      // Lo tuyo del Arranque (traspaso, Tally, preparar la reunión, "Hoy acordamos") a tu agenda
+      if (isPaf && onAddTask) tareasNuestras(temaPorId('arranque'), { id: projectId, clientName: form.estudio.trim() }, hoy, hoy).forEach(onAddTask);
       const res: Result = { projectId, estudio: form.estudio.trim(), whatsapp: form.whatsapp.replace(/\D/g, ''), warnings };
 
       if (reunion.fecha) {

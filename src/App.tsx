@@ -3350,6 +3350,7 @@ export default function App() {
           onAddProject={handleAddProject}
           onUpdateProject={handleUpdateProject}
           onAddMeeting={handleAddMeeting}
+          onAddTask={handleAddTask}
           onNavigate={navigate}
           onBack={() => goBack()}
         />

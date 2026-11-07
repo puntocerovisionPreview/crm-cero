@@ -403,6 +403,7 @@ export interface Project {
   pafHistorial?: { fecha: string; texto: string }[]; // Qué se aprobó o confirmó y cuándo (privado)
   ejemplo?: boolean; // Cliente de ejemplo: se borra entero con un botón
   proximaAccion?: ProximaAccion; // La única próxima acción del cliente (responsable, fecha y qué necesita)
+  pafAccesos?: Partial<Record<import('./portal/presenciaAuto').AccesoId, import('./portal/presenciaAuto').AccesoEstado>>; // Accesos a sus cuentas: falta pedir, pedido, lo tenemos o no aplica
   pafEntregas?: import('./portal/model').PafDelivery[]; // Entregas (enlaces a Drive), visibles si están publicadas
   studentPortalToken?: string; // Link de solo lectura para el alumno (/alumno/{token})
   statusOverride?: 'not_started' | 'in_progress' | 'waiting_client' | 'overdue_payment' | 'completed'; // Override manual del sistema de estado visual

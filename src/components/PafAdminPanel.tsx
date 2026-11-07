@@ -1,7 +1,7 @@
 import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Route, CalendarDays, FileText, Star, CalendarPlus, Check, CircleAlert, Copy, ExternalLink, Eye, FolderOpen, Home, ImagePlus, Link2, ListChecks, Loader2, Megaphone, MessageCircle, NotebookPen, Package, Palette, Radio, Settings2, Smartphone, Target, Trash2, Undo2 } from 'lucide-react';
 import { shrinkLogo } from '../utils/logoImage';
-import { AgendaMeeting, Project } from '../types';
+import { AgendaMeeting, AgendaTask, Project } from '../types';
 import { newItemId } from '../panels/model';
 import {
   APPROVAL_CHANNELS, CLIENTE_ID_RE, PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PAF_TASK_STATE_LABEL, PRESENCIA_HITOS,
@@ -45,6 +45,8 @@ type Props = {
   onUpdateMeeting?: (id: string, updates: Partial<AgendaMeeting>) => void;
   onToggleMeeting?: (id: string) => void;
   onDeleteMeeting?: (id: string) => void;
+  /** Lo tuyo de cada tema del plan va a tu agenda */
+  onAddTask?: (task: Omit<AgendaTask, 'id' | 'createdAt'>) => void;
   /** Alta con Tally (solo PAF) */
   showAlta?: boolean;
 };
@@ -79,7 +81,7 @@ const SECTION_INFO: Record<Section, { label: string; icon: React.ElementType; hi
  * rápidas; abajo una sección por vez (Inicio, Tareas, Reuniones, Entregas, Archivos, Ajustes).
  * Todo se guarda solo y, si el portal está publicado, le llega al cliente en segundos.
  */
-export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, onUpdateMeeting, onToggleMeeting, onDeleteMeeting, showAlta = true }) => {
+export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProject, onAddMeeting, onUpdateMeeting, onToggleMeeting, onDeleteMeeting, onAddTask, showAlta = true }) => {
   const [section, setSectionState] = useState<Section>(() => {
     try {
       const s = (localStorage.getItem('paf_panel_seccion') as Section) || (showAlta ? 'plan' : 'inicio');
@@ -160,7 +162,7 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
           <p className="flex items-center gap-2 text-[11px] text-zinc-500"><Icon className="w-3.5 h-3.5 shrink-0" />{info.hint}</p>
 
           {section === 'plan' && (
-            <PafPlanSection project={project} meetings={meetings} onUpdateProject={onUpdateProject}
+            <PafPlanSection project={project} meetings={meetings} onUpdateProject={onUpdateProject} onAddTask={onAddTask}
               onAgendar={(t) => { setSugerida(t); setSection('reuniones'); setAdding('reunion'); requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })); }}
               onVer={(s) => setSection(s)}
               onConfirmarHito={(n, evidencia, etapa) => {

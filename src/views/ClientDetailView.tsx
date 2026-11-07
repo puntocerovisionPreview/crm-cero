@@ -885,6 +885,7 @@ export const ClientDetailView: React.FC<Props> = ({
               onUpdateMeeting={onUpdateMeeting}
               onToggleMeeting={onToggleMeeting}
               onDeleteMeeting={onDeleteMeeting}
+              onAddTask={onAddTask}
               showAlta={isPaf}
             />
           </div>}

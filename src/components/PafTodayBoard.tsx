@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { AlertOctagon, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardList, FileText, NotebookPen, Package, Timer } from 'lucide-react';
+import { AlertOctagon, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardList, FileText, KeyRound, NotebookPen, Package, Play, Timer } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
 import { PRESENCIA_HITOS, pafTodayRows } from '../portal/model';
 import { isActivePafStudent } from '../panels/paf';
@@ -10,7 +10,7 @@ import { SALUD_DOT } from './ClienteSalud';
 
 const ICONO: Record<ItemClienteHoy['tipo'], React.ElementType> = {
   revisar: BellRing, reunion: CalendarDays, acuerdos: NotebookPen, decision: Package,
-  accion: ClipboardList, bloqueado: AlertOctagon, vencidas: Timer, reportes: FileText,
+  accion: ClipboardList, bloqueado: AlertOctagon, vencidas: Timer, reportes: FileText, plan: Play, accesos: KeyRound,
 };
 
 /**
