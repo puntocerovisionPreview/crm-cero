@@ -66,7 +66,7 @@ export function buildEjemplo(email: string, hoy = new Date()) {
     pafResumenes: [{
       id: t('r1'), fecha: d(-12), publicado: true,
       acuerdos: 'El objetivo es conseguir más proyectos de vivienda unifamiliar en zona norte.\nDecide Lucía; Martín participa en las reuniones de contenido.',
-      proximosPasos: 'De tu lado:\n- Marcar los 3 proyectos favoritos en Materiales\nDe nuestro lado:\n- Preparar el Excel de cliente ideal y explicarlo en la próxima reunión',
+      proximosPasos: 'De tu lado:\n- Cargar los proyectos en Materiales › Proyectos\nDe nuestro lado:\n- Preparar el Excel de cliente ideal y explicarlo en la próxima reunión',
     }],
     pafAnuncios: [
       { id: t('an1'), ...BIENVENIDA_PAF, publicado: true, fijado: true, creadoEn: iso(-14) },

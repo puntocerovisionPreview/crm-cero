@@ -63,7 +63,7 @@ import { accesosDelAlta } from '../src/portal/model';
 describe('arranque cargado y carpetas del alta', () => {
   it('un PAF nuevo trae las tareas de la etapa 1 ocultas y la bienvenida sin publicar', () => {
     const p = buildNewClientProject({ ...base, tipo: 'paf' } as NewClientForm, new Date('2026-11-03T12:00:00Z'));
-    expect(p.pafTareas?.map((t) => t.estado)).toEqual(['borrador', 'borrador', 'borrador']);
+    expect(p.pafTareas?.map((t) => t.estado)).toEqual(['borrador', 'borrador', 'borrador', 'borrador', 'borrador']);
     expect(p.pafTareas?.[0].titulo).toBe('Completar el formulario de arranque');
     expect(p.pafAnuncios).toHaveLength(1);
     expect(p.pafAnuncios?.[0]).toMatchObject({ titulo: 'Bienvenida', publicado: false, fijado: true });

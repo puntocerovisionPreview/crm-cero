@@ -71,7 +71,7 @@ const DEMO: PafPortalDoc = {
     { id: 'e1', titulo: 'Diagnóstico inicial del estudio', fecha: '2026-10-30', enlace: 'https://drive.google.com/' },
     { id: 'e2', titulo: 'Propuesta de foco', version: 'v2', fecha: '2026-11-04', enlace: 'https://drive.google.com/', estado: 'en_revision', decision: 'si este foco representa a tu estudio', hasta: '2026-11-07', canal: 'mail' },
   ],
-  proximaReunion: { fecha: '2026-11-10', hora: '10:30', objetivo: 'Revisar la propuesta de mensaje', preparar: 'Tus 3 proyectos favoritos', conCM: true },
+  proximaReunion: { fecha: '2026-11-10', hora: '10:30', objetivo: 'Revisar la propuesta de mensaje', preparar: 'Qué obras te gustaría mostrar primero', conCM: true },
   semana: { actual: 3, total: 12 },
   actualizadoEn: '2026-11-02T20:00:00.000Z',
   objetivos: [
@@ -285,6 +285,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   // "Tu próxima acción": la que marcó Juan o, si no, la más urgente del estudio
   const principal = ver.proximaAccion ? pendientes.find((t) => t.prioritaria) || pendientes.find((t) => (t.responsable || 'estudio') === 'estudio') : undefined;
   const resto = pendientes.filter((t) => t !== principal);
+  // Lo que tiene que hacer el estudio (sin lo que hace la CM o .CERO)
+  const suyas = pendientes.filter((t) => (t.responsable || 'estudio') === 'estudio');
   // Entregas que esperan una decisión suya (van en "Te toca a vos" con su sello)
   const decisiones = ver.entregas ? (p.entregas || []).filter((d) => d.decision && (d.estado || 'en_revision') === 'en_revision') : [];
   const entregas = p.entregas || [];
@@ -320,6 +322,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   const taskProps = {
     today: new Date().toLocaleDateString('en-CA'),
     uploadUrl: p.materiales?.proyectos || p.enlaces?.materiales || p.enlaces?.carpeta,
+    // Cada tarea sube a su subcarpeta de Materiales (Proyectos, Equipo y marca, Registro de obra…)
+    uploadFor: (t: PortalTask) => (t.carpeta && p.materiales?.[t.carpeta]) || p.materiales?.proyectos || p.enlaces?.materiales || p.enlaces?.carpeta,
     sending, readOnly: !!readOnly, onDone: done,
   };
   const verRecorrido = ver.recorrido && mostrarAvance;
@@ -363,9 +367,23 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
         {/* La semana en una frase: qué trabajamos, qué le toca y cuándo nos vemos */}
         <p className="mt-5 max-w-2xl text-lg sm:text-2xl font-light leading-snug tracking-tight text-[var(--text-primary)]">
           {mostrarAvance && p.recorrido !== 'web' && HITOS[hito - 1] ? <>Ahora estamos en <span className="font-medium">{HITOS[hito - 1].charAt(0).toLowerCase() + HITOS[hito - 1].slice(1)}</span>. </> : null}
-          {pendientes.length ? <>De tu lado hay {pendientes.length === 1 ? 'una sola cosa' : `${pendientes.length} cosas`}</> : <>De tu lado no hay nada por ahora</>}
+          {suyas.length ? <>De tu lado hay {suyas.length === 1 ? 'una sola cosa' : `${suyas.length} cosas`}</> : <>De tu lado no hay nada por ahora</>}
           {ver.reuniones && p.proximaReunion ? <>, y nos vemos <span className="font-medium">{p.proximaReunion.fecha === new Date().toLocaleDateString('en-CA') ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}{p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}</span>.</> : '.'}
         </p>
+        <nav aria-label="Tu resumen" className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { n: suyas.length, label: suyas.length === 1 ? 'tarea para vos' : 'tareas para vos', go: () => setTab(tabs.some((x) => x.id === 'tareas') ? 'tareas' : 'inicio'), alerta: suyas.some((t) => isOverdue(t, taskProps.today)) },
+            { n: ver.reuniones && p.proximaReunion ? 1 : 0, label: ver.reuniones && p.proximaReunion ? `reunión: ${p.proximaReunion.fecha === taskProps.today ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' })}` : 'reuniones agendadas', go: () => { setTab('inicio'); requestAnimationFrame(() => document.getElementById('hoy')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); } },
+            { n: decisiones.length, label: decisiones.length === 1 ? 'entrega para revisar' : 'entregas para revisar', go: () => setTab(tabs.some((x) => x.id === 'entregas') ? 'entregas' : 'inicio'), alerta: decisiones.length > 0 },
+            { n: hechos.length, label: `de ${HITOS.length} hitos listos`, go: () => setTab(verRecorrido ? 'recorrido' : 'inicio') },
+          ].map((x) => (
+            <button key={x.label} type="button" onClick={x.go} className="group rounded-2xl border border-[var(--border-subtle)] bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm">
+              <span className={`block text-3xl font-light tabular-nums ${x.alerta ? 'text-[var(--marca)]' : 'text-[var(--text-primary)]'}`}>{x.n}</span>
+              <span className="block text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">{x.label}</span>
+            </button>
+          ))}
+        </nav>
+        {!readOnly && <button type="button" onClick={() => setShowWelcome(true)} className="mt-3 text-xs text-[var(--text-tertiary)] underline underline-offset-4 hover:text-[var(--text-primary)]">Ver la guía de cómo usar tu portal</button>}
         {mostrarAvance && p.recorrido !== 'web' && <EtapasLine etapas={p.etapas || ['presencia']} actual={etapa} />}
         {mostrarAvance && (
           <button type="button" onClick={() => verRecorrido && setTab('recorrido')} className="mt-5 w-full text-left group">
@@ -386,7 +404,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
       {/* Lo nuevo desde la última visita, en una línea: cada parte lleva a su lugar */}
       {!showWelcome && ver.novedades && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => setTab(t)} />}
 
-      {showWelcome && <Welcome onClose={closeWelcome} hasWhatsapp={!!whatsapp} bienvenida={p.bienvenida} />}
+      {showWelcome && <GuiaInicial onClose={closeWelcome} estudio={p.estudio} pendientes={suyas.length} reunion={ver.reuniones ? p.proximaReunion : undefined} carpeta={p.enlaces?.carpeta} bienvenida={p.bienvenida} hasWhatsapp={!!whatsapp} />}
 
       {/* Pestañas */}
       {tabs.length > 1 && (
@@ -971,29 +989,59 @@ function PortalSkeleton() {
   );
 }
 
-function Welcome({ onClose, hasWhatsapp, bienvenida }: { onClose: () => void; hasWhatsapp: boolean; bienvenida?: string | null }) {
-  const steps = [
-    'Arriba ves en qué hito estamos. En “Mi recorrido” está qué trabajamos en cada uno.',
-    'Tu próxima acción va siempre arriba, con su explicación. No hace falta completar nada hasta que te lo indiquemos. Cuando la termines, tocá “Terminé”: la revisamos y te confirmamos.',
-    'Tus carpetas de Drive y todo lo que te entregamos están en Archivos y Entregas.',
+/**
+ * GUÍA INICIAL: se abre sola la primera vez (y desde "Ver la guía" cuando quiera).
+ * Paso a paso, con lo que tiene ahora: cuántas tareas, la próxima reunión y su carpeta.
+ */
+function GuiaInicial({ onClose, estudio, pendientes, reunion, carpeta, bienvenida, hasWhatsapp }: {
+  onClose: () => void; estudio: string; pendientes: number; reunion?: PafPortalDoc['proximaReunion'];
+  carpeta?: string | null; bienvenida?: string | null; hasWhatsapp: boolean;
+}) {
+  const [i, setI] = useState(0);
+  const pasos: { titulo: string; texto: React.ReactNode; accion?: React.ReactNode }[] = [
+    {
+      titulo: `Bienvenido, ${estudio}`,
+      texto: <>Este es tu espacio de trabajo con .CERO. Acá ves siempre <b>en qué estamos</b>, <b>qué te toca a vos</b> y <b>qué estamos haciendo nosotros</b>. Te lo mostramos en 1 minuto.</>,
+      accion: bienvenida ? <a href={bienvenida} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium underline underline-offset-4">Abrir la bienvenida en PDF <ArrowUpRight className="w-4 h-4" /></a> : null,
+    },
+    {
+      titulo: 'Arriba, tu resumen',
+      texto: <>Los números de arriba te dicen cuántas tareas tenés, cuándo nos vemos, qué tenés para revisar y cuánto avanzamos. Tocá cualquiera para ir directo.{pendientes ? <> Ahora tenés <b>{pendientes === 1 ? '1 tarea' : `${pendientes} tareas`}</b>.</> : <> Ahora no tenés tareas: te avisamos cuando haya algo.</>}</>,
+    },
+    {
+      titulo: 'Lo que te toca, de a una',
+      texto: <>Cada tarea dice <b>para qué sirve</b> y cómo hacerla. Cuando la termines tocá <b>Terminé</b>: nos llega el aviso, la revisamos y te confirmamos. No hace falta hacer nada que no aparezca acá.</>,
+    },
+    {
+      titulo: 'Tu carpeta de Drive',
+      texto: <>Tiene tres partes: <b>Para completar</b> (lo que te pedimos), <b>Materiales</b> (fotos, proyectos y lo que nos pasás) y <b>Resultados</b> (lo que te entregamos). Cuando una tarea pide archivos, el botón te lleva a la carpeta justa.</>,
+      accion: carpeta ? <a href={carpeta} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium underline underline-offset-4">Abrir tu carpeta <ArrowUpRight className="w-4 h-4" /></a> : null,
+    },
+    {
+      titulo: 'Nos vemos seguido',
+      texto: <>{reunion ? <>Nuestra próxima reunión es el <b>{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}{reunion.hora ? ` a las ${reunion.hora}` : ''}</b>. </> : 'Cuando acordemos la próxima reunión, aparece arriba con el link y para qué es. '}Después de cada una te dejamos acá lo que acordamos.{hasWhatsapp ? ' ¿Dudas? Tocá "Hablar con Juan".' : ''}</>,
+    },
   ];
+  const ultimo = i === pasos.length - 1;
+  const paso = pasos[i];
   return (
-    <Card className="mt-8 p-5 sm:p-6">
-      <Eyebrow>Bienvenido</Eyebrow>
-      <p className="mt-3 text-lg font-light tracking-tight">Así funciona tu portal</p>
-      <ol className="mt-4 space-y-3">
-        {steps.map((s, i) => (
-          <li key={i} className="flex gap-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-            <span className="w-6 h-6 shrink-0 rounded-full border border-[var(--border-subtle)] flex items-center justify-center text-[11px] font-semibold text-[var(--text-primary)]">{i + 1}</span>{s}
-          </li>
-        ))}
-      </ol>
-      {hasWhatsapp && <p className="mt-4 text-sm text-[var(--text-secondary)]">¿Dudas? Escribime por WhatsApp con el botón de abajo.</p>}
-      <div className="mt-5 flex flex-wrap gap-2">
-        {bienvenida && <a href={bienvenida} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--marca)] px-4 py-2 text-sm font-medium text-[var(--marca-text)]">Abrir la bienvenida <ArrowUpRight className="w-4 h-4" /></a>}
-        <button type="button" onClick={onClose} className="btn-solid-primary px-4 py-2 text-sm">Entendido</button>
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/40 p-3 sm:p-6 animate-in fade-in duration-200" role="dialog" aria-modal="true" aria-label="Guía del portal">
+      <div className="w-full max-w-md rounded-[28px] bg-white p-6 sm:p-8 text-[#191B20] shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between">
+          <span className="flex gap-1.5" aria-label={`Paso ${i + 1} de ${pasos.length}`}>
+            {pasos.map((_, k) => <span key={k} className={`h-1.5 rounded-full transition-all ${k === i ? 'w-6 bg-[var(--marca)]' : k < i ? 'w-1.5 bg-[#191B20]' : 'w-1.5 bg-[#DAD6CE]'}`} />)}
+          </span>
+          <button type="button" onClick={onClose} className="text-xs text-[#5F6269] hover:text-[#191B20]">Saltar</button>
+        </div>
+        <h2 className="mt-6 text-2xl font-light tracking-tight">{paso.titulo}</h2>
+        <p className="mt-3 text-[15px] leading-relaxed text-[#3D4047]">{paso.texto}</p>
+        {paso.accion && <div className="mt-4">{paso.accion}</div>}
+        <div className="mt-8 flex items-center justify-between gap-3">
+          {i > 0 ? <button type="button" onClick={() => setI(i - 1)} className="rounded-full px-4 py-2.5 text-sm text-[#5F6269] hover:text-[#191B20]">Atrás</button> : <span />}
+          <button type="button" onClick={() => (ultimo ? onClose() : setI(i + 1))} className="rounded-full bg-[var(--marca)] px-6 py-3 text-sm font-medium text-[var(--marca-text)]">{ultimo ? 'Empezar' : 'Siguiente'}</button>
+        </div>
       </div>
-    </Card>
+    </div>
   );
 }
 
@@ -1014,7 +1062,7 @@ function GoalColumn({ title, items }: { title: string; items: { texto: string; h
   );
 }
 
-function PendingTask({ t, today, uploadUrl, sending, readOnly, onDone, nuevo, bare }: { t: PortalTask; today: string; uploadUrl?: string; sending: string | null; readOnly: boolean; onDone: (id: string) => void; nuevo?: boolean; bare?: boolean }) {
+function PendingTask({ t, today, uploadUrl, uploadFor, sending, readOnly, onDone, nuevo, bare }: { t: PortalTask; today: string; uploadUrl?: string; uploadFor?: (t: PortalTask) => string | undefined; sending: string | null; readOnly: boolean; onDone: (id: string) => void; nuevo?: boolean; bare?: boolean }) {
   const overdue = isOverdue(t, today);
   const delEstudio = (t.responsable || 'estudio') === 'estudio';
   const body = (
@@ -1031,9 +1079,9 @@ function PendingTask({ t, today, uploadUrl, sending, readOnly, onDone, nuevo, ba
         {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
           {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">Abrir <ArrowUpRight className="w-3.5 h-3.5" /></a>}
-          {t.pideArchivos && uploadUrl && (
-            <a href={uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
-              <Paperclip className="w-3.5 h-3.5" /> Subir a Materiales <ArrowUpRight className="w-3.5 h-3.5" />
+          {t.pideArchivos && (uploadFor?.(t) || uploadUrl) && (
+            <a href={uploadFor?.(t) || uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
+              <Paperclip className="w-3.5 h-3.5" /> Subir a {carpetaLabel(t)} <ArrowUpRight className="w-3.5 h-3.5" />
             </a>
           )}
         </div>
@@ -1046,6 +1094,12 @@ function PendingTask({ t, today, uploadUrl, sending, readOnly, onDone, nuevo, ba
     </div>
   );
   return bare ? <div className="px-5 pb-5 pt-2">{body}</div> : <Card className="p-5">{body}</Card>;
+}
+
+/** "Materiales › Proyectos": dónde se suben los archivos de la tarea */
+function carpetaLabel(t: PortalTask): string {
+  const m = MATERIALES.find((x) => x.id === (t.carpeta || 'proyectos'));
+  return m ? `Materiales › ${m.label}` : 'Materiales';
 }
 
 /** Botón fijo para escribirle a Juan por WhatsApp */
@@ -1068,7 +1122,7 @@ function MeetingSummary({ s }: { s: { acuerdos: string; proximosPasos: string } 
 
 /** HOY: el bloque oscuro de arriba. Lo que le toca ahora (o que no le toca nada) y la próxima reunión. */
 function HoyHero({ principal, taskProps, nuevo, verReunion, reunion, porConfirmar, acuerdo, link, estudio, whatsapp, trabajando, enRevision }: {
-  principal?: PortalTask; taskProps: { today: string; uploadUrl?: string; sending: string | null; readOnly: boolean; onDone: (id: string) => void }; nuevo: boolean;
+  principal?: PortalTask; taskProps: { today: string; uploadUrl?: string; uploadFor?: (t: PortalTask) => string | undefined; sending: string | null; readOnly: boolean; onDone: (id: string) => void }; nuevo: boolean;
   verReunion: boolean; reunion: PafPortalDoc['proximaReunion']; porConfirmar?: PafPortalDoc['reunionPorConfirmar']; acuerdo?: PafPortalDoc['reunionesAcuerdo'];
   link?: string | null; estudio: string; whatsapp: string; trabajando?: string; enRevision: number;
 }) {
@@ -1076,7 +1130,7 @@ function HoyHero({ principal, taskProps, nuevo, verReunion, reunion, porConfirma
   const vencida = t ? isOverdue(t, taskProps.today) : false;
   const conReunion = verReunion && (reunion || porConfirmar);
   return (
-    <section className="overflow-hidden rounded-[28px] bg-white text-[var(--text-primary)] shadow-sm border border-[var(--border-subtle)]">
+    <section id="hoy" className="scroll-mt-6 overflow-hidden rounded-[28px] bg-white text-[var(--text-primary)] shadow-sm border border-[var(--border-subtle)]">
       <div className={`grid ${conReunion ? 'sm:grid-cols-[1.4fr_1fr]' : ''}`}>
         <div className="p-5 sm:p-7">
           <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">Te toca a vos{t?.fecha ? ` · ${isOverdue(t, taskProps.today) ? "venció el" : "para el"} ${formatDisplayDate(t.fecha, "medium")}` : ""}{nuevo && <span className="rounded-full bg-[var(--marca)] px-2 py-0.5 text-[9px] tracking-wide text-white">Nuevo</span>}</p>
@@ -1093,7 +1147,7 @@ function HoyHero({ principal, taskProps, nuevo, verReunion, reunion, porConfirma
                   {taskProps.sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
                 </button>
                 {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-5 py-3 text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]">Abrir <ArrowUpRight className="w-4 h-4" /></a>}
-                {t.pideArchivos && taskProps.uploadUrl && <a href={taskProps.uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-5 py-3 text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]"><Paperclip className="w-4 h-4" />Subir a Materiales</a>}
+                {t.pideArchivos && (taskProps.uploadFor?.(t) || taskProps.uploadUrl) && <a href={taskProps.uploadFor?.(t) || taskProps.uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-5 py-3 text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]"><Paperclip className="w-4 h-4" />Subir a {carpetaLabel(t)}</a>}
               </div>
             </>
           ) : (

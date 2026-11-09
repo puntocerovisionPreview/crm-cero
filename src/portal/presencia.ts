@@ -61,7 +61,7 @@ export interface TemaPlantilla {
   objetivo: string;
   completoCuando: string[];
   reunion?: { titulo: string; objetivo: string; preparar?: string; conCM?: boolean; horas: number };
-  tareas: { titulo: string; paraQue: string; detalle?: string; pideArchivos?: boolean; responsable?: PafResponsable }[];
+  tareas: { titulo: string; paraQue: string; detalle?: string; pideArchivos?: boolean; carpeta?: import('./model').MaterialKey; responsable?: PafResponsable }[];
   entregas: { titulo: string; decision: string; canal?: string }[];
 }
 
@@ -72,9 +72,11 @@ export const PRESENCIA_TEMAS: TemaPlantilla[] = [
     completoCuando: ['Respuestas del formulario revisadas', 'Objetivo y responsabilidades confirmados', 'Canales y accesos pedidos', 'Siguiente acción acordada'],
     reunion: { titulo: 'Reunión de arranque', objetivo: 'Conocernos, confirmar el objetivo y cómo vamos a trabajar', preparar: 'Quién decide en el estudio y qué esperás de estos meses', conCM: true, horas: 1.5 },
     tareas: [
-      { titulo: 'Completar el formulario de arranque', paraQue: 'Con estos datos organizamos tu carpeta y preparamos la primera reunión.', detalle: 'Si un dato ya nos lo pasaste, alcanza con confirmarlo.' },
-      { titulo: 'Compartir accesos a Instagram, Google y tu web', paraQue: 'Para revisar cómo está hoy tu presencia y trabajar sobre tus cuentas.', detalle: 'Como colaborador o acceso delegado: las cuentas siguen a tu nombre. Nunca nos pases contraseñas por chat.' },
-      { titulo: 'Marcar tus 3 proyectos favoritos en Materiales', paraQue: 'Son la base de las primeras publicaciones y de tu portfolio.', detalle: 'Renders, fotos y videos de obra de cada uno, en su carpeta.', pideArchivos: true },
+      { titulo: 'Completar el formulario de arranque', paraQue: 'Con estos datos armamos tu carpeta de trabajo y preparamos la primera reunión.', detalle: 'Son pocas preguntas. Si un dato ya nos lo pasaste, alcanza con confirmarlo.' },
+      { titulo: 'Leer la bienvenida y conocer tu carpeta', paraQue: 'Para que sepas qué hay en cada carpeta y cómo vamos a avanzar.', detalle: 'Tu carpeta tiene tres partes: Para completar (lo que te pedimos), Materiales (lo que nos pasás) y Resultados (lo que te entregamos). No completes nada hasta que te lo indiquemos acá.' },
+      { titulo: 'Cargar tus proyectos en Materiales › Proyectos', paraQue: 'Con tus obras reales armamos tu contenido, tu portfolio y tu web. Sin material no podemos mostrar lo que hacés.', detalle: 'Una carpeta por proyecto, con el nombre de la obra. Adentro: fotos, renders, planos y videos de obra. Subí todos los que tengas, terminados o en curso: después elegimos juntos qué mostrar. Si una obra no se puede publicar, avisanos.', pideArchivos: true, carpeta: 'proyectos' },
+      { titulo: 'Subir tu logo y fotos del equipo', paraQue: 'Para que lo que publiquemos se vea como tu estudio.', detalle: 'En Materiales › Equipo y marca: el logo (el archivo original si lo tenés), fotos del equipo y del estudio.', pideArchivos: true, carpeta: 'equipo' },
+      { titulo: 'Darnos acceso a tus cuentas', paraQue: 'Para revisar cómo está hoy tu presencia y trabajar sobre tus cuentas.', detalle: 'Te mandamos por WhatsApp cuáles y cómo, según lo que contrataste. Las cuentas siguen a tu nombre y podés sacarnos el acceso cuando quieras. Nunca nos pases contraseñas.' },
     ],
     entregas: [],
   },
@@ -84,7 +86,7 @@ export const PRESENCIA_TEMAS: TemaPlantilla[] = [
     completoCuando: ['Excel explicado y una fila completada juntos', 'Partes acordadas del Excel recibidas', 'Kit revisado con el estudio', 'Cliente ideal, nicho y oferta confirmados (o pendientes visibles)'],
     reunion: { titulo: 'Reunión de cliente ideal, nicho y oferta', objetivo: 'Explicar el Excel y completar una fila juntos', preparar: 'Pensá en 2 o 3 clientes con los que te gustó trabajar', horas: 1.5 },
     tareas: [
-      { titulo: 'Completar el Excel de cliente ideal (las partes acordadas)', paraQue: 'Con tus proyectos y clientes reales definimos a quién conviene hablarle.', detalle: 'Usá historias reales y dejá vacío lo que no sepas. No hace falta llenar todo: solo las hojas que acordamos.' },
+      { titulo: 'Completar el Excel de cliente ideal (las partes que vimos juntos)', paraQue: 'Con tus proyectos y clientes reales definimos a quién conviene hablarle.', detalle: 'Está en tu carpeta, en Para completar. Lo vemos primero en la reunión y completamos una fila juntos. Usá historias reales y dejá vacío lo que no sepas.' },
     ],
     entregas: [{ titulo: 'Kit de cliente ideal, nicho y oferta', decision: 'si este foco representa al estudio y qué compromisos puede sostener', canal: 'mail' }],
   },
@@ -94,7 +96,7 @@ export const PRESENCIA_TEMAS: TemaPlantilla[] = [
     completoCuando: ['Referencias y datos de partida recibidos', 'Competencia relevada con fuentes', 'Metas orientativas acordadas con el estudio'],
     reunion: { titulo: 'Devolución de cliente ideal y diagnóstico', objetivo: 'Mostrar el kit y el diagnóstico, y decidir qué priorizar', horas: 1.5 },
     tareas: [
-      { titulo: 'Pasarnos referencias y competidores', paraQue: 'Para comparar con quién te eligen o te descartan, y ver qué no está haciendo nadie.', detalle: 'Estudios que admires o con los que compitas. Si no sabés, lo vemos juntos.' },
+      { titulo: 'Contarnos qué estudios admirás y con quién competís', paraQue: 'Para comparar cómo se muestran y ver qué no está haciendo nadie. La investigación la hacemos nosotros.', detalle: 'Alcanza con los nombres o links por mensaje. Si te resulta más cómodo, usá el Excel de competidores (opcional) en Para completar, o subí ejemplos a Materiales › Referencias.', pideArchivos: true, carpeta: 'referencias' },
     ],
     entregas: [{ titulo: 'Informe de diagnóstico y metas', decision: 'qué priorizar y qué metas orientativas usar', canal: 'mail' }],
   },
@@ -111,11 +113,11 @@ export const PRESENCIA_TEMAS: TemaPlantilla[] = [
   {
     id: 'contenido', titulo: 'Estrategia de contenido', hito: 4, servicio: 'contenido',
     objetivo: 'Que sepas qué vamos a publicar y para qué: pilares, formatos, frecuencia y cómo se aprueba.',
-    completoCuando: ['Pilares de contenido aprobados', 'Formatos y frecuencia definidos', 'Plan del mes aprobado', 'Ciclo semanal explicado (jueves propuesta, lunes 12 h aprobación)', 'Material con 3 favoritos marcados', 'Primeras piezas publicadas'],
+    completoCuando: ['Pilares de contenido aprobados', 'Formatos y frecuencia definidos', 'Plan del mes aprobado', 'Ciclo de aprobación semanal explicado', 'Proyectos cargados en Materiales', 'Primeras piezas publicadas'],
     reunion: { titulo: 'Reunión de contenido', objetivo: 'Presentar los pilares y el plan del mes', conCM: true, horas: 1 },
     tareas: [
-      { titulo: 'Mandar el registro de obra de la semana', paraQue: 'Es lo que hace que tu contenido sea real y no genérico.', detalle: 'Imaginate que somos un cliente muy exigente que quiere ver el paso a paso: mandanos lo que le mandarías a él.', pideArchivos: true },
-      { titulo: 'Aprobar la propuesta de la semana (hasta el lunes 12 h)', paraQue: 'Para que se publique a tiempo lo que aprobaste.', detalle: 'La propuesta llega el jueves en Gestión de contenido.' },
+      { titulo: 'Subir el registro de obra de la semana', paraQue: 'Es lo que hace que tu contenido sea real y no genérico.', detalle: 'En Materiales › Registro de obra: fotos y videos cortos de lo que avanzó. Imaginate que somos un cliente muy exigente que quiere ver el paso a paso.', pideArchivos: true, carpeta: 'registro' },
+      { titulo: 'Aprobar la propuesta de contenido de la semana', paraQue: 'Nada se publica sin tu aprobación: así sale a tiempo lo que aprobaste.', detalle: 'Te avisamos cuando está lista en tu calendario de contenido y el día límite para aprobarla.' },
     ],
     entregas: [{ titulo: 'Pilares y plan del mes', decision: 'el plan del mes', canal: 'la app de contenido' }],
   },
@@ -145,7 +147,8 @@ export const PRESENCIA_TEMAS: TemaPlantilla[] = [
     completoCuando: ['Estructura y textos aprobados', 'Publicada y probada en celular y escritorio', 'Medición configurada'],
     reunion: { titulo: 'Validación de la web', objetivo: 'Revisar la versión antes de publicarla', horas: 1 },
     tareas: [
-      { titulo: 'Revisar la web antes de publicar', paraQue: 'Que lo publicado sea exactamente lo que aprobaste.', detalle: 'Probala en el celular y en la compu. Marcá lo que cambiarías.' },
+      { titulo: 'Confirmar qué proyectos van en la web', paraQue: 'Tu web muestra las obras que representan al cliente que querés atraer.', detalle: 'Te proponemos una selección con lo que subiste a Materiales › Proyectos. Si alguna obra no se puede publicar o le falta información, avisanos.' },
+      { titulo: 'Revisar la web antes de publicar', paraQue: 'Que lo publicado sea exactamente lo que aprobaste.', detalle: 'Probala en el celular y en la compu, y mandá una consulta de prueba desde el formulario. Marcá lo que cambiarías.' },
     ],
     entregas: [{ titulo: 'Web o landing para aprobar', decision: 'si está lista para publicar', canal: 'mail' }],
   },

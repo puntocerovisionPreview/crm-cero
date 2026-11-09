@@ -41,7 +41,7 @@ describe('plan de Presencia', () => {
     const p = buildNewClientProject({ tipo: 'paf', plan: 'paf_pro', estudio: 'E', contacto: '', email: 'a@b.com', whatsapp: '', monto: 0, moneda: 'USD', modo: 'unico', primerCobro: '2026-11-03', cuotas: 1, nota: '', alcance: ['google'] }, new Date('2026-11-03T12:00:00Z'));
     expect(p.pafAlcance).toEqual(['google']);
     expect(p.pafTemas?.arranque?.empezado).toBe('2026-11-03');
-    expect(p.pafTareas?.map((t) => t.tema)).toEqual(['arranque', 'arranque', 'arranque']);
+    expect(p.pafTareas?.map((t) => t.tema)).toEqual(['arranque', 'arranque', 'arranque', 'arranque', 'arranque']);
   });
 
   it('el historial suma arriba y no crece sin fin', () => {
@@ -60,7 +60,7 @@ describe('cliente de ejemplo', () => {
     expect(r.doc.emailsAutorizados).toEqual(['juan@gmail.com']);
     expect(r.doc.hitosCompletados).toEqual([1]);
     expect(r.doc.proximaReunion).toMatchObject({ fecha: '2026-11-09', objetivo: 'Mostrar el kit y el diagnóstico, y decidir qué priorizar' });
-    expect(r.doc.tareas.find((t) => t.prioritaria)?.titulo).toBe('Pasarnos referencias y competidores');
+    expect(r.doc.tareas.find((t) => t.prioritaria)?.titulo).toBe('Contarnos qué estudios admirás y con quién competís');
     expect(r.doc.entregas).toHaveLength(1); // el informe sin publicar no viaja
     expect(PRESENCIA_HITOS[r.doc.hitoVisible - 1]).toBe('Definimos el foco');
   });

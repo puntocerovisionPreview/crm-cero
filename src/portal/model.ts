@@ -94,7 +94,7 @@ export function seccionesVisibles(s?: Partial<Record<PortalSeccion, boolean>>): 
 
 export type MaterialKey = 'proyectos' | 'equipo' | 'referencias' | 'registro';
 export const MATERIALES: { id: MaterialKey; label: string; pedido: string }[] = [
-  { id: 'proyectos', label: 'Proyectos', pedido: 'Una carpeta por proyecto: renders (también el de antes de construir), fotos y videos de obra. Marcá tus 3 favoritos.' },
+  { id: 'proyectos', label: 'Proyectos', pedido: 'Una carpeta por proyecto con su nombre: fotos, renders, planos y videos de obra. Subí todo lo que tengas: después elegimos juntos qué mostrar.' },
   { id: 'equipo', label: 'Equipo y marca', pedido: 'Fotos del equipo, logo y elementos de tu marca.' },
   { id: 'referencias', label: 'Referencias', pedido: 'Campañas anteriores y cuentas o estudios que te gusten.' },
   { id: 'registro', label: 'Registro de obra', pedido: 'Imaginate que somos un cliente muy exigente que quiere ver el paso a paso: mandanos lo que le mandarías a él, aunque parezca chico.' },
@@ -170,6 +170,8 @@ export interface PafTask {
   motivo?: string;
   /** La tarea pide subir archivos: el portal muestra el link a Materiales */
   pideArchivos?: boolean;
+  /** A qué subcarpeta de Materiales se suben (por defecto, Proyectos) */
+  carpeta?: MaterialKey;
   /** Link que el estudio abre para hacer la tarea (opcional) */
   link?: string;
   /** La que va arriba del portal como "Tu próxima acción" (una sola) */
@@ -250,6 +252,7 @@ export interface PafPortalTask {
   habilitadaEn?: string; // para no mostrar como avisada una tarea que se volvió a habilitar
   motivo?: string; // por qué se volvió a habilitar
   pideArchivos?: boolean; // muestra el link a Materiales
+  carpeta?: MaterialKey; // subcarpeta de Materiales donde se sube
   link?: string; // link para hacer la tarea
   prioritaria?: boolean; // va arriba como "Tu próxima acción"
   paraQue?: string;
@@ -459,7 +462,7 @@ export function publicTasks(tasks: PafTask[] = []): PafPortalTask[] {
       ...(t.fecha ? { fecha: t.fecha } : {}),
       ...(t.habilitadaEn ? { habilitadaEn: t.habilitadaEn } : {}),
       ...(t.motivo && t.estado === 'habilitada' ? { motivo: t.motivo } : {}),
-      ...(t.pideArchivos ? { pideArchivos: true } : {}),
+      ...(t.pideArchivos ? { pideArchivos: true, ...(t.carpeta ? { carpeta: t.carpeta } : {}) } : {}),
       ...(t.link ? { link: t.link } : {}),
       ...(t.prioritaria && t.estado === 'habilitada' ? { prioritaria: true } : {}),
       ...(t.paraQue?.trim() ? { paraQue: t.paraQue.trim() } : {}),

@@ -684,8 +684,8 @@ export const ClientDetailView: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* State Badge button with quick override menu */}
-        <div className="relative">
+        {/* Estado manual: solo para clientes que no son PAF ni Web (esos tienen su semáforo) */}
+        <div className={`relative ${isPaf || isWebClient ? 'hidden' : ''}`}>
           <button
             type="button"
             onClick={() => setShowStatusPicker(prev => !prev)}
@@ -807,7 +807,7 @@ export const ClientDetailView: React.FC<Props> = ({
           {/* Una sola próxima acción: lo primero que ves */}
           {!project.archived && <ProximaAccionCard project={project} onUpdateProject={onUpdateProject} />}
           {/* Cómo está: lo que pide atención y si entra a su portal */}
-          {!project.archived && !project.isLead && <ClienteSaludCard salud={salud} visita={textoVisita(project, visita, todayStr)} />}
+          {!project.archived && !project.isLead && <ClienteSaludCard salud={{ ...salud, motivos: salud.motivos.filter((m) => m.texto !== 'Sin próxima acción definida'), nivel: salud.motivos.some((m) => m.nivel === 'riesgo') ? 'riesgo' : salud.motivos.some((m) => m.texto !== 'Sin próxima acción definida') ? 'atencion' : 'ok' }} visita={textoVisita(project, visita, todayStr)} />}
           {/* Lo de hoy con este cliente: cada cosa lleva a donde se resuelve */}
           {paraHoy.length > 0 && (
             <section aria-label="Para hoy" className="space-y-1">

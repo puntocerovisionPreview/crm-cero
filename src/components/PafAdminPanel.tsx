@@ -16,6 +16,7 @@ import type { ClientPanel } from '../panels/model';
 import { SegmentedControl } from '../ui';
 import { hapticFeedback } from '../utils/haptics';
 import { PafAltaCard } from './PafAltaCard';
+import { actualizarTareasViejas, habilitarConCarpetas } from '../portal/tareasArranque';
 import { PafMeetingsSection } from './PafMeetingsSection';
 import { PafWeekGoals } from './PafWeekGoals';
 import { PafAnnouncements } from './PafAnnouncements';
@@ -90,6 +91,12 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
   });
   const setSection = (s: Section) => { setSectionState(s); try { localStorage.setItem('paf_panel_seccion', s); } catch { /* sin almacenamiento */ } };
   const [adding, setAdding] = useState<Adding>(null);
+  // Tareas con textos viejos (ej. "Marcar tus 3 proyectos favoritos"): se pasan a la versión actual
+  useEffect(() => {
+    const pafTareas = actualizarTareasViejas(project.pafTareas);
+    if (pafTareas) onUpdateProject(project.id, { pafTareas });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id]);
   const [showPreview, setShowPreview] = useState(false);
   // Reunión que propone un tema del plan (título, objetivo y duración ya cargados)
   const [sugerida, setSugerida] = useState<TemaPlantilla | null>(null);
@@ -533,7 +540,14 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
   const alta = pedido?.alta;
   useEffect(() => {
     if (!alta?.carpetaCompartida || project.pafDrive?.carpetaCompartida) return;
-    onUpdateProject(project.id, { pafDrive: { ...project.pafDrive, carpetaCompartida: alta.carpetaCompartida, ...(alta.carpetaInterna ? { carpetaInterna: alta.carpetaInterna } : {}), ...(alta.ficha ? { ficha: alta.ficha } : {}) } });
+    // Con las carpetas listas, se habilitan solas sus primeras tareas (bienvenida y cargar proyectos)
+    const pafTareas = habilitarConCarpetas(project.pafTareas, new Date().toISOString(), newItemId);
+    const updates: Partial<Project> = {
+      pafDrive: { ...project.pafDrive, carpetaCompartida: alta.carpetaCompartida, ...(alta.carpetaInterna ? { carpetaInterna: alta.carpetaInterna } : {}), ...(alta.ficha ? { ficha: alta.ficha } : {}) },
+      ...(pafTareas ? { pafTareas, ...conHistorial(project, 'Llegaron sus carpetas: se habilitaron sus primeras tareas') } : {}),
+    };
+    onUpdateProject(project.id, updates);
+    if (pafTareas) republishIfPublished({ ...project, ...updates }, meetings).catch(() => undefined);
     setDraft((d) => {
       const next = accesosDelAlta(draftAccesos(d), alta, newItemId);
       return next ? { ...d, accesos: next } : d;
