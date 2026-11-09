@@ -10,6 +10,7 @@ import { getTodayString } from '../utils/storage';
 import { hapticFeedback } from '../utils/haptics';
 import { PafPlanAuto } from './PafPlanAuto';
 import { tareasNuestras } from '../portal/presenciaAuto';
+import { linkDeTarea } from '../portal/altaLinks';
 import type { AgendaTask } from '../types';
 
 const FASE_STYLE: Record<TemaFase, string> = {
@@ -76,7 +77,8 @@ export const PafPlanSection: React.FC<{
     const nTemas = { ...estados };
     ts.forEach((t) => {
       const kit = kitDelTema(t, { tareas: nTareas, entregas: nEntregas }, newItemId);
-      nTareas = [...nTareas, ...kit.tareas];
+      // Si el alta ya trajo el archivo (ej. su Excel), la tarea lo abre directo
+      nTareas = [...nTareas, ...kit.tareas.map((x) => { const link = linkDeTarea(x.titulo, project.pafDrive); return link ? { ...x, link } : x; })];
       nEntregas = [...nEntregas, ...kit.entregas];
       nTemas[t.id] = { ...nTemas[t.id], empezado: hoy, ...(onAddTask ? { agendado: hoy } : {}) };
       if (onAddTask) tareasNuestras(t, project, hoy, hoy).forEach(onAddTask);

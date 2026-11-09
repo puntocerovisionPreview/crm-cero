@@ -602,6 +602,14 @@ export interface PafPedidoAlta {
     carpetaCompartida?: string;
     /** Subcarpeta Materiales de la compartida (si el script la devuelve) */
     materiales?: string;
+    /** Partes y subcarpetas (script actualizado) */
+    paraCompletar?: string;
+    resultados?: string;
+    proyectos?: string;
+    equipo?: string;
+    referencias?: string;
+    registro?: string;
+    excelClienteIdeal?: string;
     ficha?: string;
     fechaRespuesta?: string;
     error?: string;
@@ -672,6 +680,12 @@ export interface PafDriveLinks {
   carpetaCompartida?: string;
   carpetaInterna?: string;
   ficha?: string;
+  /** Partes de la carpeta compartida (las devuelve el script del alta) */
+  materiales?: string;
+  paraCompletar?: string;
+  resultados?: string;
+  excelClienteIdeal?: string;
+  subcarpetas?: Partial<Record<MaterialKey, string>>;
 }
 
 // ---------- Aviso a Juan cuando el estudio toca "Terminé" (lo usa el servidor) ----------

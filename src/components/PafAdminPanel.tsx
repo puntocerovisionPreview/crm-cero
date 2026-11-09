@@ -17,6 +17,7 @@ import { SegmentedControl } from '../ui';
 import { hapticFeedback } from '../utils/haptics';
 import { PafAltaCard } from './PafAltaCard';
 import { actualizarTareasViejas, habilitarConCarpetas } from '../portal/tareasArranque';
+import { aplicarAlta } from '../portal/altaLinks';
 import { PafMeetingsSection } from './PafMeetingsSection';
 import { PafWeekGoals } from './PafWeekGoals';
 import { PafAnnouncements } from './PafAnnouncements';
@@ -535,25 +536,30 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
     if (sharedFolder) setDraft((d) => (d.enlaces.carpeta ? d : { ...d, enlaces: { ...d.enlaces, carpeta: sharedFolder } }));
   }, [sharedFolder]);
 
-  // Cuando el script devuelve las carpetas del alta: quedan guardadas en la ficha y se suman
-  // solas a los accesos del portal. Pasa una sola vez (si después sacás un acceso, no vuelve)
+  // Cuando el script devuelve las carpetas del alta: se guardan en la ficha y se reparten en el
+  // portal (tu carpeta, Para completar, Materiales y sus subcarpetas, Resultados) y en las tareas
+  // que abren un archivo (el Excel). Solo lo nuevo: si después sacás un acceso, no vuelve.
   const alta = pedido?.alta;
+  const altaKey = JSON.stringify(alta || {});
   useEffect(() => {
-    if (!alta?.carpetaCompartida || project.pafDrive?.carpetaCompartida) return;
-    // Con las carpetas listas, se habilitan solas sus primeras tareas (bienvenida y cargar proyectos)
-    const pafTareas = habilitarConCarpetas(project.pafTareas, new Date().toISOString(), newItemId);
+    if (!alta?.carpetaCompartida) return;
+    const r = aplicarAlta(project, { ...draft, accesos: draftAccesos(draft) }, alta, newItemId);
+    if (!r) return;
+    // La primera vez que llegan las carpetas se habilitan solas sus primeras tareas
+    const primeraVez = !project.pafDrive?.carpetaCompartida;
+    const base = r.pafTareas || project.pafTareas;
+    const habilitadas = primeraVez ? habilitarConCarpetas(base, new Date().toISOString(), newItemId) : null;
+    const pafTareas = habilitadas || r.pafTareas;
     const updates: Partial<Project> = {
-      pafDrive: { ...project.pafDrive, carpetaCompartida: alta.carpetaCompartida, ...(alta.carpetaInterna ? { carpetaInterna: alta.carpetaInterna } : {}), ...(alta.ficha ? { ficha: alta.ficha } : {}) },
-      ...(pafTareas ? { pafTareas, ...conHistorial(project, 'Llegaron sus carpetas: se habilitaron sus primeras tareas') } : {}),
+      pafDrive: r.pafDrive,
+      ...(pafTareas ? { pafTareas } : {}),
+      ...(habilitadas ? conHistorial(project, 'Llegaron sus carpetas: se habilitaron sus primeras tareas') : {}),
     };
     onUpdateProject(project.id, updates);
     if (pafTareas) republishIfPublished({ ...project, ...updates }, meetings).catch(() => undefined);
-    setDraft((d) => {
-      const next = accesosDelAlta(draftAccesos(d), alta, newItemId);
-      return next ? { ...d, accesos: next } : d;
-    });
+    setDraft((d) => aplicarAlta(project, { ...d, accesos: draftAccesos(d) }, alta, newItemId)?.draft || d);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [alta?.carpetaCompartida, alta?.materiales]);
+  }, [altaKey]);
 
   // Guardado automático en la ficha (no publica)
   const current = useMemo(() => ({ ...draft, emails: normalizeEmails(emailsText) }), [draft, emailsText]);

@@ -25,12 +25,15 @@ type Tab = 'inicio' | 'recorrido' | 'tareas' | 'entregas' | 'archivos';
 type PortalTask = PafPortalDoc['tareas'][number];
 
 const LINK_HINT: Record<PafPortalLinkKey, string> = {
-  carpeta: 'Todo lo del programa',
-  materiales: 'Fotos, planos y lo que nos compartís',
-  resultados: 'Métricas y avances',
+  carpeta: 'Todo lo del programa, en tu Drive',
+  materiales: 'Proyectos, fotos, logo y registro de obra',
+  resultados: 'Lo que te entregamos',
   web: 'Tu sitio',
   asana: 'Qué se publica y cuándo',
 };
+
+/** Las partes de su carpeta que no son enlaces fijos */
+const PARTE_HINT: Record<string, string> = { 'Para completar': 'Los Excel y lo que te pedimos completar' };
 
 const DEMO: PafPortalDoc = {
   clienteId: 'PAF-DEMO',
@@ -323,7 +326,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
     today: new Date().toLocaleDateString('en-CA'),
     uploadUrl: p.materiales?.proyectos || p.enlaces?.materiales || p.enlaces?.carpeta,
     // Cada tarea sube a su subcarpeta de Materiales (Proyectos, Equipo y marca, Registro de obra…)
-    uploadFor: (t: PortalTask) => (t.carpeta && p.materiales?.[t.carpeta]) || p.materiales?.proyectos || p.enlaces?.materiales || p.enlaces?.carpeta,
+    uploadFor: (t: PortalTask) => p.materiales?.[t.carpeta || 'proyectos'] || p.enlaces?.materiales || (p.accesos || []).find((a) => a.nombre === 'Materiales')?.url || p.enlaces?.carpeta,
     sending, readOnly: !!readOnly, onDone: done,
   };
   const verRecorrido = ver.recorrido && mostrarAvance;
@@ -404,7 +407,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
       {/* Lo nuevo desde la última visita, en una línea: cada parte lleva a su lugar */}
       {!showWelcome && ver.novedades && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => setTab(t)} />}
 
-      {showWelcome && <GuiaInicial onClose={closeWelcome} estudio={p.estudio} pendientes={suyas.length} reunion={ver.reuniones ? p.proximaReunion : undefined} carpeta={p.enlaces?.carpeta} bienvenida={p.bienvenida} hasWhatsapp={!!whatsapp} />}
+      {showWelcome && <GuiaInicial onClose={closeWelcome} estudio={p.estudio} pendientes={suyas.length} reunion={ver.reuniones ? p.proximaReunion : undefined} carpeta={p.enlaces?.carpeta || accesos.find((a) => a.nombre === 'Tu carpeta')?.url} bienvenida={p.bienvenida} hasWhatsapp={!!whatsapp} />}
 
       {/* Pestañas */}
       {tabs.length > 1 && (
@@ -696,7 +699,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                             <span className="w-10 h-10 shrink-0 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--marca)]"><AccessIcon nombre={a.nombre} url={a.url} className="w-[18px] h-[18px]" /></span>
                             <span className="min-w-0 flex-1">
                               <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">{a.nombre}{isNew(`l:${a.url}`) && <NewBadge />}</span>
-                              <span className="block text-xs text-[var(--text-tertiary)] truncate">{k ? LINK_HINT[k] : accessHost(a.url)}</span>
+                              <span className="block text-xs text-[var(--text-tertiary)] truncate">{k ? LINK_HINT[k] : PARTE_HINT[a.nombre] || accessHost(a.url)}</span>
                             </span>
                             <ArrowUpRight className="w-4 h-4 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                           </a>

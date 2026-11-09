@@ -11,7 +11,7 @@ const ESTADO_LABEL: Record<PafPedidoAlta['estado'], string> = {
   registrado: 'Registrado en la Sheet.',
   error: 'La Sheet no pudo registrarlo.',
 };
-const DRIVE_FIELDS: { key: keyof PafDriveLinks; label: string; hint: string }[] = [
+const DRIVE_FIELDS: { key: 'carpetaCompartida' | 'carpetaInterna' | 'ficha'; label: string; hint: string }[] = [
   { key: 'carpetaCompartida', label: 'Carpeta del estudio', hint: 'compartida' },
   { key: 'carpetaInterna', label: 'Carpeta interna', hint: 'solo vos' },
   { key: 'ficha', label: 'Ficha', hint: 'solo vos' },
@@ -90,7 +90,9 @@ export const PafAltaCard: React.FC<{ project: Project; onUpdateProject: (id: str
       clean[key] = url;
     }
     setErrors([]);
-    onUpdateProject(project.id, { pafDrive: clean });
+    // Solo cambia las tres que se editan acá: las partes que trajo el alta se conservan
+    const { carpetaCompartida: _c, carpetaInterna: _i, ficha: _f, ...resto } = project.pafDrive || {};
+    onUpdateProject(project.id, { pafDrive: { ...resto, ...clean } });
     setNotice('Carpetas guardadas. "Carpeta del estudio" se usa en su portal.');
   };
 

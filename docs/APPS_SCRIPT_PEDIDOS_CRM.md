@@ -251,3 +251,97 @@ function devolverCarpetasAlCRM() {
 
 - En el CRM, la ficha del estudio pasa a "Carpetas listas" y en Archivos aparecen solos "Tu carpeta" y "Materiales". Si el portal está publicado, el cliente los ve en segundos.
 - La carpeta interna y la ficha nunca se publican: el CRM las bloquea.
+
+---
+
+# Parte 3: que devuelva también cada parte de la carpeta
+
+Ya aplicada la parte 2. Hasta ahora el script devuelve solo la carpeta compartida y Materiales. Con esto devuelve además **Para completar**, **Resultados**, las cuatro subcarpetas de Materiales (**Proyectos**, **Equipo y marca**, **Referencias**, **Registro de obra**) y el **Excel de cliente ideal**. El CRM ya está listo para recibirlos: cada tarea del portal abre su carpeta exacta y la del Excel abre el Excel.
+
+## Pedido para la extensión
+
+En el mismo Apps Script **"PAF — Alta de clientes"**, archivo **`PedidosCRM.gs`**:
+
+1. Pegá al final del archivo la función `partesDeCarpeta_` de abajo. No borres `linkMateriales_`.
+2. En `devolverCarpetasAlCRM`, reemplazá **solo** estas partes:
+   - la línea `if (enviados[id] === compartida) return;` por `if (enviados[id] === 'v3|' + compartida) return;`
+   - el bloque `const alta = { mapValue: { fields: { … } } };` por el bloque de abajo
+   - las dos líneas `enviados[id] = compartida;` por `enviados[id] = 'v3|' + compartida;`
+   Con el `v3|` el script vuelve a mandar una vez los estudios que ya tenían carpetas, ahora con todas las partes.
+3. Ejecutá **`devolverCarpetasAlCRM`** una vez a mano y mirá el registro: tiene que decir cuántos devolvió. El activador que ya existe sigue igual.
+4. Contame qué dijo la ejecución.
+
+Función nueva (al final del archivo):
+
+```javascript
+/**
+ * Links de las partes de la carpeta compartida del estudio. Busca por cómo termina el nombre
+ * (así funciona con "01_Para_completar", "02_Materiales", "01_Proyectos", etc.). '' si no está.
+ */
+function partesDeCarpeta_(urlCompartida) {
+  const vacio = { paraCompletar: '', materiales: '', resultados: '', proyectos: '', equipo: '', referencias: '', registro: '', excelClienteIdeal: '' };
+  try {
+    const m = String(urlCompartida).match(/folders\/([\w-]{10,})/);
+    if (!m) return vacio;
+    const r = Object.assign({}, vacio);
+    const norm = function (s) { return String(s).trim().toLowerCase().replace(/[_\-]+/g, ' '); };
+    const raiz = DriveApp.getFolderById(m[1]);
+    let materiales = null, paraCompletar = null;
+    const subs = raiz.getFolders();
+    while (subs.hasNext()) {
+      const f = subs.next();
+      const n = norm(f.getName());
+      if (/para completar$/.test(n)) { r.paraCompletar = f.getUrl(); paraCompletar = f; }
+      else if (/materiales$/.test(n)) { r.materiales = f.getUrl(); materiales = f; }
+      else if (/resultados$/.test(n)) r.resultados = f.getUrl();
+    }
+    if (materiales) {
+      const ms = materiales.getFolders();
+      while (ms.hasNext()) {
+        const f = ms.next();
+        const n = norm(f.getName());
+        if (/proyectos$/.test(n)) r.proyectos = f.getUrl();
+        else if (/equipo/.test(n)) r.equipo = f.getUrl();
+        else if (/referencias$/.test(n)) r.referencias = f.getUrl();
+        else if (/registro/.test(n)) r.registro = f.getUrl();
+      }
+    }
+    if (paraCompletar) {
+      const fs = paraCompletar.getFiles();
+      while (fs.hasNext()) {
+        const f = fs.next();
+        if (/cliente ideal/.test(norm(f.getName()))) { r.excelClienteIdeal = f.getUrl(); break; }
+      }
+    }
+    return r;
+  } catch (e) { return vacio; }
+}
+```
+
+Bloque nuevo de `alta` (reemplaza el anterior):
+
+```javascript
+      const partes = partesDeCarpeta_(compartida);
+      const alta = { mapValue: { fields: {
+        estado: { stringValue: String(celda(fila, 'estado') || '') },
+        carpetaInterna: { stringValue: String(celda(fila, 'carpetaInterna') || '') },
+        carpetaCompartida: { stringValue: compartida },
+        materiales: { stringValue: partes.materiales || linkMateriales_(compartida) },
+        paraCompletar: { stringValue: partes.paraCompletar },
+        resultados: { stringValue: partes.resultados },
+        proyectos: { stringValue: partes.proyectos },
+        equipo: { stringValue: partes.equipo },
+        referencias: { stringValue: partes.referencias },
+        registro: { stringValue: partes.registro },
+        excelClienteIdeal: { stringValue: partes.excelClienteIdeal },
+        ficha: { stringValue: String(celda(fila, 'ficha') || '') },
+        fechaRespuesta: { stringValue: fecha ? new Date(fecha).toISOString() : '' },
+        error: { stringValue: String(celda(fila, 'error') || '') },
+      } } };
+```
+
+## Después
+
+- Al abrir la ficha del estudio en el CRM, los links se guardan solos y su portal muestra **Tu carpeta, Para completar, Materiales y Resultados**, y en Archivos las cuatro subcarpetas de Materiales.
+- Cada tarea que pide archivos abre su subcarpeta exacta, y "Completar el Excel de cliente ideal" abre el Excel.
+- Si el script no encuentra una parte (por ejemplo, la carpeta tiene otro nombre), esa queda vacía y la tarea sube a Materiales.
