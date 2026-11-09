@@ -434,7 +434,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
             {/* 2 · EN MARCHA: lo de cada lado */}
             {ver.enMarcha ? (
               (resto.length > 0 || decisiones.length > 0 || (p.enMarcha || []).length > 0) && (
-                <section className="grid gap-4 sm:grid-cols-2">
+                <section className={`grid gap-4 ${(p.enMarcha || []).length ? 'sm:grid-cols-2' : ''}`}>
                   <Card className="p-5">
                     <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--marca)]"><span className="w-2 h-2 rounded-full bg-[var(--marca)]" aria-hidden />Te toca a vos</p>
                     {decisiones.length + resto.length ? (
@@ -463,19 +463,14 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                       </ul>
                     ) : <p className="mt-3 text-sm text-[var(--text-secondary)]">{principal ? 'Solo lo de arriba.' : 'Nada más por ahora.'}</p>}
                   </Card>
-                  <div className="p-1 sm:p-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]">Mientras tanto, nosotros</p>
-                    {(p.enMarcha || []).length ? (
-                      <ul className="mt-3 space-y-2.5">
-                        {(p.enMarcha || []).map((x, i) => (
-                          <li key={i} className="flex items-start gap-2.5">
-                            <span className={`mt-0.5 shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${x.quien === 'cm' ? 'bg-white text-[var(--text-secondary)] border border-[var(--border-subtle)]' : 'bg-[var(--text-primary)] text-white'}`}>{x.quien === 'cm' ? 'CM' : '.CERO'}</span>
-                            <span className="text-sm text-[var(--text-primary)]">{x.texto}</span>
-                          </li>
-                        ))}
+                  {(p.enMarcha || []).length > 0 && (
+                    <div className="p-1 sm:p-5">
+                      <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]">Mientras tanto, nosotros</p>
+                      <ul className="mt-3 space-y-2">
+                        {(p.enMarcha || []).map((x, i) => <li key={i} className="text-[15px] leading-relaxed text-[var(--text-primary)]">{x.texto}</li>)}
                       </ul>
-                    ) : <p className="mt-3 text-sm text-[var(--text-secondary)]">Te avisamos acá cuando estemos preparando algo para vos.</p>}
-                  </div>
+                    </div>
+                  )}
                 </section>
               )
             ) : ver.tareas && resto.length > 0 && (
@@ -1004,16 +999,16 @@ function GuiaInicial({ onClose, estudio, pendientes, reunion, carpeta, bienvenid
   const pasos: { titulo: string; texto: React.ReactNode; accion?: React.ReactNode }[] = [
     {
       titulo: `Bienvenido, ${estudio}`,
-      texto: <>Este es tu espacio de trabajo con .CERO. Acá ves siempre <b>en qué estamos</b>, <b>qué te toca a vos</b> y <b>qué estamos haciendo nosotros</b>. Te lo mostramos en 1 minuto.</>,
+      texto: <>Este es tu espacio de trabajo con .CERO. Acá tenés lo importante: <b>lo que te toca</b>, <b>cuándo nos vemos</b>, <b>lo que tenés para revisar</b> y <b>tus carpetas</b>. Te lo mostramos en un minuto.</>,
       accion: bienvenida ? <a href={bienvenida} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium underline underline-offset-4">Abrir la bienvenida en PDF <ArrowUpRight className="w-4 h-4" /></a> : null,
     },
     {
       titulo: 'Arriba, tu resumen',
-      texto: <>Los números de arriba te dicen cuántas tareas tenés, cuándo nos vemos, qué tenés para revisar y cuánto avanzamos. Tocá cualquiera para ir directo.{pendientes ? <> Ahora tenés <b>{pendientes === 1 ? '1 tarea' : `${pendientes} tareas`}</b>.</> : <> Ahora no tenés tareas: te avisamos cuando haya algo.</>}</>,
+      texto: <>Los números de arriba te dicen cuántas tareas tenés, cuándo nos vemos, qué tenés para revisar y en qué parte del programa estamos. Tocá cualquiera para ir directo.{pendientes ? <> Ahora tenés <b>{pendientes === 1 ? '1 tarea' : `${pendientes} tareas`}</b>.</> : <> Ahora no tenés tareas: te avisamos cuando haya algo.</>}</>,
     },
     {
       titulo: 'Lo que te toca, de a una',
-      texto: <>Cada tarea dice <b>para qué sirve</b> y cómo hacerla. Cuando la termines tocá <b>Terminé</b>: nos llega el aviso, la revisamos y te confirmamos. No hace falta hacer nada que no aparezca acá.</>,
+      texto: <>Cuando necesitemos algo de vos aparece acá, con <b>para qué sirve</b> y cómo hacerla. Al terminarla tocá <b>Terminé</b>: nos llega el aviso y te confirmamos. Lo que no aparece acá, no hace falta que lo hagas.</>,
     },
     {
       titulo: 'Tu carpeta de Drive',

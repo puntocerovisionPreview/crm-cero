@@ -63,6 +63,8 @@ export interface PafPortalDraft {
   reunionesAcordadas?: number;
   /** Tus números: los carga Juan con su fuente */
   numeros?: { id: string; label: string; valor: string; fuente: string }[];
+  /** "Mientras tanto, nosotros": lo que Juan elige contarle (una línea por cosa). Vacío = no se muestra */
+  nosotros?: string;
   publishedAt?: string;
 }
 
@@ -71,8 +73,8 @@ export type PortalSeccion = 'novedades' | 'proximaAccion' | 'enMarcha' | 'tuMes'
 export const PORTAL_SECCIONES: { id: PortalSeccion; label: string; hint: string; porDefecto: boolean }[] = [
   { id: 'novedades', label: 'Desde tu última visita', hint: 'Resumen de lo nuevo arriba de todo', porDefecto: true },
   { id: 'proximaAccion', label: 'Tu próxima acción', hint: 'La tarea prioritaria, grande, arriba', porDefecto: true },
-  { id: 'enMarcha', label: 'Te toca / Nos toca', hint: 'Lo que hace él y lo que estamos haciendo nosotros', porDefecto: true },
-  { id: 'recorrido', label: 'Mi recorrido', hint: 'Las etapas y sus hitos explicados', porDefecto: true },
+  { id: 'enMarcha', label: 'Te toca / Mientras tanto', hint: 'Lo que le toca y lo que vos le contás que estás haciendo (solo si lo escribís)', porDefecto: true },
+  { id: 'recorrido', label: 'Mi recorrido', hint: 'El detalle de cada hito. Sin esto ve solo la etapa y el hito actual', porDefecto: false },
   { id: 'tuMes', label: 'Tu mes', hint: 'Resumen del mes armado con tus reportes', porDefecto: true },
   { id: 'numeros', label: 'Tus números', hint: 'Consultas, reuniones, propuestas… los cargás vos', porDefecto: false },
   { id: 'anuncios', label: 'Anuncios', hint: 'Lo que fijás arriba', porDefecto: true },
@@ -527,7 +529,8 @@ export function portalFromProject(
       hitosCompletados: hitosCompletados(project.pafHitos, project.pafEtapa || 'presencia'),
       etapa: project.pafEtapa || 'presencia',
       etapas: (['presencia', 'adquisicion', 'conversion'] as Etapa[]).filter((e) => e === 'presencia' || (project.pafEtapasContratadas || []).includes(e) || project.pafEtapa === e),
-      enMarcha: enMarchaDe(project),
+      // Solo lo que Juan escribe: el trabajo interno no se publica solo
+      enMarcha: nosotrosDe(draft.nosotros),
       recorrido: project.serviceType === 'web' || (!project.serviceType && project.projectType === 'web') ? 'web' : 'presencia',
       reunionesHechas: (meetings as { projectId?: string; completed: boolean; proposed?: boolean }[]).filter((m) => m.projectId === project.id && m.completed && !m.proposed).length,
       reunionPorConfirmar: meetingPorConfirmar(meetings as Parameters<typeof meetingPorConfirmar>[0], project.id),
@@ -1094,6 +1097,11 @@ import { ETAPA_HITOS, temaPorId } from './presencia';
  * "Nos toca a nosotros": lo que .CERO o la CM tienen entre manos, en palabras para el cliente.
  * Sale de las tareas que hacen ellos y de las entregas que se están preparando (nada privado).
  */
+/** "Mientras tanto, nosotros" escrito por Juan: una línea por cosa, hasta 3 */
+export function nosotrosDe(texto?: string): { texto: string; quien: 'cero' | 'cm' }[] {
+  return (texto || '').split('\n').map((l) => l.replace(/^[-•*]\s*/, '').trim()).filter(Boolean).slice(0, 3).map((t) => ({ texto: t, quien: 'cero' as const }));
+}
+
 export function enMarchaDe(project: { pafTareas?: PafTask[]; pafEntregas?: PafDelivery[] }): { texto: string; quien: 'cero' | 'cm' }[] {
   const tareas = (project.pafTareas || []).filter((t) => t.estado === 'habilitada' && t.responsable && t.responsable !== 'estudio')
     .map((t) => ({ texto: t.titulo, quien: t.responsable as 'cero' | 'cm' }));

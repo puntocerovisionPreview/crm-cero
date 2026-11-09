@@ -214,6 +214,10 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
                 ) : hasWeek ? <p className="text-xs text-zinc-300 whitespace-pre-line line-clamp-3">{portal.draft.resumen}</p> : <Empty>Sin foco cargado: no se muestra.</Empty>}
               </Card>
 
+              <Card title="Mientras tanto, nosotros" hint="Opcional. Lo que querés contarle que estás haciendo, una línea por cosa. Si lo dejás vacío no aparece en su portal.">
+                <textarea className={input} rows={2} value={portal.draft.nosotros || ''} placeholder="Ej: Estamos armando tu kit de presencia: te lo mostramos la semana que viene." onChange={(e) => portal.set({ nosotros: e.target.value })} />
+              </Card>
+
               <Card title="Anuncios" hint="Fijá arriba lo importante." action={adding !== 'anuncio' && <SmallButton onClick={() => setAdding('anuncio')}>+ Anuncio</SmallButton>}>
                 {(project.pafAnuncios || []).length > 0 || adding === 'anuncio'
                   ? <PafAnnouncements project={project} meetings={meetings} onUpdateProject={onUpdateProject} showForm={adding === 'anuncio'} onDone={done} bare />
@@ -715,6 +719,11 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
     approve: (id: string, canal: string) => update(id, (t) => approveTask(t, canal), (t) => `Tarea completada: ${t.titulo} (confirmada por ${canal})`),
     reopen: (id: string, motivo: string) => update(id, (t) => reopenTask(t, motivo), (t) => `Pidió ajustes en ${t.titulo}: ${motivo}`),
     remove: (id: string) => saveTasks(tasks.filter((t) => t.id !== id)),
+    /** Cambiar el texto o la fecha (las sugeridas se adaptan a cada cliente antes de habilitarlas) */
+    edit: (id: string, patch: Pick<PafTask, 'titulo'> & Partial<Pick<PafTask, 'paraQue' | 'detalle' | 'fecha'>>) => update(id, (t) => {
+      const { paraQue: _p, detalle: _d, fecha: _f, ...rest } = t;
+      return { ...rest, titulo: patch.titulo, ...(patch.paraQue ? { paraQue: patch.paraQue } : {}), ...(patch.detalle ? { detalle: patch.detalle } : {}), ...(patch.fecha ? { fecha: patch.fecha } : {}) };
+    }),
     /** Una sola prioritaria: la que va arriba del portal como "Tu próxima acción" */
     togglePrioritaria: (id: string) => saveTasks(tasks.map((t) => ({ ...t, prioritaria: t.id === id ? !t.prioritaria : false }))),
     add: (t: Omit<PafTask, 'id' | 'estado'>, visible = false) => saveTasks([...tasks, { ...t, id: newItemId(), estado: visible ? 'habilitada' : 'borrador', ...(visible ? { habilitadaEn: new Date().toISOString() } : {}) }]),
@@ -735,6 +744,8 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
   const [canal, setCanal] = useState(work.channel);
   const [reopening, setReopening] = useState(false);
   const [motivo, setMotivo] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState({ titulo: t.titulo, paraQue: t.paraQue || '', detalle: t.detalle || '', fecha: t.fecha || '' });
   const canApprove = t.estado === 'habilitada' || t.estado === 'enviada';
   const canReopen = t.estado === 'enviada' || t.estado === 'aprobada';
 
@@ -755,7 +766,18 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${t.estado === 'habilitada' && t.motivo ? 'bg-amber-400/15 text-amber-300' : STATE_STYLE[t.estado]}`}>{t.estado === 'habilitada' && t.motivo ? 'Requiere ajustes' : PAF_TASK_STATE_LABEL[t.estado]}</span>
       </div>
 
-      {reopening ? (
+      {editing ? (
+        <div className="space-y-1.5">
+          <input autoFocus className={input} value={f.titulo} placeholder="Qué tiene que hacer" onChange={(e) => setF({ ...f, titulo: e.target.value })} />
+          <input className={input} value={f.paraQue} placeholder="Para qué sirve (lo ve el cliente)" onChange={(e) => setF({ ...f, paraQue: e.target.value })} />
+          <textarea className={`${input} min-h-[64px]`} value={f.detalle} placeholder="Cómo hacerla (opcional)" onChange={(e) => setF({ ...f, detalle: e.target.value })} />
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="date" className={`${input} w-40`} value={f.fecha} aria-label="Para cuándo" onChange={(e) => setF({ ...f, fecha: e.target.value })} />
+            <button type="button" disabled={!f.titulo.trim()} onClick={() => { work.edit(t.id, { titulo: f.titulo.trim(), paraQue: f.paraQue.trim(), detalle: f.detalle.trim(), fecha: f.fecha }); setEditing(false); }} className="rounded-lg bg-sky-500/15 text-sky-300 px-2 py-1 text-[11px] font-bold disabled:opacity-50">Guardar</button>
+            <button type="button" onClick={() => setEditing(false)} className="text-[11px] text-zinc-400">Cancelar</button>
+          </div>
+        </div>
+      ) : reopening ? (
         <div className="space-y-1.5">
           <input autoFocus className={input} maxLength={140} value={motivo} placeholder="Qué ajustar (lo ve el estudio). Ej: faltan las fotos de la obra Belgrano" onChange={(e) => setMotivo(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && motivo.trim() && (work.reopen(t.id, motivo), setReopening(false))} />
           <div className="flex gap-2">
@@ -766,6 +788,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
       ) : (
         <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
           {t.estado === 'borrador' && <button type="button" onClick={() => work.enable(t.id)} className="rounded-lg bg-sky-500/15 text-sky-300 px-2 py-1">Habilitar</button>}
+          {(t.estado === 'borrador' || t.estado === 'habilitada') && <button type="button" onClick={() => { setF({ titulo: t.titulo, paraQue: t.paraQue || '', detalle: t.detalle || '', fecha: t.fecha || '' }); setEditing(true); }} className="rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1">Editar</button>}
           {t.estado === 'habilitada' && <button type="button" onClick={() => work.hide(t.id)} className="rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1">Ocultar</button>}
           {t.estado === 'habilitada' && <button type="button" onClick={() => work.togglePrioritaria(t.id)} title="La que ve arriba de todo como «Tu próxima acción»" className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 ${t.prioritaria ? 'bg-amber-400/15 text-amber-300' : 'bg-zinc-800 text-zinc-300'}`}><Star className="w-3 h-3" />{t.prioritaria ? 'Prioritaria' : 'Hacer prioritaria'}</button>}
           {canApprove && t.estado === 'enviada' && <span className="text-[10px] font-normal text-zinc-500">Revisala y confirmá:</span>}
