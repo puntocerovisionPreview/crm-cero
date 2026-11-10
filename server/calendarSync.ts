@@ -99,7 +99,7 @@ function addMinutesToTime(date: string, time: string, minutes: number): { date: 
 }
 
 export function meetingToEvent(m: MeetingDoc): any {
-  const description = [m.projectName ? `Cliente: ${m.projectName}` : '', m.notes || '', 'Creado desde .Cero CRM']
+  const description = [m.projectName ? `Cliente: ${m.projectName}` : '', m.notes || '', 'Creado desde .CERO CRM']
     .filter(Boolean)
     .join('\n\n');
   const base = {

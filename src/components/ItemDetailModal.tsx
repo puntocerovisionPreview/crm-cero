@@ -668,7 +668,7 @@ export const ItemDetailModal: React.FC<ItemDetailModalProps> = ({
                   generateCalendarICS({
                     title: isTask ? data.title : `Reunión: ${data.title}`,
                     description: isTask 
-                      ? (data.projectName ? `Proyecto: ${data.projectName}` : 'Tarea .Cero')
+                      ? (data.projectName ? `Proyecto: ${data.projectName}` : 'Tarea .CERO')
                       : [
                           data.projectName ? `Proyecto: ${data.projectName}` : '',
                           clientPhone ? `Tel/WhatsApp: ${clientPhone}` : '',

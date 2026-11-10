@@ -1,3 +1,4 @@
+import { textoVence } from '../utils/fechas';
 import React, { useState, useMemo } from 'react';
 import { taskBelongsToProject } from '../utils/taskProject';
 import { ProjectDriveCard } from '../components/ProjectDriveCard';
@@ -1314,7 +1315,7 @@ export const ClientDetailView: React.FC<Props> = ({
                           <div className="space-y-0.5">
                             <span className="text-xs font-bold text-zinc-100 block">{c.title}</span>
                             <span className="text-[11px] font-mono text-zinc-400">
-                              Vence: {c.dueDate || 'Sin fecha'} · {formatCurrencyAmount(c.amount, billing.currency, true)}
+                              {c.dueDate ? textoVence(c.dueDate, todayStr) : 'Sin fecha'} · {formatCurrencyAmount(c.amount, billing.currency, true)}
                             </span>
                           </div>
 

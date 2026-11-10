@@ -1,3 +1,4 @@
+import { fechaCorta } from '../utils/fechas';
 import React, { useState, useMemo } from 'react';
 import { 
   StudioFixedExpense, 
@@ -471,16 +472,16 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <span className="label-swiss text-[11px] font-bold text-sky-400">Gastos Fijos & Infraestructura</span>
+              <span className="label-swiss text-[11px] font-bold text-sky-400">Gastos fijos</span>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-300 border border-sky-500/20">
                 {expenses.length} suscripciones y servicios
               </span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-heading tracking-tight mt-1">
-              Control de Vencimientos, Hosting, Dominios & IAs
+              Suscripciones, hosting y dominios
             </h2>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5 max-w-2xl">
-              Calculá tu costo operativo mensualizado, llevá el control de fechas de renovación anual de Hostinger y dominios de clientes pasados, y sabé exactamente cuánto invertís en IAs cada mes.
+              Cuánto te sale el estudio por mes y cuándo vence cada cosa.
             </p>
           </div>
 
@@ -537,7 +538,7 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
               <span className="text-xs text-purple-400/80 font-normal ml-0.5">/mes</span>
             </div>
             <p className="text-[10px] font-mono text-purple-400/70 truncate">
-              ChatGPT, Claude, Cursor, Midjourney
+              {expenses.filter(e => e.active && e.category === 'ia').map(e => e.name).slice(0, 4).join(', ') || 'Ninguna cargada'}
             </p>
           </div>
 
@@ -557,7 +558,7 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
               <span className="text-xs text-sky-400/80 font-normal ml-0.5">/mes</span>
             </div>
             <p className="text-[10px] font-mono text-sky-400/70 truncate">
-              Hostinger, Vercel, VPS
+              {expenses.filter(e => e.active && e.category === 'hosting').map(e => e.name).slice(0, 4).join(', ') || 'Ninguno cargado'}
             </p>
           </div>
 
@@ -1097,7 +1098,7 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
 
                       <div className="flex items-center gap-3 text-[11px] font-mono text-[var(--text-secondary)] pt-0.5 flex-wrap">
                         {item.lastPaidDate && (
-                          <span>Último pago: {item.lastPaidDate}</span>
+                          <span>Último pago: {fechaCorta(item.lastPaidDate, today)}</span>
                         )}
                         {item.paymentMethod && (
                           <span>· Medio: {item.paymentMethod}</span>
@@ -1127,7 +1128,7 @@ export const StudioFixedExpensesSection: React.FC<Props> = ({
                     {/* Due Date & Badge */}
                     <div className="text-left md:text-right space-y-0.5 min-w-[110px]">
                       <div className="text-[11px] font-mono font-semibold text-[var(--text-primary)]">
-                        {item.nextDueDate}
+                        {fechaCorta(item.nextDueDate, today)}
                       </div>
                       <div>
                         {isOverdue ? (

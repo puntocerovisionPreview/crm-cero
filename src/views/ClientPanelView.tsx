@@ -25,7 +25,7 @@ export const ClientPanelView: React.FC<{ token: string }> = ({ token }) => {
   const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'error'>('loading');
 
   useEffect(() => {
-    document.title = 'Mi panel · .Cero';
+    document.title = 'Mi panel · .CERO';
     return subscribePanelSnapshot(
       token,
       (snap) => {

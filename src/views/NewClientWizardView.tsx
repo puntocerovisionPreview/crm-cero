@@ -434,7 +434,7 @@ export const NewClientWizardView: React.FC<Props> = ({
                   <Award className="w-5 h-5" />
                 </div>
                 <h3 className="text-sm font-black text-zinc-100 mb-1">
-                  Programa PAF (.Cero)
+                  Programa PAF (.CERO)
                 </h3>
                 <p className="text-xs text-zinc-400 leading-relaxed mb-3">
                   Aceleración comercial para estudios de arquitectura. Mentoría 1:1, 5 etapas y plan de cuotas mensuales.

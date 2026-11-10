@@ -39,7 +39,7 @@ export const AuthScreen: React.FC<Props> = ({ deniedEmail }) => {
       <div className="w-full max-w-sm bg-[var(--bg-surface)] border border-[var(--border-subtle)] rounded-[var(--radius-card)] p-7 space-y-6">
         <div className="flex flex-col items-center text-center space-y-3">
           <BrandLogo size="lg" />
-          <h1 className="text-2xl font-bold">Entrá a .Cero CRM</h1>
+          <h1 className="text-2xl font-bold">Entrá a .CERO CRM</h1>
           <p className="text-sm text-[var(--text-secondary)]">Usá tu cuenta de Google autorizada.</p>
         </div>
 

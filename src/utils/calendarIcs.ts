@@ -51,7 +51,7 @@ END:VALARM`.trim();
   const dtStartProp = isAllDay ? `DTSTART;VALUE=DATE:${startDateTimeStr}` : `DTSTART:${startDateTimeStr}`;
   const dtEndProp = isAllDay ? `DTEND;VALUE=DATE:${endDateTimeStr}` : `DTEND:${endDateTimeStr}`;
 
-  const cleanDesc = (description || 'Creado desde CRM Personal .Cero')
+  const cleanDesc = (description || 'Creado desde CRM Personal .CERO')
     .replace(/\\/g, '\\\\')
     .replace(/;/g, '\\;')
     .replace(/,/g, '\\,')
@@ -145,7 +145,7 @@ export function generateBatchCalendarICS(
 
     const dtStartProp = isAllDay ? `DTSTART;VALUE=DATE:${startDateTimeStr}` : `DTSTART:${startDateTimeStr}`;
     const dtEndProp = isAllDay ? `DTEND;VALUE=DATE:${endDateTimeStr}` : `DTEND:${endDateTimeStr}`;
-    const cleanDesc = (description || 'CRM Personal .Cero')
+    const cleanDesc = (description || 'CRM Personal .CERO')
       .replace(/\\/g, '\\\\')
       .replace(/;/g, '\\;')
       .replace(/,/g, '\\,')

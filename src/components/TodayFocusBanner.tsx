@@ -88,7 +88,7 @@ export const TodayFocusBanner: React.FC<Props> = ({
 
   return (
     <div className="relative w-full mb-4 rounded-[var(--radius-card)] bg-[var(--bg-surface)] border border-[var(--border-subtle)] overflow-hidden">
-      {/* Cuadrícula de plano: la firma visual de .Cero */}
+      {/* Cuadrícula de plano: la firma visual de .CERO */}
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 opacity-[0.07]"

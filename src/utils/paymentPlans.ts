@@ -286,8 +286,8 @@ export function generateWeb5050InstallmentSchedule(params: {
 
 /**
  * Formats a WhatsApp friendly reminder message with studio client and installment details
- * Follows the official .Cero template:
- * "Hola [Nombre], te escribo de .Cero para recordarte el vencimiento de la Cuota [N°] de [Total] correspondiente al Programa PAF por un total de [$ Monto Moneda] con fecha límite el [Fecha]. ¡Avisame cuando realices la transferencia para registrar el comprobante!"
+ * Follows the official .CERO template:
+ * "Hola [Nombre], te escribo de .CERO para recordarte el vencimiento de la Cuota [N°] de [Total] correspondiente al Programa PAF por un total de [$ Monto Moneda] con fecha límite el [Fecha]. ¡Avisame cuando realices la transferencia para registrar el comprobante!"
  */
 export function buildInstallmentWhatsAppMessage(params: {
   clientName: string;
@@ -318,7 +318,7 @@ export function buildInstallmentWhatsAppMessage(params: {
 
   const programName = projectTitle || 'Programa PAF';
 
-  return `Hola ${clientName}, te escribo de .Cero para recordarte el vencimiento de la Cuota ${installmentNumber} de ${totalInstallments} correspondiente al ${programName} por un total de ${formattedAmount} con fecha límite el ${formattedDate}. ¡Avisame cuando realices la transferencia para registrar el comprobante!`;
+  return `Hola ${clientName}, te escribo de .CERO para recordarte el vencimiento de la Cuota ${installmentNumber} de ${totalInstallments} correspondiente al ${programName} por un total de ${formattedAmount} con fecha límite el ${formattedDate}. ¡Avisame cuando realices la transferencia para registrar el comprobante!`;
 }
 
 /**
@@ -1049,7 +1049,7 @@ export function buildSmartWhatsAppPaymentMessage(params: {
     ? 'Programa PAF' 
     : (project.serviceType === 'web' ? 'desarrollo web' : 'proyecto');
 
-  let text = `Hola ${clientName}, te escribo de .Cero`;
+  let text = `Hola ${clientName}, te escribo de .CERO`;
 
   if (commitment) {
     let dateStr = commitment.dueDate;

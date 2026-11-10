@@ -48,21 +48,58 @@ function deviceLabel(): string {
   return 'Dispositivo';
 }
 
+const ON_KEY = 'cero_push_on';
+const setOn = (on: boolean) => { try { on ? localStorage.setItem(ON_KEY, '1') : localStorage.removeItem(ON_KEY); } catch { /* sin almacenamiento */ } };
+const wasOn = () => { try { return localStorage.getItem(ON_KEY) === '1'; } catch { return false; } };
+
+function sameKey(sub: PushSubscription, key: Uint8Array): boolean {
+  const actual = sub.options?.applicationServerKey;
+  if (!actual) return true; // el navegador no lo informa: no se toca
+  const a = new Uint8Array(actual);
+  return a.length === key.length && a.every((v, i) => v === key[i]);
+}
+
+/** Deja este dispositivo suscripto con las claves actuales del servidor y anotado en la base */
+async function ensureSubscribed(): Promise<void> {
+  const { publicKey } = await api('/api/push/public-key');
+  const key = urlBase64ToUint8Array(publicKey);
+  const reg = await navigator.serviceWorker.ready;
+  let subscription = await reg.pushManager.getSubscription();
+  // Suscripción hecha con claves viejas: no llega nada. Se rehace.
+  if (subscription && !sameKey(subscription, key)) {
+    await subscription.unsubscribe().catch(() => undefined);
+    subscription = null;
+  }
+  if (!subscription) subscription = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+  await api('/api/push/subscribe', { subscription: subscription.toJSON(), label: deviceLabel() });
+  setOn(true);
+}
+
 export async function enablePush(): Promise<void> {
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') throw new Error('No diste permiso para notificaciones. Podés habilitarlo en la configuración del navegador.');
-  const { publicKey } = await api('/api/push/public-key');
-  const reg = await navigator.serviceWorker.ready;
-  const existing = await reg.pushManager.getSubscription();
-  const subscription =
-    existing ||
-    (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(publicKey) }));
-  await api('/api/push/subscribe', { subscription: subscription.toJSON(), label: deviceLabel() });
+  await ensureSubscribed();
+}
+
+/**
+ * Al abrir la app: si este dispositivo tenía los avisos activados, se asegura de que sigan
+ * andando (el navegador a veces vence la suscripción, o el servidor la perdió). No pide permiso
+ * ni molesta: solo repara lo que ya habías activado.
+ */
+export async function repairPush(): Promise<void> {
+  try {
+    if (getPushSupport() !== 'ok' || Notification.permission !== 'granted') return;
+    const reg = await navigator.serviceWorker.getRegistration();
+    const existing = reg ? await reg.pushManager.getSubscription() : null;
+    if (!existing && !wasOn()) return; // nunca los activó acá
+    await ensureSubscribed();
+  } catch { /* se reintenta la próxima vez que abras la app */ }
 }
 
 export async function disablePush(): Promise<void> {
   const sub = await getCurrentSubscription();
   if (!sub) return;
+  setOn(false);
   await api('/api/push/unsubscribe', { endpoint: sub.endpoint }).catch(() => {});
   await sub.unsubscribe();
 }

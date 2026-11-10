@@ -665,6 +665,6 @@ export function generateHorizonSummarySentence(
     ocupacionStr = 'calendario libre';
   }
 
-  const countText = count === 1 ? '1 proyecto con fechas' : `${count} proyectos con fechas`;
+  const countText = count === 1 ? '1 proyecto en curso' : `${count} proyectos en curso`;
   return `${countText} hasta ${endMonth} · ${currentMonthStr} · ${ocupacionStr}`;
 }

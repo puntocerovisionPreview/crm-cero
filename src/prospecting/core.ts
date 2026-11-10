@@ -27,21 +27,21 @@ export const DEFAULT_PROSPECTING_SETTINGS: ProspectingSettings = {
   weeklyGoal: 50,
   bookingUrl: '',
   templates: {
-    first: 'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\n{personal}¿me permites realizarte una consulta?',
+    first: 'Hola {saludo}. Mi nombre es Juan, soy el dueño de .CERO.\n{personal}¿me permites realizarte una consulta?',
     firstVariants: [
-      '{saludoHora}, {saludo}. Soy Juan, de .Cero.\n{personal}¿me permites hacerte una consulta?',
+      '{saludoHora}, {saludo}. Soy Juan, de .CERO.\n{personal}¿me permites hacerte una consulta?',
       'Hola {saludo}, ¿cómo va? Mi nombre es Juan y trabajo con estudios de {rubro}.\n{personal}¿te puedo hacer una pregunta rápida?',
-      '{saludoHora}, ¿hablo con alguien de {estudio}? Soy Juan, de .Cero.\n{personal}¿les puedo hacer una consulta breve?',
-      'Hola {saludo}. Te escribe Juan, de .Cero.\n{personal}¿tienes un minuto para una consulta sobre el estudio?',
+      '{saludoHora}, ¿hablo con alguien de {estudio}? Soy Juan, de .CERO.\n{personal}¿les puedo hacer una consulta breve?',
+      'Hola {saludo}. Te escribe Juan, de .CERO.\n{personal}¿tienes un minuto para una consulta sobre el estudio?',
       '{saludoHora} {saludo}, ¿qué tal? Soy Juan.\n{personal}¿me dejas hacerte una pregunta corta?',
-      'Hola, ¿cómo están en {estudio}? Mi nombre es Juan, de .Cero.\n{personal}¿puedo hacerles una consulta?',
+      'Hola, ¿cómo están en {estudio}? Mi nombre es Juan, de .CERO.\n{personal}¿puedo hacerles una consulta?',
     ],
     firstB: '',
     followUpQuestion: '{saludo}, ¿pudiste ver lo que te pregunté? Me sirve mucho saber cómo les llegan hoy los clientes a {estudio}.',
     followUpAgree: '¿Te pasa algo así en {estudio}, {nombre}? Te pregunto porque tengo algo que te puede servir.',
     followUpAudit: 'Hola {saludo}, ¿pudiste hacer el diagnóstico? Son 5 minutos y apenas lo completas te grabo un video con lo que veo de {estudio}: {link}',
     secondChance:
-      'Hola {saludo}, te escribí hace un tiempo. Soy Juan, de .Cero. Sé que los meses pasan volando: ¿me permites hacerte una consulta rápida sobre cómo les llegan los clientes hoy?',
+      'Hola {saludo}, te escribí hace un tiempo. Soy Juan, de .CERO. Sé que los meses pasan volando: ¿me permites hacerte una consulta rápida sobre cómo les llegan los clientes hoy?',
     booking:
       '¿Pudiste ver el video, {saludo}? Si te sirvió, armemos una llamada de 20 minutos para bajarlo a {estudio}. Elige el horario que te quede cómodo: {agenda}',
     proposal: 'Hola {saludo}, ¿pudiste revisar la propuesta que te envié? Si te queda alguna duda, la vemos en 10 minutos cuando te quede cómodo.',
@@ -979,7 +979,7 @@ export function lostReasons(prospects: Prospect[]): { reason: string; count: num
 }
 
 /** Reporte de la semana para mandarle a tu mentor (texto para WhatsApp). */
-export function weeklyReportText(week: WeekMetrics, goal: number, studioName = '.Cero'): string {
+export function weeklyReportText(week: WeekMetrics, goal: number, studioName = '.CERO'): string {
   const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : '—');
   return [
     `Reporte de prospección ${studioName} — ${week.label} (${week.range})`,
@@ -1026,7 +1026,7 @@ export function callMeetingFor(
     reminderMinutesBefore: 60,
     reminderNotified: false,
     notes: [
-      `Prospecto de .Cero${p.city ? ` (${p.city})` : ''}.`,
+      `Prospecto de .CERO${p.city ? ` (${p.city})` : ''}.`,
       p.whatsapp ? `WhatsApp: ${p.whatsapp}` : '',
       p.audit ? `Auditoría ${p.audit.total}/30 (${p.audit.nivel}). Dolor: ${p.audit.dolorCaptacion || '—'}.` : '',
       p.difusion ? `Hoy difunde su trabajo por: ${DIFUSION_LABELS[p.difusion]}.` : '',
@@ -1043,8 +1043,8 @@ export function callMeetingFor(
 // ---------------- VARIANTES DEL PRIMER MENSAJE ----------------
 
 const OLD_FIRST_DEFAULTS = [
-  'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\n{personal}¿me permites realizarte una consulta?',
-  'Hola {saludo}. Mi nombre es Juan, soy el dueño de .Cero.\nViendo el enfoque y la trayectoria que tienes en tu estudio, ¿me permites realizarte una consulta?',
+  'Hola {saludo}. Mi nombre es Juan, soy el dueño de .CERO.\n{personal}¿me permites realizarte una consulta?',
+  'Hola {saludo}. Mi nombre es Juan, soy el dueño de .CERO.\nViendo el enfoque y la trayectoria que tienes en tu estudio, ¿me permites realizarte una consulta?',
 ];
 
 /** Variantes en uso: las de la configuración + tu primer mensaje si lo escribiste vos. */

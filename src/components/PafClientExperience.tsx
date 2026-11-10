@@ -40,7 +40,7 @@ export function PafClientExperience({ data, panel, panelError, token }: { data: 
   const hoursPct = data.hoursTotal > 0 ? Math.min(100, Math.max(0, data.hoursDone * 100 / data.hoursTotal)) : 0;
   return <div className="min-h-screen bg-[#0B0F17] text-zinc-100 selection:bg-amber-400/30">
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-10 space-y-6">
-      <div className="flex items-center justify-between gap-3"><BrandLogo size="sm" /><span className="text-xs text-zinc-400">Tu espacio de trabajo con .Cero</span></div>
+      <div className="flex items-center justify-between gap-3"><BrandLogo size="sm" /><span className="text-xs text-zinc-400">Tu espacio de trabajo con .CERO</span></div>
       <header className="rounded-3xl border border-zinc-800 bg-gradient-to-br from-zinc-900 via-zinc-900 to-amber-950/30 p-6 sm:p-8">
         <p className="text-xs font-bold uppercase tracking-[.2em] text-amber-400">{data.programName} · Acompañamiento de 12 semanas</p>
         <h1 className="mt-3 text-3xl sm:text-5xl font-semibold tracking-tight break-words">{data.studentName}</h1>
@@ -102,7 +102,7 @@ export function PafClientExperience({ data, panel, panelError, token }: { data: 
         </>}
         {tab === 'recursos' && <Section title="Todo lo que construimos para tu estudio"><p className="text-sm text-zinc-400 mb-4">Web, documentos, guías y materiales compartidos por tu equipo.</p>{plan.resources.length ? <ul className="grid sm:grid-cols-2 gap-3">{plan.resources.filter((r) => safeResourceUrl(r.url)).map((r) => <li key={r.id}><a href={safeResourceUrl(r.url)!} target="_blank" rel="noopener noreferrer" className="flex justify-between items-center gap-3 rounded-2xl bg-zinc-800/60 p-4 text-sm hover:bg-zinc-800"><span className="break-words">{r.title}</span><ArrowUpRight className="w-4 h-4 text-amber-300 shrink-0" /></a></li>)}</ul> : <p className="text-sm text-zinc-500">Los recursos aparecerán a medida que los preparemos y compartamos con vos.</p>}</Section>}
       </main>
-      <footer className="border-t border-zinc-800 pt-5 text-xs text-zinc-500 flex flex-wrap justify-between gap-2"><span>.Cero · Presencia, adquisición y conversión</span><span>Última actualización · {formatDisplayDate((panel?.updatedAt || data.updatedAt).slice(0, 10), 'medium')}</span></footer>
+      <footer className="border-t border-zinc-800 pt-5 text-xs text-zinc-500 flex flex-wrap justify-between gap-2"><span>.CERO · Presencia, adquisición y conversión</span><span>Última actualización · {formatDisplayDate((panel?.updatedAt || data.updatedAt).slice(0, 10), 'medium')}</span></footer>
     </div>
   </div>;
 }

@@ -57,7 +57,7 @@ export const PafGuideModal: React.FC<Props> = ({
                 Método PAF: Guía Comercial & Cierres
               </h2>
               <p className="text-xs text-zinc-400">
-                Programa de Escalabilidad Comercial para Arquitectos (.Cero)
+                Programa de Escalabilidad Comercial para Arquitectos (.CERO)
               </p>
             </div>
           </div>
@@ -153,7 +153,7 @@ export const PafGuideModal: React.FC<Props> = ({
                   </div>
                   <div className="flex items-center gap-2 text-zinc-300">
                     <CheckCircle2 className="w-4 h-4 text-[var(--accent)] shrink-0" />
-                    <span>Librería de Prompts IA .Cero + Manuales de Infraestructura Comercial</span>
+                    <span>Librería de Prompts IA .CERO + Manuales de Infraestructura Comercial</span>
                   </div>
                 </div>
 

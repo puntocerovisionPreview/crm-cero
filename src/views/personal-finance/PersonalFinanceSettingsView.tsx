@@ -167,7 +167,7 @@ export const PersonalFinanceSettingsView: React.FC<Props> = ({
   };
 
   // Scriptable iOS Code
-  const scriptableCode = `// Variables de configuración de .Cero CRM
+  const scriptableCode = `// Variables de configuración de .CERO CRM
 // Pegar este código en la app Scriptable en tu iPhone
 
 const DATA = ${JSON.stringify(widgetData, null, 2)};

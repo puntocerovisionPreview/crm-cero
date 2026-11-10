@@ -116,7 +116,7 @@ export function getWhatsAppRenewalUrl(expense: StudioFixedExpense, clientPhone?:
   const clientGreeting = expense.clientName ? `Hola ${expense.clientName}, ` : 'Hola, ';
   const currencySymbol = expense.currency === 'USD' ? 'u$s ' : '$';
 
-  const text = `${clientGreeting}te escribo de .Cero Estudio para recordarte que la renovación anual de tu ${isDomain ? 'dominio web' : 'servicio de hosting'} *${expense.name}* ${urgencyText}.\n\nEl costo de renovación es de *${currencySymbol}${expense.amount.toLocaleString('es-AR')}*.\n\n¿Me confirmás para gestionarlo y asegurar que el sitio continúe activo sin interrupciones? ¡Muchas gracias!`;
+  const text = `${clientGreeting}te escribo de .CERO Estudio para recordarte que la renovación anual de tu ${isDomain ? 'dominio web' : 'servicio de hosting'} *${expense.name}* ${urgencyText}.\n\nEl costo de renovación es de *${currencySymbol}${expense.amount.toLocaleString('es-AR')}*.\n\n¿Me confirmás para gestionarlo y asegurar que el sitio continúe activo sin interrupciones? ¡Muchas gracias!`;
 
   const phoneParam = clientPhone ? clientPhone.replace(/\D/g, '') : '';
   return `https://wa.me/${phoneParam}?text=${encodeURIComponent(text)}`;

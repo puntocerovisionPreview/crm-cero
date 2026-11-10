@@ -476,7 +476,7 @@ export const QuickAddModal: React.FC<Props> = ({
       if (taskAddToAppleCalendar) {
         generateCalendarICS({
           title: finalTitle,
-          description: pName ? `Proyecto: ${pName}` : 'Tarea de .Cero CRM',
+          description: pName ? `Proyecto: ${pName}` : 'Tarea de .CERO CRM',
           date: taskDate || today,
           time: taskTime || parsedNLPreview?.time || undefined,
           alarmMinutesBefore: reminderMins !== undefined ? reminderMins : 15,

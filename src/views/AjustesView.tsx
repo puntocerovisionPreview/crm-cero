@@ -369,7 +369,7 @@ export const AjustesView: React.FC<Props> = ({
                       Apariencia y Modo visual
                     </h2>
                     <p className="text-[11px] text-[var(--text-secondary)]">
-                      Tema activo: <strong className="text-[var(--text-primary)]">{theme === 'dark' ? 'Modo Oscuro (.Cero)' : 'Modo Claro (Swiss Minimal)'}</strong>
+                      Tema activo: <strong className="text-[var(--text-primary)]">{theme === 'dark' ? 'Modo Oscuro (.CERO)' : 'Modo Claro (Swiss Minimal)'}</strong>
                     </p>
                   </div>
                 </div>
@@ -411,7 +411,7 @@ export const AjustesView: React.FC<Props> = ({
             <GoogleCalendarSettingsCard />
 
             <p className="text-xs text-[var(--text-secondary)] mb-2">
-              Configurá todos los módulos, preferencias visuales, datos bancarios y copias de seguridad de tu CRM .Cero.
+              Configurá todos los módulos, preferencias visuales, datos bancarios y copias de seguridad de tu CRM .CERO.
             </p>
 
             <div className="card-swiss divide-y divide-[var(--border-subtle)] overflow-hidden">
@@ -458,7 +458,7 @@ export const AjustesView: React.FC<Props> = ({
           <form onSubmit={handleSaveStudioSettings} className="space-y-4">
             <div className="card-swiss p-4 sm:p-5 space-y-4">
               <h2 className="text-sm font-semibold text-[var(--text-primary)] font-heading">
-                Datos de Cobro del Estudio (.Cero)
+                Datos de Cobro del Estudio (.CERO)
               </h2>
               <p className="text-xs text-[var(--text-secondary)]">
                 Estos datos se incluyen automáticamente al presionar "WhatsApp de cobro" para enviar recordatorios a clientes.
@@ -952,7 +952,7 @@ export const AjustesView: React.FC<Props> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-[var(--text-primary)] font-heading">
-                  Papelera de Reciclaje (.Cero)
+                  Papelera de Reciclaje (.CERO)
                 </h2>
                 <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   Los elementos eliminados se conservan por 30 días. Podés restaurar cualquier registro a su lista activa con sus datos intactos.
@@ -1319,7 +1319,7 @@ export const AjustesView: React.FC<Props> = ({
           <div className="card-swiss p-4 sm:p-5 space-y-6">
             <div>
               <h2 className="text-sm font-semibold text-[var(--text-primary)] font-heading">
-                Personalizar Experiencia (.Cero)
+                Personalizar Experiencia (.CERO)
               </h2>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 Ocultá o mostrá sectores y bloques sin perder ningún dato. Todos los cambios se guardan al instante.
@@ -1341,7 +1341,7 @@ export const AjustesView: React.FC<Props> = ({
                     )}
                     <div>
                       <span className="text-xs font-semibold text-[var(--text-primary)] block">
-                        {theme === 'dark' ? 'Modo Oscuro (.Cero)' : 'Modo Claro (Swiss Minimal)'}
+                        {theme === 'dark' ? 'Modo Oscuro (.CERO)' : 'Modo Claro (Swiss Minimal)'}
                       </span>
                       <span className="text-[10px] text-[var(--text-secondary)] block">
                         Ajusta el fondo, contraste tipográfico y estética general

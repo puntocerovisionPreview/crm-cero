@@ -994,7 +994,7 @@ export const FocusView: React.FC<Props> = ({
                 ? 'Todas tus tareas pendientes están al día.'
                 : filterTab === 'completadas'
                 ? 'Comenzá a marcar tareas hechas hoy para verlas registradas aquí.'
-                : 'No tienes tareas pendientes para hoy. Agregá una abajo para comenzar tu foco.'}
+                : 'No tenés tareas pendientes para hoy. Agregá una abajo para empezar.'}
             </p>
           </div>
         ) : (

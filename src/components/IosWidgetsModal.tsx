@@ -111,7 +111,7 @@ export const IosWidgetsModal: React.FC<Props> = ({
   };
 
   // Generate Scriptable iOS Widget JavaScript code
-  const scriptableWidgetCode = `// .Cero CRM - Widget iOS para iPhone 11 Pro / iOS 14+
+  const scriptableWidgetCode = `// .CERO CRM - Widget iOS para iPhone 11 Pro / iOS 14+
 // App: Scriptable (Descárgala gratis en el App Store)
 // Widget: Tareas y Agenda Diaria en Vivo
 
@@ -122,7 +122,7 @@ async function createWidget() {
   widget.backgroundColor = new Color("#09090b");
   widget.setPadding(16, 16, 16, 16);
 
-  // Cabecera con Branding .Cero
+  // Cabecera con Branding .CERO
   const headerStack = widget.addStack();
   headerStack.layoutHorizontally();
   headerStack.centerAlignContent();
@@ -205,7 +205,7 @@ async function createWidget() {
   footerStack.layoutHorizontally();
   footerStack.centerAlignContent();
 
-  const openTxt = footerStack.addText("Tocar para abrir .Cero");
+  const openTxt = footerStack.addText("Tocar para abrir .CERO");
   openTxt.font = Font.mediumSystemFont(9);
   openTxt.textColor = new Color("#71717a");
 
@@ -234,7 +234,7 @@ Script.complete();
     const batchEvents = [
       ...tasks.map(t => ({
         title: t.title,
-        description: t.projectName ? `Proyecto: ${t.projectName}` : 'Tarea .Cero CRM',
+        description: t.projectName ? `Proyecto: ${t.projectName}` : 'Tarea .CERO CRM',
         date: t.date,
         time: t.time,
         alarmMinutesBefore: t.reminderMinutesBefore !== undefined ? t.reminderMinutesBefore : 15,
@@ -245,13 +245,13 @@ Script.complete();
           m.projectName ? `Proyecto: ${m.projectName}` : '',
           m.clientPhone ? `Tel: ${m.clientPhone}` : '',
           m.notes ? `Notas: ${m.notes}` : '',
-        ].filter(Boolean).join('\n') || 'Reunión .Cero CRM',
+        ].filter(Boolean).join('\n') || 'Reunión .CERO CRM',
         date: m.date,
         time: m.time,
         alarmMinutesBefore: m.reminderMinutesBefore !== undefined ? m.reminderMinutesBefore : 15,
       })),
     ];
-    generateBatchCalendarICS(batchEvents, 'Agenda .Cero CRM');
+    generateBatchCalendarICS(batchEvents, 'Agenda .CERO CRM');
   };
 
   return (
@@ -663,7 +663,7 @@ Script.complete();
                   <li>Abrí la app <strong className="text-white">Atajos (Shortcuts)</strong> en tu iPhone.</li>
                   <li>Tocá <strong className="text-white">+</strong> para crear un atajo nuevo.</li>
                   <li>Buscá la acción <strong className="text-white">"Abrir URL"</strong> (Open URLs) en Safari o Web.</li>
-                  <li>Pegá la URL copiada arriba y ponele de nombre <strong className="text-white">"Nueva Tarea .Cero"</strong>.</li>
+                  <li>Pegá la URL copiada arriba y ponele de nombre <strong className="text-white">"Nueva Tarea .CERO"</strong>.</li>
                   <li>En tu pantalla de inicio, mantén presionado el fondo, tocá <strong className="text-white">+</strong> en la esquina, elegí el widget de <strong className="text-white">Atajos</strong> y seleccioná tu nuevo atajo.</li>
                 </ol>
               </div>
@@ -739,7 +739,7 @@ Script.complete();
                   </div>
                   <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800/80">
                     <span className="font-black text-[var(--accent)] text-sm">2.</span>
-                    <p className="mt-1">Pegá el código copiado arriba y ponele de nombre <strong>".Cero Agenda"</strong>.</p>
+                    <p className="mt-1">Pegá el código copiado arriba y ponele de nombre <strong>".CERO Agenda"</strong>.</p>
                   </div>
                   <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800/80">
                     <span className="font-black text-[var(--accent)] text-sm">3.</span>
@@ -758,7 +758,7 @@ Script.complete();
                   Sincronización con el Widget Nativo de Calendario de Apple
                 </h4>
                 <p className="text-xs text-zinc-400 mt-0.5">
-                  El widget oficial de Calendario que ya viene preinstalado en tu iPhone 11 Pro puede mostrar todas tus tareas y reuniones de .Cero CRM.
+                  El widget oficial de Calendario que ya viene preinstalado en tu iPhone 11 Pro puede mostrar todas tus tareas y reuniones de .CERO CRM.
                 </p>
               </div>
 
@@ -793,7 +793,7 @@ Script.complete();
                 </div>
                 <ul className="list-disc list-inside space-y-1 text-zinc-400 leading-relaxed">
                   <li>Al tocar el botón de descarga en Safari de tu iPhone, iOS te preguntará si deseas <strong>"Añadir todos los eventos al Calendario"</strong>.</li>
-                  <li>Una vez importados, el widget nativo de Calendario de iOS mostrará tus compromisos de .Cero directamente en tu pantalla de inicio o en la vista "Hoy" (swipe a la izquierda).</li>
+                  <li>Una vez importados, el widget nativo de Calendario de iOS mostrará tus compromisos de .CERO directamente en tu pantalla de inicio o en la vista "Hoy" (swipe a la izquierda).</li>
                 </ul>
               </div>
             </div>

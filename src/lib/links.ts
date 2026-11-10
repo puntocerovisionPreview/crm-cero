@@ -1,4 +1,4 @@
-// Parser and resolution utility for [[WikiLinks]] in .Cero CRM
+// Parser and resolution utility for [[WikiLinks]] in .CERO CRM
 import { taskBelongsToProject } from '../utils/taskProject';
 
 export type LinkEntityType = 

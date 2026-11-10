@@ -717,7 +717,7 @@ export const NotesView: React.FC<Props> = ({
                     ref={textareaRef}
                     value={activeNote.content}
                     onChange={handleTextareaChange}
-                    placeholder="Escribe aquí… Escribe [[ para vincular con metas, clientes o proyectos."
+                    placeholder="Escribí acá… Poné [[ para vincular con metas, clientes o proyectos."
                     rows={14}
                     className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-xl p-3.5 text-xs sm:text-sm text-[var(--text-primary)] font-mono leading-relaxed placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--text-primary)] transition resize-y"
                   />

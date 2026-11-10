@@ -85,7 +85,7 @@ const ROLE_STORAGE_KEY = 'cero_gemini_selected_role';
 const INITIAL_MESSAGE: ChatMessage = {
   id: 'msg_welcome',
   role: 'assistant',
-  content: `¡Hola! Soy tu **Copiloto Inteligente de .Cero CRM & Agenda** con Gemini.
+  content: `¡Hola! Soy tu **Copiloto Inteligente de .CERO CRM & Agenda** con Gemini.
 
 Tengo control operativo directo sobre tu app para realizar cosas por vos:
 • **Crear o marcar tareas** (ej: *"anotame para mañana a las 11:00 llamar a Estudio Norte"*).

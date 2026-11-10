@@ -78,7 +78,7 @@ export function registerProspectAIRoutes(app: express.Express, { getAIClient, ge
     const b = req.body || {};
     try {
       const site = b.website ? await fetchSite(clip(b.website, 300)) : { text: '' };
-      const prompt = `Sos Juan, dueño de .Cero (marketing para estudios de arquitectura). Vas a mandar un primer mensaje por WhatsApp a este estudio.
+      const prompt = `Sos Juan, dueño de .CERO (marketing para estudios de arquitectura). Vas a mandar un primer mensaje por WhatsApp a este estudio.
 Escribí SOLO el comienzo de la frase que va antes de "¿me permites realizarte una consulta?".
 Reglas:
 - Una sola frase, máximo 18 palabras, en español neutro con "tú" (nada de "vos").
@@ -115,7 +115,7 @@ Respondé un JSON: {"line": string}`;
     const b = req.body || {};
     const a = b.audit || {};
     try {
-      const prompt = `Sos Juan, de .Cero (marketing y captación de clientes para estudios de arquitectura).
+      const prompt = `Sos Juan, de .CERO (marketing y captación de clientes para estudios de arquitectura).
 Escribí el guion de un video corto (60 a 90 segundos, grabado con la pantalla mostrando su web/Instagram) para explicarle a este estudio el resultado de su auto auditoría.
 Estructura en 4 partes con títulos: 1) Saludo y contexto (por qué le grabás esto), 2) Lo que está bien, 3) Las 2 oportunidades más grandes (según los puntajes más bajos y su dolor principal), 4) Cierre: invitación a una llamada de 20 minutos.
 Español neutro con "tú". Frases cortas, para decir en voz alta. Nada de promesas de resultados con números.

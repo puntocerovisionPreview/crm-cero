@@ -2,7 +2,7 @@
  * RESERVA DE CONTACTOS (base de prospección)
  *
  * Toma el CSV del scraper de Google Maps (Apify o Selenium), lo limpia, descarta lo que no
- * sirve y le pone un puntaje a cada contacto según qué tan buen candidato es para .Cero.
+ * sirve y le pone un puntaje a cada contacto según qué tan buen candidato es para .CERO.
  * Lógica pura: la usan la app (al subir el CSV) y las pruebas.
  */
 

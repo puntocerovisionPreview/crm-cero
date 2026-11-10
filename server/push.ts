@@ -62,7 +62,10 @@ async function ensureVapid(db?: Firestore | null): Promise<{ publicKey: string }
         const snap = await db.collection('settings').doc('push').get();
         if (snap.exists) storedFromDb = snap.data();
       } catch (err) {
-        console.warn('[push] Firestore settings/push no accesible, usando almacén local:', (err as Error).message);
+        // Si la base no contestó NO se inventan claves nuevas: con claves nuevas, todos los
+        // dispositivos ya activados dejan de recibir avisos para siempre. Mejor fallar esta vez.
+        const local = readLocalPushStore();
+        if (!local.vapid?.publicKey) throw new Error(`No se pudieron leer las claves de avisos: ${(err as Error).message}`);
       }
     }
 
@@ -81,7 +84,8 @@ async function ensureVapid(db?: Firestore | null): Promise<{ publicKey: string }
         local.vapid = { publicKey, privateKey };
         writeLocalPushStore(local);
         if (db) {
-          db.collection('settings').doc('push').set({ publicKey, privateKey, createdAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+          await db.collection('settings').doc('push').set({ publicKey, privateKey, createdAt: new Date().toISOString() }, { merge: true })
+            .catch((e) => console.warn('[push] No se pudieron guardar las claves de avisos:', (e as Error).message));
         }
       }
     }
@@ -134,6 +138,8 @@ export async function sendPushToAll(db: Firestore | null, payload: PushPayload):
   });
 
   let delivered = 0;
+  let failed = 0;
+  let lastError = '';
   const toDeleteLocal: string[] = [];
 
   await Promise.all(
@@ -142,7 +148,11 @@ export async function sendPushToAll(db: Firestore | null, payload: PushPayload):
         await webpush.sendNotification(sub, JSON.stringify(payload), { TTL: 60 * 60 * 6, urgency: 'high' });
         delivered++;
       } catch (err: any) {
-        if (err?.statusCode === 404 || err?.statusCode === 410) {
+        failed++;
+        lastError = String(err?.statusCode || err?.message || 'error').slice(0, 120);
+        // 404/410: el dispositivo se dio de baja. 403: se activó con otras claves y ya no sirve.
+        // En los tres casos se borra, así la app te pide activarlo de nuevo en vez de fallar callada.
+        if (err?.statusCode === 404 || err?.statusCode === 410 || err?.statusCode === 403) {
           if (docRef) await docRef.delete().catch(() => {});
           toDeleteLocal.push(sub.endpoint);
         } else {
@@ -157,6 +167,13 @@ export async function sendPushToAll(db: Firestore | null, payload: PushPayload):
       delete local.subscriptions[subId(ep)];
     });
     writeLocalPushStore(local);
+  }
+
+  // Queda anotado cómo salió el último envío (pantalla de Estado y alarma de avisos)
+  if (db && targets.size > 0) {
+    await db.collection('settings').doc('system_health')
+      .set({ push: { lastAt: new Date().toISOString(), delivered, failed, lastError: failed ? lastError : null, ...(delivered > 0 ? { lastOkAt: new Date().toISOString() } : {}) } }, { merge: true })
+      .catch(() => undefined);
   }
 
   return delivered;
@@ -198,9 +215,13 @@ export function registerPushRoutes(app: express.Express, requireOwner: express.R
     local.subscriptions[id] = { subscription, label, createdAt };
     writeLocalPushStore(local);
 
-    // Intentar en Firestore si está disponible
+    // En la base (lo único que sobrevive cuando el servidor se reinicia)
     if (db) {
-      db.collection('push_subscriptions').doc(id).set({ subscription, label, createdAt }).catch(() => {});
+      try {
+        await db.collection('push_subscriptions').doc(id).set({ subscription, label, createdAt });
+      } catch (err) {
+        return res.status(500).json({ error: `No se pudo guardar este dispositivo: ${(err as Error).message}` });
+      }
     }
 
     res.json({ ok: true });
@@ -226,7 +247,7 @@ export function registerPushRoutes(app: express.Express, requireOwner: express.R
     try {
       const delivered = await sendPushToAll(db, {
         title: 'Notificaciones activadas',
-        body: 'Así te va a avisar .Cero CRM: resumen del día, reuniones y cobros.',
+        body: 'Así te va a avisar .CERO CRM: resumen del día, reuniones y cobros.',
         url: '/agenda',
         tag: 'prueba',
       });

@@ -284,7 +284,7 @@ export const PersonalFinanceStudyView: React.FC<Props> = ({
           {/* Project Link */}
           <div>
             <label className="block text-[11px] font-bold uppercase tracking-wider text-zinc-400 mb-1.5">
-              Vincular con Proyecto / Cliente .Cero (Opcional)
+              Vincular con Proyecto / Cliente .CERO (Opcional)
             </label>
             <select
               value={projectId}

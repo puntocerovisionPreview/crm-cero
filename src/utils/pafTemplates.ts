@@ -69,7 +69,7 @@ export const PAF_PRO_MILESTONES: Omit<PafMilestone, 'id' | 'completed'>[] = [
     pillar: 'conversion',
   },
   {
-    title: 'Entrega de Librería de Prompts IA .Cero + PDFs Educativos para Prospectos',
+    title: 'Entrega de Librería de Prompts IA .CERO + PDFs Educativos para Prospectos',
     month: 3,
     week: 11,
     pillar: 'general',
@@ -337,7 +337,7 @@ export function generatePafWhatsAppMessage(params: {
 
   switch (type) {
     case 'recordatorio_sesion':
-      return `¡Hola ${clientName}! ¿Cómo estás? Te escribo desde .Cero para coordinar nuestra próxima sesión 1:1 del Método PAF. Tenés ${remainingHours} hs de consultoría disponibles. ¿Qué día y horario te queda mejor esta semana?`;
+      return `¡Hola ${clientName}! ¿Cómo estás? Te escribo desde .CERO para coordinar nuestra próxima sesión 1:1 del Método PAF. Tenés ${remainingHours} hs de consultoría disponibles. ¿Qué día y horario te queda mejor esta semana?`;
     case 'horas_restantes':
       return `¡Hola ${clientName}! Te comparto tu balance de mentoría PAF: llevamos realizadas ${hoursUsed} de ${totalHours || 26} horas de consultoría 1:1 (te restan ${remainingHours} hs). Venimos con excelente avance en ${stage || 'el programa'}.`;
     case 'hitos_pendientes':
@@ -345,7 +345,7 @@ export function generatePafWhatsAppMessage(params: {
     case 'cuota_pendiente':
       return `¡Hola ${clientName}! Te contacto del estudio para enviarte el recordatorio de la cuota ${installmentNumber ? `#${installmentNumber}` : ''} del Método PAF${installmentAmount ? ` por $${installmentAmount.toLocaleString('es-AR')}` : ''}. Avisame cuando puedas realizarla y te emitimos el recibo correspondiente. ¡Muchas gracias!`;
     default:
-      return `¡Hola ${clientName}! Te contacto desde .Cero respecto a tu programa Método PAF.`;
+      return `¡Hola ${clientName}! Te contacto desde .CERO respecto a tu programa Método PAF.`;
   }
 }
 

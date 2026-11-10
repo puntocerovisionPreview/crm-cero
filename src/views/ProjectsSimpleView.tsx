@@ -2795,9 +2795,9 @@ export const ProjectsSimpleView: React.FC<Props> = ({
           </div>
           <h4 className="text-sm font-bold text-zinc-200">
             {tab === 'activos' 
-              ? 'No tienes proyectos activos en este momento' 
+              ? 'No tenés proyectos activos en este momento' 
               : tab === 'posibles' 
-              ? 'No tienes posibles proyectos o cotizaciones abiertas' 
+              ? 'No tenés posibles proyectos ni cotizaciones abiertas' 
               : 'No hay proyectos archivados'}
           </h4>
           <p className="text-xs text-zinc-400 mt-1 max-w-sm mx-auto leading-relaxed">

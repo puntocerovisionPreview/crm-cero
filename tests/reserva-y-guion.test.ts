@@ -85,7 +85,7 @@ describe('guion de conversación', () => {
 
   it('el primer mensaje saluda por el @ o por el estudio', () => {
     expect(greetingFor({ ...base, instagram: 'https://instagram.com/estudiouno/' })).toBe('@estudiouno');
-    expect(renderTemplate(s.templates.first, base)).toMatch(/^Hola Estudio Uno\. Mi nombre es Juan, soy el dueño de \.Cero\./);
+    expect(renderTemplate(s.templates.first, base)).toMatch(/^Hola Estudio Uno\. Mi nombre es Juan, soy el dueño de \.CERO\./);
   });
 
   it('recorre los pasos: pregunta → su respuesta → empatía → acuerdo → speech con link → auditoría enviada', () => {

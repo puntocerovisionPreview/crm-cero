@@ -88,8 +88,8 @@ export default defineConfig(() => {
         ],
         manifest: {
           id: '/',
-          name: 'CRM Personal .Cero',
-          short_name: '.Cero CRM',
+          name: 'CRM Personal .CERO',
+          short_name: '.CERO CRM',
           description: 'Herramienta ágil y simplificada de gestión diaria: Agenda a 7 días, Proyectos activos e Ingresos mensuales.',
           theme_color: '#000000',
           background_color: '#000000',

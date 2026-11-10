@@ -31,7 +31,7 @@ export const StudentPortalView: React.FC<{ token: string }> = ({ token }) => {
   return <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-primary)] p-6">
     <div className="mx-auto max-w-lg py-8"><BrandLogo size="sm" />
       {state === 'loading' ? <div role="status" className="flex items-center justify-center gap-3 py-24 text-zinc-400"><Loader2 className="w-5 h-5 animate-spin" /> Cargando tu programa…</div> :
-        <div className="text-center py-20 space-y-3"><h1 className="text-xl font-semibold">{state === 'error' ? 'No pudimos cargar tu programa' : 'Este enlace no está disponible'}</h1><p className="text-sm text-zinc-400">{state === 'error' ? 'Revisá tu conexión y volvé a intentar.' : 'Pedile a tu equipo de .Cero el enlace de tu programa.'}</p>{state === 'error' && <button type="button" onClick={() => window.location.reload()} className="rounded-xl bg-amber-400 text-zinc-950 px-4 py-2 text-sm font-semibold">Volver a intentar</button>}</div>}
+        <div className="text-center py-20 space-y-3"><h1 className="text-xl font-semibold">{state === 'error' ? 'No pudimos cargar tu programa' : 'Este enlace no está disponible'}</h1><p className="text-sm text-zinc-400">{state === 'error' ? 'Revisá tu conexión y volvé a intentar.' : 'Pedile a tu equipo de .CERO el enlace de tu programa.'}</p>{state === 'error' && <button type="button" onClick={() => window.location.reload()} className="rounded-xl bg-amber-400 text-zinc-950 px-4 py-2 text-sm font-semibold">Volver a intentar</button>}</div>}
     </div>
   </div>;
 };

@@ -1,3 +1,4 @@
+import { fechaCorta } from '../utils/fechas';
 import React, { useState, useMemo } from 'react';
 import { 
   IncomeRecord, 
@@ -498,16 +499,16 @@ export const IncomeView: React.FC<Props> = ({
       <div className="card-swiss p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="label-swiss text-[11px] font-bold">Finanzas Flexibles</span>
+            <span className="label-swiss text-[11px] font-bold">Dinero del estudio</span>
             <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-surface-muted)] text-[var(--text-secondary)] border border-[var(--border-subtle)]">
               {selectedMonth === 'all' ? `Todo el año ${selectedYear}` : formatMonthTitle(`${selectedYear}-${selectedMonth}`)}
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] font-heading tracking-tight mt-1">
-            Control de Caja, Compromisos & Proyecciones
+            Cobros, gastos y lo que viene
           </h2>
           <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-            Movimientos libres sin ataduras, cronogramas 100% editables y cálculo automático de saldos.
+            Lo que entró, lo que te deben y lo que tenés que pagar, mes por mes.
           </p>
         </div>
 
@@ -793,10 +794,17 @@ export const IncomeView: React.FC<Props> = ({
                 <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
                 <div className="min-w-0">
                   <div className="text-xs font-bold text-amber-300">
-                    {urgentFixedExpensesList.length} servicio{urgentFixedExpensesList.length > 1 ? 's' : ''} vence{urgentFixedExpensesList.length > 1 ? 'n' : ''} en los próximos 30 días
+                    {(() => {
+                      const vencidos = urgentFixedExpensesList.filter(u => (u.nextDueDate || '') < today).length;
+                      const porVencer = urgentFixedExpensesList.length - vencidos;
+                      return [
+                        vencidos ? `${vencidos} servicio${vencidos > 1 ? 's' : ''} vencido${vencidos > 1 ? 's' : ''} sin pagar` : '',
+                        porVencer ? `${porVencer} vence${porVencer > 1 ? 'n' : ''} en los próximos 30 días` : '',
+                      ].filter(Boolean).join(' · ');
+                    })()}
                   </div>
                   <div className="text-[11px] text-amber-400/80 truncate">
-                    {urgentFixedExpensesList.map(u => `${u.name} (${u.nextDueDate})`).join(' · ')}
+                    {urgentFixedExpensesList.map(u => `${u.name} (${fechaCorta(u.nextDueDate, today)})`).join(' · ')}
                   </div>
                 </div>
               </div>
@@ -840,7 +848,7 @@ export const IncomeView: React.FC<Props> = ({
                     Gastos Fijos del Estudio & Vencimientos
                   </h3>
                   <p className="text-[11px] text-[var(--text-secondary)]">
-                    Dominios de clientes pasados, suscripciones de IA (ChatGPT, Claude, Cursor) y Hosting anual
+                    Dominios, hosting y suscripciones: cuánto salen y cuándo vencen
                   </p>
                 </div>
               </div>
@@ -868,7 +876,7 @@ export const IncomeView: React.FC<Props> = ({
                     return `${iaUSD > 0 ? `u$s ${iaUSD}` : ''}${iaUSD > 0 && iaARS > 0 ? ' + ' : ''}${iaARS > 0 ? `$${iaARS.toLocaleString('es-AR')}` : ''}/mes`;
                   })()}
                 </span>
-                <span className="text-[9.5px] text-[var(--text-tertiary)] block mt-0.5">ChatGPT, Claude, Cursor</span>
+                <span className="text-[9.5px] text-[var(--text-tertiary)] block mt-0.5 truncate">{studioFixedExpenses.filter(e => e.active && e.category === 'ia').map(e => e.name).slice(0, 3).join(', ') || 'Ninguna cargada'}</span>
               </div>
 
               {/* Dominios Clientes */}
@@ -910,7 +918,7 @@ export const IncomeView: React.FC<Props> = ({
                     const urgUSD = urgentFixedExpensesList.filter(e => e.currency === 'USD').reduce((acc, curr) => acc + curr.amount, 0);
                     const urgARS = urgentFixedExpensesList.filter(e => e.currency === 'ARS').reduce((acc, curr) => acc + curr.amount, 0);
                     const moneyStr = `${urgARS > 0 ? `$${urgARS.toLocaleString('es-AR')}` : ''}${urgARS > 0 && urgUSD > 0 ? ' + ' : ''}${urgUSD > 0 ? `u$s ${urgUSD}` : ''}`;
-                    return `${urgentFixedExpensesList.length} en <30d (${moneyStr})`;
+                    return `${urgentFixedExpensesList.length} (${moneyStr})`;
                   })()}
                 </span>
                 <span className="text-[9.5px] text-[var(--text-tertiary)] block mt-0.5">Suma a renovar pronto</span>
@@ -1641,7 +1649,7 @@ export const IncomeView: React.FC<Props> = ({
                       </span>
                     </div>
                     <div className="text-xs font-mono text-[var(--text-secondary)]">
-                      Cliente: <strong>{project.clientName}</strong> · Próximo cobro: {plan.nextDueDate}
+                      Cliente: <strong>{project.clientName}</strong> · Próximo cobro: {fechaCorta(plan.nextDueDate, today)}
                     </div>
                   </div>
 
@@ -1807,7 +1815,7 @@ export const IncomeView: React.FC<Props> = ({
                     .filter(p => p.status !== 'completado' && p.status !== 'cancelado')
                     .map(p => `   • ${p.clientName} (${p.status || 'Activo'})`),
                   `──────────────────────────────────────────`,
-                  `Generado con .Cero CRM`
+                  `Generado con .CERO CRM`
                 ];
                 return lines.join('\n');
               })()}
@@ -1845,7 +1853,7 @@ export const IncomeView: React.FC<Props> = ({
                       .filter(p => p.status !== 'completado' && p.status !== 'cancelado')
                       .map(p => `   • ${p.clientName} (${p.status || 'Activo'})`),
                     `──────────────────────────────────────────`,
-                    `Generado con .Cero CRM`
+                    `Generado con .CERO CRM`
                   ];
                   const text = lines.join('\n');
                   const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
@@ -1893,7 +1901,7 @@ export const IncomeView: React.FC<Props> = ({
                       .filter(p => p.status !== 'completado' && p.status !== 'cancelado')
                       .map(p => `   • ${p.clientName} (${p.status || 'Activo'})`),
                     `──────────────────────────────────────────`,
-                    `Generado con .Cero CRM`
+                    `Generado con .CERO CRM`
                   ];
                   navigator.clipboard.writeText(lines.join('\n'));
                   hapticFeedback.success();

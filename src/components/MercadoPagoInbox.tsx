@@ -30,6 +30,22 @@ export const isSentPayment = (p: MercadoPagoIncomingPayment) => p.direction === 
 export const MercadoPagoInbox: React.FC<Props> = ({ pending, privacyMode, onRegister, onRegisterSent, onIgnore }) => {
   const [syncing, setSyncing] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  // Ignorar varios de una: primer toque pregunta, segundo confirma
+  const [confirmar, setConfirmar] = useState<'recibidos' | 'enviados' | null>(null);
+  const ignorarTodos = (cuales: 'recibidos' | 'enviados', lista: MercadoPagoIncomingPayment[]) => {
+    if (confirmar !== cuales) { setConfirmar(cuales); return; }
+    lista.forEach((p) => onIgnore(p));
+    setConfirmar(null);
+    setNote(`Listo: ${lista.length} ${lista.length === 1 ? 'movimiento ignorado' : 'movimientos ignorados'}. No se borró nada.`);
+  };
+  const BotonIgnorar = ({ cuales, lista }: { cuales: 'recibidos' | 'enviados'; lista: MercadoPagoIncomingPayment[] }) => (
+    <span className="flex items-center gap-2">
+      <button type="button" onClick={() => ignorarTodos(cuales, lista)} className={`text-[12px] font-medium ${confirmar === cuales ? 'text-[var(--semantic-red)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+        {confirmar === cuales ? `Sí, ignorar los ${lista.length}` : lista.length === 1 ? 'Ignorar' : `Ignorar los ${lista.length}`}
+      </button>
+      {confirmar === cuales && <button type="button" onClick={() => setConfirmar(null)} className="text-[12px] text-[var(--text-secondary)]">Cancelar</button>}
+    </span>
+  );
 
   const received = pending.filter((p) => !isSentPayment(p));
   const sent = pending.filter(isSentPayment);
@@ -92,7 +108,10 @@ export const MercadoPagoInbox: React.FC<Props> = ({ pending, privacyMode, onRegi
 
       {received.length > 0 && (
         <div>
-          <h3 className="px-1 pb-1.5 text-[13px] font-medium text-[var(--text-secondary)]">Te pagaron</h3>
+          <div className="flex items-center justify-between px-1 pb-1.5">
+            <h3 className="text-[13px] font-medium text-[var(--text-secondary)]">Te pagaron</h3>
+            {received.length > 1 && <BotonIgnorar cuales="recibidos" lista={received} />}
+          </div>
           <ul className="rounded-[12px] bg-[var(--bg-surface-elevated)] divide-y divide-[var(--border-subtle)] overflow-hidden">
             {received.slice(0, 5).map((p) => (
               <li key={p.id} className="flex items-center gap-3 px-3 py-2.5">
@@ -125,7 +144,10 @@ export const MercadoPagoInbox: React.FC<Props> = ({ pending, privacyMode, onRegi
 
       {sent.length > 0 && (
         <div>
-          <h3 className="px-1 pb-1.5 text-[13px] font-medium text-[var(--text-secondary)]">Pagaste vos</h3>
+          <div className="flex items-center justify-between px-1 pb-1.5">
+            <h3 className="text-[13px] font-medium text-[var(--text-secondary)]">Pagaste vos</h3>
+            {sent.length > 1 && <BotonIgnorar cuales="enviados" lista={sent} />}
+          </div>
           <ul className="rounded-[12px] bg-[var(--bg-surface-elevated)] divide-y divide-[var(--border-subtle)] overflow-hidden">
             {sent.slice(0, 5).map((p) => (
               <li key={p.id} className="px-3 py-2.5 space-y-2">

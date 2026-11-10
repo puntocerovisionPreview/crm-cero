@@ -4,7 +4,7 @@
  * y un calendario de ejemplo. Con eso arma el .zip que la app importa de una.
  */
 
-export const CLAUDE_INSTRUCTIONS = `# Calendario de contenido para importar en mi CRM (.Cero)
+export const CLAUDE_INSTRUCTIONS = `# Calendario de contenido para importar en mi CRM (.CERO)
 
 Armame el calendario de contenido y entregámelo como **un solo archivo .zip** que pueda importar en mi CRM (Contenido → Importar). Seguí exactamente esta estructura.
 

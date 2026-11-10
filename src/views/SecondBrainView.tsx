@@ -786,7 +786,7 @@ export const SecondBrainView: React.FC<Props> = ({
               <textarea
                 value={activeNote.content}
                 onChange={(e) => handleUpdateActiveNote({ content: e.target.value })}
-                placeholder="Escribe lo que mueve tu día… Escribe [[Nombre de Meta o Proyecto]] para conectar con nodos, o @tarea para incluir tareas."
+                placeholder="Escribí lo que mueve tu día… Poné [[Nombre de Meta o Proyecto]] para conectar con nodos, o @tarea para incluir tareas."
                 rows={12}
                 className="w-full bg-[var(--bg-app)] border border-[var(--border-subtle)] rounded-[var(--radius-control)] p-3 text-xs sm:text-sm text-[var(--text-primary)] font-mono leading-relaxed placeholder-[var(--text-tertiary)] focus:outline-none focus:border-[var(--text-primary)] transition resize-y"
               />

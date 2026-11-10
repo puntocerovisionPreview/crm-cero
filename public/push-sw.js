@@ -1,4 +1,4 @@
-/* Notificaciones push de .Cero CRM (lo carga el service worker de la app).
+/* Notificaciones push de .CERO CRM (lo carga el service worker de la app).
    Muestra la notificación que manda el servidor y, al tocarla, abre la pantalla indicada. */
 
 self.addEventListener('push', (event) => {
@@ -6,9 +6,9 @@ self.addEventListener('push', (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch (e) {
-    data = { title: '.Cero CRM', body: event.data ? event.data.text() : '' };
+    data = { title: '.CERO CRM', body: event.data ? event.data.text() : '' };
   }
-  const title = data.title || '.Cero CRM';
+  const title = data.title || '.CERO CRM';
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || '',

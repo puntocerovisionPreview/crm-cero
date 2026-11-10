@@ -55,7 +55,7 @@ describe('cliente de ejemplo', () => {
   const { project, meetings } = buildEjemplo('Juan@Gmail.com', new Date('2026-11-03T12:00:00'));
   it('tiene ID de ejemplo válido y se publica solo para tu correo', () => {
     expect(CLIENTE_ID_RE.test(EJEMPLO_ID)).toBe(true);
-    const r = portalFromProject({ ...project, id: 'p' }, meetings.map((m) => ({ ...m, projectId: 'p' })));
+    const r = portalFromProject({ ...project, id: 'p' }, meetings.map((m) => ({ ...m, projectId: 'p' })), undefined, undefined, new Date('2026-11-03T12:00:00'));
     if (!('doc' in r)) throw new Error(r.errors.join());
     expect(r.doc.emailsAutorizados).toEqual(['juan@gmail.com']);
     expect(r.doc.hitosCompletados).toEqual([1]);
@@ -66,7 +66,7 @@ describe('cliente de ejemplo', () => {
   });
   it('sus reuniones nunca van a Calendar y nada privado viaja', () => {
     expect(meetings.every((m) => m.sinCalendar)).toBe(true);
-    const r = portalFromProject({ ...project, id: 'p' }, meetings.map((m) => ({ ...m, projectId: 'p' })));
+    const r = portalFromProject({ ...project, id: 'p' }, meetings.map((m) => ({ ...m, projectId: 'p' })), undefined, undefined, new Date('2026-11-03T12:00:00'));
     const json = JSON.stringify('doc' in r ? r.doc : {});
     expect(json).not.toContain('Martín no conoce el Excel'); // preparación privada
     expect(json).not.toContain('Cruzarlo con el diagnóstico'); // próxima acción privada

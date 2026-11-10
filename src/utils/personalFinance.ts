@@ -1,4 +1,4 @@
-// Pure business logic and calculation engine for Personal Finance (.Cero Mis Finanzas)
+// Pure business logic and calculation engine for Personal Finance (.CERO Mis Finanzas)
 import { 
   PersonalAccount, 
   PersonalCategory, 
@@ -58,7 +58,7 @@ export const DEFAULT_PERSONAL_ACCOUNTS: Omit<PersonalAccount, 'createdAt'>[] = [
 export const DEFAULT_PERSONAL_CATEGORIES: Omit<PersonalCategory, 'createdAt'>[] = [
   // --- Ingresos ---
   { id: 'cat_ing_honorarios', name: 'Honorarios & Clientes', type: 'ingreso', color: '#10b981', icon: 'Briefcase' },
-  { id: 'cat_ing_cobros_cero', name: 'Cobros .Cero CRM', type: 'ingreso', color: '#E8590C', icon: 'FolderKanban' },
+  { id: 'cat_ing_cobros_cero', name: 'Cobros .CERO CRM', type: 'ingreso', color: '#E8590C', icon: 'FolderKanban' },
   { id: 'cat_ing_rendimientos', name: 'Rendimientos / Inversiones', type: 'ingreso', color: '#38bdf8', icon: 'TrendingUp' },
   { id: 'cat_ing_otros', name: 'Otros Ingresos', type: 'ingreso', color: '#a1a1aa', icon: 'Plus' },
 

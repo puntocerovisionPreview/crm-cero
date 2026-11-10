@@ -1,4 +1,4 @@
-// Web Audio API Sound Generator for .Cero CRM
+// Web Audio API Sound Generator for .CERO CRM
 // Zero external assets, 100% offline, crisp, instant feedback
 
 const SOUND_STORAGE_KEY = 'cero_sound_enabled';

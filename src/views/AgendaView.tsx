@@ -2263,7 +2263,7 @@ const DayColumn: React.FC<DayColumnProps> = ({
                             meet.projectName ? `Proyecto: ${meet.projectName}` : '',
                             meet.clientPhone ? `Tel/WhatsApp: ${meet.clientPhone}` : '',
                             meet.notes ? `Notas: ${meet.notes}` : '',
-                          ].filter(Boolean).join('\n') || 'Reunión .Cero CRM',
+                          ].filter(Boolean).join('\n') || 'Reunión .CERO CRM',
                           date: meet.date,
                           time: meet.time,
                           alarmMinutesBefore: meet.reminderMinutesBefore !== undefined ? meet.reminderMinutesBefore : 15,
@@ -2801,7 +2801,7 @@ const SwipeableTaskItem: React.FC<SwipeableTaskItemProps> = ({
                 const projName = task.projectName || (projects.length > 0 ? resolveTaskProject(task, projects)?.clientName : undefined);
                 generateCalendarICS({
                   title: task.title,
-                  description: projName ? `Proyecto: ${projName}` : 'Tarea .Cero CRM',
+                  description: projName ? `Proyecto: ${projName}` : 'Tarea .CERO CRM',
                   date: task.date,
                   time: task.time,
                   alarmMinutesBefore: task.reminderMinutesBefore !== undefined ? task.reminderMinutesBefore : 15,

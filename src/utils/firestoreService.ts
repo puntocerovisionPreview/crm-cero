@@ -1,3 +1,4 @@
+import { proximoVencimiento } from './fechas';
 import {
   collection,
   doc,
@@ -681,7 +682,7 @@ export function normalizeStudioFixedExpense(data: any, id: string): StudioFixedE
     amount: Number(data.amount) || 0,
     currency: data.currency === 'ARS' ? 'ARS' : 'USD',
     billingCycle: data.billingCycle || 'mensual',
-    nextDueDate: toSafeDateString(data.nextDueDate) || todayLocal(),
+    nextDueDate: proximoVencimiento(toSafeDateString(data.nextDueDate) || todayLocal(), data.lastPaidDate ? toSafeDateString(data.lastPaidDate) : undefined, data.billingCycle),
     lastPaidDate: data.lastPaidDate ? toSafeDateString(data.lastPaidDate) : undefined,
     autoRenew: Boolean(data.autoRenew),
     projectId: data.projectId || undefined,
@@ -1439,7 +1440,7 @@ export async function deleteLinkFromFirestore(linkId: string): Promise<void> {
 }
 
 // =========================================================================
-// FINANZAS PERSONALES (.Cero Personal Finance)
+// FINANZAS PERSONALES (.CERO Personal Finance)
 // =========================================================================
 
 // 1. Cuentas (PersonalAccount)

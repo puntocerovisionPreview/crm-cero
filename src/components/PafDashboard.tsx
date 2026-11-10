@@ -282,7 +282,7 @@ export const PafDashboard: React.FC<Props> = ({
           </div>
           <h3 className="text-base font-bold text-zinc-200">
             {stageFilter === 'todos' && tierFilter === 'todos' 
-              ? 'No tienes clientes PAF activos registrados aún' 
+              ? 'Todavía no tenés clientes PAF activos' 
               : 'No hay estudios PAF en esta etapa o filtro'}
           </h3>
           <p className="text-xs text-zinc-400 max-w-sm mx-auto leading-relaxed">

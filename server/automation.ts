@@ -1,3 +1,4 @@
+import { proximoVencimiento } from '../src/utils/fechas';
 import type express from 'express';
 import { timingSafeEqual } from 'crypto';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
@@ -164,7 +165,8 @@ export async function loadAutomationData(db: Firestore): Promise<PeriodicData> {
     meetings: plainDates(meetings),
     projects: plainDates(projects),
     incomes: plainDates(incomes),
-    fixedExpenses: plainDates(fixedExpenses),
+    // Mismo criterio que la app: lo que ya se pagó este ciclo no se avisa como vencido
+    fixedExpenses: plainDates(fixedExpenses).map((f: any) => ({ ...f, nextDueDate: proximoVencimiento(String(f.nextDueDate || '').slice(0, 10), f.lastPaidDate ? String(f.lastPaidDate).slice(0, 10) : undefined, f.billingCycle) })),
     routine: plainDates(routine).sort((a: any, b: any) => (a.order ?? 0) - (b.order ?? 0)),
     prospects: plainDates(prospects).map((p: any) => ({ followUps: 0, ...p })),
     prospectingSettings: mergeProspectingSettings(savedSettings),
@@ -431,11 +433,26 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
 
   // Reloj externo: GET o POST /api/cron/<tarea>?key=CRON_SECRET
   // "frequent" junta lo que conviene correr cada 10-15 min (avisos + calendario)
+  // Una vuelta "frecuente" a la vez. Si una tarda (respaldo, calendario), la siguiente no se encima.
+  let vueltaEnCurso = 0;
   app.all('/api/cron/:job', async (req, res) => {
     if (!cronSecretOk(req)) return res.status(401).json({ error: 'Clave de cron inválida o no configurada' });
     const job = req.params.job;
     const jobs = job === 'frequent' ? ['reminders', 'calendar-sync', 'mercadopago', 'clientes'] : CRON_JOBS.includes(job) ? [job] : [];
     if (jobs.length === 0) return res.status(404).json({ error: 'Tarea desconocida' });
+    if (job === 'frequent') {
+      if (vueltaEnCurso && Date.now() - vueltaEnCurso < 5 * 60 * 1000) return res.json({ ok: true, enCurso: true });
+      vueltaEnCurso = Date.now();
+    }
+    // El reloj externo corta a los 30 segundos y, si le pasa seguido, se desactiva solo y te quedás
+    // sin avisos. Por eso se le contesta a los 20 segundos como mucho; la vuelta termina igual.
+    const corte = setTimeout(() => { if (!res.headersSent) res.json({ ok: true, sigueCorriendo: true }); }, 20000);
+    const terminar = (body: unknown) => {
+      clearTimeout(corte);
+      if (job === 'frequent') vueltaEnCurso = 0;
+      if (!res.headersSent) res.json(body);
+    };
+    try {
     const results: JobResult[] = [];
     const db = getAdminDb();
     const notify = async (title: string, body: string) => {
@@ -507,7 +524,11 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
         await recordJobRun(db, 'contenido', false, (err as Error).message);
       }
     }
-    res.json({ ok: true, results });
+    terminar({ ok: true, results });
+    } catch (err) {
+      console.error('[automation] La vuelta del reloj falló:', err);
+      terminar({ ok: false, error: (err as Error).message });
+    }
   });
 
   // Estado de la app: integraciones, tareas, respaldo y errores (pantalla Ajustes → Estado)
@@ -586,7 +607,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
         { telegramChatId: String(last.chat.id), telegramChatName: chatName, linkedAt: new Date().toISOString() },
         { merge: true }
       );
-      await sendTelegram('<b>Listo.</b> Desde ahora tu CRM .Cero te escribe por acá.', String(last.chat.id));
+      await sendTelegram('<b>Listo.</b> Desde ahora tu CRM .CERO te escribe por acá.', String(last.chat.id));
       res.json({ ok: true, chatName });
     } catch (err) {
       res.status(500).json({ error: (err as Error).message });

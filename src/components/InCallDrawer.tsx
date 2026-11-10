@@ -574,7 +574,7 @@ export const InCallDrawer: React.FC<Props> = ({
 
       {/* Drawer Footer */}
       <div className="p-3 bg-zinc-900/80 border-t border-zinc-800/80 flex items-center justify-between text-xs text-zinc-500 shrink-0">
-        <span className="text-[11px]">.Cero Operativo 1:1</span>
+        <span className="text-[11px]">.CERO Operativo 1:1</span>
         <button
           onClick={onClose}
           className="px-3 py-1.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-bold transition active:scale-95"

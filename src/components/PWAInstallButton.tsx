@@ -91,7 +91,7 @@ export const PWAInstallButton: React.FC = () => {
                     ✓
                   </div>
                   <div>
-                    <span className="font-semibold text-zinc-100">Paso 3:</span> Tocá <strong className="text-zinc-100">"Agregar"</strong> arriba a la derecha. ¡Listo! Tendrás el ícono de .Cero en tu inicio.
+                    <span className="font-semibold text-zinc-100">Paso 3:</span> Tocá <strong className="text-zinc-100">"Agregar"</strong> arriba a la derecha. ¡Listo! Tendrás el ícono de .CERO en tu inicio.
                   </div>
                 </div>
               </div>

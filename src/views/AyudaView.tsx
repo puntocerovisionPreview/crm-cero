@@ -72,7 +72,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
           </div>
           <div>
             <h1 className="text-sm font-bold text-zinc-100">
-              Centro de Ayuda & Metodología .Cero
+              Centro de Ayuda & Metodología .CERO
             </h1>
             <p className="text-[10px] text-zinc-500">
               Método PAF, Atajos de Teclado y Buenas Prácticas
@@ -387,7 +387,7 @@ export const AyudaView: React.FC<Props> = ({ privacyMode = false }) => {
                 <span>Control de Flujo de Caja & Esquema 50/50</span>
               </h3>
               <p className="text-xs text-zinc-400 leading-relaxed">
-                Reglas de oro para la estabilidad financiera de .Cero:
+                Reglas de oro para la estabilidad financiera de .CERO:
               </p>
               <ul className="space-y-2 text-xs text-zinc-300">
                 <li className="flex items-start gap-2">

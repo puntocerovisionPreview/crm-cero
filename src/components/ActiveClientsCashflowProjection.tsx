@@ -1,3 +1,4 @@
+import { textoVence } from '../utils/fechas';
 import React, { useState } from 'react';
 import { Project, IncomeRecord, ProjectInstallment } from '../types';
 import { 
@@ -696,7 +697,7 @@ export const ActiveClientsCashflowProjection: React.FC<Props> = ({
                         <div className="flex items-center gap-2 text-[11px] text-[#C4C7C5] mt-0.5 flex-wrap">
                           <span>{item.concept}</span>
                           <span>•</span>
-                          <span className="font-mono">Vence: {item.dueDate}</span>
+                          <span className="font-mono">{textoVence(item.dueDate, getTodayString())}</span>
                         </div>
                       </div>
                     </div>

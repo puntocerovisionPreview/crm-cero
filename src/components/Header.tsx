@@ -349,7 +349,7 @@ export const Header: React.FC<Props> = ({
                           setShowOverflowMenu(false);
                           const status = await requestNotificationPermission();
                           if (status === 'granted') {
-                            showSystemNotification('Notificaciones .Cero Activadas', {
+                            showSystemNotification('Notificaciones .CERO Activadas', {
                               body: 'Te avisaremos cuando tengas tareas o reuniones por cumplir.',
                             });
                           }
@@ -577,7 +577,7 @@ export const Header: React.FC<Props> = ({
                   ✓
                 </div>
                 <div>
-                  <span className="font-bold text-zinc-100">3. Tocá "Agregar":</span> Arriba a la derecha. ¡Listo! Se creará el ícono oficial de <strong>.Cero CRM</strong> en tu pantalla de inicio y se abrirá como app nativa.
+                  <span className="font-bold text-zinc-100">3. Tocá "Agregar":</span> Arriba a la derecha. ¡Listo! Se creará el ícono oficial de <strong>.CERO CRM</strong> en tu pantalla de inicio y se abrirá como app nativa.
                 </div>
               </div>
 

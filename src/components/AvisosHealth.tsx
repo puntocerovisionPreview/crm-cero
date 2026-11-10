@@ -3,6 +3,7 @@ import { BellOff, X } from 'lucide-react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { getAuthHeaders } from '../utils/authAccess';
+import { repairPush } from '../utils/pushClient';
 
 const OCULTO_KEY = 'cero_avisos_alarma_oculta';
 const HORA = 3600000;
@@ -16,20 +17,23 @@ export const AvisosHealth: React.FC<{ onOpen: () => void }> = ({ onOpen }) => {
   const [oculto, setOculto] = useState(() => { try { return Number(localStorage.getItem(OCULTO_KEY) || 0) > Date.now(); } catch { return false; } });
 
   useEffect(() => {
-    if (oculto) return;
     let vivo = true;
     (async () => {
+      // Primero se repara este dispositivo (si ya tenía los avisos activados) y después se mira el estado
+      await repairPush();
+      if (oculto || !vivo || ['localhost', '127.0.0.1'].includes(window.location.hostname)) return;
       try {
         const res = await fetch('/api/automation/status', { headers: await getAuthHeaders() });
         if (!res.ok) return;
         const s = await res.json();
-        const salud = (await getDoc(doc(db, 'settings', 'system_health')).catch(() => null))?.data() as { jobs?: Record<string, { lastRunAt?: string }> } | undefined;
+        const salud = (await getDoc(doc(db, 'settings', 'system_health')).catch(() => null))?.data() as { jobs?: Record<string, { lastRunAt?: string }>; push?: { delivered?: number; failed?: number } } | undefined;
         // El reloj corre la tarea de avisos cada 10 minutos: si no corrió en 2 horas, está parado
         const ultima = salud?.jobs?.reminders?.lastRunAt;
         const out: string[] = [];
         if (!s.cronSecret) out.push('Falta la clave del reloj (CRON_SECRET): sin eso no sale ningún aviso.');
         else if (!ultima || Date.now() - Date.parse(ultima) > 2 * HORA) out.push(`El reloj de avisos no está corriendo${ultima ? ` desde el ${new Date(ultima).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}` : ''}.`);
         if (!s.pushDevices && !s.telegramChat) out.push('No hay dónde mandarte avisos: activalos en esta PC o en tu celular.');
+        else if (!s.telegramChat && salud?.push && !salud.push.delivered && (salud.push.failed || 0) > 0) out.push('El último aviso salió pero no llegó a ningún dispositivo: volvé a activarlos en tu celular.');
         if (vivo) setProblemas(out);
       } catch { /* sin conexión: no se muestra nada */ }
     })();

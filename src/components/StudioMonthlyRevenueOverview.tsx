@@ -1,3 +1,4 @@
+import { textoVence } from '../utils/fechas';
 import React, { useState } from 'react';
 import { Project, IncomeRecord, StudioPaymentSettings } from '../types';
 import { 
@@ -434,7 +435,7 @@ export const StudioMonthlyRevenueOverview: React.FC<Props> = ({
                       </span>
                       <span className="text-[var(--text-tertiary)]">·</span>
                       <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
-                        Vence: {item.dueDate}
+                        {textoVence(item.dueDate, today)}
                       </span>
                     </div>
                   </div>

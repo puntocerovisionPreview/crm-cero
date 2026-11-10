@@ -1,4 +1,4 @@
-// Natural Language Parser for .Cero CRM v3
+// Natural Language Parser for .CERO CRM v3
 // Parses input strings like:
 // "Reunión con Martín mañana a las 16hs cobrar 200 USD"
 // "Tarea enviar propuesta a Sofia el viernes a las 11:00"

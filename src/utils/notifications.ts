@@ -1,4 +1,4 @@
-// System notification scheduler and Web Notification API helper for .Cero CRM
+// System notification scheduler and Web Notification API helper for .CERO CRM
 
 export type NotificationPermissionStatus = 'default' | 'granted' | 'denied' | 'unsupported';
 

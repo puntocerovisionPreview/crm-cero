@@ -69,7 +69,7 @@ export const PafTodayBoard: React.FC<{ projects: Project[]; meetings: AgendaMeet
       {rows.length > 0 && (
         <ul className="mt-3 divide-y divide-[var(--border-divider)] border-t border-[var(--border-divider)]">
           {rows.map((r) => {
-            const motivo = r.salud.motivos[0];
+            const motivo = r.salud.motivos.find((m) => m.texto !== 'Sin próxima acción definida') || r.salud.motivos[0];
             return (
               <li key={r.id}>
                 <button type="button" onClick={() => onOpen(`/clientes/${r.id}`)} className="w-full flex items-center gap-3 py-3 text-left cursor-pointer group">

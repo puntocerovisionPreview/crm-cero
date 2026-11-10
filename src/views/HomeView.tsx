@@ -1,3 +1,4 @@
+import { weeklyCollections } from '../utils/periodic';
 import React, { useEffect, useMemo, useState } from 'react';
 import { BarChart3, ChevronRight, Moon } from 'lucide-react';
 import { AgendaMeeting, AgendaTask, IncomeRecord, Project, SecondBrainNote, StudioPaymentSettings } from '../types';
@@ -91,7 +92,10 @@ export const HomeView: React.FC<Props> = ({
     const todayMeetings = meetings.filter(m => m.date === today && !m.completed).sort((a, b) => (a.time || '99').localeCompare(b.time || '99'));
     const active = projects.filter(p => !p.archived && !p.isLead);
     const leads = projects.filter(p => !p.archived && p.isLead);
+    // Mismo criterio que la cobranza de Dinero: saldo del acuerdo o una cuota/abono que ya toca cobrar
+    const porCobrar = new Set(weeklyCollections(projects, incomes, today).map(c => c.projectId));
     const withBalance = active.filter(p => {
+      if (porCobrar.has(p.id)) return true;
       try {
         return calculateProjectBilling(p, incomes).saldoPendiente > 0;
       } catch {
@@ -136,7 +140,7 @@ export const HomeView: React.FC<Props> = ({
       : [{ value: loadError ? '—' : '…', label: loadError ? 'abrí la sección para ver tu cola' : 'cargando' }],
     clientes: [
       { value: String(data.active.length), label: 'activos' },
-      { value: String(data.withBalance.length), label: 'con saldo' },
+      { value: String(data.withBalance.length), label: 'por cobrar', ...(data.withBalance.length ? { tone: 'warn' as const } : {}) },
       ...(data.leads.length ? [{ value: String(data.leads.length), label: data.leads.length === 1 ? 'posible' : 'posibles' }] : []),
       ...(cold.length ? [{ value: String(cold.length), label: 'sin contacto', tone: 'warn' as const }] : []),
     ],

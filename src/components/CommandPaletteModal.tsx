@@ -747,7 +747,7 @@ export const CommandPaletteModal: React.FC<Props> = ({
             </span>
           </div>
           <div className="hidden sm:flex items-center gap-2 text-zinc-500 font-mono text-[10px]">
-            <span>.Cero CRM Desktop</span>
+            <span>.CERO CRM Desktop</span>
           </div>
         </div>
       </div>

@@ -5,7 +5,7 @@
  * Si el CRM no responde, el quiz sigue igual y el mail se envía como siempre.
  */
 export function buildWebSnippet(crmOrigin: string): string {
-  return `        // .Cero CRM: copia de la auto auditoría al CRM (si falla, el quiz sigue igual)
+  return `        // .CERO CRM: copia de la auto auditoría al CRM (si falla, el quiz sigue igual)
         try {
           var crmData = {};
           fd.forEach(function (value, key) { crmData[key] = String(value); });

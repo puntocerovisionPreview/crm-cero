@@ -312,7 +312,7 @@ export const HorizonView: React.FC<Props> = ({
                 Se detectaron {ghostProjects.length} contratos antiguos creados como proyectos cliente
               </p>
               <p className="text-zinc-400 mt-0.5">
-                Para mantener tu lista de clientes limpia, puedes convertirlos a Abonos Recurrentes limpios.
+                Para mantener tu lista de clientes limpia, podés convertirlos en abonos recurrentes.
               </p>
             </div>
           </div>

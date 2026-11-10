@@ -1,4 +1,4 @@
-// Types for .Cero CRM v3 - Minimalist 4-Module Architecture + Sync
+// Types for .CERO CRM v3 - Minimalist 4-Module Architecture + Sync
 
 export type ViewTab = 'agenda' | 'calendario' | 'web' | 'paf' | 'ingresos' | 'proyectos';
 
@@ -265,7 +265,7 @@ export interface ProjectInstallment {
 }
 
 // -------------------------------------------------------------
-// 2.1 Modelo de Acuerdo de Cobro Flexible (.Cero v3.8)
+// 2.1 Modelo de Acuerdo de Cobro Flexible (.CERO v3.8)
 // -------------------------------------------------------------
 export type BillingAgreementType = 
   | 'cuotas'       // Programa en cuotas (ej. PAF o custom N cuotas)
@@ -710,7 +710,7 @@ export interface ChatMessage {
 }
 
 // -------------------------------------------------------------
-// 9. MÓDULO DE FINANZAS PERSONALES (.Cero Personal Finance)
+// 9. MÓDULO DE FINANZAS PERSONALES (.CERO Personal Finance)
 // -------------------------------------------------------------
 
 export type PersonalAccountType = 'efectivo' | 'banco' | 'billetera_virtual' | 'dolares' | 'otro';

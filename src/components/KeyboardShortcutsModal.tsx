@@ -63,7 +63,7 @@ export const KeyboardShortcutsModal: React.FC<Props> = ({ isOpen, onClose }) => 
             </div>
             <div>
               <h3 className="text-sm font-bold text-zinc-100">Atajos de Teclado Desktop</h3>
-              <p className="text-[11px] text-zinc-400">Trabajá con velocidad profesional en .Cero CRM</p>
+              <p className="text-[11px] text-zinc-400">Trabajá con velocidad profesional en .CERO CRM</p>
             </div>
           </div>
           <button

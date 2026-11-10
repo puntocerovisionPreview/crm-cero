@@ -1,3 +1,4 @@
+import { fechaCorta, textoVence } from '../../utils/fechas';
 import React, { useState, useMemo } from 'react';
 import { 
   Plus, 
@@ -104,7 +105,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
         monthlyARS += r.amount * multiplier;
       }
 
-      const isDueThisMonth = r.nextDate && r.nextDate.startsWith(currentMonth);
+      const isDueThisMonth = r.nextDate && r.nextDate.slice(0, 7) <= currentMonth;
       if (isDueThisMonth) {
         if (r.currency === 'USD') pendingThisMonthUSD += r.amount;
         else pendingThisMonthARS += r.amount;
@@ -256,10 +257,11 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
           </div>
 
           <p className="text-xs text-amber-200/80 leading-relaxed">
-            Tenés cobros registrados en .Cero CRM que aún no fueron ingresados a tus cuentas personales:
+            Tenés cobros registrados en .CERO CRM que aún no fueron ingresados a tus cuentas personales:
           </p>
 
           <div className="space-y-2">
+            {unallocatedIncomes.length > 2 && <p className="text-[11px] text-amber-200/70">Los 2 más recientes de {unallocatedIncomes.length}.</p>}
             {unallocatedIncomes.slice(0, 2).map(({ income }) => (
               <div 
                 key={income.id}
@@ -268,7 +270,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
                 <div className="min-w-0">
                   <div className="font-bold text-zinc-100 truncate">{income.title}</div>
                   <div className="text-[10px] text-zinc-400 font-mono">
-                    {income.date} · {income.projectName || 'Sin proyecto'}
+                    {fechaCorta(income.date)} · {income.projectName || 'Sin proyecto'}
                   </div>
                 </div>
 
@@ -570,7 +572,7 @@ export const PersonalFinanceOverviewView: React.FC<Props> = ({
                 <div className="min-w-0">
                   <div className="font-bold text-zinc-200 truncate">{rec.title}</div>
                   <div className="text-[10px] text-zinc-400 font-mono">
-                    Vence: {rec.nextDate} · {rec.frequency}
+                    {textoVence(rec.nextDate, new Date().toLocaleDateString('en-CA'))} · {rec.frequency}
                   </div>
                 </div>
 
