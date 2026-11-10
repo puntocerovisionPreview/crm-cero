@@ -400,6 +400,7 @@ export interface Project {
   pafEtapasInicio?: Partial<Record<import('./portal/presencia').Etapa, string>>; // Cuándo empezó cada etapa (YYYY-MM-DD)
   pafAlcance?: import('./portal/presencia').Servicio[]; // Qué contrató además de la base (contenido, Google, web)
   pafTemas?: Partial<Record<import('./portal/presencia').TemaId, import('./portal/presencia').TemaEstado>>; // Plan de Presencia: cuándo empezó cada tema y su checklist
+  pafPlanLibre?: boolean; // Plan en modo libre: sin avisos de "ya toca empezar"; vos decidís cuándo arranca cada tema
   pafHistorial?: { fecha: string; texto: string }[]; // Qué se aprobó o confirmó y cuándo (privado)
   ejemplo?: boolean; // Cliente de ejemplo: se borra entero con un botón
   proximaAccion?: ProximaAccion; // La única próxima acción del cliente (responsable, fecha y qué necesita)

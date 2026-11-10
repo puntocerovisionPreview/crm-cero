@@ -21,6 +21,7 @@ import { aplicarAlta } from '../portal/altaLinks';
 import { PafMeetingsSection } from './PafMeetingsSection';
 import { PafWeekGoals } from './PafWeekGoals';
 import { PafAnnouncements } from './PafAnnouncements';
+import { PafNovedadBox } from './PafNovedadBox';
 import { PafHitosCard, confirmarHito } from './PafHitosCard';
 import { PafPlanSection } from './PafPlanSection';
 import { conHistorial } from '../portal/historial';
@@ -92,6 +93,9 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
   });
   const setSection = (s: Section) => { setSectionState(s); try { localStorage.setItem('paf_panel_seccion', s); } catch { /* sin almacenamiento */ } };
   const [adding, setAdding] = useState<Adding>(null);
+  // Lo de todos los días es la caja de novedad; el resto queda a un toque, sin ocupar lugar
+  const [masOpciones, setMasOpciones] = useState(() => { try { return localStorage.getItem('paf_panel_mas') === '1'; } catch { return false; } });
+  const toggleMas = () => setMasOpciones((v) => { try { localStorage.setItem('paf_panel_mas', v ? '0' : '1'); } catch { /* sin almacenamiento */ } return !v; });
   // Tareas con textos viejos (ej. "Marcar tus 3 proyectos favoritos"): se pasan a la versión actual
   useEffect(() => {
     const pafTareas = actualizarTareasViejas(project.pafTareas);
@@ -133,8 +137,18 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
       <PanelHeader portal={portal} project={project} studio={project.clientName} phone={project.clientPhone} preview={showPreview} onTogglePreview={() => setShowPreview((v) => !v)} />
       {showPreview && portal.published && <PortalPreview portal={portal.published} />}
 
+      {/* Lo de todas las semanas: una línea y sale al portal */}
+      <PafNovedadBox project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
+
+      <button type="button" onClick={toggleMas} aria-expanded={masOpciones || !!adding}
+        className="flex w-full items-center gap-2 text-left text-[11px] font-semibold text-zinc-500 hover:text-zinc-300">
+        <span className="h-px flex-1 bg-zinc-800" aria-hidden />
+        {masOpciones || adding ? 'Ocultar el resto' : 'Algo más armado: reunión, acuerdos, acceso, foco, reporte'}
+        <span className="h-px flex-1 bg-zinc-800" aria-hidden />
+      </button>
+
       {/* Acciones rápidas: lo que más hacés, a un toque */}
-      <div className="grid grid-cols-4 gap-2" role="toolbar" aria-label="Agregar al portal">
+      <div className={`grid-cols-4 gap-2 ${masOpciones || adding ? 'grid' : 'hidden'}`} role="toolbar" aria-label="Agregar al portal">
         {QUICK.map((q) => {
           const QIcon = q.icon;
           const active = adding === q.id;

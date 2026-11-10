@@ -800,6 +800,22 @@ h1, h2, h3, .font-heading {
   transform: translateY(0) scale(0.98);
 }
 
+/* Portal: papelitos cuando se cierra un hito */
+@keyframes portalConfeti {
+  0% { transform: translate3d(0, -12vh, 0) rotate(0deg); opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translate3d(0, 108vh, 0) rotate(var(--giro, 360deg)); opacity: 0; }
+}
+.portal-confeti {
+  position: absolute;
+  top: 0;
+  border-radius: 2px;
+  animation: portalConfeti 2.4s cubic-bezier(.25, .6, .5, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .portal-confeti { display: none; }
+}
+
 /* 10. Accessibility Guard for Reduced Motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

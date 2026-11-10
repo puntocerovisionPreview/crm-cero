@@ -52,6 +52,11 @@ export const PafPlanAuto: React.FC<{
       <div className="flex flex-wrap items-baseline gap-2">
         <h3 className="flex-1 text-xs font-bold text-zinc-100">Presencia esta semana</h3>
         <span className="text-[11px] text-zinc-400">{semana ? `Semana ${semana} desde el ${inicio!.split('-').reverse().slice(0, 2).join('/')}` : 'Sin fecha de inicio'}</span>
+        <button type="button" role="switch" aria-checked={!!project.pafPlanLibre} onClick={() => onUpdateProject(project.id, { pafPlanLibre: !project.pafPlanLibre })}
+          title="En modo libre nadie te avisa que “ya toca empezar” un tema: lo arrancás vos cuando quieras"
+          className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition ${project.pafPlanLibre ? 'border-emerald-400/50 text-emerald-300' : 'border-zinc-700 text-zinc-400 hover:text-zinc-200'}`}>
+          {project.pafPlanLibre ? 'Modo libre: activado' : 'Pasar a modo libre'}
+        </button>
       </div>
 
       {toca.length > 0 ? (
@@ -59,7 +64,8 @@ export const PafPlanAuto: React.FC<{
           <p className="flex-1 min-w-[12rem] text-[11px] text-zinc-200">Ya toca empezar <b>{toca.map((t) => t.titulo).join(', ')}</b>. Se cargan sus tareas (ocultas) y entregas{onAgendar ? ', y lo tuyo va a tu agenda con fecha' : ''}.</p>
           <button type="button" onClick={() => onEmpezar(toca)} className="inline-flex items-center gap-1 btn-solid-primary px-2.5 py-1 text-[11px]"><Play className="w-3 h-3" />Empezar {toca.length === 1 ? 'el tema' : `los ${toca.length}`}</button>
         </div>
-      ) : semana ? <p className="text-[11px] text-zinc-400">Estás al día con lo que toca empezar. Las semanas son una referencia: acomodalas a lo que acordaste con el estudio.</p> : null}
+      ) : project.pafPlanLibre ? <p className="text-[11px] text-zinc-400">Modo libre: sin avisos por semana. Empezá cada tema cuando te sirva, desde la lista de abajo.</p>
+      : semana ? <p className="text-[11px] text-zinc-400">Estás al día con lo que toca empezar. Las semanas son una referencia: acomodalas a lo que acordaste con el estudio.</p> : null}
 
       {sinAgenda.length > 0 && onAgendar && (
         <div className="flex flex-wrap items-center gap-2">

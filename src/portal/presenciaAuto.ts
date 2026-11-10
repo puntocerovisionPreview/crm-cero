@@ -111,7 +111,8 @@ export const semanaDelPrograma = (inicio: string, today: string) => Math.max(1, 
 /** Temas de Presencia (según lo contratado) que ya tocaría empezar y siguen sin empezar */
 export function temasParaEmpezar(p: Project, today: string): TemaPlantilla[] {
   const inicio = inicioPrograma(p);
-  if (!inicio || (p.pafEtapa && p.pafEtapa !== 'presencia')) return [];
+  // Plan libre: las semanas son solo una referencia, nadie avisa que "ya toca"
+  if (!inicio || p.pafPlanLibre || (p.pafEtapa && p.pafEtapa !== 'presencia')) return [];
   const semana = semanaDelPrograma(inicio, today);
   return temasDelAlcance(p.pafAlcance || [], 'presencia')
     .filter((t) => !p.pafTemas?.[t.id]?.empezado && (SEMANA_SUGERIDA[t.id] ?? 99) <= semana);

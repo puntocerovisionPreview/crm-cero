@@ -1,10 +1,12 @@
-import React, { useMemo } from 'react';
-import { AlertOctagon, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardList, FileText, KeyRound, NotebookPen, Package, Play, Timer } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { AlertOctagon, BellRing, CalendarDays, CheckCircle2, ChevronRight, ClipboardList, FileText, KeyRound, MessageSquarePlus, NotebookPen, Package, Play, Timer } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
 import { PRESENCIA_HITOS, pafTodayRows } from '../portal/model';
 import { isActivePafStudent } from '../panels/paf';
 import { itemsClientesHoy, type ItemClienteHoy } from '../automation/clientes';
-import { saludCliente, textoVisita } from '../portal/salud';
+import { diasEntre, saludCliente, textoVisita } from '../portal/salud';
+import { ultimaNovedad } from '../portal/novedad';
+import { PafNovedadBox } from './PafNovedadBox';
 import { useVisitas } from '../portal/useVisitas';
 import { SALUD_DOT } from './ClienteSalud';
 
@@ -17,9 +19,11 @@ const ICONO: Record<ItemClienteHoy['tipo'], React.ElementType> = {
  * Inicio: "Tus clientes hoy". Arriba, lo que tus clientes necesitan de vos hoy (revisar,
  * reuniones, acuerdos, decisiones, acciones vencidas), cada cosa lleva a su ficha.
  * Abajo, cómo está cada estudio: semáforo, el motivo principal y si entra a su portal.
+ * Y el repaso de la semana: desde acá mismo le contás algo a cada uno, sin abrir su ficha.
  */
-export const PafTodayBoard: React.FC<{ projects: Project[]; meetings: AgendaMeeting[]; onOpen: (path: string) => void }> = ({ projects, meetings, onOpen }) => {
+export const PafTodayBoard: React.FC<{ projects: Project[]; meetings: AgendaMeeting[]; onOpen: (path: string) => void; onUpdateProject?: (id: string, updates: Partial<Project>) => void }> = ({ projects, meetings, onOpen, onUpdateProject }) => {
   const today = new Date().toLocaleDateString('en-CA');
+  const [contando, setContando] = useState<string | null>(null);
   const visitas = useVisitas();
   const items = useMemo(() => itemsClientesHoy(projects, meetings, today), [projects, meetings, today]);
   const rows = useMemo(() => {
@@ -29,7 +33,10 @@ export const PafTodayBoard: React.FC<{ projects: Project[]; meetings: AgendaMeet
       .map((r) => {
         const p = byId.get(r.id)!;
         const visita = p.pafClienteId ? visitas.get(p.pafClienteId) : undefined;
-        return { ...r, salud: saludCliente(p, { meetings, visita, today }), visita: textoVisita(p, visita, today) };
+        const ultima = ultimaNovedad(p);
+        // Portal quieto: publicado y hace más de una semana que no le mostrás nada
+        const quieto = !!p.pafPortal?.publishedAt && (!ultima || diasEntre(ultima, today) > 7);
+        return { ...r, project: p, quieto, diasQuieto: ultima ? diasEntre(ultima, today) : null, salud: saludCliente(p, { meetings, visita, today }), visita: textoVisita(p, visita, today) };
       })
       .sort((a, b) => nivel[a.salud.nivel] - nivel[b.salud.nivel]);
   }, [projects, meetings, today, visitas]);
@@ -72,7 +79,8 @@ export const PafTodayBoard: React.FC<{ projects: Project[]; meetings: AgendaMeet
             const motivo = r.salud.motivos.find((m) => m.texto !== 'Sin próxima acción definida') || r.salud.motivos[0];
             return (
               <li key={r.id}>
-                <button type="button" onClick={() => onOpen(`/clientes/${r.id}`)} className="w-full flex items-center gap-3 py-3 text-left cursor-pointer group">
+                <div className="flex items-center gap-1">
+                <button type="button" onClick={() => onOpen(`/clientes/${r.id}`)} className="min-w-0 flex-1 flex items-center gap-3 py-3 text-left cursor-pointer group">
                   <span className={`w-2 h-2 shrink-0 rounded-full ${SALUD_DOT[r.salud.nivel]}`} aria-hidden />
                   <span className="flex-1 min-w-0">
                     <span className="block truncate text-[14px] font-medium text-[var(--text-primary)]">{r.estudio}</span>
@@ -90,10 +98,28 @@ export const PafTodayBoard: React.FC<{ projects: Project[]; meetings: AgendaMeet
                   </span>
                   <ChevronRight className="w-4 h-4 text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]" />
                 </button>
+                {onUpdateProject && (
+                  <button type="button" onClick={() => setContando((v) => (v === r.id ? null : r.id))} aria-expanded={contando === r.id}
+                    aria-label={`Contarle algo a ${r.estudio}`}
+                    title={r.quieto ? (r.diasQuieto === null ? 'Todavía no le mostraste nada en su portal' : `Hace ${r.diasQuieto} días que no ve nada nuevo en su portal`) : 'Contarle algo en su portal'}
+                    className={`relative shrink-0 rounded-[var(--radius-control)] border p-2 transition cursor-pointer ${contando === r.id ? 'border-[var(--text-primary)] text-[var(--text-primary)]' : 'border-[var(--border-subtle)] text-[var(--text-tertiary)] hover:border-[var(--border-strong)] hover:text-[var(--text-primary)]'}`}>
+                    <MessageSquarePlus className="w-4 h-4" />
+                    {r.quieto && <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 ring-2 ring-[var(--bg-surface)]" aria-hidden />}
+                  </button>
+                )}
+                </div>
+                {onUpdateProject && contando === r.id && (
+                  <div className="pb-3">
+                    <PafNovedadBox compact autoFocus project={r.project} meetings={meetings} onUpdateProject={onUpdateProject} />
+                  </div>
+                )}
               </li>
             );
           })}
         </ul>
+      )}
+      {onUpdateProject && rows.some((r) => r.quieto) && (
+        <p className="mt-3 flex items-center gap-2 text-[12px] text-[var(--text-tertiary)]"><span className="h-2 w-2 rounded-full bg-amber-500" aria-hidden />Hace más de una semana que no ve nada nuevo en su portal. Una línea alcanza.</p>
       )}
     </section>
   );

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  ArrowRight, ArrowUpRight, CalendarPlus, Check, ChevronDown, Folder, Home, LayoutList, ListChecks, Loader2, Megaphone, Route, MessageCircle, Package, Paperclip, Video,
+  ArrowRight, ArrowUpRight, CalendarPlus, Check, ChevronDown, Folder, Home, LayoutList, ListChecks, Loader2, Route, MessageCircle, Package, Paperclip, Video,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
@@ -12,6 +12,7 @@ import { AccessIcon } from '../components/AccessIcon';
 import { ETAPAS, type Etapa } from '../portal/presencia';
 import { MATERIALES, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, hitoInfoDe, hitosDe, seccionesVisibles, type Recorrido } from '../portal/model';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
+import { Festejo, LoUltimo, saludoDelMomento, useFestejo } from './portal/PortalUltimo';
 import { sendTaskDone, sendVisita, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
 /**
@@ -50,6 +51,8 @@ const DEMO: PafPortalDoc = {
   ],
   anuncios: [
     { id: 'a1', titulo: 'Ya está el borrador de tu web', texto: 'Miralo con calma y anotá lo que cambiarías. Lo vemos el martes.', link: 'https://example.com/', fijado: true, fecha: '2026-11-03' },
+    { id: 'a2', texto: 'Te grabé 3 minutos contándote cómo quedó la propuesta de foco y qué mirar primero.', link: 'https://www.loom.com/', fecha: '2026-11-09' },
+    { id: 'a3', texto: 'Esta semana cerramos el diagnóstico y ya estamos armando las primeras publicaciones con tus fotos.', fecha: '2026-11-07' },
   ],
   mostrarAvance: true,
   linkReunion: 'https://meet.google.com/',
@@ -295,7 +298,6 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   const entregas = p.entregas || [];
   // Accesos libres; los portales publicados antes traen los 5 enlaces fijos
   const accesos = p.accesos ?? accessesFromEnlaces(p.enlaces || {});
-  const anuncios = p.anuncios || [];
   const mostrarAvance = p.mostrarAvance !== false;
   // Presencia (PAF) o Web: cada uno tiene sus hitos
   const etapa: Etapa = p.etapa || 'presencia';
@@ -309,6 +311,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   const materiales = MATERIALES.filter((m) => p.materiales?.[m.id]);
   const whatsapp = p.contacto?.whatsapp || '';
   const isNew = useNewItems(p, !readOnly && !demo);
+  // Hito cerrado desde la última vez que entró: se festeja una vez (en el ejemplo, siempre)
+  const [festejo, cerrarFestejo] = useFestejo(p.clienteId, etapa, hechos, !readOnly && !embedded, !!demo);
   useBrandHead(p, !embedded);
 
   // Bienvenida solo la primera vez en este dispositivo (no en la vista previa de Juan)
@@ -364,7 +368,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
           )}
           <div className="min-w-0">
             <Eyebrow>Tu espacio con .CERO · {p.recorrido === 'web' ? 'Tu web' : ETAPAS.find((x) => x.id === etapa)!.label}</Eyebrow>
-            <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">Hola, {p.estudio}.</h1>
+            <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">{saludoDelMomento()}, {p.estudio}.</h1>
           </div>
         </div>
         {/* La semana en una frase: qué trabajamos, qué le toca y cuándo nos vemos */}
@@ -403,6 +407,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
           </button>
         )}
       </header>
+
+      {festejo && HITOS[festejo - 1] && <div className="mt-8"><Festejo titulo={HITOS[festejo - 1]} hechos={hechos.length} total={HITOS.length} onClose={cerrarFestejo} /></div>}
 
       {/* Lo nuevo desde la última visita, en una línea: cada parte lleva a su lugar */}
       {!showWelcome && ver.novedades && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => setTab(t)} />}
@@ -480,22 +486,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </section>
             )}
 
-            {/* 3 · Anuncios: información, más liviana */}
-            {anuncios.length > 0 && (
-              <ul className="space-y-3" aria-label="Anuncios">
-                {anuncios.map((a) => (
-                  <li key={a.id} className={`flex gap-3 rounded-[var(--radius-card)] px-4 py-3.5 ${a.fijado ? 'bg-white border border-[var(--border-subtle)]' : 'bg-transparent border border-dashed border-[var(--border-strong)]'}`}>
-                    <Megaphone className="mt-0.5 w-4 h-4 shrink-0 text-[var(--marca)]" />
-                    <div className="min-w-0">
-                      {isNew(`a:${a.id}`) && <NewBadge className="mb-1.5" />}
-                      {a.titulo && <p className="text-sm font-medium text-[var(--text-primary)]">{a.titulo}</p>}
-                      <p className="text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{a.texto}</p>
-                      {a.link && <a href={a.link} target="_blank" rel="noopener noreferrer" className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">Abrir <ArrowUpRight className="w-3.5 h-3.5" /></a>}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {/* 3 · Lo último: la historia de lo que fue pasando (novedades, entregas, reuniones) */}
+            <LoUltimo portal={p} today={taskProps.today} isNew={isNew} />
 
             {/* El ritmo del contenido con la CM */}
             {ver.cicloCM && (
