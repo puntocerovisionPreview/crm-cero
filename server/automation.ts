@@ -169,11 +169,12 @@ async function loadFrequentData(db: Firestore, today: string): Promise<PeriodicD
     // Por si alguna tarea de hoy quedó sin el campo "completed"
     leerConMemoria(`tasks:${today}`, 2 * MIN, async () => docsDe(await db.collection('tasks').where('date', '==', today).get())),
     leerConMemoria(`meetings:${today}`, 2 * MIN, async () => docsDe(await db.collection('meetings').where('date', '>=', today).where('date', '<=', manana).get())),
-    leerConMemoria('projects', 30 * MIN, () => readCollection<any>(db, 'projects')),
-    leerConMemoria('incomes', 30 * MIN, () => readCollection<any>(db, 'incomes')),
-    leerConMemoria('studioFixedExpenses', 60 * MIN, () => readCollection<any>(db, 'studioFixedExpenses')),
-    leerConMemoria('personal_recurrings', 60 * MIN, () => readCollection<any>(db, 'personal_recurrings')),
-    leerConMemoria('paf_visitas', 60 * MIN, () => readCollection<any>(db, 'paf_visitas')),
+    // Clientes y cobros cambian poco: con releerlos cada 6 horas alcanza para los avisos
+    leerConMemoria('projects', 6 * 60 * MIN, () => readCollection<any>(db, 'projects')),
+    leerConMemoria('incomes', 6 * 60 * MIN, () => readCollection<any>(db, 'incomes')),
+    leerConMemoria('studioFixedExpenses', 6 * 60 * MIN, () => readCollection<any>(db, 'studioFixedExpenses')),
+    leerConMemoria('personal_recurrings', 6 * 60 * MIN, () => readCollection<any>(db, 'personal_recurrings')),
+    leerConMemoria('paf_visitas', 6 * 60 * MIN, () => readCollection<any>(db, 'paf_visitas')),
   ]);
   const tasks = [...new Map([...pendientes, ...deHoy].map((t) => [t.id, t])).values()];
   return {
@@ -428,6 +429,8 @@ const CRON_JOBS = ['daily-brief', 'reminders', 'weekly', 'calendar-sync', 'prosp
  */
 const PROGRAMADAS: { job: string; dias?: number[]; diaDelMes?: number; desde: number; hasta: number }[] = [
   { job: 'daily-brief', desde: 8 * 60, hasta: 13 * 60 },
+  // Pagos de Mercado Pago: una vez por día (el webhook igual avisa al instante los que entran)
+  { job: 'mercadopago', desde: 9 * 60, hasta: 14 * 60 },
   { job: 'weekly-collections', dias: [1], desde: 9 * 60, hasta: 14 * 60 },
   { job: 'paf-report', dias: [5], desde: 17 * 60, hasta: 22 * 60 },
   { job: 'prospecting-close', dias: [1, 2, 3, 4, 5], desde: 19 * 60, hasta: 23 * 60 },
@@ -486,15 +489,15 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
   // "frequent" junta lo que conviene correr cada 10-15 min (avisos + calendario)
   // Una vuelta "frecuente" a la vez. Si una tarda (respaldo, calendario), la siguiente no se encima.
   let vueltaEnCurso = 0;
-  // Calendar y Mercado Pago no hace falta mirarlos cada 10 minutos: el navegador ya manda los
-  // cambios al Calendar y el webhook avisa los pagos al instante. Cada 30 minutos alcanza.
+  // El Calendar no hace falta mirarlo cada 10 minutos: el navegador ya manda los cambios al
+  // momento. Una vez por hora alcanza para traer lo que se agenda desde Google o Calendly.
   const ultimaVez = new Map<string, number>();
-  const CADA_30 = new Set(['calendar-sync', 'mercadopago']);
+  const CADA_HORA = new Set(['calendar-sync']);
   app.all('/api/cron/:job', async (req, res) => {
     if (!cronSecretOk(req)) return res.status(401).json({ error: 'Clave de cron inválida o no configurada' });
     const job = req.params.job;
     const jobs = job === 'frequent'
-      ? ['reminders', 'calendar-sync', 'mercadopago', 'clientes'].filter((j) => !CADA_30.has(j) || Date.now() - (ultimaVez.get(j) || 0) >= 28 * 60 * 1000)
+      ? ['reminders', 'calendar-sync', 'clientes'].filter((j) => !CADA_HORA.has(j) || Date.now() - (ultimaVez.get(j) || 0) >= 58 * 60 * 1000)
       : CRON_JOBS.includes(job) ? [job] : [];
     if (jobs.length === 0) return res.status(404).json({ error: 'Tarea desconocida' });
     if (job === 'frequent') {
@@ -519,7 +522,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
       try {
         const r = await runJob(j);
         results.push(r);
-        if (CADA_30.has(j)) ultimaVez.set(j, Date.now());
+        if (CADA_HORA.has(j)) ultimaVez.set(j, Date.now());
         if (db && PROGRAMADAS.some((x) => x.job === j)) await marcarProgramada(db, j);
         if (db) await recordJobRun(db, j, true, r.skipped || (typeof r.detail === 'string' ? r.detail : r.sent !== undefined ? `${r.sent} enviados` : ''));
       } catch (err) {
