@@ -1,4 +1,5 @@
 import { addDoc, arrayUnion, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { crearConReintentos } from './altaSegura';
 import { db } from '../firebase';
 import { getAuthHeaders } from '../utils/authAccess';
 import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, PORTAL_SEPARATE_FIELDS, clienteIdNumber, portalFromProject, suggestClienteId, suggestWebClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
@@ -197,6 +198,12 @@ export async function createPedidoAlta(pedido: Omit<PafPedidoAlta, 'id'>, replac
   });
   return id;
 }
+/** Alta con reintentos: busca el ID si falta, salta los ya usados y reintenta si se corta la conexión */
+export const crearPedidoAltaSeguro = (
+  armar: Parameters<typeof crearConReintentos>[1],
+  opts: Parameters<typeof crearConReintentos>[2]
+) => crearConReintentos({ sugerir: suggestNextClienteId, crear: createPedidoAlta }, armar, opts);
+
 /** El último pedido de alta del proyecto (o null) */
 export function subscribePedidoDeProyecto(projectId: string, onChanged: (p: PafPedidoAlta | null) => void) {
   return onSnapshot(

@@ -11,7 +11,8 @@ const ARRANQUE = (() => {
   return { tema: 'arranque' as const, objetivo: r.objetivo, ...(r.preparar ? { preparar: r.preparar } : {}), ...(r.conCM ? { conCM: true } : {}) };
 })();
 import { buildPedidoAlta, portalFromProject, type PafPortalDraft } from '../portal/model';
-import { createPedidoAlta, publishPafPortal, suggestNextClienteId } from '../portal/store';
+import { crearPedidoAltaSeguro, publishPafPortal, suggestNextClienteId } from '../portal/store';
+import { AltaInvalida, motivoError } from '../portal/altaSegura';
 import { getTodayString } from '../utils/storage';
 
 const field = 'w-full rounded-[var(--radius-control)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-3 py-2 text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]';
@@ -86,25 +87,32 @@ export const NewClientView: React.FC<{
       }
 
       if (isPaf) {
-        // ID y link de Tally en el mismo paso
-        const pedido = buildPedidoAlta({ projectId, clienteId, estudio: form.estudio, contacto: form.contacto, email: form.email, zonaHoraria: 'America/Argentina/Buenos_Aires', prueba: false });
-        if ('errors' in pedido) warnings.push(`El link de Tally no se creó: ${pedido.errors.join(' ')} Lo creás desde la ficha.`);
-        else {
-          try {
-            await createPedidoAlta(pedido.pedido);
-            res.tally = pedido.pedido.enlaceFormulario;
-            res.clienteId = pedido.pedido.clienteId;
-            const draft: PafPortalDraft = { emails: [form.email.trim().toLowerCase()], hito: 1, resumen: '', enlaces: {}, accesos: [] };
-            let publishedAt: string | undefined;
-            if (publicar) {
+        // ID y link de Tally en el mismo paso. Si el ID no llegó a cargarse, ya se usó o se corta
+        // la conexión (pasa en el celular), se resuelve acá mismo con reintentos.
+        try {
+          const pedido = await crearPedidoAltaSeguro(
+            (id) => buildPedidoAlta({ projectId, clienteId: id, estudio: form.estudio, contacto: form.contacto, email: form.email, zonaHoraria: 'America/Argentina/Buenos_Aires', prueba: false }),
+            { prueba: false, clienteId }
+          );
+          res.tally = pedido.enlaceFormulario;
+          res.clienteId = pedido.clienteId;
+          const draft: PafPortalDraft = { emails: [form.email.trim().toLowerCase()], hito: 1, resumen: '', enlaces: {}, accesos: [] };
+          let publishedAt: string | undefined;
+          if (publicar) {
+            try {
               const portal = portalFromProject({ id: projectId, clientName: form.estudio.trim(), pafClienteId: res.clienteId }, reunion.fecha ? [{ projectId, date: reunion.fecha, time: reunion.hora, completed: false }] : [], draft, res.clienteId);
               if ('doc' in portal) { await publishPafPortal(portal.doc); publishedAt = portal.doc.actualizadoEn; res.portal = `${window.location.origin}/portal`; }
-              else warnings.push('El portal no se publicó. Lo publicás desde la ficha.');
+              else warnings.push(`El portal no se publicó: ${portal.errors.join(' ')} Lo publicás desde la ficha.`);
+            } catch (err) {
+              warnings.push(`El portal no se publicó (${motivoError(err)}). Lo publicás desde la ficha.`);
             }
-            onUpdateProject(projectId, { pafClienteId: res.clienteId, pafPortal: { ...draft, ...(publishedAt ? { publishedAt } : {}) } });
-          } catch (err) {
-            warnings.push((err as Error)?.message?.includes('ya se usó') ? (err as Error).message : 'El link de Tally no se creó por un problema de conexión. Lo creás desde la ficha.');
           }
+          onUpdateProject(projectId, { pafClienteId: res.clienteId, pafPortal: { ...draft, ...(publishedAt ? { publishedAt } : {}) } });
+        } catch (err) {
+          warnings.push(err instanceof AltaInvalida
+            ? `El link de Tally no se creó: ${err.message} Lo creás desde la ficha.`
+            : (err as Error)?.message?.includes('ya se usó') ? (err as Error).message
+              : `El link de Tally no se creó (${motivoError(err)}). Entrá a la ficha y tocá "Crear link de Tally": se reintenta solo.`);
         }
       }
       setResult(res);
@@ -181,7 +189,7 @@ export const NewClientView: React.FC<{
 
       {isPaf && (
         <Section title="Alta">
-          <p className="text-xs text-[var(--text-secondary)]">Se crea el ID <span className="font-mono text-[var(--text-primary)]">{clienteId || '…'}</span> y su link de Tally.</p>
+          <p className="text-xs text-[var(--text-secondary)]">{clienteId ? <>Se crea el ID <span className="font-mono text-[var(--text-primary)]">{clienteId}</span> y su link de Tally.</> : 'El ID y su link de Tally se asignan al crear.'}</p>
           <label className="flex items-start gap-2 text-sm text-[var(--text-primary)]">
             <input type="checkbox" className="mt-1" checked={publicar} onChange={(e) => setPublicar(e.target.checked)} />
             <span>Publicar su portal ahora<span className="block text-xs text-[var(--text-tertiary)]">Entra con el correo de arriba. Si no, lo publicás después desde la ficha.</span></span>

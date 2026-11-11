@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Copy, ExternalLink, FolderOpen, Loader2, MessageCircle, UserPlus } from 'lucide-react';
 import { Project } from '../types';
-import { buildPedidoAlta, safeHttpsUrl, type PafDriveLinks, type PafPedidoAlta } from '../portal/model';
-import { createPedidoAlta, subscribePedidoDeProyecto, suggestNextClienteId } from '../portal/store';
+import { buildPedidoAlta, clienteIdNumber, safeHttpsUrl, type PafDriveLinks, type PafPedidoAlta } from '../portal/model';
+import { crearPedidoAltaSeguro, subscribePedidoDeProyecto, suggestNextClienteId } from '../portal/store';
+import { AltaInvalida, motivoError } from '../portal/altaSegura';
 import { hapticFeedback } from '../utils/haptics';
 
 const input = 'w-full rounded-lg bg-zinc-950 border border-zinc-800 px-2.5 py-1.5 text-xs text-zinc-100 placeholder:text-zinc-600';
@@ -53,24 +54,32 @@ export const PafAltaCard: React.FC<{ project: Project; onUpdateProject: (id: str
   useEffect(() => {
     if (legacy) setForm((f) => ({ ...f, estudio: legacy.estudio, contacto: legacy.contacto, email: legacy.email, zonaHoraria: legacy.zonaHoraria, prueba: legacy.prueba }));
   }, [legacy?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  // El ID que propuso el CRM: si Juan no lo cambia, se puede pasar al siguiente libre solo
+  const [sugerido, setSugerido] = useState('');
   useEffect(() => {
     if (!formOpen) return;
     let alive = true;
-    suggestNextClienteId(form.prueba).then((id) => alive && setForm((f) => ({ ...f, clienteId: id }))).catch(() => undefined);
+    suggestNextClienteId(form.prueba).then((id) => { if (alive) { setSugerido(id); setForm((f) => ({ ...f, clienteId: id })); } }).catch(() => undefined);
     return () => { alive = false; };
   }, [formOpen, form.prueba]);
 
   const create = async () => {
     hapticFeedback.light();
-    const r = buildPedidoAlta({ projectId: project.id, ...form });
-    if ('errors' in r) { setErrors(r.errors); return; }
+    const escrito = form.clienteId.trim().toUpperCase();
+    const fijo = !!escrito && escrito !== sugerido;
+    // El ID escrito a mano tiene que tener el formato; el resto de los datos se revisan igual que antes
+    if (fijo && clienteIdNumber(escrito, form.prueba) === null) {
+      const r = buildPedidoAlta({ projectId: project.id, ...form });
+      if ('errors' in r) { setErrors(r.errors); return; }
+    }
     setBusy(true); setErrors([]); setNotice('');
     try {
-      await createPedidoAlta(r.pedido, legacy?.id);
-      onUpdateProject(project.id, { pafClienteId: r.pedido.clienteId, ...(project.clientEmail ? {} : { clientEmail: r.pedido.email }) });
+      const pedido = await crearPedidoAltaSeguro((id) => buildPedidoAlta({ projectId: project.id, ...form, clienteId: id }), { prueba: form.prueba, clienteId: escrito, fijo, replacesId: legacy?.id });
+      onUpdateProject(project.id, { pafClienteId: pedido.clienteId, ...(project.clientEmail ? {} : { clientEmail: pedido.email }) });
       setShowForm(false);
     } catch (err) {
-      setErrors([(err as Error)?.message?.includes('ya se usó') ? (err as Error).message : 'No se pudo crear. Revisá la conexión y reintentá.']);
+      setErrors(err instanceof AltaInvalida ? err.errores
+        : [(err as Error)?.message?.includes('ya se usó') ? (err as Error).message : `No se pudo crear (${motivoError(err)}). Probá de nuevo: se reintenta solo.`]);
     } finally {
       setBusy(false);
     }
