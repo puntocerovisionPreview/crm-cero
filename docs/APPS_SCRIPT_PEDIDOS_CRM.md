@@ -345,3 +345,45 @@ Bloque nuevo de `alta` (reemplaza el anterior):
 - Al abrir la ficha del estudio en el CRM, los links se guardan solos y su portal muestra **Tu carpeta, Para completar, Materiales y Resultados**, y en Archivos las cuatro subcarpetas de Materiales.
 - Cada tarea que pide archivos abre su subcarpeta exacta, y "Completar el Excel de cliente ideal" abre el Excel.
 - Si el script no encuentra una parte (por ejemplo, la carpeta tiene otro nombre), esa queda vacía y la tarea sube a Materiales.
+
+---
+
+# Parte 4: que el alta cargada a mano en la planilla también llegue al CRM
+
+Ya aplicadas las partes 1 a 3. Hasta ahora, `devolverCarpetasAlCRM` solo devolvía las carpetas si el CRM ya tenía el pedido de ese ID; si no (alta hecha con el menú PAF → "Registrar cliente vendido…"), lo daba por alta vieja y **no lo intentaba nunca más**. Con este cambio, el script siempre deja las carpetas en el CRM con su ID, y en la ficha del cliente alcanza con escribir ese mismo ID en **Ajustes → Alta del estudio → Crear link de Tally**: el CRM lo vincula y muestra las carpetas.
+
+## Pedido para la extensión
+
+En el Apps Script **"PAF — Alta de clientes"** (Sheet "Formulario de arranque — datos para organizarnos" → Extensiones → Apps Script), archivo **`PedidosCRM.gs`**, función **`devolverCarpetasAlCRM`**. Cambiá **solo** esto:
+
+1. La línea `if (enviados[id] === 'v3|' + compartida) return;` por `if (enviados[id] === 'v4|' + compartida) return;`
+2. El bloque `try { fsFetch_(FS_URL + '/paf_pedidos_alta/' ... } catch (e) { ... }` completo por el bloque de abajo.
+3. Guardá y ejecutá **`devolverCarpetasAlCRM`** una vez a mano. En el registro tiene que decir cuántas devolvió y que no hubo errores. El activador de cada 5 minutos sigue igual.
+4. Contame qué dijo la ejecución.
+
+```javascript
+      try {
+        // Crea el pedido si no existía (alta cargada a mano en la planilla): el CRM lo vincula
+        // cuando en la ficha se escribe este mismo ID. No toca nada más del pedido.
+        fsFetch_(FS_URL + '/paf_pedidos_alta/' + encodeURIComponent(id)
+          + '?updateMask.fieldPaths=alta&updateMask.fieldPaths=clienteId&updateMask.fieldPaths=estado', {
+          method: 'patch',
+          payload: JSON.stringify({ fields: {
+            alta: alta,
+            clienteId: { stringValue: id },
+            estado: { stringValue: 'registrado' },
+          } }),
+        });
+        enviados[id] = 'v4|' + compartida;
+        devueltos++;
+      } catch (e) {
+        errores++;
+        console.warn(id + ': ' + e.message);
+      }
+```
+
+## Después
+
+- Si cargás un estudio a mano en la planilla, cuando responda Tally y se creen sus carpetas, en el CRM escribís ese ID en su ficha (Ajustes → Alta del estudio) y aparecen solas "Tu carpeta", "Materiales" y el resto en su portal.
+- Si el estudio lo creaste desde el CRM, sigue igual que siempre.
+- Si la base del CRM está sin cupo ese día, el script registra el error y lo reintenta solo en la vuelta siguiente.

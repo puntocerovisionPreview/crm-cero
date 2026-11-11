@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AltaInvalida, crearConReintentos, motivoError } from '../src/portal/altaSegura';
+import { AltaInvalida, crearConReintentos, decidirPedido, motivoError } from '../src/portal/altaSegura';
 import { buildPedidoAlta } from '../src/portal/model';
 
 const armar = (email = 'estudio@gmail.com') => (id: string) =>
@@ -50,5 +50,23 @@ describe('alta con link de Tally que no se traba', () => {
     expect(crear).toHaveBeenCalledTimes(4);
     expect(motivoError(err)).toBe('se cortó la conexión con la base');
     expect(motivoError({ code: 'permission-denied' })).toContain('permiso');
+  });
+});
+
+describe('alta cargada a mano en la planilla', () => {
+  const nuevo = (armar()('PAF-012') as { pedido: any }).pedido;
+  it('si la planilla ya devolvió las carpetas, el ID se vincula a la ficha y las conserva', () => {
+    const prev = { clienteId: 'PAF-012', estado: 'registrado' as const, alta: { carpetaCompartida: 'https://drive.google.com/drive/folders/x' } };
+    const d = decidirPedido(prev, nuevo);
+    expect(d.accion).toBe('vincular');
+    if (d.accion !== 'vincular') return;
+    expect(d.datos.projectId).toBe('p1');
+    expect(d.datos.estado).toBe('registrado');
+    expect('alta' in d.datos).toBe(false); // el merge no pisa las carpetas
+  });
+  it('sin nada guardado se crea; si es de otro cliente, no se toca', () => {
+    expect(decidirPedido(undefined, nuevo).accion).toBe('crear');
+    expect(decidirPedido({ projectId: 'otro', estado: 'registrado' }, nuevo)).toEqual({ accion: 'error', mensaje: 'El ID PAF-012 ya se usó. Elegí otro.' });
+    expect(decidirPedido({ projectId: 'p1', estado: 'pendiente' }, nuevo).accion).toBe('vincular');
   });
 });

@@ -134,7 +134,7 @@ export const PafAltaCard: React.FC<{ project: Project; onUpdateProject: (id: str
               </div>
             </div>
           )}
-          <p className={`text-[11px] ${pedido.estado === 'error' ? 'text-rose-300' : 'text-zinc-400'}`}>{ESTADO_LABEL[pedido.estado]}{alta?.estado ? ` · ${alta.estado}` : ''}</p>
+          <p className={`text-[11px] ${pedido.estado === 'error' ? 'text-rose-300' : 'text-zinc-400'}`}>{ESTADO_LABEL[pedido.estado] || ''}{alta?.estado ? ` · ${alta.estado}` : ''}</p>
           {(pedido.error || alta?.error) && <p role="alert" className="text-[11px] text-rose-300">{pedido.error || alta?.error}</p>}
           {alta?.fechaRespuesta && <p className="text-[11px] text-emerald-300">Respondió el formulario el {alta.fechaRespuesta.slice(0, 10)}</p>}
           {pedido.estado === 'error' && <button type="button" onClick={() => setShowForm(true)} className="text-[11px] font-bold text-amber-300">Corregir y crear de nuevo</button>}
@@ -145,7 +145,7 @@ export const PafAltaCard: React.FC<{ project: Project; onUpdateProject: (id: str
         <div className="space-y-1.5">
           <p className="text-[11px] text-zinc-400">Te da el link de Tally para mandarle al estudio. Cuando responda, se crean sus carpetas de Drive.</p>
           <label className="flex items-center gap-2 text-[11px] text-zinc-400"><input type="checkbox" checked={form.prueba} onChange={(e) => setForm({ ...form, prueba: e.target.checked })} /> Es una prueba</label>
-          <label className="block text-[11px] text-zinc-400">ID del cliente (no se reutiliza nunca)<input className={`${input} font-mono`} value={form.clienteId} placeholder={form.prueba ? 'PAF-PRUEBA-002' : 'PAF-002'} onChange={(e) => setForm({ ...form, clienteId: e.target.value.toUpperCase() })} /></label>
+          <label className="block text-[11px] text-zinc-400">ID del cliente (no se reutiliza nunca). Si ya lo registraste en la planilla con el menú PAF, escribí ese mismo ID: se conecta con sus carpetas.<input className={`${input} font-mono`} value={form.clienteId} placeholder={form.prueba ? 'PAF-PRUEBA-002' : 'PAF-002'} onChange={(e) => setForm({ ...form, clienteId: e.target.value.toUpperCase() })} /></label>
           <label className="block text-[11px] text-zinc-400">Estudio<input className={input} value={form.estudio} onChange={(e) => setForm({ ...form, estudio: e.target.value })} /></label>
           <label className="block text-[11px] text-zinc-400">Correo (con el que se comparte la carpeta)<input className={input} type="email" value={form.email} placeholder="estudio@gmail.com" onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
           <label className="block text-[11px] text-zinc-400">Contacto (opcional)<input className={input} value={form.contacto} placeholder="Nombre y apellido" onChange={(e) => setForm({ ...form, contacto: e.target.value })} /></label>

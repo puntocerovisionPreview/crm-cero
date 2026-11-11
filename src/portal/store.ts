@@ -1,5 +1,5 @@
 import { addDoc, arrayUnion, collection, collectionGroup, deleteDoc, doc, getDoc, getDocs, onSnapshot, query, runTransaction, serverTimestamp, setDoc, where } from 'firebase/firestore';
-import { crearConReintentos } from './altaSegura';
+import { crearConReintentos, decidirPedido } from './altaSegura';
 import { db } from '../firebase';
 import { getAuthHeaders } from '../utils/authAccess';
 import { PAF_PEDIDOS_COLLECTION, PAF_PORTAL_COLLECTION, PORTAL_SEPARATE_FIELDS, clienteIdNumber, portalFromProject, suggestClienteId, suggestWebClienteId, type PafAviso, type PafPedidoAlta, type PafPortalDoc } from './model';
@@ -188,10 +188,13 @@ export async function createPedidoAlta(pedido: Omit<PafPedidoAlta, 'id'>, replac
   const ref = doc(db, PAF_PEDIDOS_COLLECTION, id);
   await runTransaction(db, async (tx) => {
     const [prev, counter] = await Promise.all([tx.get(ref), tx.get(counterRef())]);
-    if (prev.exists() && prev.data().estado !== 'error') throw new Error(`El ID ${id} ya se usó. Elegí otro.`);
+    // Si el ID se cargó a mano en la planilla, el pedido se vincula a esta ficha (con sus carpetas)
+    const d = decidirPedido(prev.exists() ? (prev.data() as Partial<PafPedidoAlta>) : undefined, pedido);
+    if (d.accion === 'error') throw new Error(d.mensaje);
     const key = pedido.prueba ? 'ultimoPrueba' : 'ultimoReal';
     const n = clienteIdNumber(id, pedido.prueba) || 0;
-    tx.set(ref, pedido);
+    if (d.accion === 'crear') tx.set(ref, d.datos);
+    else tx.set(ref, d.datos, { merge: true });
     // Pedido viejo sin ID del mismo estudio: se reemplaza por este
     if (replacesId && replacesId !== id) tx.delete(doc(db, PAF_PEDIDOS_COLLECTION, replacesId));
     if (n > Number(counter.data()?.[key] || 0)) tx.set(counterRef(), { [key]: n }, { merge: true });
@@ -210,7 +213,7 @@ export function subscribePedidoDeProyecto(projectId: string, onChanged: (p: PafP
     query(collection(db, PAF_PEDIDOS_COLLECTION), where('projectId', '==', projectId)),
     (snap) => {
       const items = snap.docs.map((d) => ({ ...(d.data() as Omit<PafPedidoAlta, 'id'>), id: d.id }));
-      items.sort((a, b) => b.creadoEn.localeCompare(a.creadoEn));
+      items.sort((a, b) => (b.creadoEn || '').localeCompare(a.creadoEn || ''));
       onChanged(items[0] || null);
     },
     () => onChanged(null)

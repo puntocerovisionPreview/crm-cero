@@ -65,3 +65,25 @@ export async function crearConReintentos(
   }
   throw ultimo;
 }
+
+/**
+ * Qué hacer con el pedido de un ID cuando ya hay algo guardado con ese ID.
+ * - No hay nada (o quedó en error): se crea.
+ * - Lo creó la planilla (alta cargada a mano con el menú PAF, sin cliente del CRM) o ya es de
+ *   este mismo cliente: se VINCULA a la ficha, conservando lo que trajo el script (estado y carpetas).
+ * - Es de otro cliente del CRM: no se toca.
+ */
+export function decidirPedido(
+  prev: Partial<PafPedidoAlta> | undefined,
+  nuevo: Pedido
+): { accion: 'crear'; datos: Pedido } | { accion: 'vincular'; datos: Partial<Pedido> } | { accion: 'error'; mensaje: string } {
+  if (!prev || prev.estado === 'error') return { accion: 'crear', datos: nuevo };
+  if (!prev.projectId || prev.projectId === nuevo.projectId) {
+    const { estado: _e, creadoEn, alta: _a, ...datos } = nuevo;
+    return {
+      accion: 'vincular',
+      datos: { ...datos, estado: prev.estado || 'registrado', creadoEn: prev.creadoEn || creadoEn },
+    };
+  }
+  return { accion: 'error', mensaje: `El ID ${nuevo.clienteId} ya se usó. Elegí otro.` };
+}
