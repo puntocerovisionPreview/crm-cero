@@ -144,6 +144,54 @@ function plainDates<T extends Record<string, any>>(items: T[]): T[] {
   });
 }
 
+/**
+ * MEMORIA CORTA DEL SERVIDOR
+ * La base gratis tiene 50.000 lecturas por día. El reloj corre cada 10 minutos (144 veces) y antes
+ * leía 11 colecciones enteras dos veces por vuelta: se pasaba del cupo y, desde ahí, la base
+ * rechazaba todo (también el alta y el link de Tally). Ahora cada vuelta lee solo lo que usa.
+ */
+const memoria = new Map<string, { at: number; docs: any[] }>();
+async function leerConMemoria(key: string, ttlMs: number, leer: () => Promise<any[]>): Promise<any[]> {
+  const m = memoria.get(key);
+  if (m && Date.now() - m.at < ttlMs) return m.docs;
+  const docs = await leer();
+  memoria.set(key, { at: Date.now(), docs });
+  return docs;
+}
+const docsDe = (snap: FirebaseFirestore.QuerySnapshot) => snap.docs.map((d) => ({ ...(d.data() as any), id: d.id }));
+const MIN = 60 * 1000;
+
+/** Lo que usan los avisos de cada 10 minutos: tareas sin terminar, reuniones de hoy y mañana, y el resto con memoria */
+async function loadFrequentData(db: Firestore, today: string): Promise<PeriodicData> {
+  const manana = addDays(today, 1);
+  const [pendientes, deHoy, meetings, projects, incomes, fixedExpenses, personalRecurrings, visitas] = await Promise.all([
+    leerConMemoria('tasks:pendientes', 2 * MIN, async () => docsDe(await db.collection('tasks').where('completed', '==', false).get())),
+    // Por si alguna tarea de hoy quedó sin el campo "completed"
+    leerConMemoria(`tasks:${today}`, 2 * MIN, async () => docsDe(await db.collection('tasks').where('date', '==', today).get())),
+    leerConMemoria(`meetings:${today}`, 2 * MIN, async () => docsDe(await db.collection('meetings').where('date', '>=', today).where('date', '<=', manana).get())),
+    leerConMemoria('projects', 30 * MIN, () => readCollection<any>(db, 'projects')),
+    leerConMemoria('incomes', 30 * MIN, () => readCollection<any>(db, 'incomes')),
+    leerConMemoria('studioFixedExpenses', 60 * MIN, () => readCollection<any>(db, 'studioFixedExpenses')),
+    leerConMemoria('personal_recurrings', 60 * MIN, () => readCollection<any>(db, 'personal_recurrings')),
+    leerConMemoria('paf_visitas', 60 * MIN, () => readCollection<any>(db, 'paf_visitas')),
+  ]);
+  const tasks = [...new Map([...pendientes, ...deHoy].map((t) => [t.id, t])).values()];
+  return {
+    tasks: plainDates(tasks),
+    meetings: plainDates(meetings),
+    projects: plainDates(projects),
+    incomes: plainDates(incomes),
+    fixedExpenses: plainDates(fixedExpenses).map((f: any) => ({ ...f, nextDueDate: proximoVencimiento(String(f.nextDueDate || '').slice(0, 10), f.lastPaidDate ? String(f.lastPaidDate).slice(0, 10) : undefined, f.billingCycle) })),
+    routine: [],
+    prospects: [],
+    prospectingSettings: mergeProspectingSettings({}),
+    expenses: [],
+    prospectEvents: [],
+    personalRecurrings: plainDates(personalRecurrings),
+    visitas: plainDates(visitas),
+  } as PeriodicData;
+}
+
 export async function loadAutomationData(db: Firestore): Promise<PeriodicData> {
   const [tasks, meetings, projects, incomes, fixedExpenses, routine, prospects, prospectingDoc, expenses, prospectEvents, personalRecurrings, visitas] = await Promise.all([
     readCollection<any>(db, 'tasks'),
@@ -250,7 +298,8 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
     if (pushDevices > 0) sent += await sendPushToAll(db, push);
     return sent;
   };
-  const data = await loadAutomationData(db);
+  // Los avisos de cada 10 minutos leen poco; los resúmenes del día y la semana, todo
+  const data = job === 'reminders' || job === 'clientes' ? await loadFrequentData(db, today) : await loadAutomationData(db);
 
   if (job === 'daily-brief') {
     const top3 = buildTop3Section(data, today);
@@ -346,6 +395,8 @@ async function runJob(job: string, options: { dryRun?: boolean } = {}): Promise<
       // Marca para no repetir; se limpia sola si se reprograma (ver firestoreService)
       await db.collection(r.kind === 'reunion' ? 'meetings' : 'tasks').doc(r.id).set({ telegramReminded: true }, { merge: true });
     }
+    // Que la próxima vuelta lea la marca y no repita el aviso
+    if (sent) for (const k of [...memoria.keys()]) if (k.startsWith('tasks:') || k.startsWith('meetings:')) memoria.delete(k);
     return { job, sent };
   }
 
@@ -435,10 +486,16 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
   // "frequent" junta lo que conviene correr cada 10-15 min (avisos + calendario)
   // Una vuelta "frecuente" a la vez. Si una tarda (respaldo, calendario), la siguiente no se encima.
   let vueltaEnCurso = 0;
+  // Calendar y Mercado Pago no hace falta mirarlos cada 10 minutos: el navegador ya manda los
+  // cambios al Calendar y el webhook avisa los pagos al instante. Cada 30 minutos alcanza.
+  const ultimaVez = new Map<string, number>();
+  const CADA_30 = new Set(['calendar-sync', 'mercadopago']);
   app.all('/api/cron/:job', async (req, res) => {
     if (!cronSecretOk(req)) return res.status(401).json({ error: 'Clave de cron inválida o no configurada' });
     const job = req.params.job;
-    const jobs = job === 'frequent' ? ['reminders', 'calendar-sync', 'mercadopago', 'clientes'] : CRON_JOBS.includes(job) ? [job] : [];
+    const jobs = job === 'frequent'
+      ? ['reminders', 'calendar-sync', 'mercadopago', 'clientes'].filter((j) => !CADA_30.has(j) || Date.now() - (ultimaVez.get(j) || 0) >= 28 * 60 * 1000)
+      : CRON_JOBS.includes(job) ? [job] : [];
     if (jobs.length === 0) return res.status(404).json({ error: 'Tarea desconocida' });
     if (job === 'frequent') {
       if (vueltaEnCurso && Date.now() - vueltaEnCurso < 5 * 60 * 1000) return res.json({ ok: true, enCurso: true });
@@ -462,6 +519,7 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
       try {
         const r = await runJob(j);
         results.push(r);
+        if (CADA_30.has(j)) ultimaVez.set(j, Date.now());
         if (db && PROGRAMADAS.some((x) => x.job === j)) await marcarProgramada(db, j);
         if (db) await recordJobRun(db, j, true, r.skipped || (typeof r.detail === 'string' ? r.detail : r.sent !== undefined ? `${r.sent} enviados` : ''));
       } catch (err) {

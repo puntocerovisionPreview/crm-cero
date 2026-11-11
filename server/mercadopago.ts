@@ -161,11 +161,16 @@ export async function classifyPayments(rawPayments: any[]) {
 export async function ingestPayments(db: Firestore, rawPayments: any[]) {
   const classified = await classifyPayments(rawPayments);
   if (classified.length === 0) return [];
-  const { projects, incomes } = await loadForMatching(db);
+  // De una sola vez y, solo si hay algún pago nuevo, se leen clientes y cobros para sugerir a cuál va
+  const refs = classified.map((x) => db.collection('mp_incoming').doc(x.id));
+  const snaps = await db.getAll(...refs);
+  const yaEstan = new Map(snaps.map((s) => [s.id, s]));
+  const hayNuevos = snaps.some((s) => !s.exists);
+  const { projects, incomes } = hayNuevos ? await loadForMatching(db) : { projects: [], incomes: [] };
   const created: Array<ReturnType<typeof toIncoming> & { suggestion?: MpSuggestion | null }> = [];
   for (const incoming of classified) {
     const ref = db.collection('mp_incoming').doc(incoming.id);
-    const existing = await ref.get();
+    const existing = yaEstan.get(incoming.id)!;
     if (existing.exists) {
       const patch: Record<string, unknown> = {};
       if (existing.get('direction') !== incoming.direction) patch.direction = incoming.direction;
