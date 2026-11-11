@@ -43,10 +43,10 @@ Se copian de una **carpeta modelo** en tu Drive: lo que cambies ahí (un PDF nue
 
 ## Pasos
 
-### Paso 0 (vos, del lado de Google, 10 minutos)
-1. **Pasar la base a pago por uso** (Firebase → Firestore → aviso de "cuota compartida de IA" → Actualizar a pago por uso) y poner una alerta de presupuesto, por ejemplo US$5 por mes. Sin esto, cualquier día que se pase el cupo se corta todo, con o sin Tally.
-2. **Reconectar Drive con permiso para leer tus plantillas.** Hoy el CRM solo puede tocar lo que creó él. Para copiar los PDF y los Excel de la carpeta modelo necesita permiso para ver tu Drive. Es un clic en Ajustes del CRM con puntocerovision@gmail.com. Yo dejo el botón listo; vos aceptás.
-3. **Decirme cuál es la carpeta modelo** o confirmar la que encuentre yo. En la carpeta de PAF-011 no vi los PDF dentro de cada subcarpeta de Materiales: hay que confirmar que estén en la carpeta modelo.
+### Paso 0 (vos, del lado de Google, 5 minutos)
+La base **sigue en el plan gratis** (decisión de Juan: no se pasa a pago por uso). Por eso el CRM tiene que gastar poco: ver "Quedarse dentro del cupo gratis", abajo.
+1. **Reconectar Drive con permiso para leer tus plantillas.** Hoy el CRM solo puede tocar lo que creó él. Para copiar los PDF y los Excel de la carpeta modelo necesita permiso para ver tu Drive. Es un clic en Ajustes del CRM con puntocerovision@gmail.com. Yo dejo el botón listo; vos aceptás.
+2. **Decirme cuál es la carpeta modelo** o confirmar la que encuentre yo. En la carpeta de PAF-011 no vi los PDF dentro de cada subcarpeta de Materiales: hay que confirmar que estén en la carpeta modelo.
 
 ### Paso 1: el formulario en el portal
 - Carta **"Completá tus datos"** como lo de ahora, hasta que la mande.
@@ -77,6 +77,14 @@ Se copian de una **carpeta modelo** en tu Drive: lo que cambies ahí (un PDF nue
 3. Prendemos el flujo nuevo en Adrede, publicás, le mandás el link.
 4. Tests, build, commit, `main` (con tu OK) y redeploy en AI Studio.
 
+## Quedarse dentro del cupo gratis
+
+El cupo gratis son **50.000 lecturas por día**, compartidas con tus otras apps de AI Studio, y se renueva cada madrugada (alrededor de las 5 de Argentina). Antes del 11/11 el CRM solo gastaba unas 29.000 por día; con los cambios del 11/11 el servidor gasta mucho menos.
+- El alta nueva **gasta menos que la de hoy**: no hay un script consultando la base cada 5 minutos, solo unas pocas lecturas cuando el cliente manda el formulario.
+- **Medidor en Ajustes → Estado:** cuánto se usó hoy (lo que lee el servidor) y un aviso a tu teléfono si pasa del 70%, para que nunca te enteres por un "no se pudo".
+- **Si un día se llega al tope igual:** el CRM lo dice claro ("la base llegó a su límite de hoy, vuelve a las 5") en vez de "revisá la conexión", y lo que no se pudo guardar se reintenta solo cuando vuelve.
+- **Tus otras apps de AI Studio comparten el cupo:** si tenés alguna que ya no usás, conviene borrarla (o al menos no abrirla) para que no gaste.
+
 ## Para decidir antes de empezar
 
 1. **¿Google le manda al cliente el mail de "te compartieron una carpeta"?** Hoy el CRM lo comparte sin mail. Mi sugerencia: sin mail, porque ya le llega todo por el portal.
@@ -91,4 +99,4 @@ Se copian de una **carpeta modelo** en tu Drive: lo que cambies ahí (un PDF nue
 
 ## Para hoy, mientras tanto
 
-Nada. Mañana, con la base con cupo, se puede seguir con el alta de siempre para Adrede (Publicar portal y link de Tally) o esperar a que esté el flujo nuevo. Las dos opciones sirven.
+Nada. Mañana, cuando se renueve el cupo, se puede seguir con el alta de siempre para Adrede (Publicar portal y link de Tally) o esperar a que esté el flujo nuevo. Las dos opciones sirven.
