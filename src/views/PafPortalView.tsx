@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  ArrowRight, ArrowUpRight, CalendarPlus, Check, ChevronDown, Folder, Home, LayoutList, ListChecks, Loader2, Route, MessageCircle, Package, Paperclip, Video,
+  ArrowRight, ArrowUpRight, Building2, CalendarPlus, Camera, Check, ChevronDown, Folder, Sparkles, Users, Home, LayoutList, ListChecks, Loader2, Route, MessageCircle, Package, Paperclip, Video,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
@@ -10,8 +10,8 @@ import { isAllowedUser, signInWithGoogle, signOutUser } from '../utils/authAcces
 import { formatDisplayDate } from '../utils/projectTimeline';
 import { AccessIcon } from '../components/AccessIcon';
 import { ETAPAS, type Etapa } from '../portal/presencia';
-import { MATERIALES, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, hitoInfoDe, hitosDe, seccionesVisibles, type Recorrido } from '../portal/model';
-import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, PRESENCIA_HITOS, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
+import { MATERIALES, type MaterialKey, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, hitoInfoDe, hitosDe, seccionesVisibles, type Recorrido } from '../portal/model';
+import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { Festejo, LoUltimo, saludoDelMomento, useFestejo } from './portal/PortalUltimo';
 import { sendTaskDone, sendVisita, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
@@ -310,6 +310,14 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   const reportes = p.reportes || [];
   const materiales = MATERIALES.filter((m) => p.materiales?.[m.id]);
   const whatsapp = p.contacto?.whatsapp || '';
+  // Atajos de Inicio: solo lo que este cliente tiene a la vista
+  const carpetaUrl = p.enlaces?.carpeta || accesos.find((a) => a.nombre === 'Tu carpeta')?.url;
+  const atajos: { key: string; label: string; hint: string; icon: React.ElementType; url?: string }[] = [
+    ...(ver.materiales ? materiales.map((m) => ({ key: `m-${m.id}`, label: m.label, hint: 'Subí acá', icon: MATERIAL_ICON[m.id], url: p.materiales![m.id] })) : []),
+    ...(ver.contenido && p.gestionContenido ? [{ key: 'contenido', label: 'Contenido', hint: 'Ver y aprobar', icon: LayoutList, url: p.gestionContenido }] : []),
+    ...(ver.accesos && carpetaUrl ? [{ key: 'carpeta', label: 'Tu carpeta', hint: 'Todo en Drive', icon: Folder, url: carpetaUrl }] : []),
+    ...(ver.accesos && accesos.length > 1 ? [{ key: 'todo', label: 'Todos tus enlaces', hint: `${accesos.length} accesos`, icon: Paperclip }] : []),
+  ];
   const isNew = useNewItems(p, !readOnly && !demo);
   // Hito cerrado desde la última vez que entró: se festeja una vez (en el ejemplo, siempre)
   const [festejo, cerrarFestejo] = useFestejo(p.clienteId, etapa, hechos, !readOnly && !embedded, !!demo);
@@ -379,14 +387,17 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
         </p>
         <nav aria-label="Tu resumen" className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-2">
           {[
-            { n: suyas.length, label: suyas.length === 1 ? 'tarea para vos' : 'tareas para vos', go: () => setTab(tabs.some((x) => x.id === 'tareas') ? 'tareas' : 'inicio'), alerta: suyas.some((t) => isOverdue(t, taskProps.today)) },
-            { n: ver.reuniones && p.proximaReunion ? 1 : 0, label: ver.reuniones && p.proximaReunion ? `reunión: ${p.proximaReunion.fecha === taskProps.today ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' })}` : 'reuniones agendadas', go: () => { setTab('inicio'); requestAnimationFrame(() => document.getElementById('hoy')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); } },
-            { n: decisiones.length, label: decisiones.length === 1 ? 'entrega para revisar' : 'entregas para revisar', go: () => setTab(tabs.some((x) => x.id === 'entregas') ? 'entregas' : 'inicio'), alerta: decisiones.length > 0 },
-            { n: hechos.length, label: `de ${HITOS.length} hitos listos`, go: () => setTab(verRecorrido ? 'recorrido' : 'inicio') },
+            { icon: ListChecks, n: suyas.length, label: suyas.length === 1 ? 'tarea para vos' : 'tareas para vos', go: () => setTab(tabs.some((x) => x.id === 'tareas') ? 'tareas' : 'inicio'), alerta: suyas.some((t) => isOverdue(t, taskProps.today)) },
+            { icon: Video, n: ver.reuniones && p.proximaReunion ? 1 : 0, label: ver.reuniones && p.proximaReunion ? `reunión: ${p.proximaReunion.fecha === taskProps.today ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' })}` : 'reuniones agendadas', go: () => { setTab('inicio'); requestAnimationFrame(() => document.getElementById('hoy')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); } },
+            { icon: Package, n: decisiones.length, label: decisiones.length === 1 ? 'entrega para revisar' : 'entregas para revisar', go: () => setTab(tabs.some((x) => x.id === 'entregas') ? 'entregas' : 'inicio'), alerta: decisiones.length > 0 },
+            { icon: Route, n: hechos.length, label: `de ${HITOS.length} hitos listos`, go: () => setTab(verRecorrido ? 'recorrido' : 'inicio') },
           ].map((x) => (
-            <button key={x.label} type="button" onClick={x.go} className="group rounded-2xl border border-[var(--border-subtle)] bg-white px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm">
-              <span className={`block text-3xl font-light tabular-nums ${x.alerta ? 'text-[var(--marca)]' : 'text-[var(--text-primary)]'}`}>{x.n}</span>
-              <span className="block text-xs text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">{x.label}</span>
+            <button key={x.label} type="button" onClick={x.go} className="group flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-sm">
+              <IconTile icon={x.icon} fuerte={!!x.alerta} />
+              <span className="min-w-0">
+                <span className="block text-2xl font-light leading-none tabular-nums text-[var(--text-primary)]">{x.n}</span>
+                <span className="mt-1 block text-xs leading-tight text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">{x.label}</span>
+              </span>
             </button>
           ))}
         </nav>
@@ -436,6 +447,34 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               trabajando={(p.enMarcha || [])[0]?.texto} enRevision={enRevision.length}
             />
             {error && <p role="alert" className="text-sm text-rose-500">{error}</p>}
+
+            {/* Atajos: subir materiales, ver el contenido y abrir la carpeta sin buscar */}
+            {atajos.length > 0 && (
+              <section aria-label="Atajos">
+                <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-tertiary)]">Ir directo a</p>
+                <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
+                  {atajos.map((a) => {
+                    const inner = (
+                      <>
+                        <IconTile icon={a.icon} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium leading-tight text-[var(--text-primary)]">{a.label}</span>
+                          <span className="mt-0.5 block text-xs leading-tight text-[var(--text-tertiary)]">{a.hint}</span>
+                        </span>
+                      </>
+                    );
+                    const cls = 'group flex h-full w-full items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-sm';
+                    return (
+                      <li key={a.key}>
+                        {a.url
+                          ? <a href={a.url} target="_blank" rel="noopener noreferrer" className={cls}>{inner}</a>
+                          : <button type="button" onClick={() => { setTab('archivos'); window.scrollTo({ top: 0 }); }} className={cls}>{inner}</button>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
 
             {/* 2 · EN MARCHA: lo de cada lado */}
             {ver.enMarcha ? (
@@ -663,9 +702,13 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                 <ul className="grid gap-3 sm:grid-cols-2">
                   {materiales.map((m) => (
                     <li key={m.id}>
-                      <a href={p.materiales![m.id]} target="_blank" rel="noopener noreferrer" className="card-swiss group flex h-full flex-col gap-2 p-4 transition hover:-translate-y-0.5">
-                        <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]"><Folder className="w-4 h-4 text-[var(--marca)]" />{m.label}<ArrowUpRight className="ml-auto w-4 h-4 text-[var(--text-tertiary)]" /></span>
-                        <span className="text-xs leading-relaxed text-[var(--text-secondary)]">{m.pedido}</span>
+                      <a href={p.materiales![m.id]} target="_blank" rel="noopener noreferrer" className="card-swiss group flex h-full items-start gap-4 p-4 transition hover:-translate-y-0.5">
+                        <IconTile icon={MATERIAL_ICON[m.id]} />
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">{m.label}<ArrowUpRight className="ml-auto w-4 h-4 shrink-0 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" /></span>
+                          <span className="mt-1 block text-xs leading-relaxed text-[var(--text-secondary)]">{m.pedido}</span>
+                          <span className="mt-2 inline-block text-xs font-medium text-[var(--marca)]">Subir acá</span>
+                        </span>
                       </a>
                     </li>
                   ))}
@@ -712,43 +755,29 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
 
 // ---------- Piezas ----------
 
-function latest<T extends { fecha?: string }>(items: T[]): T {
-  return [...items].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0];
+/** Cada material con su ícono, para reconocerlo de un vistazo */
+const MATERIAL_ICON: Record<MaterialKey, React.ElementType> = {
+  proyectos: Building2,
+  equipo: Users,
+  referencias: Sparkles,
+  registro: Camera,
+};
+
+/** Cuadrado con ícono en el color de la marca del estudio */
+function IconTile({ icon: Icon, fuerte = false }: { icon: React.ElementType; fuerte?: boolean }) {
+  return (
+    <span
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+      style={fuerte ? { background: 'var(--marca)', color: 'var(--marca-text)' } : { background: 'color-mix(in srgb, var(--marca) 12%, transparent)', color: 'var(--marca)' }}
+      aria-hidden
+    >
+      <Icon className="h-[18px] w-[18px]" strokeWidth={1.8} />
+    </span>
+  );
 }
 
-function MeetingDate({ fecha, hora, objetivo, preparar, conCM, link, estudio, whatsapp }: { fecha: string; hora?: string; objetivo?: string; preparar?: string; conCM?: boolean; link?: string | null; estudio?: string; whatsapp?: string }) {
-  const d = new Date(`${fecha}T12:00:00`);
-  const month = d.toLocaleDateString('es-AR', { month: 'short' }).replace('.', '');
-  const weekday = d.toLocaleDateString('es-AR', { weekday: 'long' });
-  const cuando = `${weekday} ${d.getDate()}${hora ? ` a las ${hora}` : ''}`;
-  return (
-    <>
-    <div className="mt-3 flex items-center gap-4">
-      <div className="w-14 shrink-0 rounded-[var(--radius-control)] border border-[var(--border-subtle)] overflow-hidden text-center">
-        <p className="bg-[var(--marca)] py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--marca-text)]">{month}</p>
-        <p className="py-1.5 text-2xl font-light tracking-tight">{d.getDate()}</p>
-      </div>
-      <div>
-        <p className="text-sm font-medium capitalize text-[var(--text-primary)]">{weekday}</p>
-        <p className="text-sm text-[var(--text-secondary)]">{hora ? `${hora} hs · hora de Argentina` : 'Horario a confirmar'}</p>
-        <p className="text-xs text-[var(--text-tertiary)]">Con Juan{conCM ? ' y la community manager' : ''}</p>
-      </div>
-    </div>
-    {(objetivo || preparar) && (
-      <div className="mt-4 space-y-1.5 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] px-3 py-2.5 text-sm">
-        {objetivo && <p className="text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué: </span>{objetivo}</p>}
-        {preparar && <p className="text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Traé o pensá: </span>{preparar}</p>}
-      </div>
-    )}
-    {estudio !== undefined && (
-      <div className="mt-4 flex flex-wrap gap-2">
-        {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--marca)] px-3 py-1.5 text-xs font-medium text-[var(--marca-text)]"><Video className="w-3.5 h-3.5" />Entrar a la reunión</a>}
-        <a href={calendarLink({ fecha, hora }, `Reunión .CERO · ${estudio}`, link)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)]"><CalendarPlus className="w-3.5 h-3.5" />Agregar a mi calendario</a>
-        {whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola Juan, soy de ${estudio}. ¿Podemos mover la reunión del ${cuando}?`)}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center px-1 py-1.5 text-xs text-[var(--text-tertiary)] underline underline-offset-4 hover:text-[var(--text-primary)]">Reprogramar</a>}
-      </div>
-    )}
-    </>
-  );
+function latest<T extends { fecha?: string }>(items: T[]): T {
+  return [...items].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0];
 }
 
 function DeliveryRow({ d, nuevo }: { d: PafPortalDoc['entregas'][number]; nuevo?: boolean }) {
@@ -851,16 +880,6 @@ function Recorrido({ hito, hechos, recorrido, etapa = 'presencia', etapas = ['pr
         </ol>
       )}
     </section>
-  );
-}
-
-/** "Tu próxima acción": la tarea prioritaria, grande, con su explicación y su botón */
-function NextAction(props: { t: PortalTask; today: string; uploadUrl?: string; sending: string | null; readOnly: boolean; onDone: (id: string) => void; nuevo?: boolean }) {
-  return (
-    <div className="rounded-[var(--radius-card)] border-2 border-[var(--marca)] bg-[var(--bg-surface)] shadow-sm">
-      <p className="flex items-center gap-2 px-5 pt-4 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--marca)]">Tu próxima acción</p>
-      <PendingTask {...props} bare />
-    </div>
   );
 }
 

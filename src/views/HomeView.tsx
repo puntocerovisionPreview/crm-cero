@@ -1,6 +1,6 @@
-import { weeklyCollections } from '../utils/periodic';
 import React, { useEffect, useMemo, useState } from 'react';
-import { BarChart3, ChevronRight, Moon } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronRight, Moon } from 'lucide-react';
+import { weeklyCollections } from '../utils/periodic';
 import { AgendaMeeting, AgendaTask, IncomeRecord, Project, SecondBrainNote, StudioPaymentSettings } from '../types';
 import { Top3Card } from '../components/Top3Card';
 import { HomeMoneyCard } from '../components/HomeMoneyCard';
@@ -16,7 +16,7 @@ import { ColdClientsCard } from '../components/ColdClientsCard';
 import { PafTodayBoard } from '../components/PafTodayBoard';
 import { coldClients } from '../utils/coldClients';
 import { hapticFeedback } from '../utils/haptics';
-import { DayRing, NextCallChip, RouteLine, usePulse } from '../components/ProspectingVisuals';
+import { usePulse } from '../components/ProspectingVisuals';
 import { useContent } from '../content/useContent';
 import { ContentTodayCard } from '../components/ContentTodayCard';
 import { addDays } from '../utils/dates';
@@ -52,12 +52,27 @@ const greeting = () => {
 const money = (n: number, cur: 'ARS' | 'USD', privacy?: boolean) =>
   privacy ? '••••' : `${cur === 'USD' ? 'US$' : '$'} ${Math.round(n).toLocaleString('es-AR')}`;
 
-
 interface Stat {
   value: string;
   label: string;
   tone?: 'warn' | 'good';
 }
+
+const toneClass = (tone?: Stat['tone']) =>
+  tone === 'warn' ? 'text-[var(--semantic-amber)]' : tone === 'good' ? 'text-[var(--semantic-green)]' : 'text-[var(--text-primary)]';
+
+const SectorIcon: React.FC<{ sector: Sector; size?: number }> = ({ sector, size = 40 }) => {
+  const Icon = sector.icon;
+  return (
+    <span className="rounded-[12px] flex items-center justify-center text-white shrink-0" style={{ backgroundColor: sector.tint, width: size, height: size }} aria-hidden>
+      <Icon style={{ width: size * 0.5, height: size * 0.5 }} strokeWidth={2} />
+    </span>
+  );
+};
+
+const sectorPath = (key: SectorKey) => SECTORS.find(s => s.key === key)!.items[0].path;
+
+const DETALLE_KEY = 'inicio_detalle';
 
 // Inicio: elegís el sector del estudio y entrás a sus pantallas
 export const HomeView: React.FC<Props> = ({
@@ -166,41 +181,25 @@ export const HomeView: React.FC<Props> = ({
     onNavigate(path);
   };
 
-  const featured = SECTORS.filter(s => s.featured);
-  const others = SECTORS.filter(s => !s.featured);
+  // Lo que pide atención ahora, en una sola fila: cada aviso lleva a su lugar
+  const avisos: { key: string; n: number; label: string; path: string }[] = [
+    { key: 'atrasadas', n: data.overdue.length, label: data.overdue.length === 1 ? 'tarea atrasada' : 'tareas atrasadas', path: sectorPath('dia') },
+    { key: 'respuestas', n: pulse.mine, label: pulse.mine === 1 ? 'prospecto espera tu respuesta' : 'prospectos esperan tu respuesta', path: sectorPath('prospeccion') },
+    { key: 'anotar', n: prospecting?.pending || 0, label: 'sin anotar si respondieron', path: sectorPath('prospeccion') },
+    { key: 'cobrar', n: data.withBalance.length, label: data.withBalance.length === 1 ? 'cliente por cobrar' : 'clientes por cobrar', path: sectorPath('finanzas') },
+    { key: 'pagos', n: pendingPayments, label: pendingPayments === 1 ? 'pago por registrar' : 'pagos por registrar', path: sectorPath('finanzas') },
+    { key: 'frios', n: cold.length, label: cold.length === 1 ? 'cliente sin contacto' : 'clientes sin contacto', path: sectorPath('clientes') },
+    { key: 'contenido', n: contentStats?.late || 0, label: 'sin marcar publicada', path: sectorPath('contenido') },
+  ].filter(x => x.n > 0);
 
-  const StatsRow: React.FC<{ items: Stat[]; big?: boolean }> = ({ items, big }) => (
-    <dl className="flex flex-wrap gap-x-5 gap-y-1">
-      {items.map(st => (
-        <div key={st.label} className="flex items-baseline gap-1.5">
-          <dt className="sr-only">{st.label}</dt>
-          <dd
-            className={`${big ? 'text-[28px]' : 'text-[20px]'} font-bold tracking-tight tabular-nums ${
-              st.tone === 'warn' ? 'text-[var(--semantic-amber)]' : st.tone === 'good' ? 'text-[var(--semantic-green)]' : 'text-[var(--text-primary)]'
-            }`}
-          >
-            {st.value}
-          </dd>
-          <span className="text-[13px] text-[var(--text-secondary)]" aria-hidden>
-            {st.label}
-          </span>
-        </div>
-      ))}
-    </dl>
-  );
-
-  const SectorIcon: React.FC<{ sector: Sector; size?: number }> = ({ sector, size = 44 }) => {
-    const Icon = sector.icon;
-    return (
-      <span
-        className="rounded-[12px] flex items-center justify-center text-white shrink-0"
-        style={{ backgroundColor: sector.tint, width: size, height: size }}
-        aria-hidden
-      >
-        <Icon style={{ width: size * 0.5, height: size * 0.5 }} strokeWidth={2} />
-      </span>
-    );
-  };
+  // El detalle (dinero, constancia, clientes fríos) queda plegado: lo abrís cuando lo querés mirar
+  const [detalle, setDetalle] = useState(() => {
+    try { return localStorage.getItem(DETALLE_KEY) === '1'; } catch { return false; }
+  });
+  const toggleDetalle = () => setDetalle(v => {
+    try { localStorage.setItem(DETALLE_KEY, v ? '0' : '1'); } catch { /* sin almacenamiento */ }
+    return !v;
+  });
 
   return (
     <div className="max-w-5xl mx-auto w-full px-1 sm:px-2 pb-28 space-y-6">
@@ -209,7 +208,19 @@ export const HomeView: React.FC<Props> = ({
           {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
         </p>
         <h1 className="text-[34px] leading-tight font-bold tracking-tight text-[var(--text-primary)]">{greeting()}</h1>
-        <p className="text-[15px] text-[var(--text-secondary)] mt-0.5">¿En qué parte del estudio querés trabajar?</p>
+        <p className="text-[15px] text-[var(--text-secondary)] mt-0.5">{avisos.length ? 'Esto pide tu atención:' : 'Todo al día. Elegí en qué querés trabajar.'}</p>
+        {avisos.length > 0 && (
+          <ul className="flex flex-wrap gap-2 mt-3" aria-label="Para atender ahora">
+            {avisos.map(a => (
+              <li key={a.key}>
+                <button type="button" onClick={() => go(a.path)} className="h-9 pl-2 pr-3.5 rounded-full bg-[var(--bg-surface)] border border-[var(--border-subtle)] hover:border-[var(--border-strong)] text-[14px] text-[var(--text-primary)] flex items-center gap-2 cursor-pointer transition-colors">
+                  <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-[var(--semantic-amber)] text-white text-[12px] font-bold tabular-nums flex items-center justify-center">{a.n}</span>
+                  {a.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
         <div className="flex flex-wrap gap-2 mt-3">
           <button
             type="button"
@@ -238,132 +249,67 @@ export const HomeView: React.FC<Props> = ({
       {/* Tus clientes hoy: lo que te piden y cómo está cada estudio */}
       <PafTodayBoard projects={projects} meetings={meetings} onOpen={go} onUpdateProject={onUpdateProject} />
 
-      {/* Contenido: hoy se publica / mañana toca */}
-      <ContentTodayCard onNavigate={go} />
-
-      {/* Sectores principales */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-label="Sectores principales">
-        {featured.map(sector => (
-          <article key={sector.key} className="card-swiss p-5 flex flex-col gap-4">
-            <button type="button" onClick={() => go(sector.items[0].path)} className="flex items-center gap-3 text-left cursor-pointer group">
-              <SectorIcon sector={sector} />
-              <span className="flex-1 min-w-0">
-                <span className="block text-[22px] font-bold tracking-tight text-[var(--text-primary)] leading-tight">{sector.label}</span>
-                <span className="block text-[13px] text-[var(--text-secondary)]">{sector.description}</span>
-              </span>
-              <ChevronRight className="w-5 h-5 text-[var(--text-tertiary)] group-hover:translate-x-0.5 transition-transform" aria-hidden />
-            </button>
-
-            {sector.key === 'prospeccion' && prospects ? (
-              <div className="flex items-center gap-4">
-                <DayRing done={pulse.doneToday} planned={pulse.planned} size={64} />
-                <StatsRow items={stats[sector.key]} big />
-              </div>
-            ) : (
-              <StatsRow items={stats[sector.key]} big />
-            )}
-
-            {/* Prospección: la ruta y la próxima llamada */}
-            {sector.key === 'prospeccion' && prospects && (
-              <div className="space-y-3">
-                <div className="rounded-[12px] bg-[var(--bg-surface-elevated)] px-2 py-3">
-                  <RouteLine stations={pulse.stations} compact onStation={() => go('/prospeccion')} />
-                </div>
-                {pulse.nextCall && <NextCallChip prospect={pulse.nextCall} today={today} onClick={() => go('/prospeccion')} />}
-              </div>
-            )}
-
-            {/* Mi día: las próximas tareas a la vista */}
-            {sector.key === 'dia' && (
-              <ul className="rounded-[12px] bg-[var(--bg-surface-elevated)] divide-y divide-[var(--border-subtle)] overflow-hidden">
-                {data.todayMeetings.slice(0, 1).map(m => (
-                  <li key={m.id}>
-                    <button type="button" onClick={() => go(`/agenda/reunion/${m.id}`)} className="w-full min-h-[44px] px-3 py-2 flex items-center gap-2.5 text-left cursor-pointer">
-                      <span className="w-2 h-2 rounded-full bg-[#30B0C7] shrink-0" aria-hidden />
-                      <span className="flex-1 min-w-0 text-[14px] text-[var(--text-primary)] truncate">{m.title}</span>
-                      {m.time && <span className="text-[13px] text-[var(--text-tertiary)] tabular-nums">{m.time}</span>}
-                    </button>
-                  </li>
-                ))}
-                {data.pendingToday.slice(0, 4).map(t => (
-                  <li key={t.id}>
-                    <button type="button" onClick={() => go(`/agenda/tarea/${t.id}`)} className="w-full min-h-[44px] px-3 py-2 flex items-center gap-2.5 text-left cursor-pointer">
-                      <span className="w-4 h-4 rounded-full border-2 border-[var(--border-strong)] shrink-0" aria-hidden />
-                      <span className="flex-1 min-w-0 text-[14px] text-[var(--text-primary)] truncate">{t.title}</span>
-                      {t.projectName && <span className="text-[12px] text-[var(--text-tertiary)] truncate max-w-[40%]">{t.projectName}</span>}
-                    </button>
-                  </li>
-                ))}
-                {data.pendingToday.length === 0 && data.todayMeetings.length === 0 && (
-                  <li className="px-3 py-3 text-[14px] text-[var(--text-secondary)]">Nada pendiente para hoy.</li>
-                )}
-              </ul>
-            )}
-
-            <div className="flex flex-wrap gap-2 mt-auto">
-              {sector.items.map(item => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.path}
-                    type="button"
-                    onClick={() => go(item.path)}
-                    className="h-9 px-3.5 rounded-full bg-[var(--bg-surface-muted)]/70 hover:bg-[var(--bg-surface-muted)] text-[14px] font-medium text-[var(--text-primary)] flex items-center gap-1.5 cursor-pointer transition-colors"
-                  >
-                    <Icon className="w-4 h-4" style={{ color: sector.tint }} aria-hidden />
-                    {item.label}
-                  </button>
-                );
-              })}
-            </div>
-          </article>
-        ))}
+      {/* Los sectores del estudio: todos iguales, con su número clave */}
+      <section aria-label="Sectores del estudio">
+        <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Ir a</h2>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+          {SECTORS.map(sector => {
+            const items = stats[sector.key].slice(0, 2);
+            return (
+              <button key={sector.key} type="button" onClick={() => go(sector.items[0].path)}
+                className="card-swiss group p-4 flex flex-col gap-3 text-left cursor-pointer hover:border-[var(--border-strong)] hover:-translate-y-0.5 transition">
+                <span className="flex items-center gap-3">
+                  <SectorIcon sector={sector} />
+                  <span className="flex-1 min-w-0 text-[17px] font-semibold text-[var(--text-primary)] leading-tight">{sector.label}</span>
+                  <ChevronRight className="hidden sm:block w-4 h-4 text-[var(--text-tertiary)] group-hover:translate-x-0.5 transition-transform" aria-hidden />
+                </span>
+                <span className="flex flex-col gap-0.5">
+                  {items.map(st => (
+                    <span key={st.label} className="flex items-baseline gap-1.5 min-w-0">
+                      <span className={`text-[17px] font-bold tabular-nums ${toneClass(st.tone)}`}>{st.value}</span>
+                      <span className="text-[12px] text-[var(--text-secondary)] truncate">{st.label}</span>
+                    </span>
+                  ))}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       </section>
 
-      {/* Dinero: saldo de Mercado Pago, último cobro y cobrado por mes */}
-      <HomeMoneyCard projects={projects} incomes={incomes} today={today} privacyMode={privacyMode} onOpen={() => go('/dinero')} />
-
-      {/* Clientes que se enfrían */}
-      <ColdClientsCard
-        clients={cold}
-        onOpenClient={id => go(`/clientes/${id}`)}
-        onCreateTask={c =>
-          onAddTask({
-            title: `Escribirle a ${c.project.clientName}`,
-            date: today,
-            completed: false,
-            priority: 'media',
-            projectId: c.project.id,
-            projectName: c.project.clientName,
-            notes: `Último contacto hace ${c.daysSince} días.`,
-          })
-        }
-        onMarkContacted={c => onUpdateProject(c.project.id, { lastContactDate: today })}
-      />
-
-      {/* Constancia estilo GitHub */}
-      <ActivityHeatmap tasks={tasks} meetings={meetings} prospectEvents={events} today={today} />
-
-      {/* Los demás sectores */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" aria-label="Otros sectores">
-        {others.map(sector => (
-          <button
-            key={sector.key}
-            type="button"
-            onClick={() => go(sector.items[0].path)}
-            className="card-swiss p-4 flex flex-col gap-3 text-left cursor-pointer hover:border-[var(--border-strong)] transition-colors"
-          >
-            <span className="flex items-center gap-3">
-              <SectorIcon sector={sector} size={36} />
-              <span className="flex-1 min-w-0">
-                <span className="block text-[17px] font-semibold text-[var(--text-primary)] leading-tight">{sector.label}</span>
-                <span className="block text-[12px] text-[var(--text-secondary)] truncate">{sector.description}</span>
-              </span>
-              <ChevronRight className="w-4 h-4 text-[var(--text-tertiary)]" aria-hidden />
-            </span>
-            <StatsRow items={stats[sector.key]} />
-          </button>
-        ))}
+      {/* Más detalle: plegado para que Inicio sea corto */}
+      <section>
+        <button type="button" onClick={toggleDetalle} aria-expanded={detalle}
+          className="w-full flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--border-subtle)] bg-[var(--bg-surface)] px-4 py-3 text-left cursor-pointer hover:border-[var(--border-strong)] transition-colors">
+          <span>
+            <span className="block text-[15px] font-semibold text-[var(--text-primary)]">Más detalle</span>
+            <span className="block text-[12px] text-[var(--text-secondary)]">Contenido de hoy, dinero, clientes sin contacto y tu constancia</span>
+          </span>
+          <ChevronDown className={`w-5 h-5 text-[var(--text-tertiary)] transition-transform ${detalle ? 'rotate-180' : ''}`} aria-hidden />
+        </button>
+        {detalle && (
+          <div className="mt-4 space-y-6">
+            <ContentTodayCard onNavigate={go} />
+            <HomeMoneyCard projects={projects} incomes={incomes} today={today} privacyMode={privacyMode} onOpen={() => go('/dinero')} />
+            <ColdClientsCard
+              clients={cold}
+              onOpenClient={id => go(`/clientes/${id}`)}
+              onCreateTask={c =>
+                onAddTask({
+                  title: `Escribirle a ${c.project.clientName}`,
+                  date: today,
+                  completed: false,
+                  priority: 'media',
+                  projectId: c.project.id,
+                  projectName: c.project.clientName,
+                  notes: `Último contacto hace ${c.daysSince} días.`,
+                })
+              }
+              onMarkContacted={c => onUpdateProject(c.project.id, { lastContactDate: today })}
+            />
+            <ActivityHeatmap tasks={tasks} meetings={meetings} prospectEvents={events} today={today} />
+          </div>
+        )}
       </section>
 
       <DayCloseModal
@@ -376,10 +322,6 @@ export const HomeView: React.FC<Props> = ({
         onToggleTask={onToggleTask}
         showToast={showToast}
       />
-
-      <p className="text-center text-[12px] text-[var(--text-tertiary)]">
-        Dentro de cada sector, el menú muestra solo sus pantallas. Volvés acá con «Inicio».
-      </p>
     </div>
   );
 };

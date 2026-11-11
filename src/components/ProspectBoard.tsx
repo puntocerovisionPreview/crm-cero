@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ChevronUp, ClipboardCopy, MessageCircle, MoreHorizontal, Phone, Undo2, Video } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, ClipboardCopy, MessageCircle, MoreHorizontal, Phone, Search, Undo2, Video, X } from 'lucide-react';
 import { Prospect, ProspectingSettings } from '../types';
 import { ProspectAction, normalizeInstagram } from '../prospecting/core';
 import { BOARD_COLUMNS, BoardColumn, ClosedColumn, NextMove, columnOf, nextMove, turnTone } from '../prospecting/board';
+import { findProspects } from '../prospecting/find';
 import { formatWhatsAppUrl } from '../utils/contact';
 import { updateProspect } from '../prospecting/store';
 import { ReplyButton } from './ProspectConversation';
@@ -23,7 +24,8 @@ const TONE: Record<'mio' | 'suyo' | 'frio', { color: string; label: string }> = 
 };
 
 const btn = 'rounded-[12px] font-semibold flex items-center justify-center gap-2 transition active:scale-[0.98] disabled:opacity-40 cursor-pointer';
-const ghost = `${btn} h-9 px-3 text-[13px] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]`;
+const ghostBase = `${btn} px-3 text-[13px] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]`;
+const ghost = `${ghostBase} h-9`;
 const chip = `${btn} h-9 px-3 text-[13px] bg-[var(--bg-surface-muted)] text-[var(--text-primary)] hover:bg-[var(--border-subtle)]`;
 
 const SEND_LOG: Partial<Record<ProspectAction, string>> = {
@@ -71,7 +73,7 @@ export const ProspectCard: React.FC<{
     catch { setSaveError('No se guardó. Volvé a intentar.'); }
     finally { locked.current = false; setBusy(false); }
   };
-  const copyAndMark = () => {
+  const copyMessage = () => {
     navigator.clipboard?.writeText(move.message).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1200);
@@ -93,7 +95,7 @@ export const ProspectCard: React.FC<{
       <button
         type="button"
         onClick={() => {
-          copyAndMark();
+          copyMessage();
           if (ig) window.open(`https://instagram.com/${ig}`, '_blank', 'noopener');
         }}
         className={`${btn} ${big ? 'h-12 text-[15px] px-5' : 'h-9 text-[13px] px-3'} text-white`}
@@ -103,6 +105,9 @@ export const ProspectCard: React.FC<{
       </button>
     )
   ) : null;
+  // Sin mensaje para mandar (está esperando): igual se puede abrir su chat para ver si contestó
+  const chatUrl = p.whatsapp ? formatWhatsAppUrl(p.whatsapp) : ig ? `https://ig.me/m/${ig}` : '';
+  const contact = [p.whatsapp, ig ? `@${ig}` : ''].filter(Boolean).join(' · ');
 
   return (
     <article
@@ -153,6 +158,8 @@ export const ProspectCard: React.FC<{
         </span>
       </header>
 
+      {contact && <p className={`${big ? 'text-[13px]' : 'text-[11px]'} text-[var(--text-tertiary)] truncate tabular-nums`} title="Así lo encontrás en WhatsApp o Instagram">{contact}</p>}
+
       <p className={`${big ? 'text-[17px]' : 'text-[13px]'} font-semibold text-[var(--text-primary)]`}>{move.title}</p>
 
       {move.message && (
@@ -181,9 +188,14 @@ export const ProspectCard: React.FC<{
 
       <div className={`flex flex-wrap items-center gap-2 ${big ? 'pt-1' : ''}`}>
         {primary}
-        {move.send && <button type="button" disabled={busy} onClick={() => pick(move.send!)} className={ghost + ' h-12'}>
+        {move.send && <button type="button" disabled={busy} onClick={() => pick(move.send!)} className={`${ghostBase} ${big ? 'h-12' : 'h-9'}`}>
           <Check className="w-4 h-4" /> {busy ? 'Guardando…' : 'Ya envié el mensaje'}
         </button>}
+        {!primary && chatUrl && (
+          <a href={chatUrl} target="_blank" rel="noopener noreferrer" className={ghost} title={`Abrir el chat con ${name} para ver si contestó`}>
+            <MessageCircle className="w-4 h-4" style={{ color: TINT }} /> Abrir chat
+          </a>
+        )}
         {saveError && <p role="alert" className="text-xs text-red-400">{saveError}</p>}
         {move.need === 'call_time' && (
           <button type="button" onClick={() => onCall(p)} className={`${btn} ${big ? 'h-12 text-[15px] px-5' : 'h-9 text-[13px] px-3'} text-white`} style={{ backgroundColor: '#0A84FF' }}>
@@ -202,7 +214,7 @@ export const ProspectCard: React.FC<{
           </button>
         )}
         {big && move.message && (
-          <button type="button" onClick={copyAndMark} className={ghost}>
+          <button type="button" onClick={copyMessage} className={ghost}>
             <ClipboardCopy className="w-4 h-4" /> {copied ? 'Copiado' : 'Copiar'}
           </button>
         )}
@@ -228,24 +240,45 @@ export const ProspectBoard: React.FC<{
     if (initialColumn) setMobileCol(initialColumn);
   }, [initialColumn]);
 
-  const byCol = useMemo(() => {
-    const m: Record<string, Prospect[]> = {};
+  const [q, setQ] = useState('');
+  const [onlyMine, setOnlyMine] = useState(false);
+
+  // Lo próximo de cada uno se calcula una sola vez (antes se recalculaba en cada orden y en cada contador)
+  const info = useMemo(() => {
+    const m = new Map<string, { mine: boolean; rank: number }>();
     prospects.forEach((p) => {
+      const mv = nextMove(p, today, settings);
+      m.set(p.id, { mine: turnTone(p, mv, settings) === 'mio', rank: mv.waiting ? 2 : mv.send === 'follow_up' ? 1 : 0 });
+    });
+    return m;
+  }, [prospects, today, settings]);
+
+  const { byCol, mine } = useMemo(() => {
+    let shown = prospects;
+    if (q.trim()) {
+      const ids = new Set(findProspects(prospects, q, prospects.length).map((p) => p.id));
+      shown = shown.filter((p) => ids.has(p.id));
+    }
+    // Solo los chats ya empezados donde el próximo paso es tuyo (los que nunca escribiste no cuentan)
+    if (onlyMine) shown = shown.filter((p) => info.get(p.id)?.mine && columnOf(p) !== 'por_escribir');
+    const m: Record<string, Prospect[]> = {};
+    shown.forEach((p) => {
       const c = columnOf(p);
       (m[c] = m[c] || []).push(p);
     });
     // Dentro de cada columna: primero a quien le toca, después los que esperan hace más
-    const rank = (p: Prospect) => {
-      const mv = nextMove(p, today, settings);
-      return mv.waiting ? 2 : mv.send === 'follow_up' ? 1 : 0;
-    };
+    const rank = (p: Prospect) => info.get(p.id)?.rank ?? 0;
     Object.values(m).forEach((list) => list.sort((a, b) => rank(a) - rank(b) || (a.lastContactAt || '').localeCompare(b.lastContactAt || '')));
-    return m;
-  }, [prospects, today, settings]);
-
-  // "Te toca" de cada columna (en Por escribir, solo los de hoy)
-  const mineIn = (c: BoardColumn) =>
-    (byCol[c] || []).filter((p) => (c !== 'por_escribir' || (p.plannedFirstContact || p.createdAt) <= today) && turnTone(p, nextMove(p, today, settings), settings) === 'mio').length;
+    // "Te toca" de cada columna (en Por escribir, solo los de hoy)
+    const mine: Record<string, number> = {};
+    BOARD_COLUMNS.forEach(({ id }) => {
+      mine[id] = (m[id] || []).filter((p) => (id !== 'por_escribir' || (p.plannedFirstContact || p.createdAt) <= today) && info.get(p.id)?.mine).length;
+    });
+    return { byCol: m, mine };
+  }, [prospects, info, q, onlyMine, today]);
+  const mineIn = (c: BoardColumn) => mine[c] || 0;
+  const totalMine = BOARD_COLUMNS.reduce((n, c) => n + (c.id === 'por_escribir' ? 0 : mineIn(c.id)), 0);
+  const filtering = !!q.trim() || onlyMine;
 
   const renderColumn = (id: BoardColumn) => {
     const all = byCol[id] || [];
@@ -274,7 +307,7 @@ export const ProspectBoard: React.FC<{
         <header className="px-1.5 pt-1">
           <p className="text-[14px] font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
             {col.label}
-            <span className="text-[12px] tabular-nums text-[var(--text-tertiary)]">{items.length}</span>
+            <span className="text-[12px] tabular-nums text-[var(--text-tertiary)]">{id === 'por_escribir' ? all.length - later.length : items.length}</span>
             {mineIn(id) > 0 && (
               <span className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold text-white flex items-center justify-center" style={{ backgroundColor: TINT }} title="Te toca">
                 {mineIn(id)}
@@ -284,7 +317,7 @@ export const ProspectBoard: React.FC<{
           <p className="text-[11px] text-[var(--text-tertiary)]">{col.hint}</p>
         </header>
         {items.length === 0 ? (
-          <p className="text-[12px] text-[var(--text-tertiary)] px-1.5 py-4 text-center">Nadie acá.</p>
+          <p className="text-[12px] text-[var(--text-tertiary)] px-1.5 py-4 text-center">{filtering ? 'Nadie con ese filtro.' : 'Nadie acá.'}</p>
         ) : (
           items.slice(0, 60).map((p) => (
             <ProspectCard key={p.id} prospect={p} settings={settings} today={today} onSend={onSend} onMove={onMove} onCall={onCall} onDetail={onDetail} draggable />
@@ -303,6 +336,21 @@ export const ProspectBoard: React.FC<{
 
   return (
     <div className="space-y-3">
+      {/* Filtrar el tablero: por nombre/teléfono/@ o solo lo que te toca */}
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex flex-1 min-w-[200px] max-w-md items-center gap-2 h-9 px-3 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] focus-within:border-[var(--border-strong)]">
+          <Search className="w-4 h-4 shrink-0 text-[var(--text-tertiary)]" aria-hidden />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filtrar el tablero" aria-label="Filtrar el tablero por nombre, estudio, teléfono o Instagram"
+            className="flex-1 min-w-0 bg-transparent text-[13px] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none" />
+          {q && <button type="button" onClick={() => setQ('')} aria-label="Quitar el filtro" className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer"><X className="w-4 h-4" /></button>}
+        </label>
+        <button type="button" onClick={() => setOnlyMine((v) => !v)} aria-pressed={onlyMine}
+          className={`h-9 px-3.5 rounded-full text-[13px] font-medium flex items-center gap-2 border cursor-pointer transition-colors ${onlyMine ? 'bg-[var(--text-primary)] text-[var(--bg-app)] border-transparent' : 'border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--border-strong)]'}`}>
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TINT }} aria-hidden />
+          Chats que me tocan{totalMine > 0 && <span className="tabular-nums opacity-70">{totalMine}</span>}
+        </button>
+      </div>
+
       {/* Celular: elegís la columna */}
       <div className="md:hidden flex gap-1.5 overflow-x-auto no-scrollbar">
         {BOARD_COLUMNS.map((c) => (

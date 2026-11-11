@@ -11,7 +11,6 @@ import {
   PAF_STAGES, 
   PafStage, 
   TimeLog,
-  ProjectInstallment,
   ProjectVisualStatus
 } from '../types';
 import { 
@@ -28,17 +27,11 @@ import {
   Plus, 
   Trash2, 
   Archive, 
-  Edit3, 
   Save, 
   AlertTriangle, 
-  ExternalLink, 
-  TrendingUp, 
   FileText, 
   Award, 
   Sparkles, 
-  Check, 
-  MapPin, 
-  Building2, 
   User, 
   RotateCcw,
   SlidersHorizontal,
@@ -56,7 +49,6 @@ import { formatWhatsAppUrl, formatTelUrl } from '../utils/contact';
 import { hapticFeedback } from '../utils/haptics';
 import { getTodayString } from '../utils/storage';
 import { playTaskDone } from '../utils/sound';
-import { PaymentPlanManager } from '../components/PaymentPlanManager';
 import { ProjectKeyLinks } from '../components/ProjectKeyLinks';
 import { PafAdminPanel } from '../components/PafAdminPanel';
 import { ProximaAccionCard } from '../components/ProximaAccionCard';
@@ -73,7 +65,6 @@ import { PafPanelButton } from '../components/PafPanelButton';
 import { ProjectPanelCard } from '../components/ProjectPanelCard';
 import { TimeTrackerSection } from '../components/TimeTrackerSection';
 import { 
-  formatProjectPrice, 
   resolveProjectCurrency, 
   calculateProjectBilling, 
   getProjectPayments, 
@@ -93,7 +84,6 @@ import {
   FlexiblePaymentCommitment, 
   RecurringIncomePlan,
   BillingAgreement,
-  BillingInstallment
 } from '../types';
 import { ProjectPaymentProgressBar } from '../components/ProjectPaymentProgressBar';
 import { RegisterPaymentModal } from '../components/RegisterPaymentModal';
@@ -107,7 +97,7 @@ import { resolveProjectAgreement } from '../utils/paymentPlans';
 import { DEFAULT_USD_RATE } from '../utils/currency';
 import { ClientTimeline } from '../components/ClientTimeline';
 import { OnboardingTemplateCard } from '../components/OnboardingTemplateCard';
-import { History } from 'lucide-react';
+import { History, CalendarDays as IconReunion, ChevronDown as IconPlegar, ListChecks as IconTareas } from 'lucide-react';
 
 interface Props {
   project: Project;
@@ -195,6 +185,8 @@ export const ClientDetailView: React.FC<Props> = ({
   const visita = project.pafClienteId ? visitas.get(project.pafClienteId) : undefined;
   const salud = useMemo(() => saludCliente(project, { meetings, visita, today: todayStr }), [project, meetings, visita, todayStr]);
   const [masOpciones, setMasOpciones] = useState(false);
+  // En el celular, el estado y la carpeta quedan plegados para llegar rápido a Portal / Cobros / Cliente
+  const [masInfo, setMasInfo] = useState(false);
   const fraseComoViene = useMemo(() => {
     const paf = project.serviceType === 'paf' || (project.projectType || '').startsWith('paf');
     const etapa = project.pafEtapa || 'presencia';
@@ -283,9 +275,6 @@ export const ClientDetailView: React.FC<Props> = ({
   const clientTasks = tasks.filter(t => taskBelongsToProject(t, project));
   const clientMeetings = meetings.filter(
     m => m.projectId === project.id || (m.projectName && m.projectName.toLowerCase() === project.clientName.toLowerCase())
-  );
-  const clientIncomes = incomes.filter(
-    i => i.projectId === project.id || (i.projectName && i.projectName.toLowerCase() === project.clientName.toLowerCase())
   );
 
   // Derived Horizon Project Data & Overrides
@@ -654,12 +643,49 @@ export const ClientDetailView: React.FC<Props> = ({
   const currentSection: FichaSection = fichaSection === 'portal' && !(isPaf || isWebClient) ? 'cliente' : fichaSection;
   const shownTab: ClientTab = currentSection === 'cobros' ? 'cobros' : activeTab === 'cobros' ? 'resumen' : activeTab;
 
+  // De un vistazo: cuatro números que además te llevan a su parte de la ficha
+  const tareasAbiertas = clientTasks.filter((t) => !t.completed);
+  const tareasAtrasadas = tareasAbiertas.filter((t) => t.date && t.date < todayStr).length;
+  const proximaReunion = clientMeetings.filter((m) => !m.completed && m.date >= todayStr).sort((a, b) => `${a.date}${a.time || ''}`.localeCompare(`${b.date}${b.time || ''}`))[0];
+  const fechaCorta = (d: string) => (d === todayStr ? 'Hoy' : d.slice(5).split('-').reverse().join('/'));
+  const irATrabajo = () => { setFichaSection('cliente'); setActiveTab('trabajo'); };
+  const visitaTexto = textoVisita(project, visita, todayStr);
+  const vistazo: { key: string; label: string; value: string; hint: string; icon: React.ElementType; tone?: 'warn' | 'good'; on: boolean; go: () => void }[] = [
+    ...(isPaf || isWebClient ? [{
+      key: 'portal', label: 'Su portal', icon: Globe,
+      value: !project.pafPortal?.publishedAt ? 'Sin publicar' : visita ? 'Lo usa' : 'No entró',
+      hint: visitaTexto || 'Todavía no lo ve el cliente',
+      tone: (!project.pafPortal?.publishedAt || !visita ? 'warn' : 'good') as 'warn' | 'good',
+      on: currentSection === 'portal', go: () => setFichaSection('portal'),
+    }] : []),
+    {
+      key: 'cobros', label: 'Por cobrar', icon: DollarSign,
+      value: privacyMode ? '$ ••••' : billing.saldoPendiente > 0 ? formatCurrencyAmount(billing.saldoPendiente, billing.currency, true) : 'Al día',
+      hint: billing.saldoPendiente > 0 ? 'Saldo pendiente' : 'No debe nada',
+      tone: billing.saldoPendiente > 0 ? undefined : 'good',
+      on: currentSection === 'cobros', go: () => setFichaSection('cobros'),
+    },
+    {
+      key: 'tareas', label: 'Tareas', icon: IconTareas,
+      value: tareasAbiertas.length ? `${tareasAbiertas.length} ${tareasAbiertas.length === 1 ? 'abierta' : 'abiertas'}` : 'Ninguna',
+      hint: tareasAtrasadas ? `${tareasAtrasadas} ${tareasAtrasadas === 1 ? 'atrasada' : 'atrasadas'}` : 'Nada atrasado',
+      tone: tareasAtrasadas ? 'warn' : undefined,
+      on: currentSection === 'cliente' && shownTab === 'trabajo', go: irATrabajo,
+    },
+    {
+      key: 'reunion', label: 'Próxima reunión', icon: IconReunion,
+      value: proximaReunion ? `${fechaCorta(proximaReunion.date)}${proximaReunion.time ? ` · ${proximaReunion.time}` : ''}` : 'Sin fecha',
+      hint: proximaReunion ? proximaReunion.title : 'No hay ninguna agendada',
+      on: false, go: irATrabajo,
+    },
+  ];
+
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-zinc-950 text-zinc-100 animate-in slide-in-from-right-4 duration-150">
       {/* Top Mobile Bar / Desktop Breadcrumb Bar */}
       <div 
         style={{ paddingTop: 'max(0.75rem, calc(env(safe-area-inset-top, 0px) + 0.65rem))' }}
-        className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/80 px-4 py-3 flex items-center justify-between touch-manipulation"
+        className={`sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-md border-b border-zinc-800/80 px-4 py-3 flex items-center justify-between touch-manipulation ${isPaf || isWebClient ? 'lg:hidden' : ''}`}
       >
         <div className="flex items-center gap-3">
           <button
@@ -710,7 +736,6 @@ export const ClientDetailView: React.FC<Props> = ({
                 </div>
                 {(Object.keys(VISUAL_STATUS_CONFIGS) as ProjectVisualStatus[]).map(statusKey => {
                   const cfg = VISUAL_STATUS_CONFIGS[statusKey];
-                  const Icon = cfg.icon;
                   const isCurrent = project.statusOverride === statusKey || (!project.statusOverride && statusConfig.id === statusKey);
                   return (
                     <button
@@ -746,17 +771,16 @@ export const ClientDetailView: React.FC<Props> = ({
         </div>
       </div>
 
-      {/* Main Container: 2-Column on Desktop (30% Left Sticky / 70% Right) */}
-      <div className="max-w-3xl w-full mx-auto p-4 sm:p-6 space-y-4">
-        
-        {/* ================= COLUMNA IZQUIERDA (30% Sticky en Desktop) ================= */}
-        <div className="w-full space-y-4">
-          {/* Encabezado: quién es, cómo contactarlo y cómo viene, en una frase */}
-          <header className="space-y-5 pt-2">
-            <div className="flex items-start gap-4">
-              <span className="flex w-16 h-16 shrink-0 items-center justify-center rounded-full text-xl" style={{ background: colorDe(project), color: '#fff' }} aria-hidden>{iniciales(project.clientName)}</span>
+      {/* En pantalla grande: quién es y cómo viene a la izquierda (fijo), el trabajo a la derecha. En el celular, uno debajo del otro. */}
+      <div className="max-w-3xl lg:max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-4 lg:space-y-0 lg:grid lg:grid-cols-[340px_minmax(0,1fr)] lg:gap-6 lg:items-start">
+
+        {/* Quién es, cómo contactarlo y cómo viene */}
+        <aside className={`w-full space-y-4 lg:sticky lg:overflow-y-auto lg:pr-1 ${isPaf || isWebClient ? 'lg:top-4 lg:max-h-[calc(100vh-6rem)]' : 'lg:top-[4.5rem] lg:max-h-[calc(100vh-9rem)]'}`}>
+          <header className="space-y-4 pt-2 lg:pt-0">
+            <div className="flex items-start gap-3">
+              <span className="flex w-12 h-12 shrink-0 items-center justify-center rounded-full text-base font-semibold" style={{ background: colorDe(project), color: '#fff' }} aria-hidden>{iniciales(project.clientName)}</span>
               <div className="min-w-0 flex-1">
-                <h1 className="text-3xl sm:text-4xl font-light tracking-tight leading-tight text-zinc-100 break-words">{project.clientName}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight leading-tight text-zinc-100 break-words">{project.clientName}</h1>
                 <p className="mt-1 text-sm text-zinc-400">
                   {[project.ownerName, isPaf ? 'Programa PAF' : isWebClient ? 'Web' : null, project.isLead ? 'Posible cliente' : null, (project.startDate || project.createdAt) ? `desde el ${(project.startDate || project.createdAt)!.slice(0, 10).split('-').reverse().slice(0, 2).join('/')}` : null].filter(Boolean).join(' · ')}
                 </p>
@@ -788,10 +812,9 @@ export const ClientDetailView: React.FC<Props> = ({
             {!project.archived && !project.isLead && (
               <section aria-label="Cómo viene" className="space-y-1">
                 <p className="text-xs text-zinc-500">Cómo viene</p>
-                <p className="text-xl sm:text-2xl font-light leading-snug tracking-tight text-zinc-100">{fraseComoViene}</p>
+                <p className="text-lg font-normal leading-snug tracking-tight text-zinc-100">{fraseComoViene}</p>
               </section>
             )}
-            <ProjectDriveCard project={project} />
           </header>
 
           {project.ejemplo && (
@@ -807,8 +830,16 @@ export const ClientDetailView: React.FC<Props> = ({
 
           {/* Una sola próxima acción: lo primero que ves */}
           {!project.archived && <ProximaAccionCard project={project} onUpdateProject={onUpdateProject} />}
+          {/* En el celular esto se abre a pedido, así el scroll es corto */}
+          <button type="button" onClick={() => setMasInfo((v) => !v)} aria-expanded={masInfo} className="lg:hidden flex w-full min-h-[44px] items-center justify-between gap-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 text-left text-sm text-zinc-200">
+            <span>Cómo está y su carpeta{salud.motivos.some((m) => m.nivel === 'riesgo') && <span className="ml-2 inline-block h-2 w-2 rounded-full bg-rose-400 align-middle" aria-label="Hay algo en riesgo" />}</span>
+            <IconPlegar className={`h-4 w-4 text-zinc-500 transition-transform ${masInfo ? 'rotate-180' : ''}`} aria-hidden />
+          </button>
+          <div className={`space-y-4 ${masInfo ? '' : 'hidden lg:block'}`}>
           {/* Cómo está: lo que pide atención y si entra a su portal */}
           {!project.archived && !project.isLead && <ClienteSaludCard salud={{ ...salud, motivos: salud.motivos.filter((m) => m.texto !== 'Sin próxima acción definida'), nivel: salud.motivos.some((m) => m.nivel === 'riesgo') ? 'riesgo' : salud.motivos.some((m) => m.texto !== 'Sin próxima acción definida') ? 'atencion' : 'ok' }} visita={textoVisita(project, visita, todayStr)} />}
+            <ProjectDriveCard project={project} />
+          </div>
           {/* Lo de hoy con este cliente: cada cosa lleva a donde se resuelve */}
           {paraHoy.length > 0 && (
             <section aria-label="Para hoy" className="space-y-1">
@@ -825,9 +856,26 @@ export const ClientDetailView: React.FC<Props> = ({
               </ul>
             </section>
           )}
+        </aside>
+
+        {/* El trabajo: de un vistazo arriba, y las tres partes de la ficha */}
+        <div className="min-w-0 space-y-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" aria-label="De un vistazo">
+            {vistazo.map((t) => {
+              const Icon = t.icon;
+              return (
+                <button key={t.key} type="button" onClick={() => { hapticFeedback.light(); t.go(); }} aria-pressed={t.on}
+                  className={`group rounded-2xl border p-3 text-left transition hover:-translate-y-0.5 hover:border-zinc-600 ${t.on ? 'border-zinc-600 bg-zinc-900' : 'border-zinc-800 bg-zinc-900/50'}`}>
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-zinc-500"><Icon className="h-3.5 w-3.5" aria-hidden />{t.label}</span>
+                  <span className={`mt-1 block truncate text-base font-semibold tabular-nums ${t.tone === 'warn' ? 'text-orange-400' : t.tone === 'good' ? 'text-emerald-400' : 'text-zinc-100'}`}>{t.value}</span>
+                  <span className="block truncate text-[11px] text-zinc-500">{t.hint}</span>
+                </button>
+              );
+            })}
+          </div>
 
           {/* Las tres partes de la ficha */}
-          <nav className="sticky top-[calc(env(safe-area-inset-top,0px)+3.75rem)] z-10 grid grid-cols-3 gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/95 p-1 backdrop-blur-md" aria-label="Partes de la ficha">
+          <nav className={`sticky top-[calc(env(safe-area-inset-top,0px)+3.75rem)] z-10 grid grid-cols-3 gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/95 p-1 backdrop-blur-md ${isPaf || isWebClient ? 'lg:top-2' : ''}`} aria-label="Partes de la ficha">
             {([
               { id: 'portal' as FichaSection, label: 'Portal', icon: Globe, hidden: !(isPaf || isWebClient) },
               { id: 'cobros' as FichaSection, label: 'Cobros', icon: DollarSign },
@@ -861,9 +909,7 @@ export const ClientDetailView: React.FC<Props> = ({
               showAlta={isPaf}
             />
           </div>}
-        </div>
 
-        {/* ================= COLUMNA DERECHA (70% Scrollable) ================= */}
         {currentSection !== 'portal' && (
         <main className="min-w-0 space-y-4">
           {/* Portal anterior por link: solo si este cliente todavía lo tiene */}
@@ -1745,6 +1791,7 @@ export const ClientDetailView: React.FC<Props> = ({
           </div>
         </main>
         )}
+        </div>
       </div>
 
       {/* Confirmation Modal: Delete Project */}

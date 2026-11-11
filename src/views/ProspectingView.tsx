@@ -5,8 +5,6 @@ import {
   Loader2,
   Phone,
   Sparkles,
-
-  Zap,
   Check,
   ChevronDown,
   ChevronUp,
@@ -15,7 +13,6 @@ import {
   Flame,
   Instagram,
   MessageCircle,
-  Moon,
   Trash2,
   Upload,
   Video,
@@ -49,15 +46,18 @@ import {
   scoreTier,
   weeklyReportText,
   ProspectAction,
+  CONV_STEP_LABELS,
+  DIFUSION_LABELS,
+  callMeetingFor,
 } from '../prospecting/core';
 import { COUNTRY_NAMES } from '../prospecting/pool';
 import { friendlyError, generateVideoScript, markDayStarted, useAddMore, usePoolTakeOptions, useRecycle } from '../prospecting/actions';
-import { BurstMode, DayStartFlow, LocalTimeBadge, PersonalLineButton, PersonalizeAllButton } from '../components/ProspectingDayStart';
+import { AddMoreRow, BurstMode, DayStartFlow, LocalTimeBadge, PersonalLineButton } from '../components/ProspectingDayStart';
 import { AwaitingBanner, CallPrep, ConversationLog, ReplyButton } from '../components/ProspectConversation';
 import { ProspectingPulsePanel, usePulse } from '../components/ProspectingVisuals';
 import { ProspectingDailyDesk } from '../components/ProspectingDailyDesk';
 import { ProspectingInbox } from '../components/ProspectingInbox';
-import { AddMoreRow } from '../components/ProspectingDayStart';
+import { ProspectFinder } from '../components/ProspectFinder';
 import { deleteProspect, moveProspect, recordProspectAction, recordWithUndo, saveProspectingSettings, saveProspects, updateProspect } from '../prospecting/store';
 import { BOARD_COLUMNS, BoardColumn, ClosedColumn, moveUpdates } from '../prospecting/board';
 import { ProspectBoard, UndoToast, sendLabel } from '../components/ProspectBoard';
@@ -65,7 +65,6 @@ import { Sheet } from '../components/Sheet';
 import { useProspecting } from '../prospecting/useProspecting';
 import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
 import { ReservaPanel } from '../components/ReservaPanel';
-import { CONV_STEP_LABELS, DIFUSION_LABELS } from '../prospecting/core';
 import { DifusionKey } from '../types';
 import { buildWebSnippet } from '../prospecting/webSnippet';
 import { formatWhatsAppUrl } from '../utils/contact';
@@ -74,7 +73,6 @@ import { playTaskDone } from '../utils/sound';
 import { addDays, parseLocalDate, todayLocal } from '../utils/dates';
 import { saveMeetingToFirestore, saveTaskToFirestore } from '../utils/firestoreService';
 import { PrepTask, prepDateFor, prepDayLabel, prepTaskId, suggestedPrepTasks } from '../prospecting/callPrep';
-import { callMeetingFor } from '../prospecting/core';
 import { prospectToProject } from '../prospecting/convert';
 
 type Tab = 'hoy' | 'embudo' | 'prospectos' | 'reserva' | 'cargar' | 'metricas' | 'mensajes';
@@ -85,14 +83,15 @@ interface Props {
   initialTab?: Tab;
 }
 
-const TABS: { id: Tab; label: string }[] = [
+// Lo de todos los días a la vista; lo demás, detrás de "Más"
+const TABS: { id: Tab; label: string; more?: boolean }[] = [
   { id: 'hoy', label: 'Hoy' },
   { id: 'embudo', label: 'Tablero' },
   { id: 'prospectos', label: 'Prospectos' },
-  { id: 'reserva', label: 'Reserva' },
-  { id: 'cargar', label: 'Cargar a mano' },
-  { id: 'metricas', label: 'Métricas' },
-  { id: 'mensajes', label: 'Mensajes' },
+  { id: 'reserva', label: 'Reserva', more: true },
+  { id: 'cargar', label: 'Cargar a mano', more: true },
+  { id: 'metricas', label: 'Métricas', more: true },
+  { id: 'mensajes', label: 'Mensajes', more: true },
 ];
 
 const btn = 'px-3 py-2 rounded-[var(--radius-control)] text-sm font-semibold flex items-center gap-1.5 transition active:scale-95 disabled:opacity-40';
@@ -110,6 +109,8 @@ function shortDate(d?: string): string {
 export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initialTab = 'hoy' }) => {
   const { prospects, events, eventsLoaded, eventsError, settings, settingsLoaded, today, hour, loadError } = useProspecting();
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const showMore = moreOpen || !!TABS.find((t) => t.id === tab)?.more;
   const [funnelFrom, setFunnelFrom] = useState<string | null>(null);
   const list = prospects || [];
   const pool = usePool();
@@ -179,8 +180,8 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
   const moveTo = async (p: Prospect, to: BoardColumn | ClosedColumn) => {
     const updates = moveUpdates(p, to, today, settings);
     const label = BOARD_COLUMNS.find((c) => c.id === to)?.label || (to === 'cliente' ? 'Cliente' : 'Perdido');
-    const before: Partial<Prospect> = {};
-    (Object.keys(updates) as (keyof Prospect)[]).forEach((k) => ((before as any)[k] = p[k]));
+    // Lo que tenía antes, para poder deshacer
+    const before = Object.fromEntries((Object.keys(updates) as (keyof Prospect)[]).map((k) => [k, p[k]])) as Partial<Prospect>;
     try {
       await moveProspect(p, updates, label);
       setUndo({ text: `${p.studio || p.name} → ${label}`, run: () => updateProspect(p.id, before) });
@@ -240,7 +241,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
       )}
 
       <div className="flex gap-1 overflow-x-auto no-scrollbar p-1 rounded-[var(--radius-control)] bg-[var(--bg-surface)] border border-[var(--border-subtle)]" role="tablist">
-        {TABS.map((t) => (
+        {TABS.filter((t) => !t.more || showMore).map((t) => (
           <button
             key={t.id}
             type="button"
@@ -257,7 +258,18 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
             )}
           </button>
         ))}
+        {!showMore && (
+          <button type="button" onClick={() => setMoreOpen(true)} aria-expanded={false} title="Reserva, cargar a mano, métricas y mensajes"
+            className="ml-auto px-3 py-1.5 rounded-[8px] text-sm font-medium shrink-0 flex items-center gap-1 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] cursor-pointer">
+            Más <ChevronDown className="w-4 h-4" />
+          </button>
+        )}
       </div>
+
+      {/* Te contestaron por WhatsApp o Instagram: lo encontrás acá, desde cualquier pestaña */}
+      {prospects !== null && (
+        <ProspectFinder prospects={list} today={today} onAct={send} onMove={moveTo} onDetail={setDetailFor} />
+      )}
 
       {prospects === null && !loadError && <p className="text-sm text-[var(--text-tertiary)]">Cargando…</p>}
       {prospects === null && loadError && (
