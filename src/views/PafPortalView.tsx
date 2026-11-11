@@ -428,6 +428,16 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
       <main className="mt-6 sm:mt-8 animate-in fade-in duration-200" key={tab}>
         {tab === 'inicio' && (
           <div className="space-y-6 sm:space-y-8">
+            {/* Lo que Juan fijó (la bienvenida, un aviso importante): arriba de todo, apenas entra */}
+            {ver.anuncios && (p.anuncios || []).filter((a) => a.fijado).slice(0, 2).map((a) => (
+              <section key={a.id} aria-label={a.titulo || 'Mensaje de .CERO'} className="rounded-[28px] border border-[var(--border-subtle)] bg-white p-5 shadow-sm sm:p-7">
+                <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">De .CERO para vos{isNew(`a:${a.id}`) && <NewBadge />}</p>
+                {a.titulo && <h2 className="mt-2 text-2xl font-normal leading-tight tracking-tight text-[var(--text-primary)] sm:text-[28px]">{a.titulo}</h2>}
+                <p className="mt-3 max-w-2xl whitespace-pre-line text-[15px] leading-relaxed text-[var(--text-secondary)]">{a.texto}</p>
+                {a.link && <a href={a.link} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]">Abrir <ArrowUpRight className="h-4 w-4" /></a>}
+              </section>
+            ))}
+
             {/* AHORA: una sola carta (lo que le toca y, en la misma carta, nuestra devolución) y la reunión */}
             <section id="hoy" aria-label="Lo de ahora" className="scroll-mt-6 overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-white text-[var(--text-primary)] shadow-sm">
               <div className={`grid ${conReunion ? 'sm:grid-cols-[1.45fr_1fr]' : ''}`}>
@@ -1042,6 +1052,8 @@ function EstadoChip({ e }: { e: PasoEstado }) {
 function PasoCuerpo({ c, grande, sinEncabezado, isNew, ...tp }: { c: PortalPaso; grande?: boolean; sinEncabezado?: boolean; isNew: (k: string) => boolean } & TaskProps) {
   const soloTarea = c.solo && c.tareas.length === 1 && !c.entregas.length;
   const soloEntrega = c.solo && c.entregas.length === 1 && !c.tareas.length;
+  const primeraPendiente = c.tareas.find((t) => t.estado === 'habilitada' && !tp.avisada(t) && (t.responsable || 'estudio') === 'estudio')
+    || c.tareas.find((t) => t.estado === 'habilitada' && !tp.avisada(t));
   const nuevo = c.tareas.some((t) => isNew(`t:${t.id}:${t.habilitadaEn || ''}`)) || c.entregas.some((e) => isNew(`e:${e.id}`));
   const tit = 'text-[11px] font-semibold uppercase tracking-[.16em] text-[var(--text-tertiary)]';
   return (
@@ -1057,7 +1069,28 @@ function PasoCuerpo({ c, grande, sinEncabezado, isNew, ...tp }: { c: PortalPaso;
         <div className={soloTarea ? 'mt-2' : 'mt-5'}>
           {!soloTarea && <p className={tit}>Tu parte</p>}
           <ul className={`${soloTarea ? '' : 'mt-3'} space-y-4`}>
-            {c.tareas.map((t) => <li key={t.id}><TaskRow t={t} sinTitulo={soloTarea} grande={grande} {...tp} /></li>)}
+            {c.tareas.map((t) => {
+              // Una cosa a la vez también adentro de la carta: abierta la primera pendiente, las demás en una línea
+              const pendiente = t.estado === 'habilitada' && !tp.avisada(t);
+              const plegada = pendiente && !soloTarea && t.id !== primeraPendiente?.id;
+              return (
+                <li key={t.id}>
+                  {plegada ? (
+                    <details className="group">
+                      <summary className="flex cursor-pointer list-none items-start gap-3">
+                        <span className="mt-0.5 h-5 w-5 shrink-0 rounded-full border-2 border-[var(--marca)]" aria-hidden />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-[15px] font-medium text-[var(--text-primary)] break-words">{t.titulo}</span>
+                          {t.fecha && <span className="block text-xs text-[var(--text-tertiary)]">Para el {formatDisplayDate(t.fecha, 'medium')}</span>}
+                        </span>
+                        <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 text-xs text-[var(--text-tertiary)] group-open:hidden">Ver<ChevronDown className="h-3.5 w-3.5" /></span>
+                      </summary>
+                      <div className="mt-2 pl-8"><TaskRow t={t} sinTitulo grande={grande} {...tp} /></div>
+                    </details>
+                  ) : <TaskRow t={t} sinTitulo={soloTarea} grande={grande} {...tp} />}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
