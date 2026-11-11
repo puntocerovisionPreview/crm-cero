@@ -72,18 +72,18 @@ export interface PafPortalDraft {
 export type PortalSeccion = 'novedades' | 'proximaAccion' | 'enMarcha' | 'tuMes' | 'numeros' | 'recorrido' | 'anuncios' | 'semana' | 'tareas' | 'reuniones' | 'reunionesAcuerdo' | 'acuerdos' | 'entregas' | 'reportes' | 'materiales' | 'contenido' | 'cicloCM' | 'accesos';
 export const PORTAL_SECCIONES: { id: PortalSeccion; label: string; hint: string; porDefecto: boolean }[] = [
   { id: 'novedades', label: 'Desde tu última visita', hint: 'Resumen de lo nuevo arriba de todo', porDefecto: true },
-  { id: 'proximaAccion', label: 'Tu próxima acción', hint: 'La tarea prioritaria, grande, arriba', porDefecto: true },
-  { id: 'enMarcha', label: 'Te toca / Mientras tanto', hint: 'Lo que le toca y lo que vos le contás que estás haciendo (solo si lo escribís)', porDefecto: true },
-  { id: 'recorrido', label: 'Mi recorrido', hint: 'El detalle de cada hito. Sin esto ve solo la etapa y el hito actual', porDefecto: false },
+  { id: 'proximaAccion', label: 'Lo de ahora', hint: 'En Inicio, una carta a la vez: lo que le toca y tu devolución juntos', porDefecto: true },
+  { id: 'enMarcha', label: 'Mientras tanto, nosotros', hint: 'Lo que le contás que estás haciendo (solo si lo escribís)', porDefecto: true },
+  { id: 'recorrido', label: 'Cómo es el programa', hint: 'El detalle de cada hito, plegado al final de Paso a paso. Sin esto ve solo la etapa y el hito actual', porDefecto: false },
   { id: 'tuMes', label: 'Tu mes', hint: 'Resumen del mes armado con tus reportes', porDefecto: true },
   { id: 'numeros', label: 'Tus números', hint: 'Consultas, reuniones, propuestas… los cargás vos', porDefecto: false },
   { id: 'anuncios', label: 'Anuncios', hint: 'Lo que fijás arriba', porDefecto: true },
   { id: 'semana', label: 'Esta semana', hint: 'Foco y objetivos de la semana', porDefecto: true },
-  { id: 'tareas', label: 'Tareas', hint: 'Lo que necesitamos de su lado', porDefecto: true },
+  { id: 'tareas', label: 'Tareas', hint: 'Lo que necesitamos de su lado, ordenado en cartas', porDefecto: true },
   { id: 'reuniones', label: 'Próxima reunión', hint: 'Con objetivo y qué preparar', porDefecto: true },
   { id: 'reunionesAcuerdo', label: 'Reuniones del acuerdo', hint: 'Cuántas van de las acordadas', porDefecto: false },
   { id: 'acuerdos', label: 'Lo que acordamos', hint: 'Resumen de cada reunión', porDefecto: true },
-  { id: 'entregas', label: 'Entregas', hint: 'Con la decisión que le pedís', porDefecto: true },
+  { id: 'entregas', label: 'Entregas', hint: 'Tus devoluciones, en la misma carta que su tarea', porDefecto: true },
   { id: 'reportes', label: 'Reportes', hint: 'El reporte del viernes publicado', porDefecto: false },
   { id: 'materiales', label: 'Materiales', hint: 'Dónde subir cada cosa', porDefecto: true },
   { id: 'contenido', label: 'Gestión de contenido', hint: 'Botón a la app de la CM', porDefecto: true },
@@ -176,7 +176,7 @@ export interface PafTask {
   carpeta?: MaterialKey;
   /** Link que el estudio abre para hacer la tarea (opcional) */
   link?: string;
-  /** La que va arriba del portal como "Tu próxima acción" (una sola) */
+  /** Su carta va primero en "Ahora" (una sola) */
   prioritaria?: boolean;
   /** Para qué sirve (lo ve el estudio arriba de la explicación) */
   paraQue?: string;
@@ -184,6 +184,8 @@ export interface PafTask {
   responsable?: PafResponsable;
   /** Tema del plan de Presencia al que pertenece */
   tema?: import('./presencia').TemaId;
+  /** Carta del portal: vacío = la del tema; "-" = sola; otro texto = carta con ese nombre */
+  carta?: string;
 }
 
 /** Hito de Presencia que Juan confirmó, con su evidencia (privada: el estudio solo ve cuáles) */
@@ -239,6 +241,8 @@ export interface PafDelivery {
   estado?: PafDeliveryState;
   /** Tema del plan de Presencia al que pertenece */
   tema?: import('./presencia').TemaId;
+  /** Carta del portal: vacío = la del tema; "-" = sola; otro texto = carta con ese nombre */
+  carta?: string;
 }
 export type PafDeliveryState = 'en_revision' | 'aprobada' | 'ajustes';
 export const PAF_DELIVERY_STATE_LABEL: Record<PafDeliveryState, string> = { en_revision: 'Para revisar', aprobada: 'Aprobada', ajustes: 'Con ajustes' };
@@ -256,9 +260,11 @@ export interface PafPortalTask {
   pideArchivos?: boolean; // muestra el link a Materiales
   carpeta?: MaterialKey; // subcarpeta de Materiales donde se sube
   link?: string; // link para hacer la tarea
-  prioritaria?: boolean; // va arriba como "Tu próxima acción"
+  prioritaria?: boolean; // su carta va primero en "Ahora"
   paraQue?: string;
   responsable?: PafResponsable;
+  /** Carta en la que va (ver pasos.ts) */
+  paso?: string;
 }
 
 /** Objetivo de la semana (sale de los objetivos del panel del estudio) */
@@ -277,6 +283,8 @@ export interface PafPortalDelivery {
   hasta?: string;
   canal?: string;
   estado?: PafDeliveryState;
+  /** Carta en la que va (ver pasos.ts) */
+  paso?: string;
 }
 
 /** Documento paf_portal/{clienteId}: lo único que lee el cliente */
@@ -298,6 +306,8 @@ export interface PafPortalDoc {
   reuniones?: { fecha: string; acuerdos: string; proximosPasos: string }[];
   /** Accesos directos, en el orden que eligió Juan */
   accesos?: { nombre: string; url: string }[];
+  /** Cartas que juntan tareas y entregas (ver pasos.ts) */
+  pasos?: import('./pasos').PafPortalPaso[];
   /** Anuncios publicados: fijados primero, después los más nuevos */
   anuncios?: PafPortalAnnouncement[];
   /** Si es false, el portal oculta la etapa, la barra y el paso a paso */
@@ -378,7 +388,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; recorrido?: Recorrido; etapa?: Etapa; etapas?: Etapa[]; enMarcha?: PafPortalDoc['enMarcha']; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; recorrido?: Recorrido; etapa?: Etapa; etapas?: Etapa[]; enMarcha?: PafPortalDoc['enMarcha']; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[]; pasos?: import('./pasos').PafPortalPaso[] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -420,9 +430,10 @@ export function buildPafPortal(
       hitoVisible: hito,
       resumenVisible: input.draft.resumen.trim().slice(0, 2000),
       enlaces,
-      tareas: (ver.tareas || ver.proximaAccion ? input.tareas || [] : []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo, pideArchivos, link, prioritaria, paraQue, responsable }) => ({ id, titulo, estado, ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}), ...(pideArchivos ? { pideArchivos: true } : {}), ...(link && safeHttpsUrl(link) ? { link: safeHttpsUrl(link)! } : {}), ...(prioritaria ? { prioritaria: true } : {}), ...(paraQue?.trim() ? { paraQue: paraQue.trim().slice(0, 300) } : {}), ...(responsable && responsable !== 'estudio' ? { responsable } : {}) })),
+      tareas: (ver.tareas || ver.proximaAccion ? input.tareas || [] : []).map(({ id, titulo, detalle, fecha, estado, aprobadaEl, habilitadaEn, motivo, pideArchivos, link, prioritaria, paraQue, responsable, paso }) => ({ id, titulo, estado, ...(paso ? { paso } : {}), ...(detalle ? { detalle } : {}), ...(fecha ? { fecha } : {}), ...(aprobadaEl ? { aprobadaEl } : {}), ...(habilitadaEn ? { habilitadaEn } : {}), ...(motivo && estado === 'habilitada' ? { motivo } : {}), ...(pideArchivos ? { pideArchivos: true } : {}), ...(link && safeHttpsUrl(link) ? { link: safeHttpsUrl(link)! } : {}), ...(prioritaria ? { prioritaria: true } : {}), ...(paraQue?.trim() ? { paraQue: paraQue.trim().slice(0, 300) } : {}), ...(responsable && responsable !== 'estudio' ? { responsable } : {}) })),
       tareasHabilitadas: (ver.tareas || ver.proximaAccion ? input.tareas || [] : []).filter((t) => t.estado === 'habilitada').map((t) => t.id),
       entregas: (ver.entregas ? input.entregas || [] : []).map(({ enlace, ...d }) => ({ ...d, ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
+      pasos: ver.tareas || ver.proximaAccion || ver.entregas ? input.pasos || [] : [],
       proximaReunion: ver.reuniones ? input.proximaReunion || null : null,
       semana: input.semana || null,
       reuniones: ver.acuerdos ? input.reuniones || [] : [],
@@ -460,6 +471,7 @@ export function publicTasks(tasks: PafTask[] = []): PafPortalTask[] {
       id: t.id,
       titulo: t.titulo,
       estado: t.estado as PafPortalTask['estado'],
+      ...pasoDe(t, 't'),
       ...(t.detalle ? { detalle: t.detalle } : {}),
       ...(t.fecha ? { fecha: t.fecha } : {}),
       ...(t.habilitadaEn ? { habilitadaEn: t.habilitadaEn } : {}),
@@ -474,8 +486,8 @@ export function publicTasks(tasks: PafTask[] = []): PafPortalTask[] {
 }
 
 export function publicDeliveries(items: PafDelivery[] = []): PafPortalDelivery[] {
-  return items.filter((d) => d.publicada).map(({ id, titulo, fecha, enlace, version, decision, hasta, canal, estado }) => ({
-    id, titulo,
+  return items.filter((d) => d.publicada).map(({ id, titulo, fecha, enlace, version, decision, hasta, canal, estado, tema, carta }) => ({
+    id, titulo, ...pasoDe({ id, titulo, tema, carta }, 'e'),
     ...(fecha ? { fecha } : {}), ...(enlace ? { enlace } : {}), ...(version?.trim() ? { version: version.trim() } : {}),
     ...(decision?.trim() ? { decision: decision.trim() } : {}), ...(hasta ? { hasta } : {}), ...(canal?.trim() ? { canal: canal.trim() } : {}), ...(estado ? { estado } : {}),
   }));
@@ -522,6 +534,7 @@ export function portalFromProject(
       draft,
       tareas: publicTasks(project.pafTareas),
       entregas: publicDeliveries(project.pafEntregas),
+      pasos: publicPasos(project.pafTareas, project.pafEntregas),
       proximaReunion: nextMeeting(meetings, project.id, today),
       semana: programWeek(project.pafStartDate || project.startDate, today),
       reuniones: publicSummaries(project.pafResumenes),
@@ -1092,6 +1105,9 @@ export function accesosDelAlta(actuales: PafAccess[], alta: { carpetaCompartida?
 
 import type { Etapa } from './presencia';
 import { ETAPA_HITOS, temaPorId } from './presencia';
+import { cartaDe, esCartaSuelta, publicPasos } from './pasos';
+/** Solo se publica la carta si junta cosas: lo suelto ya se arma solo en el portal */
+const pasoDe = (x: Parameters<typeof cartaDe>[0], tipo: 't' | 'e') => { const id = cartaDe(x, tipo).id; return esCartaSuelta(id) ? {} : { paso: id }; };
 
 /**
  * "Nos toca a nosotros": lo que .CERO o la CM tienen entre manos, en palabras para el cliente.

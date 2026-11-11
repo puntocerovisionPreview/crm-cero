@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  ArrowRight, ArrowUpRight, Building2, CalendarPlus, Camera, Check, ChevronDown, Folder, Sparkles, Users, Home, LayoutList, ListChecks, Loader2, Route, MessageCircle, Package, Paperclip, Video,
+  ArrowRight, ArrowUpRight, Building2, CalendarPlus, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, Sparkles, Users, Home, LayoutList, ListChecks, Loader2, MessageCircle, Newspaper, Paperclip, Video,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
@@ -13,6 +13,7 @@ import { ETAPAS, type Etapa } from '../portal/presencia';
 import { MATERIALES, type MaterialKey, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, hitoInfoDe, hitosDe, seccionesVisibles, type Recorrido } from '../portal/model';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { Festejo, LoUltimo, saludoDelMomento, useFestejo } from './portal/PortalUltimo';
+import { PASO_ESTADO_LABEL, armarPasos, pasosPorHito, type PasoEstado, type PortalPaso } from '../portal/pasos';
 import { sendTaskDone, sendVisita, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
 /**
@@ -22,7 +23,7 @@ import { sendTaskDone, sendVisita, subscribeAvisos, subscribeMyPafPortals, subsc
  * En desarrollo, /portal?demo muestra un ejemplo sin login para revisar el diseño.
  */
 
-type Tab = 'inicio' | 'recorrido' | 'tareas' | 'entregas' | 'archivos';
+type Tab = 'inicio' | 'pasos' | 'novedades' | 'archivos';
 type PortalTask = PafPortalDoc['tareas'][number];
 
 const LINK_HINT: Record<PafPortalLinkKey, string> = {
@@ -67,15 +68,19 @@ const DEMO: PafPortalDoc = {
   materiales: { proyectos: 'https://drive.google.com/', equipo: 'https://drive.google.com/', referencias: 'https://drive.google.com/', registro: 'https://drive.google.com/' },
   reunionesAcuerdo: { total: 8, hechas: 3 },
   tareas: [
-    { id: 'd1', titulo: 'Completar el formulario de arranque', estado: 'aprobada', aprobadaEl: '2026-10-28' },
+    { id: 'd1', titulo: 'Completar el formulario de arranque', estado: 'aprobada', aprobadaEl: '2026-10-28', paso: 'arranque' },
     { id: 'd2', titulo: 'Subir 10 fotos de obras terminadas', paraQue: 'Con esto armamos las primeras publicaciones de tu portfolio.', detalle: 'Las de mejor calidad que tengas, sin editar.', link: 'https://drive.google.com/', fecha: '2026-11-06', estado: 'habilitada', prioritaria: true },
-    { id: 'd3', titulo: 'Elegir 3 proyectos que te representen', detalle: 'Los que te gustaría hacer más seguido.', fecha: '2026-11-01', estado: 'habilitada', motivo: 'Sumá uno de vivienda, así comparamos.' },
-    { id: 'd4', titulo: 'Revisar la propuesta de foco', estado: 'enviada' },
+    { id: 'd3', titulo: 'Elegir 3 proyectos que te representen', detalle: 'Los que te gustaría hacer más seguido.', fecha: '2026-11-01', estado: 'habilitada', motivo: 'Sumá uno de vivienda, así comparamos.', paso: 'cliente_ideal' },
+    { id: 'd4', titulo: 'Completar el Excel de cliente ideal', estado: 'enviada', paso: 'cliente_ideal' },
   ],
   tareasHabilitadas: ['d2', 'd3'],
+  pasos: [
+    { id: 'arranque', titulo: 'Arranque', objetivo: 'Ordenar todo para empezar: accesos, materiales y reunión inicial.', hito: 1 },
+    { id: 'cliente_ideal', titulo: 'Cliente ideal, nicho y oferta', objetivo: 'Definir a quién le hablamos y qué proyectos queremos atraer.', hito: 2 },
+  ],
   entregas: [
-    { id: 'e1', titulo: 'Diagnóstico inicial del estudio', fecha: '2026-10-30', enlace: 'https://drive.google.com/' },
-    { id: 'e2', titulo: 'Propuesta de foco', version: 'v2', fecha: '2026-11-04', enlace: 'https://drive.google.com/', estado: 'en_revision', decision: 'si este foco representa a tu estudio', hasta: '2026-11-07', canal: 'mail' },
+    { id: 'e1', titulo: 'Diagnóstico inicial del estudio', fecha: '2026-10-30', enlace: 'https://drive.google.com/', paso: 'arranque' },
+    { id: 'e2', paso: 'cliente_ideal', titulo: 'Devolución del kit de cliente ideal', version: 'v2', fecha: '2026-11-04', enlace: 'https://drive.google.com/', estado: 'en_revision', decision: 'si este foco representa a tu estudio', hasta: '2026-11-07', canal: 'mail' },
   ],
   proximaReunion: { fecha: '2026-11-10', hora: '10:30', objetivo: 'Revisar la propuesta de mensaje', preparar: 'Qué obras te gustaría mostrar primero', conCM: true },
   semana: { actual: 3, total: 12 },
@@ -284,18 +289,17 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   const tareas = p.tareas || [];
   const avisada = (t: PortalTask) =>
     t.estado === 'enviada' || (t.estado === 'habilitada' && avisos.some((a) => a.tareaId === t.id && (!t.habilitadaEn || a.creadoEn > t.habilitadaEn)));
-  const pendientes = tareas.filter((t) => t.estado === 'habilitada' && !avisada(t))
-    .sort((a, b) => Number(!!b.prioritaria) - Number(!!a.prioritaria) || (a.fecha || '9').localeCompare(b.fecha || '9'));
-  const enRevision = tareas.filter((t) => t.estado !== 'aprobada' && avisada(t));
-  const aprobadas = tareas.filter((t) => t.estado === 'aprobada');
-  // "Tu próxima acción": la que marcó Juan o, si no, la más urgente del estudio
-  const principal = ver.proximaAccion ? pendientes.find((t) => t.prioritaria) || pendientes.find((t) => (t.responsable || 'estudio') === 'estudio') : undefined;
-  const resto = pendientes.filter((t) => t !== principal);
-  // Lo que tiene que hacer el estudio (sin lo que hace la CM o .CERO)
-  const suyas = pendientes.filter((t) => (t.responsable || 'estudio') === 'estudio');
-  // Entregas que esperan una decisión suya (van en "Te toca a vos" con su sello)
-  const decisiones = ver.entregas ? (p.entregas || []).filter((d) => d.decision && (d.estado || 'en_revision') === 'en_revision') : [];
   const entregas = p.entregas || [];
+  // Las cartas: cada una junta lo que le pedimos y lo que le devolvemos (Juan decide cuál va con cuál)
+  const cartas = armarPasos({ tareas: ver.tareas || ver.proximaAccion ? tareas : [], entregas: ver.entregas ? entregas : [], pasos: p.pasos }, avisada);
+  const enCurso = cartas.filter((c) => c.estado !== 'listo');
+  const cerradas = cartas.filter((c) => c.estado === 'listo');
+  // Lo que le toca a él (hacer o revisar): en Inicio va de a una
+  const tuyas = enCurso.filter((c) => c.estado === 'te_toca' || c.estado === 'revisar');
+  const nuestras = enCurso.filter((c) => c.estado === 'nosotros');
+  const [ahoraI, setAhoraI] = useState(0);
+  const idx = Math.min(ahoraI, Math.max(0, tuyas.length - 1));
+  const ahora = tuyas[idx];
   // Accesos libres; los portales publicados antes traen los 5 enlaces fijos
   const accesos = p.accesos ?? accessesFromEnlaces(p.enlaces || {});
   const mostrarAvance = p.mostrarAvance !== false;
@@ -334,14 +338,16 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
     try { localStorage.setItem(welcomeKey, '1'); } catch { /* sin almacenamiento: se vuelve a mostrar */ }
   };
 
-  const taskProps = {
+  const taskProps: TaskProps = {
     today: new Date().toLocaleDateString('en-CA'),
     uploadUrl: p.materiales?.proyectos || p.enlaces?.materiales || p.enlaces?.carpeta,
     // Cada tarea sube a su subcarpeta de Materiales (Proyectos, Equipo y marca, Registro de obra…)
     uploadFor: (t: PortalTask) => p.materiales?.[t.carpeta || 'proyectos'] || p.enlaces?.materiales || (p.accesos || []).find((a) => a.nombre === 'Materiales')?.url || p.enlaces?.carpeta,
-    sending, readOnly: !!readOnly, onDone: done,
+    sending, readOnly: !!readOnly, onDone: done, avisada,
   };
   const verRecorrido = ver.recorrido && mostrarAvance;
+  const conReunion = ver.reuniones && !!(p.proximaReunion || p.reunionPorConfirmar);
+  const hayNovedades = ver.novedades || ver.anuncios || ver.semana || ver.cicloCM || ver.tuMes || ver.reportes || ver.acuerdos || (p.numeros || []).length > 0;
 
   const account = (
     <div className="flex items-center gap-3">
@@ -355,18 +361,18 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'inicio', label: 'Inicio' },
-    ...(verRecorrido ? [{ id: 'recorrido' as Tab, label: 'Mi recorrido' }] : []),
-    ...(ver.tareas ? [{ id: 'tareas' as Tab, label: 'Tareas', count: pendientes.length || undefined }] : []),
-    ...(ver.entregas || ver.acuerdos || ver.reportes ? [{ id: 'entregas' as Tab, label: 'Entregas', count: entregas.length || undefined }] : []),
+    ...(cartas.length ? [{ id: 'pasos' as Tab, label: 'Paso a paso', count: tuyas.length || undefined }] : []),
+    ...(hayNovedades ? [{ id: 'novedades' as Tab, label: 'Novedades' }] : []),
     ...(ver.accesos || ver.materiales || ver.contenido ? [{ id: 'archivos' as Tab, label: 'Archivos' }] : []),
   ];
+  const irA = (t: Tab) => { setTab(t); window.scrollTo({ top: 0 }); };
 
   return (
     <Shell right={readOnly ? undefined : account} marca={p.marca} embedded={embedded}>
       {readOnly && !embedded && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista previa: así ve {p.estudio} su portal ahora. Es solo lectura: los botones no hacen nada.</p>}
       {demo && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista de ejemplo, solo en tu compu: así lo ve un estudio. Los datos son inventados.</p>}
 
-      {/* Encabezado de marca: logo del estudio, saludo y avance por hitos */}
+      {/* Encabezado de marca: logo del estudio, saludo, la semana en una frase y el avance */}
       <header className="pt-1 sm:pt-4">
         <div className="flex items-center gap-4 sm:gap-5">
           {p.logo && (
@@ -379,39 +385,22 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
             <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">{saludoDelMomento()}, {p.estudio}.</h1>
           </div>
         </div>
-        {/* La semana en una frase: qué trabajamos, qué le toca y cuándo nos vemos */}
         <p className="mt-5 max-w-2xl text-lg sm:text-2xl font-light leading-snug tracking-tight text-[var(--text-primary)]">
           {mostrarAvance && p.recorrido !== 'web' && HITOS[hito - 1] ? <>Ahora estamos en <span className="font-medium">{HITOS[hito - 1].charAt(0).toLowerCase() + HITOS[hito - 1].slice(1)}</span>. </> : null}
-          {suyas.length ? <>De tu lado hay {suyas.length === 1 ? 'una sola cosa' : `${suyas.length} cosas`}</> : <>De tu lado no hay nada por ahora</>}
-          {ver.reuniones && p.proximaReunion ? <>, y nos vemos <span className="font-medium">{p.proximaReunion.fecha === new Date().toLocaleDateString('en-CA') ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}{p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}</span>.</> : '.'}
+          {tuyas.length ? <>De tu lado hay {tuyas.length === 1 ? 'una sola cosa' : `${tuyas.length} cosas`}</> : <>De tu lado no hay nada por ahora</>}
+          {ver.reuniones && p.proximaReunion ? <>, y nos vemos <span className="font-medium">{p.proximaReunion.fecha === taskProps.today ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}{p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}</span>.</> : '.'}
         </p>
-        <nav aria-label="Tu resumen" className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {[
-            { icon: ListChecks, n: suyas.length, label: suyas.length === 1 ? 'tarea para vos' : 'tareas para vos', go: () => setTab(tabs.some((x) => x.id === 'tareas') ? 'tareas' : 'inicio'), alerta: suyas.some((t) => isOverdue(t, taskProps.today)) },
-            { icon: Video, n: ver.reuniones && p.proximaReunion ? 1 : 0, label: ver.reuniones && p.proximaReunion ? `reunión: ${p.proximaReunion.fecha === taskProps.today ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric' })}` : 'reuniones agendadas', go: () => { setTab('inicio'); requestAnimationFrame(() => document.getElementById('hoy')?.scrollIntoView({ behavior: 'smooth', block: 'start' })); } },
-            { icon: Package, n: decisiones.length, label: decisiones.length === 1 ? 'entrega para revisar' : 'entregas para revisar', go: () => setTab(tabs.some((x) => x.id === 'entregas') ? 'entregas' : 'inicio'), alerta: decisiones.length > 0 },
-            { icon: Route, n: hechos.length, label: `de ${HITOS.length} hitos listos`, go: () => setTab(verRecorrido ? 'recorrido' : 'inicio') },
-          ].map((x) => (
-            <button key={x.label} type="button" onClick={x.go} className="group flex items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-sm">
-              <IconTile icon={x.icon} fuerte={!!x.alerta} />
-              <span className="min-w-0">
-                <span className="block text-2xl font-light leading-none tabular-nums text-[var(--text-primary)]">{x.n}</span>
-                <span className="mt-1 block text-xs leading-tight text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]">{x.label}</span>
-              </span>
-            </button>
-          ))}
-        </nav>
         {!readOnly && <button type="button" onClick={() => setShowWelcome(true)} className="mt-3 text-xs text-[var(--text-tertiary)] underline underline-offset-4 hover:text-[var(--text-primary)]">Ver la guía de cómo usar tu portal</button>}
         {mostrarAvance && p.recorrido !== 'web' && <EtapasLine etapas={p.etapas || ['presencia']} actual={etapa} />}
         {mostrarAvance && (
-          <button type="button" onClick={() => verRecorrido && setTab('recorrido')} className="mt-5 w-full text-left group">
+          <button type="button" onClick={() => cartas.length > 0 && irA('pasos')} className="mt-5 w-full text-left group">
             <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm text-[var(--text-secondary)]">
               <span className="flex flex-wrap items-baseline gap-x-1.5">
                 <span>Ahora:</span>
                 <span className="font-serif italic text-base text-[var(--text-primary)]">{HITOS[hito - 1]}</span>
               </span>
               <span className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]">
-                {hechos.length} de {HITOS.length} hitos completados{verRecorrido && <ArrowRight className="w-3.5 h-3.5" />}
+                {hechos.length} de {HITOS.length} hitos completados{cartas.length > 0 && <ArrowRight className="w-3.5 h-3.5" />}
               </span>
             </span>
             <HitosBar hito={hito} hechos={hechos} hitos={HITOS} />
@@ -422,9 +411,9 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
       {festejo && HITOS[festejo - 1] && <div className="mt-8"><Festejo titulo={HITOS[festejo - 1]} hechos={hechos.length} total={HITOS.length} onClose={cerrarFestejo} /></div>}
 
       {/* Lo nuevo desde la última visita, en una línea: cada parte lleva a su lugar */}
-      {!showWelcome && ver.novedades && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => setTab(t)} />}
+      {!showWelcome && ver.novedades && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => irA(tabs.some((x) => x.id === t) ? t : 'inicio')} />}
 
-      {showWelcome && <GuiaInicial onClose={closeWelcome} estudio={p.estudio} pendientes={suyas.length} reunion={ver.reuniones ? p.proximaReunion : undefined} carpeta={p.enlaces?.carpeta || accesos.find((a) => a.nombre === 'Tu carpeta')?.url} bienvenida={p.bienvenida} hasWhatsapp={!!whatsapp} />}
+      {showWelcome && <GuiaInicial onClose={closeWelcome} estudio={p.estudio} pendientes={tuyas.length} reunion={ver.reuniones ? p.proximaReunion : undefined} carpeta={carpetaUrl} bienvenida={p.bienvenida} hasWhatsapp={!!whatsapp} />}
 
       {/* Pestañas */}
       {tabs.length > 1 && (
@@ -432,20 +421,42 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
           <nav className="hidden sm:block mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
             <SegmentedControl<Tab> value={tab} onChange={setTab} options={tabs} />
           </nav>
-          <BottomNav tabs={tabs} tab={tab} onChange={(t) => { setTab(t); window.scrollTo({ top: 0 }); }} />
+          <BottomNav tabs={tabs} tab={tab} onChange={irA} />
         </>
       )}
 
       <main className="mt-6 sm:mt-8 animate-in fade-in duration-200" key={tab}>
         {tab === 'inicio' && (
           <div className="space-y-6 sm:space-y-8">
-            {/* 1 · HOY: lo que le toca ahora y la próxima reunión, en un bloque que se distingue de todo */}
-            <HoyHero
-              principal={principal} taskProps={taskProps} nuevo={principal ? isNew(`t:${principal.id}:${principal.habilitadaEn || ''}`) : false}
-              verReunion={ver.reuniones} reunion={p.proximaReunion} porConfirmar={p.reunionPorConfirmar} acuerdo={p.reunionesAcuerdo}
-              link={p.linkReunion} estudio={p.estudio} whatsapp={whatsapp}
-              trabajando={(p.enMarcha || [])[0]?.texto} enRevision={enRevision.length}
-            />
+            {/* AHORA: una sola carta (lo que le toca y, en la misma carta, nuestra devolución) y la reunión */}
+            <section id="hoy" aria-label="Lo de ahora" className="scroll-mt-6 overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-white text-[var(--text-primary)] shadow-sm">
+              <div className={`grid ${conReunion ? 'sm:grid-cols-[1.45fr_1fr]' : ''}`}>
+                <div className="p-5 sm:p-7">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">Ahora</p>
+                    {tuyas.length > 1 && (
+                      <span className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)]">
+                        <button type="button" aria-label="Anterior" disabled={idx === 0} onClick={() => setAhoraI(idx - 1)} className="rounded-full p-1.5 hover:bg-[var(--bg-surface-muted)] disabled:opacity-30"><ChevronLeft className="w-4 h-4" /></button>
+                        <span className="tabular-nums">{idx + 1} de {tuyas.length}</span>
+                        <button type="button" aria-label="Siguiente" disabled={idx === tuyas.length - 1} onClick={() => setAhoraI(idx + 1)} className="rounded-full p-1.5 hover:bg-[var(--bg-surface-muted)] disabled:opacity-30"><ChevronRight className="w-4 h-4" /></button>
+                      </span>
+                    )}
+                  </div>
+                  {ahora ? (
+                    <div className="mt-3" key={ahora.id}><PasoCuerpo c={ahora} grande isNew={isNew} {...taskProps} /></div>
+                  ) : (
+                    <>
+                      <h2 className="mt-3 text-2xl sm:text-[32px] font-light leading-tight tracking-tight">Nada de tu lado por ahora.</h2>
+                      <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-secondary)]">
+                        {nuestras.length ? `Lo tenemos nosotros: ${nuestras.slice(0, 2).map((c) => c.titulo).join(' y ')}${nuestras.length > 2 ? ` y ${nuestras.length - 2} más` : ''}. ` : ''}
+                        Te avisamos acá cuando haya algo para vos.
+                      </p>
+                    </>
+                  )}
+                </div>
+                {conReunion && <ReunionBlock reunion={p.proximaReunion} porConfirmar={p.reunionPorConfirmar} acuerdo={p.reunionesAcuerdo} link={p.linkReunion} estudio={p.estudio} whatsapp={whatsapp} />}
+              </div>
+            </section>
             {error && <p role="alert" className="text-sm text-rose-500">{error}</p>}
 
             {/* Atajos: subir materiales, ver el contenido y abrir la carpeta sin buscar */}
@@ -468,7 +479,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                       <li key={a.key}>
                         {a.url
                           ? <a href={a.url} target="_blank" rel="noopener noreferrer" className={cls}>{inner}</a>
-                          : <button type="button" onClick={() => { setTab('archivos'); window.scrollTo({ top: 0 }); }} className={cls}>{inner}</button>}
+                          : <button type="button" onClick={() => irA('archivos')} className={cls}>{inner}</button>}
                       </li>
                     );
                   })}
@@ -476,59 +487,90 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </section>
             )}
 
-            {/* 2 · EN MARCHA: lo de cada lado */}
-            {ver.enMarcha ? (
-              (resto.length > 0 || decisiones.length > 0 || (p.enMarcha || []).length > 0) && (
-                <section className={`grid gap-4 ${(p.enMarcha || []).length ? 'sm:grid-cols-2' : ''}`}>
-                  <Card className="p-5">
-                    <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--marca)]"><span className="w-2 h-2 rounded-full bg-[var(--marca)]" aria-hidden />Te toca a vos</p>
-                    {decisiones.length + resto.length ? (
-                      <ul className="mt-3 space-y-2.5">
-                        {decisiones.map((d) => (
-                          <li key={d.id}>
-                            <button type="button" onClick={() => setTab('entregas')} className="w-full text-left rounded-[var(--radius-control)] border border-amber-300 bg-amber-50 px-3 py-2.5">
-                              <span className="inline-flex rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">Decidís vos{d.hasta ? ` · hasta el ${formatDisplayDate(d.hasta, 'short')}` : ''}</span>
-                              <span className="mt-1.5 block text-sm font-medium text-[var(--text-primary)]">{d.titulo}{d.version ? ` ${d.version}` : ''}</span>
-                              {d.decision && <span className="block text-xs text-[var(--text-secondary)]">{d.decision}</span>}
-                            </button>
-                          </li>
-                        ))}
-                        {resto.slice(0, 4).map((t) => (
-                          <li key={t.id}>
-                            <button type="button" onClick={() => setTab('tareas')} className="flex w-full items-start gap-2.5 text-left">
-                              <span className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${isOverdue(t, taskProps.today) ? 'bg-rose-500' : 'bg-[var(--marca)]'}`} aria-hidden />
-                              <span className="min-w-0">
-                                <span className="block text-sm text-[var(--text-primary)]">{t.titulo}</span>
-                                {t.fecha && <span className={`block text-xs ${isOverdue(t, taskProps.today) ? 'text-rose-600' : 'text-[var(--text-tertiary)]'}`}>{isOverdue(t, taskProps.today) ? 'Venció el ' : 'Para el '}{formatDisplayDate(t.fecha, 'medium')}</span>}
-                              </span>
-                            </button>
-                          </li>
-                        ))}
-                        {resto.length > 4 && <li><button type="button" onClick={() => setTab('tareas')} className="text-xs font-medium text-[var(--text-primary)] underline underline-offset-4">Ver las {pendientes.length} tareas</button></li>}
-                      </ul>
-                    ) : <p className="mt-3 text-sm text-[var(--text-secondary)]">{principal ? 'Solo lo de arriba.' : 'Nada más por ahora.'}</p>}
-                  </Card>
-                  {(p.enMarcha || []).length > 0 && (
-                    <div className="p-1 sm:p-5">
-                      <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]">Mientras tanto, nosotros</p>
-                      <ul className="mt-3 space-y-2">
-                        {(p.enMarcha || []).map((x, i) => <li key={i} className="text-[15px] leading-relaxed text-[var(--text-primary)]">{x.texto}</li>)}
-                      </ul>
-                    </div>
-                  )}
-                </section>
-              )
-            ) : ver.tareas && resto.length > 0 && (
-              <section>
-                <SectionTitle title="También te toca" hint="Cuando termines, tocá “Terminé”. Lo revisamos y te confirmamos." />
-                <ul className="space-y-3">{resto.slice(0, 3).map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} nuevo={isNew(`t:${t.id}:${t.habilitadaEn || ''}`)} /></li>)}</ul>
+            {/* Lo que estamos haciendo nosotros: chico, para que sepa que avanza */}
+            {ver.enMarcha && (p.enMarcha || []).length > 0 && (
+              <section className="rounded-[var(--radius-card)] border border-dashed border-[var(--border-strong)] px-5 py-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]">Mientras tanto, nosotros</p>
+                <ul className="mt-2 space-y-1.5">
+                  {(p.enMarcha || []).map((x, i) => <li key={i} className="text-sm leading-relaxed text-[var(--text-primary)]">{x.texto}</li>)}
+                </ul>
               </section>
             )}
 
-            {/* 3 · Lo último: la historia de lo que fue pasando (novedades, entregas, reuniones) */}
+            {/* El resto, ordenado: un solo acceso al paso a paso */}
+            {cartas.length > 0 && (
+              <button type="button" onClick={() => irA('pasos')} className="card-swiss group flex w-full items-center gap-4 p-4 text-left transition hover:-translate-y-0.5">
+                <IconTile icon={ListChecks} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-[var(--text-primary)]">Todo el paso a paso</span>
+                  <span className="block text-xs text-[var(--text-tertiary)]">{enCurso.length} en curso · {cerradas.length} {cerradas.length === 1 ? 'cerrada' : 'cerradas'}</span>
+                </span>
+                <ArrowRight className="w-4 h-4 text-[var(--text-tertiary)] transition group-hover:translate-x-0.5 group-hover:text-[var(--text-primary)]" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {tab === 'pasos' && (
+          <div className="space-y-10">
+            <section>
+              <SectionTitle title="En curso" hint="Cada carta junta lo que te pedimos y lo que te devolvemos. Cuando termines tu parte, tocá “Terminé”: lo revisamos y te confirmamos." />
+              {enCurso.length ? (
+                <ul className="space-y-3">
+                  {enCurso.map((c, i) => <li key={c.id}><PasoPlegable c={c} abierto={i === 0} isNew={isNew} {...taskProps} /></li>)}
+                </ul>
+              ) : <EmptyState icon={<Check className="w-5 h-5" />} title="Nada en curso" description="Cuando arranquemos algo nuevo, aparece acá." />}
+              {error && <p role="alert" className="mt-3 text-sm text-rose-500">{error}</p>}
+            </section>
+
+            {cerradas.length > 0 && (
+              <section>
+                <SectionTitle title="Ya cerrado" hint={mostrarAvance && p.recorrido !== 'web' ? 'Lo que fuimos terminando juntos, por hito del programa.' : 'Lo que fuimos terminando juntos.'} />
+                <div className="space-y-3">
+                  {(mostrarAvance && p.recorrido !== 'web' ? pasosPorHito(cerradas, etapa) : [{ titulo: 'Todo lo cerrado', pasos: cerradas }]).map((g) => (
+                    <details key={g.titulo} className="group card-swiss">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--text-primary)]"><Check className="w-4 h-4 shrink-0 text-emerald-600" />{g.titulo}</span>
+                        <span className="flex shrink-0 items-center gap-2 text-xs text-[var(--text-tertiary)]">{g.pasos.length} {g.pasos.length === 1 ? 'carta' : 'cartas'}<ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" /></span>
+                      </summary>
+                      <ul className="divide-y divide-[var(--border-divider)] border-t border-[var(--border-divider)] px-5">
+                        {g.pasos.map((c) => <li key={c.id} className="py-4"><PasoCuerpo c={c} isNew={isNew} {...taskProps} /></li>)}
+                      </ul>
+                    </details>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {verRecorrido && (
+              <details className="group">
+                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+                  <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />Ver cómo es el programa, hito por hito
+                </summary>
+                <div className="mt-6"><Recorrido hito={hito} hechos={hechos} recorrido={p.recorrido} etapa={etapa} etapas={p.etapas || ['presencia']} /></div>
+              </details>
+            )}
+          </div>
+        )}
+
+        {tab === 'novedades' && (
+          <div className="space-y-6 sm:space-y-8">
+            {/* La historia de lo que fue pasando (anuncios, entregas, reuniones) */}
             <LoUltimo portal={p} today={taskProps.today} isNew={isNew} />
 
-            {/* El ritmo del contenido con la CM */}
+            {ver.semana && (p.resumenVisible || objetivos.length > 0) && (
+              <Card className="p-5 sm:p-6">
+                <Eyebrow>Esta semana</Eyebrow>
+                {p.resumenVisible && <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{p.resumenVisible}</p>}
+                {objetivos.length > 0 && (
+                  <div className={`grid gap-5 sm:grid-cols-2 ${p.resumenVisible ? 'mt-5 pt-5 border-t border-[var(--border-divider)]' : 'mt-4'}`}>
+                    <GoalColumn title="Hace .CERO" items={objetivos.filter((g) => g.quien === 'cero')} />
+                    <GoalColumn title="Hace tu estudio" items={objetivos.filter((g) => g.quien === 'estudio')} />
+                  </div>
+                )}
+              </Card>
+            )}
+
             {ver.cicloCM && (
               <Card className="p-5 sm:p-6">
                 <Eyebrow>El ritmo del contenido</Eyebrow>
@@ -548,21 +590,6 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </Card>
             )}
 
-            {/* Esta semana: foco y objetivos */}
-            {ver.semana && (p.resumenVisible || objetivos.length > 0) && (
-              <Card className="p-5 sm:p-6">
-                <Eyebrow>Esta semana</Eyebrow>
-                {p.resumenVisible && <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{p.resumenVisible}</p>}
-                {objetivos.length > 0 && (
-                  <div className={`grid gap-5 sm:grid-cols-2 ${p.resumenVisible ? 'mt-5 pt-5 border-t border-[var(--border-divider)]' : 'mt-4'}`}>
-                    <GoalColumn title="Hace .CERO" items={objetivos.filter((g) => g.quien === 'cero')} />
-                    <GoalColumn title="Hace tu estudio" items={objetivos.filter((g) => g.quien === 'estudio')} />
-                  </div>
-                )}
-              </Card>
-            )}
-
-            {/* Tus números (los carga Juan, con su fuente) */}
             {(p.numeros || []).length > 0 && (
               <section>
                 <Eyebrow>Tus números</Eyebrow>
@@ -578,114 +605,26 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </section>
             )}
 
-            {/* Tu mes: lo hecho en el mes, armado con los reportes */}
             {ver.tuMes && reportes.length > 0 && <TuMes reportes={reportes} />}
 
-            {/* 4 · PARA CONSULTAR: lo de referencia, más chico y plegado */}
-            {(entregas.length > 0 || reuniones.length > 0 || accesos.length > 0) && (
-              <details className="group card-swiss" open={!principal && !resto.length}>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
-                  <span className="text-sm font-medium text-[var(--text-primary)]">Para consultar</span>
-                  <span className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">Entregas, acuerdos y accesos<ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" /></span>
-                </summary>
-                <div className="space-y-6 border-t border-[var(--border-divider)] px-5 pb-5 pt-4">
-                  {ver.entregas && entregas.length > 0 && (
-                    <div>
-                      <div className="flex items-center justify-between gap-3">
-                        <Eyebrow>Última entrega</Eyebrow>
-                        {entregas.length > 1 && <button type="button" onClick={() => setTab('entregas')} className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">Ver todas</button>}
-                      </div>
-                      <DeliveryRow d={latest(entregas)} nuevo={isNew(`e:${latest(entregas).id}`)} />
-                    </div>
-                  )}
-                  {reuniones.length > 0 && (
-                    <div>
-                      <span className="flex items-center gap-2"><Eyebrow>Lo que acordamos · {formatDisplayDate(reuniones[0].fecha, 'medium')}</Eyebrow>{isNew(`r:${reuniones[0].fecha}`) && <NewBadge />}</span>
-                      <MeetingSummary s={reuniones[0]} />
-                    </div>
-                  )}
-                  {accesos.length > 0 && (
-                    <div>
-                      <Eyebrow>Tus accesos</Eyebrow>
-                      <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                        {accesos.slice(0, 4).map((a, i) => (
-                          <li key={`${a.url}-${i}`}>
-                            <a href={a.url} target="_blank" rel="noopener noreferrer" className="group relative flex h-full items-center gap-2.5 rounded-[var(--radius-control)] border border-[var(--border-subtle)] p-3 transition hover:border-[var(--border-strong)]">
-                              {isNew(`l:${a.url}`) && <NewBadge className="absolute -right-1 -top-2" />}
-                              <AccessIcon nombre={a.nombre} url={a.url} className="w-4 h-4 shrink-0 text-[var(--marca)]" />
-                              <span className="text-sm leading-snug text-[var(--text-primary)] break-words">{a.nombre}</span>
-                            </a>
-                          </li>
-                        ))}
-                      </ul>
-                      {ver.contenido && !ver.cicloCM && p.gestionContenido && <ContentButton url={p.gestionContenido} className="mt-3" />}
-                    </div>
-                  )}
-                </div>
-              </details>
-            )}
-          </div>
-        )}
-
-        {tab === 'recorrido' && <Recorrido hito={hito} hechos={hechos} recorrido={p.recorrido} etapa={etapa} etapas={p.etapas || ['presencia']} />}
-
-        {tab === 'tareas' && (
-          <div className="space-y-10">
-            <section>
-              <SectionTitle title="Lo que necesitamos de vos" hint="Cuando termines una, tocá “Terminé”. La revisamos y te confirmamos: avisar no la da por aprobada." />
-              {pendientes.length ? (
-                <ul className="space-y-3">
-                  {pendientes.map((t) => <li key={t.id}><PendingTask t={t} {...taskProps} nuevo={isNew(`t:${t.id}:${t.habilitadaEn || ''}`)} /></li>)}
-                </ul>
-              ) : <EmptyState icon={<Check className="w-5 h-5" />} title="Nada pendiente" description="Cuando tengamos algo para vos, aparece acá." />}
-              {error && <p role="alert" className="mt-3 text-sm text-rose-500">{error}</p>}
-            </section>
-
-            {enRevision.length > 0 && (
-              <section>
-                <SectionTitle title="Recibidas · en revisión" hint="Nos avisaste que las terminaste. Te confirmamos cuando las revisemos." />
-                <TaskList items={enRevision} dot="bg-sky-500" />
-              </section>
-            )}
-
-            {aprobadas.length > 0 && (
-              <section>
-                <SectionTitle title="Completadas" />
-                <TaskList items={aprobadas} dot="bg-emerald-500" muted />
-              </section>
-            )}
-          </div>
-        )}
-
-        {tab === 'entregas' && (
-          <section className="space-y-10">
-            {ver.entregas && (
-              <div>
-                <SectionTitle title="Entregas" hint="Lo que preparamos para tu estudio y qué necesitamos que decidas." />
-                {entregas.length ? (
-                  <Card className="px-5 divide-y divide-[var(--border-divider)]">
-                    {[...entregas].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || '')).map((d) => <DeliveryRow key={d.id} d={d} nuevo={isNew(`e:${d.id}`)} />)}
-                  </Card>
-                ) : <EmptyState icon={<Package className="w-5 h-5" />} title="Todavía no hay entregas" description="Aparecen acá a medida que las compartimos." />}
-              </div>
-            )}
             {reportes.length > 0 && (
-              <div>
+              <section>
                 <SectionTitle title="Reportes" hint="El resumen de cada semana." />
                 <ul className="space-y-3">{reportes.map((r) => <li key={r.id}><ReportCard r={r} /></li>)}</ul>
-              </div>
+              </section>
             )}
+
             {reuniones.length > 0 && (
-              <div>
-                <SectionTitle title="Resúmenes de reunión" hint="Acuerdos y próximos pasos de cada encuentro." />
+              <section>
+                <SectionTitle title="Lo que acordamos" hint="Acuerdos y próximos pasos de cada reunión." />
                 <ul className="space-y-3">
                   {reuniones.map((s, i) => (
-                    <li key={i}><Card className="p-5"><p className="text-xs text-[var(--text-tertiary)]">{formatDisplayDate(s.fecha, 'medium')}</p><MeetingSummary s={s} /></Card></li>
+                    <li key={i}><Card className="p-5"><p className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">{formatDisplayDate(s.fecha, 'medium')}{isNew(`r:${s.fecha}`) && <NewBadge />}</p><MeetingSummary s={s} /></Card></li>
                   ))}
                 </ul>
-              </div>
+              </section>
             )}
-          </section>
+          </div>
         )}
 
         {tab === 'archivos' && (
@@ -776,20 +715,19 @@ function IconTile({ icon: Icon, fuerte = false }: { icon: React.ElementType; fue
   );
 }
 
-function latest<T extends { fecha?: string }>(items: T[]): T {
-  return [...items].sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0];
-}
-
-function DeliveryRow({ d, nuevo }: { d: PafPortalDoc['entregas'][number]; nuevo?: boolean }) {
+function DeliveryRow({ d, nuevo, sinTitulo }: { d: PafPortalDoc['entregas'][number]; nuevo?: boolean; sinTitulo?: boolean }) {
   const hasta = d.hasta ? formatDisplayDate(d.hasta, 'medium') : '';
   return (
     <div className="py-4">
       <div className="flex items-start gap-4">
         <span className="min-w-0 flex-1">
-          <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">
-            {d.titulo}{d.version && <span className="text-xs font-normal text-[var(--text-tertiary)]">{d.version}</span>}{nuevo && <NewBadge />}
-          </span>
+          {!sinTitulo && (
+            <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">
+              {d.titulo}{d.version && <span className="text-xs font-normal text-[var(--text-tertiary)]">{d.version}</span>}{nuevo && <NewBadge />}
+            </span>
+          )}
           <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-[var(--text-tertiary)]">
+            {sinTitulo && d.version && <span>{d.version}</span>}
             {d.fecha && <span>{formatDisplayDate(d.fecha, 'medium')}</span>}
             {d.estado && <span className={d.estado === 'aprobada' ? 'text-emerald-600' : d.estado === 'ajustes' ? 'text-amber-600' : ''}>{PAF_DELIVERY_STATE_LABEL[d.estado]}</span>}
           </span>
@@ -803,20 +741,6 @@ function DeliveryRow({ d, nuevo }: { d: PafPortalDoc['entregas'][number]; nuevo?
         </p>
       )}
     </div>
-  );
-}
-
-function TaskList({ items, dot, muted }: { items: PortalTask[]; dot: string; muted?: boolean }) {
-  return (
-    <ul className="divide-y divide-[var(--border-divider)] border-y border-[var(--border-subtle)]">
-      {items.map((t) => (
-        <li key={t.id} className="flex items-center gap-3 py-3.5">
-          <span className={`w-1.5 h-1.5 shrink-0 rounded-full ${dot}`} />
-          <span className={`flex-1 min-w-0 text-sm break-words ${muted ? 'text-[var(--text-secondary)]' : 'text-[var(--text-primary)]'}`}>{t.titulo}</span>
-          {t.aprobadaEl && <span className="shrink-0 text-xs text-[var(--text-tertiary)]">{formatDisplayDate(t.aprobadaEl, 'short')}</span>}
-        </li>
-      ))}
-    </ul>
   );
 }
 
@@ -920,11 +844,11 @@ function ReportCard({ r }: { r: NonNullable<PafPortalDoc['reportes']>[number] })
 function SinceLastVisit({ keys, onGo }: { keys: string[]; onGo: (tab: Tab) => void }) {
   const n = (prefix: string) => keys.filter((k) => k.startsWith(prefix)).length;
   const parts: { text: string; tab: Tab }[] = [
-    { count: n('a:'), one: '1 anuncio', many: 'anuncios', tab: 'inicio' as Tab },
-    { count: n('t:'), one: '1 tarea nueva', many: 'tareas nuevas', tab: 'tareas' as Tab },
-    { count: n('e:'), one: '1 entrega', many: 'entregas', tab: 'entregas' as Tab },
+    { count: n('a:'), one: '1 anuncio', many: 'anuncios', tab: 'novedades' as Tab },
+    { count: n('t:'), one: '1 tarea nueva', many: 'tareas nuevas', tab: 'pasos' as Tab },
+    { count: n('e:'), one: '1 entrega', many: 'entregas', tab: 'pasos' as Tab },
     { count: n('l:'), one: '1 acceso', many: 'accesos', tab: 'archivos' as Tab },
-    { count: n('r:'), one: '1 resumen de reunión', many: 'resúmenes de reunión', tab: 'inicio' as Tab },
+    { count: n('r:'), one: '1 resumen de reunión', many: 'resúmenes de reunión', tab: 'novedades' as Tab },
   ].filter((x) => x.count > 0).map((x) => ({ text: x.count === 1 ? x.one : `${x.count} ${x.many}`, tab: x.tab }));
   if (!parts.length) return null;
   return (
@@ -1014,12 +938,12 @@ function GuiaInicial({ onClose, estudio, pendientes, reunion, carpeta, bienvenid
       accion: bienvenida ? <a href={bienvenida} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium underline underline-offset-4">Abrir la bienvenida en PDF <ArrowUpRight className="w-4 h-4" /></a> : null,
     },
     {
-      titulo: 'Arriba, tu resumen',
-      texto: <>Los números de arriba te dicen cuántas tareas tenés, cuándo nos vemos, qué tenés para revisar y en qué parte del programa estamos. Tocá cualquiera para ir directo.{pendientes ? <> Ahora tenés <b>{pendientes === 1 ? '1 tarea' : `${pendientes} tareas`}</b>.</> : <> Ahora no tenés tareas: te avisamos cuando haya algo.</>}</>,
+      titulo: 'Una cosa a la vez',
+      texto: <>En <b>Inicio</b> ves solo lo de ahora: una carta con lo que te toca y, en la misma carta, lo que te devolvemos. Si hay más de una, pasás con las flechas.{pendientes ? <> Ahora tenés <b>{pendientes === 1 ? '1 cosa' : `${pendientes} cosas`}</b> de tu lado.</> : <> Ahora no tenés nada de tu lado: te avisamos cuando haya algo.</>}</>,
     },
     {
-      titulo: 'Lo que te toca, de a una',
-      texto: <>Cuando necesitemos algo de vos aparece acá, con <b>para qué sirve</b> y cómo hacerla. Al terminarla tocá <b>Terminé</b>: nos llega el aviso y te confirmamos. Lo que no aparece acá, no hace falta que lo hagas.</>,
+      titulo: 'Todo ordenado, paso a paso',
+      texto: <>Cada tarea viene con <b>para qué sirve</b> y cómo hacerla. Al terminarla tocá <b>Terminé</b>: nos llega el aviso y te confirmamos. En <b>Paso a paso</b> queda todo: lo que está en curso arriba y lo cerrado guardado por etapa. Lo que no aparece, no hace falta que lo hagas.</>,
     },
     {
       titulo: 'Tu carpeta de Drive',
@@ -1071,40 +995,6 @@ function GoalColumn({ title, items }: { title: string; items: { texto: string; h
   );
 }
 
-function PendingTask({ t, today, uploadUrl, uploadFor, sending, readOnly, onDone, nuevo, bare }: { t: PortalTask; today: string; uploadUrl?: string; uploadFor?: (t: PortalTask) => string | undefined; sending: string | null; readOnly: boolean; onDone: (id: string) => void; nuevo?: boolean; bare?: boolean }) {
-  const overdue = isOverdue(t, today);
-  const delEstudio = (t.responsable || 'estudio') === 'estudio';
-  const body = (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0">
-        {nuevo && <NewBadge className="mb-2" />}
-        <p className={`${bare ? 'text-lg' : 'text-[15px]'} font-medium text-[var(--text-primary)] break-words`}>{t.titulo}</p>
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-tertiary)]">
-          {!delEstudio && <span className="rounded-full bg-[var(--bg-surface-muted)] px-2 py-0.5 text-[var(--text-secondary)]">Lo hace {PAF_RESPONSABLE_LABEL[t.responsable!]}</span>}
-          {t.fecha && <span className="inline-flex items-center gap-1.5">{overdue && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" aria-hidden />}{overdue ? `Venció el ${formatDisplayDate(t.fecha, 'medium')}` : `Para el ${formatDisplayDate(t.fecha, 'medium')}`}</span>}
-        </p>
-        {t.paraQue && <p className="mt-3 text-sm leading-relaxed text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué sirve: </span>{t.paraQue}</p>}
-        {t.motivo && <p className="mt-3 rounded-[var(--radius-control)] border-l-[3px] border-l-amber-500 bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Requiere ajustes: </span>{t.motivo}</p>}
-        {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
-          {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">Abrir <ArrowUpRight className="w-3.5 h-3.5" /></a>}
-          {t.pideArchivos && (uploadFor?.(t) || uploadUrl) && (
-            <a href={uploadFor?.(t) || uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
-              <Paperclip className="w-3.5 h-3.5" /> Subir a {carpetaLabel(t)} <ArrowUpRight className="w-3.5 h-3.5" />
-            </a>
-          )}
-        </div>
-      </div>
-      {delEstudio && (
-        <button type="button" onClick={() => onDone(t.id)} disabled={sending === t.id || readOnly} title={readOnly ? 'Vista previa: el botón no hace nada' : 'Avisanos que lo terminaste: lo revisamos y te confirmamos'} className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] bg-[var(--marca)] px-4 py-2 text-sm font-medium text-[var(--marca-text)] disabled:opacity-60">
-          {sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
-        </button>
-      )}
-    </div>
-  );
-  return bare ? <div className="px-5 pb-5 pt-2">{body}</div> : <Card className="p-5">{body}</Card>;
-}
-
 /** "Materiales › Proyectos": dónde se suben los archivos de la tarea */
 function carpetaLabel(t: PortalTask): string {
   const m = MATERIALES.find((x) => x.id === (t.carpeta || 'proyectos'));
@@ -1129,82 +1019,169 @@ function MeetingSummary({ s }: { s: { acuerdos: string; proximosPasos: string } 
   );
 }
 
-/** HOY: el bloque oscuro de arriba. Lo que le toca ahora (o que no le toca nada) y la próxima reunión. */
-function HoyHero({ principal, taskProps, nuevo, verReunion, reunion, porConfirmar, acuerdo, link, estudio, whatsapp, trabajando, enRevision }: {
-  principal?: PortalTask; taskProps: { today: string; uploadUrl?: string; uploadFor?: (t: PortalTask) => string | undefined; sending: string | null; readOnly: boolean; onDone: (id: string) => void }; nuevo: boolean;
-  verReunion: boolean; reunion: PafPortalDoc['proximaReunion']; porConfirmar?: PafPortalDoc['reunionPorConfirmar']; acuerdo?: PafPortalDoc['reunionesAcuerdo'];
-  link?: string | null; estudio: string; whatsapp: string; trabajando?: string; enRevision: number;
-}) {
-  const t = principal;
-  const vencida = t ? isOverdue(t, taskProps.today) : false;
-  const conReunion = verReunion && (reunion || porConfirmar);
+type TaskProps = {
+  today: string; uploadUrl?: string; uploadFor?: (t: PortalTask) => string | undefined;
+  sending: string | null; readOnly: boolean; onDone: (id: string) => void; avisada: (t: PortalTask) => boolean;
+};
+
+const ESTADO_CHIP: Record<PasoEstado, string> = {
+  te_toca: 'bg-[var(--marca)] text-[var(--marca-text)]',
+  revisar: 'bg-amber-500 text-white',
+  nosotros: 'bg-sky-100 text-sky-800',
+  listo: 'bg-emerald-100 text-emerald-800',
+};
+
+function EstadoChip({ e }: { e: PasoEstado }) {
+  return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${ESTADO_CHIP[e]}`}>{PASO_ESTADO_LABEL[e]}</span>;
+}
+
+/**
+ * Una carta: lo que le pedimos (con "Terminé") y lo que le devolvemos, juntos.
+ * Si la carta es de una sola cosa, el título ya es esa tarea o esa entrega.
+ */
+function PasoCuerpo({ c, grande, sinEncabezado, isNew, ...tp }: { c: PortalPaso; grande?: boolean; sinEncabezado?: boolean; isNew: (k: string) => boolean } & TaskProps) {
+  const soloTarea = c.solo && c.tareas.length === 1 && !c.entregas.length;
+  const soloEntrega = c.solo && c.entregas.length === 1 && !c.tareas.length;
+  const nuevo = c.tareas.some((t) => isNew(`t:${t.id}:${t.habilitadaEn || ''}`)) || c.entregas.some((e) => isNew(`e:${e.id}`));
+  const tit = 'text-[11px] font-semibold uppercase tracking-[.16em] text-[var(--text-tertiary)]';
   return (
-    <section id="hoy" className="scroll-mt-6 overflow-hidden rounded-[28px] bg-white text-[var(--text-primary)] shadow-sm border border-[var(--border-subtle)]">
-      <div className={`grid ${conReunion ? 'sm:grid-cols-[1.4fr_1fr]' : ''}`}>
-        <div className="p-5 sm:p-7">
-          <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">Te toca a vos{t?.fecha ? ` · ${isOverdue(t, taskProps.today) ? "venció el" : "para el"} ${formatDisplayDate(t.fecha, "medium")}` : ""}{nuevo && <span className="rounded-full bg-[var(--marca)] px-2 py-0.5 text-[9px] tracking-wide text-white">Nuevo</span>}</p>
-          {t ? (
-            <>
-              <h2 className="mt-3 text-2xl sm:text-[32px] font-normal leading-tight tracking-tight break-words">{t.titulo}</h2>
-              {t.paraQue && <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-secondary)]"><span className="font-medium text-[var(--text-primary)]">Para qué sirve: </span>{t.paraQue}</p>}
-              {t.motivo && <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><span className="text-amber-700">Requiere ajustes: </span>{t.motivo}</p>}
-              {t.detalle && <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
-              {vencida && <p className="mt-3 text-xs text-rose-600">Se pasó la fecha: si necesitás más tiempo, avisanos.</p>}
-              <div className="mt-5 flex flex-wrap gap-2">
-                <button type="button" onClick={() => taskProps.onDone(t.id)} disabled={taskProps.sending === t.id || taskProps.readOnly} title={taskProps.readOnly ? 'Vista previa: el botón no hace nada' : 'Avisanos que lo terminaste: lo revisamos y te confirmamos'}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--marca)] px-6 py-3 text-[15px] font-medium text-[var(--marca-text)] disabled:opacity-60">
-                  {taskProps.sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
-                </button>
-                {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-5 py-3 text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]">Abrir <ArrowUpRight className="w-4 h-4" /></a>}
-                {t.pideArchivos && (taskProps.uploadFor?.(t) || taskProps.uploadUrl) && <a href={taskProps.uploadFor?.(t) || taskProps.uploadUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-5 py-3 text-[15px] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)]"><Paperclip className="w-4 h-4" />Subir a {carpetaLabel(t)}</a>}
-              </div>
-            </>
-          ) : (
-            <>
-              <h2 className="mt-3 text-2xl sm:text-[32px] font-light leading-tight tracking-tight">Nada de tu lado por ahora.</h2>
-              <p className="mt-2 text-[15px] leading-relaxed text-[var(--text-secondary)]">
-                {enRevision ? `Estamos revisando ${enRevision === 1 ? 'lo que nos mandaste' : `${enRevision} cosas que nos mandaste`}. ` : ''}
-                {trabajando ? `Estamos con: ${trabajando.replace(/^Preparando: /, 'preparando ')}.` : 'Te avisamos acá cuando haya algo para vos.'}
-              </p>
-            </>
-          )}
+    <div>
+      {!sinEncabezado && (
+        <>
+          <p className="flex flex-wrap items-center gap-2"><EstadoChip e={c.estado} />{nuevo && <NewBadge />}</p>
+          <h3 className={`mt-2 font-normal leading-tight tracking-tight text-[var(--text-primary)] break-words ${grande ? 'text-2xl sm:text-[30px]' : 'text-[17px]'}`}>{c.titulo}</h3>
+        </>
+      )}
+      {c.objetivo && <p className={`${sinEncabezado ? '' : 'mt-1.5'} text-sm leading-relaxed text-[var(--text-secondary)]`}>{c.objetivo}</p>}
+      {c.tareas.length > 0 && (
+        <div className={soloTarea ? 'mt-2' : 'mt-5'}>
+          {!soloTarea && <p className={tit}>Tu parte</p>}
+          <ul className={`${soloTarea ? '' : 'mt-3'} space-y-4`}>
+            {c.tareas.map((t) => <li key={t.id}><TaskRow t={t} sinTitulo={soloTarea} grande={grande} {...tp} /></li>)}
+          </ul>
         </div>
-        {conReunion && (
-          <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-muted)] p-5 sm:border-l sm:border-t-0 sm:p-7">
-            <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--text-tertiary)]">Nos vemos</p>
-            {reunion ? (
-              <>
-                <div className="mt-3 flex items-center gap-3">
-                  <div className="w-14 shrink-0 overflow-hidden rounded-xl bg-white text-center text-[#191B20] border border-[var(--border-subtle)]">
-                    <p className="bg-[var(--marca)] py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</p>
-                    <p className="py-1 text-2xl font-light">{new Date(`${reunion.fecha}T12:00:00`).getDate()}</p>
-                  </div>
-                  <div className="min-w-0 text-sm">
-                    <p className="font-medium capitalize">{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long' })}</p>
-                    <p className="text-[var(--text-secondary)]">{reunion.hora ? `${reunion.hora} hs · Argentina` : 'Horario a confirmar'}</p>
-                  </div>
-                </div>
-                {reunion.objetivo && <p className="mt-3 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué: </span>{reunion.objetivo}</p>}
-                {reunion.preparar && <p className="mt-1 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Traé o pensá: </span>{reunion.preparar}</p>}
-                <p className="mt-1 text-xs text-[var(--text-tertiary)]">Con Juan{reunion.conCM ? ' y la community manager' : ''}</p>
-                <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                  {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[#191B20] px-3 py-1.5 font-medium text-white"><Video className="w-3.5 h-3.5" />Entrar</a>}
-                  <a href={calendarLink({ fecha: reunion.fecha, hora: reunion.hora }, `Reunión .CERO · ${estudio}`, link)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-[var(--text-primary)]"><CalendarPlus className="w-3.5 h-3.5" />A mi calendario</a>
-                  {whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola Juan, soy de ${estudio}. ¿Podemos mover la reunión del ${formatDisplayDate(reunion.fecha, 'medium')}?`)}`} target="_blank" rel="noopener noreferrer" className="px-1 py-1.5 text-[var(--text-secondary)] underline underline-offset-4">Reprogramar</a>}
-                </div>
-              </>
-            ) : (
-              <>
-                <span className="mt-3 inline-flex rounded-full border border-[var(--border-strong)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)]">Por confirmar</span>
-                {porConfirmar?.objetivo && <p className="mt-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué: </span>{porConfirmar.objetivo}</p>}
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">La fecha la acordamos con vos.</p>
-              </>
-            )}
-            {acuerdo && <p className="mt-4 text-[11px] text-[var(--text-tertiary)]">Es la reunión {Math.min(acuerdo.hechas + 1, acuerdo.total)} de {acuerdo.total} del acuerdo</p>}
+      )}
+      {c.entregas.length > 0 && (
+        <div className={c.tareas.length ? 'mt-5 border-t border-[var(--border-divider)] pt-4' : soloEntrega ? '' : 'mt-5'}>
+          {!soloEntrega && <p className={tit}>{c.entregas.length === 1 ? 'Nuestra devolución' : 'Nuestras devoluciones'}</p>}
+          <div className="divide-y divide-[var(--border-divider)]">
+            {c.entregas.map((d) => <DeliveryRow key={d.id} d={d} sinTitulo={soloEntrega} nuevo={!soloEntrega && isNew(`e:${d.id}`)} />)}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Una tarea dentro de su carta: lo pendiente con su "para qué" y botones; lo hecho, en una línea */
+function TaskRow({ t, sinTitulo, grande, today, uploadUrl, uploadFor, sending, readOnly, onDone, avisada }: { t: PortalTask; sinTitulo?: boolean; grande?: boolean } & TaskProps) {
+  const delEstudio = (t.responsable || 'estudio') === 'estudio';
+  const pendiente = t.estado === 'habilitada' && !avisada(t);
+  const overdue = pendiente && isOverdue(t, today);
+  const subir = t.pideArchivos ? uploadFor?.(t) || uploadUrl : undefined;
+  const estado = t.estado === 'aprobada'
+    ? <span className="text-emerald-700">Aprobada{t.aprobadaEl ? ` el ${formatDisplayDate(t.aprobadaEl, 'short')}` : ''}</span>
+    : !pendiente ? <span className="text-sky-700">Recibida · la estamos revisando</span>
+      : t.fecha ? <span className={overdue ? 'text-rose-600' : ''}>{overdue ? 'Venció el ' : 'Para el '}{formatDisplayDate(t.fecha, 'medium')}</span> : null;
+  const btn = grande ? 'px-5 py-2.5 text-[15px]' : 'px-4 py-2 text-sm';
+  return (
+    <div className="flex items-start gap-3">
+      {!sinTitulo && (
+        <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${t.estado === 'aprobada' ? 'bg-emerald-500 text-white' : !pendiente ? 'bg-sky-500 text-white' : 'border-2 border-[var(--marca)]'}`} aria-hidden>
+          {!pendiente && <Check className="w-3 h-3" />}
+        </span>
+      )}
+      <div className="min-w-0 flex-1">
+        {!sinTitulo && <p className={`font-medium break-words ${pendiente ? 'text-[15px] text-[var(--text-primary)]' : 'text-sm text-[var(--text-secondary)]'}`}>{t.titulo}</p>}
+        {(estado || !delEstudio) && (
+          <p className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-[var(--text-tertiary)]">
+            {!delEstudio && <span>Lo hace {PAF_RESPONSABLE_LABEL[t.responsable!]}</span>}{estado}
+          </p>
+        )}
+        {pendiente && (
+          <>
+            {t.paraQue && <p className="mt-2 text-sm leading-relaxed text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué sirve: </span>{t.paraQue}</p>}
+            {t.motivo && <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900"><span className="text-amber-700">Requiere ajustes: </span>{t.motivo}</p>}
+            {t.detalle && <p className="mt-2 text-sm leading-relaxed text-[var(--text-secondary)] whitespace-pre-line">{t.detalle}</p>}
+            {overdue && grande && <p className="mt-2 text-xs text-rose-600">Se pasó la fecha: si necesitás más tiempo, avisanos.</p>}
+            {(delEstudio || t.link || subir) && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {delEstudio && (
+                  <button type="button" onClick={() => onDone(t.id)} disabled={sending === t.id || readOnly} title={readOnly ? 'Vista previa: el botón no hace nada' : 'Avisanos que lo terminaste: lo revisamos y te confirmamos'}
+                    className={`inline-flex items-center gap-1.5 rounded-full bg-[var(--marca)] font-medium text-[var(--marca-text)] disabled:opacity-60 ${btn}`}>
+                    {sending === t.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}Terminé
+                  </button>
+                )}
+                {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] ${btn}`}>Abrir <ArrowUpRight className="w-4 h-4" /></a>}
+                {subir && <a href={subir} target="_blank" rel="noopener noreferrer" className={`inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] text-[var(--text-primary)] hover:bg-[var(--bg-surface-muted)] ${btn}`}><Paperclip className="w-4 h-4" />Subir a {carpetaLabel(t)}</a>}
+              </div>
+            )}
+          </>
         )}
       </div>
-    </section>
+    </div>
+  );
+}
+
+/** Carta plegada en "Paso a paso": se ve el estado y el título; se abre para hacer */
+function PasoPlegable({ c, abierto, ...rest }: { c: PortalPaso; abierto?: boolean; isNew: (k: string) => boolean } & TaskProps) {
+  const resumen = [
+    c.tareas.length ? `${c.tareas.length} ${c.tareas.length === 1 ? 'tarea' : 'tareas'}` : '',
+    c.entregas.length ? `${c.entregas.length} ${c.entregas.length === 1 ? 'devolución' : 'devoluciones'}` : '',
+  ].filter(Boolean).join(' · ');
+  const tuya = c.estado === 'te_toca' || c.estado === 'revisar';
+  return (
+    <details open={abierto} className={`group card-swiss ${tuya ? 'border-[var(--marca)]' : ''}`}>
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4">
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2"><EstadoChip e={c.estado} />{!c.solo && <span className="text-xs text-[var(--text-tertiary)]">{resumen}</span>}</span>
+          <span className="mt-1.5 block text-[15px] font-medium text-[var(--text-primary)] break-words">{c.titulo}</span>
+        </span>
+        <ChevronDown className="w-4 h-4 shrink-0 text-[var(--text-tertiary)] transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-[var(--border-divider)] px-5 pb-5 pt-4"><PasoCuerpo c={c} sinEncabezado {...rest} /></div>
+    </details>
+  );
+}
+
+/** La próxima reunión (o la que está por confirmar), al lado de la carta de ahora */
+function ReunionBlock({ reunion, porConfirmar, acuerdo, link, estudio, whatsapp }: {
+  reunion: PafPortalDoc['proximaReunion']; porConfirmar?: PafPortalDoc['reunionPorConfirmar']; acuerdo?: PafPortalDoc['reunionesAcuerdo'];
+  link?: string | null; estudio: string; whatsapp: string;
+}) {
+  return (
+    <div className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-muted)] p-5 sm:border-l sm:border-t-0 sm:p-7">
+      <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--text-tertiary)]">Nos vemos</p>
+      {reunion ? (
+        <>
+          <div className="mt-3 flex items-center gap-3">
+            <div className="w-14 shrink-0 overflow-hidden rounded-xl bg-white text-center text-[#191B20] border border-[var(--border-subtle)]">
+              <p className="bg-[var(--marca)] py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white">{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { month: 'short' }).replace('.', '')}</p>
+              <p className="py-1 text-2xl font-light">{new Date(`${reunion.fecha}T12:00:00`).getDate()}</p>
+            </div>
+            <div className="min-w-0 text-sm">
+              <p className="font-medium capitalize">{new Date(`${reunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long' })}</p>
+              <p className="text-[var(--text-secondary)]">{reunion.hora ? `${reunion.hora} hs · Argentina` : 'Horario a confirmar'}</p>
+            </div>
+          </div>
+          {reunion.objetivo && <p className="mt-3 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué: </span>{reunion.objetivo}</p>}
+          {reunion.preparar && <p className="mt-1 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Traé o pensá: </span>{reunion.preparar}</p>}
+          <p className="mt-1 text-xs text-[var(--text-tertiary)]">Con Juan{reunion.conCM ? ' y la community manager' : ''}</p>
+          <div className="mt-4 flex flex-wrap gap-2 text-xs">
+            {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-[#191B20] px-3 py-1.5 font-medium text-white"><Video className="w-3.5 h-3.5" />Entrar</a>}
+            <a href={calendarLink({ fecha: reunion.fecha, hora: reunion.hora }, `Reunión .CERO · ${estudio}`, link)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] px-3 py-1.5 text-[var(--text-primary)]"><CalendarPlus className="w-3.5 h-3.5" />A mi calendario</a>
+            {whatsapp && <a href={`https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola Juan, soy de ${estudio}. ¿Podemos mover la reunión del ${formatDisplayDate(reunion.fecha, 'medium')}?`)}`} target="_blank" rel="noopener noreferrer" className="px-1 py-1.5 text-[var(--text-secondary)] underline underline-offset-4">Reprogramar</a>}
+          </div>
+        </>
+      ) : (
+        <>
+          <span className="mt-3 inline-flex rounded-full border border-[var(--border-strong)] px-2.5 py-0.5 text-xs text-[var(--text-secondary)]">Por confirmar</span>
+          {porConfirmar?.objetivo && <p className="mt-2 text-sm text-[var(--text-primary)]"><span className="text-[var(--text-tertiary)]">Para qué: </span>{porConfirmar.objetivo}</p>}
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">La fecha la acordamos con vos.</p>
+        </>
+      )}
+      {acuerdo && <p className="mt-4 text-[11px] text-[var(--text-tertiary)]">Es la reunión {Math.min(acuerdo.hechas + 1, acuerdo.total)} de {acuerdo.total} del acuerdo</p>}
+    </div>
   );
 }
 
@@ -1255,7 +1232,7 @@ function TuMes({ reportes }: { reportes: NonNullable<PafPortalDoc['reportes']> }
 
 /** Navegación de abajo en el celular, como una app */
 function BottomNav({ tabs, tab, onChange }: { tabs: { id: Tab; label: string; count?: number }[]; tab: Tab; onChange: (t: Tab) => void }) {
-  const ICON: Record<Tab, React.ElementType> = { inicio: Home, recorrido: Route, tareas: ListChecks, entregas: Package, archivos: Folder };
+  const ICON: Record<Tab, React.ElementType> = { inicio: Home, pasos: ListChecks, novedades: Newspaper, archivos: Folder };
   return (
     <nav className="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]" aria-label="Secciones">
       <ul className="flex">
@@ -1265,7 +1242,7 @@ function BottomNav({ tabs, tab, onChange }: { tabs: { id: Tab; label: string; co
           return (
             <li key={x.id} className="flex-1">
               <button type="button" onClick={() => onChange(x.id)} aria-current={on ? 'page' : undefined} className={`relative flex w-full flex-col items-center gap-0.5 py-2.5 text-[10px] ${on ? 'text-[var(--marca)] font-semibold' : 'text-[var(--text-tertiary)]'}`}>
-                <Icon className="w-5 h-5" />{x.label.replace('Mi recorrido', 'Recorrido')}
+                <Icon className="w-5 h-5" />{x.label}
                 {!!x.count && <span className="absolute right-[calc(50%-18px)] top-1.5 min-w-[16px] rounded-full bg-[var(--marca)] px-1 text-[9px] leading-4 text-white">{x.count}</span>}
               </button>
             </li>

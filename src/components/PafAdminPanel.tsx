@@ -26,6 +26,7 @@ import { PafHitosCard, confirmarHito } from './PafHitosCard';
 import { PafPlanSection } from './PafPlanSection';
 import { conHistorial } from '../portal/historial';
 import { ETAPAS, temaPorId, type TemaPlantilla } from '../portal/presencia';
+import { CARTA_SOLA, cartaDe, cartasEnUso } from '../portal/pasos';
 import { PafReportes } from './PafReportes';
 import { NumerosEditor, PortalLinksEditor, PortalSectionsToggles } from './PafPortalSettings';
 
@@ -738,7 +739,9 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
       const { paraQue: _p, detalle: _d, fecha: _f, ...rest } = t;
       return { ...rest, titulo: patch.titulo, ...(patch.paraQue ? { paraQue: patch.paraQue } : {}), ...(patch.detalle ? { detalle: patch.detalle } : {}), ...(patch.fecha ? { fecha: patch.fecha } : {}) };
     }),
-    /** Una sola prioritaria: la que va arriba del portal como "Tu próxima acción" */
+    /** En qué carta del portal va (vacío = la de su tema) */
+    setCarta: (id: string, carta?: string) => update(id, (t) => conCarta(t, carta)),
+    /** Una sola prioritaria: su carta va primero en "Ahora" */
     togglePrioritaria: (id: string) => saveTasks(tasks.map((t) => ({ ...t, prioritaria: t.id === id ? !t.prioritaria : false }))),
     add: (t: Omit<PafTask, 'id' | 'estado'>, visible = false) => saveTasks([...tasks, { ...t, id: newItemId(), estado: visible ? 'habilitada' : 'borrador', ...(visible ? { habilitadaEn: new Date().toISOString() } : {}) }]),
     /** Varias de una (plantilla de la etapa): ocultas o ya habilitadas */
@@ -749,6 +752,39 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
   };
 }
 type Work = ReturnType<typeof usePafWork>;
+
+/** Pone o saca la carta sin dejar campos vacíos (Firestore no acepta undefined) */
+function conCarta<T extends { carta?: string }>(x: T, carta?: string): T {
+  const { carta: _c, ...rest } = x;
+  return (carta ? { ...rest, carta } : rest) as T;
+}
+
+/**
+ * "Va en": la carta del portal donde el cliente ve esta tarea o entrega. Por defecto, la de su tema
+ * (así la tarea y su devolución quedan juntas); se puede dejar sola, sumar a otra o inventar una.
+ */
+function CartaSelect({ item, tipo, work, onChange }: { item: { id: string; titulo: string; tema?: PafTask['tema']; carta?: string }; tipo: 't' | 'e'; work: Work; onChange: (carta?: string) => void }) {
+  const libre = item.carta && item.carta !== CARTA_SOLA ? cartaDe(item, tipo).titulo : '';
+  const value = item.carta === CARTA_SOLA ? CARTA_SOLA : libre;
+  const temaTitulo = item.tema ? temaPorId(item.tema).titulo : '';
+  const otras = cartasEnUso(work.tasks, work.deliveries).filter((x) => x !== temaTitulo || !!libre);
+  return (
+    <label className="inline-flex items-center gap-1 text-[10px] font-normal text-zinc-500" title="En qué carta del portal lo ve el cliente. Lo que va en la misma carta se ve junto (la tarea y su devolución).">
+      Va en
+      <select aria-label="Carta del portal" value={value} onChange={(e) => {
+        const v = e.target.value;
+        if (v !== '__nueva') { onChange(v || undefined); return; }
+        const nombre = window.prompt('Nombre de la carta (lo ve el cliente). Ej: Fotos del estudio')?.trim();
+        if (nombre) onChange(nombre.slice(0, 80));
+      }} className="max-w-[11rem] rounded-md bg-zinc-950 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">
+        <option value="">{temaTitulo ? `Su tema: ${temaTitulo}` : 'Sola (carta propia)'}</option>
+        {temaTitulo && <option value={CARTA_SOLA}>Sola (carta propia)</option>}
+        {otras.map((x) => <option key={x} value={x}>{x}</option>)}
+        <option value="__nueva">Otra carta nueva…</option>
+      </select>
+    </label>
+  );
+}
 
 function TaskList({ tasks, work }: { tasks: PafTask[]; work: Work }) {
   return <ul className="space-y-1.5">{tasks.map((t) => <TaskItem key={t.id} t={t} work={work} />)}</ul>;
@@ -770,7 +806,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
           <span className="font-semibold">{t.titulo}</span>{t.fecha && <span className="text-zinc-500"> · {t.fecha}</span>}
           {t.paraQue && <span className="block text-[11px] text-zinc-300"><span className="text-zinc-500">Para qué: </span>{t.paraQue}</span>}
           {t.detalle && <span className="block text-[11px] text-zinc-400">{t.detalle}</span>}
-          <span className="block text-[10px] text-zinc-500">Hace: {PAF_RESPONSABLE_LABEL[t.responsable || 'estudio']}{t.tema && <span className="ml-2">· {temaPorId(t.tema).titulo}</span>}{t.prioritaria && <span className="ml-2 text-amber-300">★ Su próxima acción</span>}</span>
+          <span className="block text-[10px] text-zinc-500">Hace: {PAF_RESPONSABLE_LABEL[t.responsable || 'estudio']}{t.tema && <span className="ml-2">· {temaPorId(t.tema).titulo}</span>}{t.prioritaria && <span className="ml-2 text-amber-300">★ Va primero en su portal</span>}</span>
           {t.link && <a href={t.link} target="_blank" rel="noopener noreferrer" className="block text-[10px] text-sky-300 truncate">{t.link}</a>}
           {t.pideArchivos && <span className="block text-[10px] text-zinc-500">Pide archivos · link a Materiales</span>}
           {t.motivo && t.estado === 'habilitada' && <span className="block text-[10px] text-sky-300">Reabierta: {t.motivo}</span>}
@@ -804,7 +840,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
           {t.estado === 'borrador' && <button type="button" onClick={() => work.enable(t.id)} className="rounded-lg bg-sky-500/15 text-sky-300 px-2 py-1">Habilitar</button>}
           {(t.estado === 'borrador' || t.estado === 'habilitada') && <button type="button" onClick={() => { setF({ titulo: t.titulo, paraQue: t.paraQue || '', detalle: t.detalle || '', fecha: t.fecha || '' }); setEditing(true); }} className="rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1">Editar</button>}
           {t.estado === 'habilitada' && <button type="button" onClick={() => work.hide(t.id)} className="rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1">Ocultar</button>}
-          {t.estado === 'habilitada' && <button type="button" onClick={() => work.togglePrioritaria(t.id)} title="La que ve arriba de todo como «Tu próxima acción»" className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 ${t.prioritaria ? 'bg-amber-400/15 text-amber-300' : 'bg-zinc-800 text-zinc-300'}`}><Star className="w-3 h-3" />{t.prioritaria ? 'Prioritaria' : 'Hacer prioritaria'}</button>}
+          {t.estado === 'habilitada' && <button type="button" onClick={() => work.togglePrioritaria(t.id)} title="Su carta es la primera que ve en «Ahora»" className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 ${t.prioritaria ? 'bg-amber-400/15 text-amber-300' : 'bg-zinc-800 text-zinc-300'}`}><Star className="w-3 h-3" />{t.prioritaria ? 'Va primero' : 'Ponerla primero'}</button>}
           {canApprove && t.estado === 'enviada' && <span className="text-[10px] font-normal text-zinc-500">Revisala y confirmá:</span>}
           {canApprove && (
             <span className="inline-flex items-center rounded-lg overflow-hidden border border-emerald-500/30">
@@ -815,6 +851,7 @@ function TaskItem({ t, work }: { t: PafTask; work: Work }) {
             </span>
           )}
           {canReopen && <button type="button" onClick={() => setReopening(true)} className="inline-flex items-center gap-1 rounded-lg bg-zinc-800 text-zinc-300 px-2 py-1"><Undo2 className="w-3 h-3" />Pedir ajustes</button>}
+          <CartaSelect item={t} tipo="t" work={work} onChange={(c) => work.setCarta(t.id, c)} />
           <button type="button" aria-label={`Borrar ${t.titulo}`} onClick={() => window.confirm(`¿Borrar la tarea "${t.titulo}"?`) && work.remove(t.id)} className="ml-auto text-zinc-500 hover:text-rose-300"><Trash2 className="w-3.5 h-3.5" /></button>
         </div>
       )}
@@ -892,6 +929,7 @@ function Deliveries({ work, showForm = true, onDone }: { work: Work; showForm?: 
                   <span className="block truncate">{d.enlace ? <a href={d.enlace} target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-1">{d.titulo}<ExternalLink className="w-3 h-3" /></a> : d.titulo}
                     {d.version && <span className="text-zinc-500"> · {d.version}</span>}{d.fecha && <span className="text-zinc-500"> · {d.fecha}</span>}</span>
                   {d.decision && <span className="block text-[11px] text-zinc-400">Decide: {d.decision}{d.hasta && ` · hasta el ${d.hasta.split('-').reverse().slice(0, 2).join('/')}`}{d.canal && ` · por ${d.canal}`}</span>}
+                  <span className="mt-1 block"><CartaSelect item={d} tipo="e" work={work} onChange={(c) => work.saveDeliveries(work.deliveries.map((x) => (x.id === d.id ? conCarta(x, c) : x)))} /></span>
                 </span>
                 <select aria-label="Estado de la entrega" value={d.estado || 'en_revision'} onChange={(e) => update(d.id, { estado: e.target.value as PafDeliveryState })} className="rounded-md bg-zinc-950 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">
                   {(Object.keys(PAF_DELIVERY_STATE_LABEL) as PafDeliveryState[]).map((k) => <option key={k} value={k}>{PAF_DELIVERY_STATE_LABEL[k]}</option>)}

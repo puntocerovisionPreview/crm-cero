@@ -38,6 +38,7 @@ describe('portal PAF con login', () => {
         { nombre: 'Calendario de contenido', url: 'https://app.asana.com/0/1' },
       ],
       anuncios: [],
+      pasos: [],
       mostrarAvance: true,
       hitosCompletados: [],
       recorrido: 'presencia',
