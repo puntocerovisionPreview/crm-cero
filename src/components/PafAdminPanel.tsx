@@ -16,6 +16,7 @@ import type { ClientPanel } from '../panels/model';
 import { SegmentedControl } from '../ui';
 import { hapticFeedback } from '../utils/haptics';
 import { PafAltaCard } from './PafAltaCard';
+import { PafAltaNueva } from './PafAltaNueva';
 import { actualizarTareasViejas, habilitarConCarpetas } from '../portal/tareasArranque';
 import { aplicarAlta } from '../portal/altaLinks';
 import { PafMeetingsSection } from './PafMeetingsSection';
@@ -302,7 +303,13 @@ export const PafAdminPanel: React.FC<Props> = ({ project, meetings, onUpdateProj
               <Card title="Tu WhatsApp" hint="Para el botón «Hablar con Juan». Es uno solo para todos los clientes.">
                 <WhatsappField value={portal.whatsapp} onSave={portal.saveWhatsapp} />
               </Card>
-              {showAlta && <Card title="Alta del estudio"><PafAltaCard project={project} onUpdateProject={onUpdateProject} /></Card>}
+              {showAlta && (
+                <Card title="Alta del estudio">
+                  <PafAltaNueva project={project} meetings={meetings} onUpdateProject={onUpdateProject} />
+                  {/* El alta con Tally y la planilla, para los clientes sin el alta nueva */}
+                  {!project.pafAltaNueva && <PafAltaCard project={project} onUpdateProject={onUpdateProject} />}
+                </Card>
+              )}
               {portal.published && (
                 <div className="rounded-xl border border-rose-500/20 p-3 flex items-center gap-3">
                   <p className="flex-1 text-[11px] text-zinc-400">Despublicar: el cliente deja de ver su portal.</p>
@@ -638,7 +645,7 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
           const email = normalizeEmails(emailsText)[0] || project.clientEmail || '';
           const built = buildPedidoAlta({ projectId: project.id, clienteId: nuevo, estudio: project.clientName, contacto: project.ownerName || project.clientName, email, zonaHoraria: 'America/Argentina/Buenos_Aires', prueba: false });
           if ('errors' in built) { setErrors(built.errors.map((e) => `Para darle su ID: ${e}`)); return; }
-          await createPedidoAlta(built.pedido);
+          await createPedidoAlta(project.pafAltaNueva ? { ...built.pedido, estado: 'registrado' } : built.pedido);
           id = nuevo; altaNueva = true;
         }
         setClienteId(id);
@@ -649,7 +656,9 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
       await publishPortalExtras(result.doc.clienteId, { objetivos: portalGoals(panel?.goals), contacto: { whatsapp: config.whatsapp || '' } });
       onUpdateProject(project.id, { pafClienteId: result.doc.clienteId, pafPortal: { ...current, publishedAt: result.doc.actualizadoEn } });
       lastSaved.current = snapshot(current); setPending(false); setSavedAt(new Date());
-      setNotice(altaNueva
+      setNotice(altaNueva && project.pafAltaNueva
+        ? `Publicado con el ID ${result.doc.clienteId}. Mandale el link del portal: lo primero que ve es "Completá tus datos" y, al mandarlos, se crean sus carpetas.`
+        : altaNueva
         ? `Publicado con el ID ${result.doc.clienteId}. También quedó su link de Tally: lo mandás desde Ajustes → Alta, y al responder se crean sus carpetas.`
         : published ? '' : 'Publicado. Copiá el enlace y pasáselo por tu canal.');
     } catch {

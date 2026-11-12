@@ -389,6 +389,9 @@ export interface Project {
   pafStageChecklist?: Record<string, { id: string; text: string; done: boolean }[]>; // Hitos de salida por etapa
   pafClienteId?: string; // ID del alta PAF (PAF-002, PAF-PRUEBA-001); no se reutiliza nunca
   pafPortal?: import('./portal/model').PafPortalDraft; // Lo que Juan decide publicar en paf_portal/{pafClienteId}
+  /** Alta sin Tally: el estudio completa sus datos en el portal y el CRM crea sus carpetas */
+  pafAltaNueva?: boolean;
+  pafArranque?: import('./portal/arranque').PafArranque;
   pafDrive?: import('./portal/model').PafDriveLinks; // Carpetas pegadas a mano (si el script todavía no las devolvió)
   pafAnuncios?: import('./portal/model').PafAnnouncement[]; // Anuncios para el estudio (ve los publicados)
   pafResumenes?: import('./portal/model').PafMeetingSummary[]; // Acuerdos y próximos pasos de cada reunión (el estudio ve los publicados)

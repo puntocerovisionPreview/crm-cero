@@ -13,6 +13,7 @@ import { ETAPAS, type Etapa } from '../portal/presencia';
 import { MATERIALES, type MaterialKey, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE_LABEL, hitoInfoDe, hitosDe, seccionesVisibles, type Recorrido } from '../portal/model';
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { Festejo, LoUltimo, saludoDelMomento, useFestejo } from './portal/PortalUltimo';
+import { ArranqueCreando, ArranqueForm } from './portal/PortalArranque';
 import { PASO_ESTADO_LABEL, armarPasos, pasosPorHito, type PasoEstado, type PortalPaso } from '../portal/pasos';
 import { sendTaskDone, sendVisita, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
@@ -438,8 +439,12 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               </section>
             ))}
 
+            {/* Alta sin Tally: lo primero es completar sus datos (con eso se crean sus carpetas) */}
+            {p.arranque?.pendiente && <ArranqueForm clienteId={p.clienteId} estudio={p.estudio} email={email} readOnly={readOnly || demo} />}
+            {p.arranque?.creando && <ArranqueCreando />}
+
             {/* AHORA: una sola carta (lo que le toca y, en la misma carta, nuestra devolución) y la reunión */}
-            <section id="hoy" aria-label="Lo de ahora" className="scroll-mt-6 overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-white text-[var(--text-primary)] shadow-sm">
+            {!p.arranque?.pendiente && <section id="hoy" aria-label="Lo de ahora" className="scroll-mt-6 overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-white text-[var(--text-primary)] shadow-sm">
               <div className={`grid ${conReunion ? 'sm:grid-cols-[1.45fr_1fr]' : ''}`}>
                 <div className="p-5 sm:p-7">
                   <div className="flex items-center justify-between gap-3">
@@ -466,7 +471,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                 </div>
                 {conReunion && <ReunionBlock reunion={p.proximaReunion} porConfirmar={p.reunionPorConfirmar} acuerdo={p.reunionesAcuerdo} link={p.linkReunion} estudio={p.estudio} whatsapp={whatsapp} />}
               </div>
-            </section>
+            </section>}
             {error && <p role="alert" className="text-sm text-rose-500">{error}</p>}
 
             {/* Atajos: subir materiales, ver el contenido y abrir la carpeta sin buscar */}

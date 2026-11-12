@@ -8,6 +8,8 @@ export const DRIVE_OWNER = 'puntocerovision@gmail.com';
 export const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 /** Para invitar a los clientes a las reuniones desde tu Gmail (Google les manda la invitación) */
 export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+/** Para copiar las carpetas modelo del alta PAF (00_MODELO_CLIENTE y 00_MODELO_INTERNO): solo lectura */
+export const DRIVE_READ_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 export const integrationRef = (db: Firestore) => db.collection('settings').doc('integrations_private');
 export class DrivePending extends Error {}
 export function appOrigin(): string {
@@ -72,7 +74,7 @@ export function registerDriveOAuth(app: express.Express, requireOwner: express.R
       const { codeVerifier, codeChallenge } = await client.generateCodeVerifierAsync();
       await db.collection('settings').doc(`drive_oauth_${hash(state)}`).set({ verifier: encryptDriveSecret(codeVerifier), expires: Date.now() + 10 * 60_000 });
       res.cookie('cero_drive_state', state, { httpOnly: true, secure: appOrigin().startsWith('https:'), sameSite: 'lax', path: '/api/drive/callback', maxAge: 10 * 60_000 });
-      res.json({ url: client.generateAuthUrl({ scope: [DRIVE_SCOPE, CALENDAR_SCOPE, 'openid', 'email'], include_granted_scopes: true, access_type: 'offline', prompt: 'consent', login_hint: DRIVE_OWNER, state, code_challenge: codeChallenge, code_challenge_method: 'S256' as any }) });
+      res.json({ url: client.generateAuthUrl({ scope: [DRIVE_SCOPE, DRIVE_READ_SCOPE, CALENDAR_SCOPE, 'openid', 'email'], include_granted_scopes: true, access_type: 'offline', prompt: 'consent', login_hint: DRIVE_OWNER, state, code_challenge: codeChallenge, code_challenge_method: 'S256' as any }) });
     } catch { res.status(503).json({ error: 'Falta configurar la conexión de Drive. Revisá los Secrets y APP_URL.' }); }
   });
   app.get('/api/drive/callback', async (req, res) => {

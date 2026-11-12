@@ -56,3 +56,36 @@ export function habilitarConCarpetas(tareas: PafTask[] = [], ahora: string, newI
   }
   return cambio ? lista : null;
 }
+
+/** Alta sin Tally: las 4 tareas de materiales, juntas en la carta "Tus materiales" */
+export const CARTA_MATERIALES = 'Tus materiales';
+export const TAREAS_MATERIALES: { titulo: string; carpeta: 'proyectos' | 'equipo' | 'referencias' | 'registro'; paraQue: string; detalle: string }[] = [
+  { titulo: 'Subí tus proyectos', carpeta: 'proyectos', paraQue: 'Con tus obras reales armamos tu contenido, tu portfolio y tu web.', detalle: 'Una carpeta por obra, con su nombre: fotos, renders, planos y videos. Subí todo lo que tengas, terminado o en curso; después elegimos juntos qué mostrar. Adentro de la carpeta hay un PDF que lo explica.' },
+  { titulo: 'Subí tu logo y fotos del equipo', carpeta: 'equipo', paraQue: 'Para que todo lo que publiquemos se vea como tu estudio.', detalle: 'El logo en su archivo original si lo tenés, fotos del equipo y del estudio. Adentro de la carpeta hay un PDF que lo explica.' },
+  { titulo: 'Sumá tus referencias', carpeta: 'referencias', paraQue: 'Para entender qué te gusta y hacia dónde querés llevar tu estudio.', detalle: 'Campañas que hayas hecho y cuentas o estudios que te gusten. Adentro de la carpeta hay un PDF que lo explica.' },
+  { titulo: 'Mandanos el registro de obra', carpeta: 'registro', paraQue: 'Mostrar el proceso genera confianza: es de lo que mejor funciona.', detalle: 'Imaginate que somos un cliente exigente que quiere ver el paso a paso: mandanos lo que le mandarías a él, aunque parezca chico. Adentro de la carpeta hay un PDF que lo explica.' },
+];
+
+/**
+ * Llegaron las carpetas del alta nueva: habilita las 4 tareas de materiales (las agrega si no
+ * están), en la carta "Tus materiales", para dentro de una semana y la primera como "va primero".
+ * Las de arranque viejas que hacen lo mismo ("Cargar tus proyectos…", "Subir tu logo…") quedan ocultas.
+ */
+export function habilitarMateriales(tareas: PafTask[] = [], ahora: string, newId: () => string): PafTask[] | null {
+  const fecha = addDays(ahora.slice(0, 10), 7);
+  const yaPrioritaria = tareas.some((t) => t.prioritaria && t.estado === 'habilitada');
+  let cambio = false;
+  const lista = [...tareas];
+  TAREAS_MATERIALES.forEach((def, i) => {
+    const k = lista.findIndex((t) => t.titulo === def.titulo);
+    const prioritaria = i === 0 && !yaPrioritaria ? { prioritaria: true } : {};
+    if (k === -1) {
+      lista.push({ id: newId(), titulo: def.titulo, paraQue: def.paraQue, detalle: def.detalle, pideArchivos: true, carpeta: def.carpeta, tema: 'arranque', carta: CARTA_MATERIALES, fecha, estado: 'habilitada', habilitadaEn: ahora, ...prioritaria });
+      cambio = true;
+    } else if (lista[k].estado === 'borrador') {
+      lista[k] = { ...lista[k], estado: 'habilitada', habilitadaEn: ahora, carta: lista[k].carta || CARTA_MATERIALES, ...(lista[k].fecha ? {} : { fecha }), ...prioritaria };
+      cambio = true;
+    }
+  });
+  return cambio ? lista : null;
+}

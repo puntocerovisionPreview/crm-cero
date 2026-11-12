@@ -20,6 +20,7 @@ import { describeNewPayment, isMercadoPagoConfigured, registerMercadoPagoRoutes,
 import { registerDocumentRoutes } from './documents';
 import { registerPanelRoutes } from './panels';
 import { registerPafPortalRoutes } from './pafPortal';
+import { registerPafAltaRoutes } from './pafAlta';
 import { registerDocumensoRoutes } from './documenso';
 import { recordError, recordJobRun, registerHealthRoutes, runBackupIfDue } from './health';
 import { documentFollowups } from './contractsServer';
@@ -478,6 +479,11 @@ export function registerAutomationRoutes(app: express.Express, requireOwner: exp
   registerPafPortalRoutes(app, getAdminDb, async (title, body, url) => {
     const db = getAdminDb();
     if (db) await notifyAll(db, title, body, url, 'paf-terminado');
+  });
+  // Alta sin Tally: el estudio completa sus datos en el portal y se crean sus carpetas
+  registerPafAltaRoutes(app, requireOwner, getAdminDb, async (title, body, url) => {
+    const db = getAdminDb();
+    if (db) await notifyAll(db, title, body, url, 'paf-alta');
   });
   // Presupuestos: firma digital con Documenso
   registerDocumensoRoutes(app, requireOwner, getAdminDb, async (title, body) => {

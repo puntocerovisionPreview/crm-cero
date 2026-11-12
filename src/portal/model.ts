@@ -308,6 +308,8 @@ export interface PafPortalDoc {
   accesos?: { nombre: string; url: string }[];
   /** Cartas que juntan tareas y entregas (ver pasos.ts) */
   pasos?: import('./pasos').PafPortalPaso[];
+  /** Alta sin Tally: el portal le pide sus datos (pendiente) o le avisa que se están creando sus carpetas */
+  arranque?: { pendiente: boolean; creando?: boolean } | null;
   /** Anuncios publicados: fijados primero, después los más nuevos */
   anuncios?: PafPortalAnnouncement[];
   /** Si es false, el portal oculta la etapa, la barra y el paso a paso */
@@ -388,7 +390,7 @@ export function safeHttpsUrl(value: string): string | null {
  * pasa "de arrastre". Devuelve los errores para mostrarlos en la ficha.
  */
 export function buildPafPortal(
-  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; recorrido?: Recorrido; etapa?: Etapa; etapas?: Etapa[]; enMarcha?: PafPortalDoc['enMarcha']; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[]; pasos?: import('./pasos').PafPortalPaso[] },
+  input: { clienteId?: string; estudio: string; draft: PafPortalDraft; tareas?: PafPortalTask[]; entregas?: PafPortalDelivery[]; proximaReunion?: PafPortalDoc['proximaReunion']; semana?: PafPortalDoc['semana']; reuniones?: PafPortalDoc['reuniones']; anuncios?: PafPortalAnnouncement[]; privados?: (string | undefined)[]; hitosCompletados?: number[]; recorrido?: Recorrido; etapa?: Etapa; etapas?: Etapa[]; enMarcha?: PafPortalDoc['enMarcha']; reunionesHechas?: number; reunionPorConfirmar?: PafPortalDoc['reunionPorConfirmar']; reportes?: PafReporte[]; pasos?: import('./pasos').PafPortalPaso[]; arranque?: PafPortalDoc['arranque'] },
   now = new Date().toISOString()
 ): { doc: PafPortalDoc } | { errors: string[] } {
   const errors: string[] = [];
@@ -434,6 +436,7 @@ export function buildPafPortal(
       tareasHabilitadas: (ver.tareas || ver.proximaAccion ? input.tareas || [] : []).filter((t) => t.estado === 'habilitada').map((t) => t.id),
       entregas: (ver.entregas ? input.entregas || [] : []).map(({ enlace, ...d }) => ({ ...d, ...(enlace && safeHttpsUrl(enlace) ? { enlace: safeHttpsUrl(enlace)! } : {}) })),
       pasos: ver.tareas || ver.proximaAccion || ver.entregas ? input.pasos || [] : [],
+      arranque: input.arranque ?? null,
       proximaReunion: ver.reuniones ? input.proximaReunion || null : null,
       semana: input.semana || null,
       reuniones: ver.acuerdos ? input.reuniones || [] : [],
@@ -517,8 +520,15 @@ export function meetingPorConfirmar(
   return m ? { ...(m.objetivo?.trim() ? { objetivo: m.objetivo.trim() } : {}) } : null;
 }
 
+/** Alta sin Tally: si el portal le pide sus datos, o le avisa que se están creando sus carpetas */
+export function arranqueDelPortal(p: { pafAltaNueva?: boolean; pafArranque?: { enviadoEn?: string; estado?: string } }): PafPortalDoc['arranque'] {
+  if (!p.pafAltaNueva) return null;
+  if (!p.pafArranque?.enviadoEn) return { pendiente: true };
+  return p.pafArranque.estado === 'listo' ? null : { pendiente: false, creando: true };
+}
+
 export function portalFromProject(
-  project: { id: string; clientName: string; pafClienteId?: string; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[]; pafHitos?: PafHitoConfirmado[]; pafReportes?: PafReporte[]; serviceType?: string; projectType?: string; pafEtapa?: Etapa; pafEtapasContratadas?: Etapa[] },
+  project: { id: string; clientName: string; pafClienteId?: string; pafAltaNueva?: boolean; pafArranque?: { enviadoEn?: string; estado?: string }; pafPortal?: PafPortalDraft; pafTareas?: PafTask[]; pafEntregas?: PafDelivery[]; pafDrive?: PafDriveLinks; pafStartDate?: string; startDate?: string; pafResumenes?: PafMeetingSummary[]; pafAnuncios?: PafAnnouncement[]; pafHitos?: PafHitoConfirmado[]; pafReportes?: PafReporte[]; serviceType?: string; projectType?: string; pafEtapa?: Etapa; pafEtapasContratadas?: Etapa[] },
   meetings: Parameters<typeof nextMeeting>[0],
   draft: PafPortalDraft = project.pafPortal || emptyPortalDraft(),
   clienteId = project.pafClienteId,
@@ -535,6 +545,7 @@ export function portalFromProject(
       tareas: publicTasks(project.pafTareas),
       entregas: publicDeliveries(project.pafEntregas),
       pasos: publicPasos(project.pafTareas, project.pafEntregas),
+      arranque: arranqueDelPortal(project),
       proximaReunion: nextMeeting(meetings, project.id, today),
       semana: programWeek(project.pafStartDate || project.startDate, today),
       reuniones: publicSummaries(project.pafResumenes),

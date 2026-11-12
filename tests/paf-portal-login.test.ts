@@ -39,6 +39,7 @@ describe('portal PAF con login', () => {
       ],
       anuncios: [],
       pasos: [],
+      arranque: null,
       mostrarAvance: true,
       hitosCompletados: [],
       recorrido: 'presencia',

@@ -92,6 +92,30 @@ export async function sendTaskDone(clienteId: string, tareaId: string, email: st
     .catch(() => undefined);
 }
 
+/** Alta sin Tally: el estudio manda sus datos y el servidor crea sus carpetas. Devuelve el error en criollo */
+export async function sendArranque(clienteId: string, respuestas: Record<string, string | string[]>): Promise<string | null> {
+  try {
+    const headers = await getAuthHeaders();
+    const r = await fetch('/api/paf/arranque', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ clienteId, respuestas }) });
+    if (r.ok) return null;
+    return String(((await r.json().catch(() => ({}))) as { error?: string }).error || 'No pudimos guardar tus datos. Probá de nuevo.');
+  } catch {
+    return 'No pudimos guardar tus datos. Revisá tu conexión y probá de nuevo.';
+  }
+}
+
+/** Juan reintenta crear las carpetas del alta nueva (ej. después de reconectar Drive) */
+export async function retryArranque(projectId: string): Promise<string | null> {
+  try {
+    const headers = await getAuthHeaders();
+    const r = await fetch('/api/paf/arranque/reintentar', { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId }) });
+    if (r.ok) return null;
+    return String(((await r.json().catch(() => ({}))) as { error?: string }).error || 'No se pudo. Probá de nuevo.');
+  } catch {
+    return 'No se pudo conectar con el servidor.';
+  }
+}
+
 /** El estudio entró a su portal: el servidor guarda la fecha (una vez por hora como mucho) */
 export function sendVisita(clienteId: string): void {
   getAuthHeaders()

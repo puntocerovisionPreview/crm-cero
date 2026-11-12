@@ -25,7 +25,7 @@ function tooMany(key: string): boolean {
 }
 
 /** Correo verificado de un token de Firebase (cualquier cuenta, no solo las del CRM) */
-async function verifiedEmail(req: express.Request): Promise<string | null> {
+export async function verifiedEmail(req: express.Request): Promise<string | null> {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token) return null;
