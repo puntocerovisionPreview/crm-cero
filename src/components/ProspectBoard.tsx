@@ -8,6 +8,7 @@ import { formatWhatsAppUrl } from '../utils/contact';
 import { updateProspect } from '../prospecting/store';
 import { ReplyButton } from './ProspectConversation';
 import { PersonalLineButton } from './ProspectingDayStart';
+import { MasAdelanteButton } from './MasAdelante';
 
 /**
  * LA TARJETA DE UN PROSPECTO (igual en Hoy y en el tablero)
@@ -60,6 +61,7 @@ export const ProspectCard: React.FC<{
   const tone = TONE[turnTone(p, move, settings)];
   const [showMsg, setShowMsg] = useState(!!big);
   const [menu, setMenu] = useState(false);
+  const [laterOpen, setLaterOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [video, setVideo] = useState(p.videoUrl || '');
   const name = p.studio || p.name;
@@ -146,6 +148,11 @@ export const ProspectCard: React.FC<{
                   Cliente
                 </button>
                 <div className="my-1 border-t border-[var(--border-subtle)]" />
+                {!['cliente', 'descartado'].includes(p.stage) && (
+                  <button type="button" className="w-full text-left px-3 py-2 rounded-[8px] hover:bg-[var(--bg-surface-muted)]" onClick={() => { setMenu(false); setLaterOpen(true); }}>
+                    Empieza más adelante…
+                  </button>
+                )}
                 <button type="button" className="w-full text-left px-3 py-2 rounded-[8px] hover:bg-[var(--bg-surface-muted)]" onClick={() => { setMenu(false); pick('lost', 'No le interesa'); }}>
                   No le interesa
                 </button>
@@ -158,6 +165,7 @@ export const ProspectCard: React.FC<{
         </span>
       </header>
 
+      {laterOpen && <MasAdelanteButton prospect={p} today={today} startOpen onCerrar={() => setLaterOpen(false)} onAct={(_p, a, n) => pick(a, n)} />}
       {contact && <p className={`${big ? 'text-[13px]' : 'text-[11px]'} text-[var(--text-tertiary)] truncate tabular-nums`} title="Así lo encontrás en WhatsApp o Instagram">{contact}</p>}
 
       <p className={`${big ? 'text-[17px]' : 'text-[13px]'} font-semibold text-[var(--text-primary)]`}>{move.title}</p>

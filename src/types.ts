@@ -1073,6 +1073,8 @@ export interface Prospect {
   calendlyEventUri?: string; // si la agendó por Calendly
   proposalSentAt?: string; // propuesta enviada después de la llamada
   secondChance?: boolean; // volvió de descartados a los 90 días
+  /** Dijo que empieza más adelante: sale de la lista y vuelve sola en esa fecha */
+  retomar?: { fecha: string; motivo?: string; desde: string };
   recycleAfter?: string; // desde cuándo puede volver a la lista (descartado sin respuesta)
   doNotContact?: boolean; // pidió que no lo contacten más
   // A quién le toca escribir
@@ -1149,6 +1151,7 @@ export interface ProspectingSettings {
     followUp: string[]; // seguimiento 1, 2, 3
     followUpQuestion: string; // no contestó la pregunta
     followUpAgree: string; // no contestó después de la empatía
+    retomar?: string; // retomar con quien dijo que empezaba más adelante
     followUpAudit: string; // le pasaste el link y no completó la auditoría
     question: string; // "¿Cómo haces para difundir tu trabajo...?"
     empathy: Record<DifusionKey, string>; // respuesta según cómo difunde

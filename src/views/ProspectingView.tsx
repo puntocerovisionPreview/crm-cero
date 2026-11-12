@@ -35,6 +35,7 @@ import {
   pendingDayClose,
   pendingOutcomes,
   callsOn,
+  masAdelante,
   turnOf,
   funnelStepOf,
   FUNNEL_STEPS,
@@ -65,6 +66,7 @@ import { Sheet } from '../components/Sheet';
 import { useProspecting } from '../prospecting/useProspecting';
 import { usePool, useWeeklyAutoBatch } from '../prospecting/usePool';
 import { ReservaPanel } from '../components/ReservaPanel';
+import { MasAdelanteButton, MasAdelanteLista } from '../components/MasAdelante';
 import { DifusionKey } from '../types';
 import { buildWebSnippet } from '../prospecting/webSnippet';
 import { formatWhatsAppUrl } from '../utils/contact';
@@ -302,10 +304,13 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
           onBurst={() => setBurstOpen(true)}
           tomorrowCalls={callsOn(list, addDays(today, 1))}
           footer={
+            <>
+            <MasAdelanteLista prospects={masAdelante(list)} today={today} onAct={send} />
             <section className="card-swiss p-4">
               <AddMoreRow poolAvailable={pool.availableCount} addMore={more.addMore} busy={more.busy} message={more.message} />
               <button type="button" className="mt-3 text-xs text-[var(--text-secondary)] underline" onClick={() => setDayStartOpen(true)}>Abrir inicio guiado</button>
             </section>
+            </>
           }
         />
         </ProspectingDailyDesk>
@@ -333,7 +338,7 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
       {detailFor && (() => {
         const live = list.find((x) => x.id === detailFor.id) || detailFor;
         const kindGuess: QueueItem['kind'] =
-          live.stage === 'nuevo' ? 'primer' : live.stage === 'respondio' ? 'responder' : live.stage === 'auditoria_completada' ? 'video' : live.stage === 'llamada' ? (live.proposalSentAt ? 'propuesta' : live.callDate === today ? 'llamada_hoy' : 'llamada') : 'seguimiento';
+          live.retomar && live.retomar.fecha <= today ? 'retomar' : live.stage === 'nuevo' ? 'primer' : live.stage === 'respondio' ? 'responder' : live.stage === 'auditoria_completada' ? 'video' : live.stage === 'llamada' ? (live.proposalSentAt ? 'propuesta' : live.callDate === today ? 'llamada_hoy' : 'llamada') : 'seguimiento';
         const item = queue.items.find((i) => i.prospect.id === live.id) || { prospect: live, kind: kindGuess, overdueDays: 0, suggestDiscard: false, hot: isHot(live) };
         return (
           <Sheet onClose={() => setDetailFor(null)} label={`Detalle de ${live.studio || live.name}`}>
@@ -624,6 +629,19 @@ const QueueCard: React.FC<{ item: QueueItem; settings: ProspectingSettings; onAc
               <Check className="w-3.5 h-3.5" /> Seguimiento enviado
             </button>
           ))}
+        {item.kind === 'retomar' && (
+          <>
+            <button type="button" className={`${btnPrimary} py-1.5 text-xs`} onClick={() => onAct(p, 'i_replied')}>
+              <Check className="w-3.5 h-3.5" /> Le escribí
+            </button>
+            <button type="button" className={`${btnGhost} py-1.5 text-xs`} onClick={() => onAct(p, 'lost', 'No le interesa')}>
+              No le interesa
+            </button>
+          </>
+        )}
+        {['retomar', 'seguimiento', 'responder', 'propuesta'].includes(item.kind) && (
+          <MasAdelanteButton prospect={p} today={todayLocal()} onAct={onAct} label={item.kind === 'retomar' ? 'Más adelante otra vez' : 'Empieza más adelante'} />
+        )}
         {item.kind === 'responder' && !offScript && (
           <>
             {step === 'pregunta' && (

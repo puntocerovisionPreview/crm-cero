@@ -105,6 +105,20 @@ export function nextMove(
   const said = p.lastReplyNote ? ` Te dijo: «${p.lastReplyNote}».` : '';
   const step = p.convStep || 'pregunta';
   const base = { sendLabel: 'Enviar por WhatsApp', waiting: false, canReply: false, due: true, message: '' };
+  // Empieza más adelante: espera tranquilo hasta su fecha y ese día toca retomar
+  if (p.retomar && !p.awaitingMe) {
+    const cuando = `${p.retomar.fecha.slice(8, 10)}/${p.retomar.fecha.slice(5, 7)}`;
+    const dijo = p.retomar.motivo ? ` Te dijo: «${p.retomar.motivo}».` : '';
+    if (p.retomar.fecha > today) return { ...base, title: `Empieza más adelante: retomar el ${cuando}`, why: `Quedaron en hablar más adelante.${dijo}`, waiting: true, canReply: true, due: false };
+    return {
+      ...base,
+      title: 'Retomá: te dijo que empezaba más adelante',
+      why: `Quedaron en retomar por estas fechas.${dijo}`,
+      message: msg(p, 'retomar', settings),
+      send: 'i_replied',
+      canReply: true,
+    };
+  }
   const followUp = (what: string): NextMove => {
     const n = Math.min((p.followUps || 0) + 1, settings.maxFollowUps);
     const done = (p.followUps || 0) >= settings.maxFollowUps;

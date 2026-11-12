@@ -326,6 +326,7 @@ export type ProspectAction =
   | 'conv_agreed'
   | 'snooze'
   | 'do_not_contact'
+  | 'later' // empieza más adelante: note = 'YYYY-MM-DD|motivo'
   | 'they_replied' // te escribió (en cualquier etapa): te toca a vos
   | 'i_replied' // le contestaste (fuera del guion)
   | 'note'; // solo una nota en el historial
@@ -340,6 +341,8 @@ export function applyAction(
   const r = applyActionInner(p, action, today, settings, note);
   // Cualquier mensaje tuyo deja de estar "pendiente de contestar"
   if (OUTBOUND.includes(action) || action.startsWith('conv_answer:')) r.updates.awaitingMe = false;
+  // Cualquier otra cosa que pase con él (le escribiste, te escribió, se descartó) termina la espera
+  if (p.retomar && action !== 'later' && action !== 'note') r.updates.retomar = undefined;
   return r;
 }
 
@@ -377,6 +380,23 @@ function applyActionInner(
       return { updates: { lastContactAt: today, lastOutcomeAt: today, nextActionDate: next, followUps: 0 }, event: null };
     case 'note':
       return { updates: {}, event: null };
+    case 'later': {
+      const [fecha, ...resto] = (note || '').split('|');
+      const ok = /^\d{4}-\d{2}-\d{2}$/.test(fecha) && fecha >= today ? fecha : addDays(today, 30);
+      const motivo = resto.join('|').trim().slice(0, 200);
+      return {
+        updates: {
+          retomar: { fecha: ok, desde: today, ...(motivo ? { motivo } : {}) },
+          nextActionDate: ok,
+          followUps: 0,
+          awaitingMe: false,
+          lastOutcomeAt: today,
+          pulledOn: undefined,
+          ...(p.stage === 'nuevo' ? { plannedFirstContact: ok } : {}),
+        },
+        event: null,
+      };
+    }
     case 'follow_up':
       updates = { followUps: (p.followUps || 0) + 1, lastContactAt: today, nextActionDate: next };
       break;
@@ -447,7 +467,7 @@ function applyActionInner(
 
 // ---------------- COLA DEL DÍA ----------------
 
-export type QueueKind = 'llamada_hoy' | 'video' | 'responder' | 'llamada' | 'propuesta' | 'seguimiento' | 'primer';
+export type QueueKind = 'llamada_hoy' | 'video' | 'responder' | 'retomar' | 'llamada' | 'propuesta' | 'seguimiento' | 'primer';
 
 export interface QueueItem {
   prospect: Prospect;
@@ -462,14 +482,15 @@ export const QUEUE_LABELS: Record<QueueKind, string> = {
   llamada_hoy: 'Llamada de hoy',
   video: 'Mandar video de la auditoría',
   responder: 'Respondió: contestarle',
+  retomar: 'Retomar: te dijo que empezaba más adelante',
   llamada: '¿Cómo salió la llamada?',
   propuesta: 'Seguimiento de la propuesta',
   seguimiento: 'Seguimiento',
   primer: 'Primer mensaje',
 };
 
-const KIND_ORDER: Record<QueueKind, number> = { llamada_hoy: 0, responder: 1, video: 2, llamada: 3, propuesta: 4, seguimiento: 5, primer: 6 };
-const MUST_DO: QueueKind[] = ['llamada_hoy', 'video', 'responder', 'llamada', 'propuesta'];
+const KIND_ORDER: Record<QueueKind, number> = { llamada_hoy: 0, responder: 1, video: 2, retomar: 3, llamada: 4, propuesta: 5, seguimiento: 6, primer: 7 };
+const MUST_DO: QueueKind[] = ['llamada_hoy', 'video', 'responder', 'retomar', 'llamada', 'propuesta'];
 const WAITING_STEPS: ConvStep[] = ['esperando_respuesta', 'esperando_acuerdo'];
 
 /** ¿Ya pasó la hora de la llamada? (hora de Argentina) */
@@ -564,6 +585,11 @@ export function buildDailyQueue(
       // Te escribió: lo primero es contestarle, esté en la etapa que esté
       kind = 'responder';
       due = p.lastReplyAt || today;
+    } else if (p.retomar) {
+      // Empieza más adelante: no aparece hasta su fecha y ese día vuelve sola
+      if (p.retomar.fecha > today) return;
+      kind = 'retomar';
+      due = p.retomar.fecha;
     } else if (p.stage === 'llamada') {
       if (p.proposalSentAt) {
         if (dueNow) kind = 'propuesta';
@@ -629,6 +655,7 @@ export function pendingOutcomes(prospects: Prospect[], today: string): Prospect[
       (p) =>
         !!p.lastContactAt &&
         p.lastContactAt < today &&
+        !p.retomar &&
         (p.lastOutcomeAt || '') < p.lastContactAt &&
         !p.awaitingMe &&
         (['contactado', 'auditoria_enviada', 'video_enviado'].includes(p.stage) ||
@@ -636,6 +663,11 @@ export function pendingOutcomes(prospects: Prospect[], today: string): Prospect[
           (p.stage === 'llamada' && !!p.proposalSentAt))
     )
     .sort((a, b) => (a.lastContactAt || '').localeCompare(b.lastContactAt || ''));
+}
+
+/** Los que dijeron que empiezan más adelante, del más próximo al más lejano */
+export function masAdelante(prospects: Prospect[]): Prospect[] {
+  return prospects.filter((p) => p.retomar && !CLOSED.includes(p.stage)).sort((a, b) => a.retomar!.fecha.localeCompare(b.retomar!.fecha));
 }
 
 /** Descartados sin respuesta que ya cumplieron los 90 días: vuelven con otro mensaje. */
@@ -649,6 +681,7 @@ export function pendingDayClose(prospects: Prospect[], today: string): Prospect[
     (p) =>
       p.lastContactAt === today &&
       p.lastOutcomeAt !== today &&
+      !p.retomar &&
       !p.awaitingMe &&
       !CLOSED.includes(p.stage) &&
       (p.stage !== 'respondio' || WAITING_STEPS.includes(p.convStep as ConvStep))
@@ -760,6 +793,9 @@ export function renderTemplate(template: string, p: Prospect, settings?: Prospec
     .replace(/\{link\}/g, auditLinkFor(p));
 }
 
+/** Para retomar con quien dijo que empezaba más adelante (se puede cambiar en la configuración) */
+export const RETOMAR_DEFAULT = '{saludoHora}, {saludo}. ¿Cómo va todo en {estudio}? Me habías comentado que por estas fechas querían arrancar. ¿Seguís con ganas de que veamos cómo darle más visibilidad a tu trabajo?';
+
 export function templateFor(item: QueueItem, settings: ProspectingSettings): string {
   const t = settings.templates;
   const p = item.prospect;
@@ -770,6 +806,7 @@ export function templateFor(item: QueueItem, settings: ProspectingSettings): str
     return pool[firstVariantIndex(p, settings)] || t.first;
   }
   if (item.kind === 'video') return t.video;
+  if (item.kind === 'retomar') return t.retomar || RETOMAR_DEFAULT;
   if (item.kind === 'llamada' || item.kind === 'llamada_hoy') return '';
   if (item.kind === 'propuesta') return t.proposal;
   if (item.kind === 'seguimiento' && p.stage === 'video_enviado') return t.booking;
@@ -1079,6 +1116,7 @@ export function turnOf(p: Prospect, today: string, settings: ProspectingSettings
   const ago = since === 0 ? 'hoy' : since === 1 ? 'hace 1 día' : `hace ${since} días`;
   if (CLOSED.includes(p.stage)) return { turn: 'cerrado', label: STAGE_LABELS[p.stage], days: 0 };
   if (p.stage === 'nuevo') return { turn: 'sin_contactar', label: 'Sin contactar', days: 0 };
+  if (p.retomar && p.retomar.fecha > today && !p.awaitingMe) return { turn: 'suyo', label: `Empieza más adelante: retomar el ${p.retomar.fecha.slice(8, 10)}/${p.retomar.fecha.slice(5, 7)}${p.retomar.motivo ? ` · ${p.retomar.motivo}` : ''}`, days: 0 };
   if (p.awaitingMe) return { turn: 'mio', label: `Te escribió${p.lastReplyAt && p.lastReplyAt !== today ? ` el ${p.lastReplyAt.slice(8, 10)}/${p.lastReplyAt.slice(5, 7)}` : ''}: te toca`, days: 0 };
   if (p.stage === 'auditoria_completada') return { turn: 'mio', label: 'Te toca: mandar el video', days: 0 };
   if (p.stage === 'respondio' && !WAITING_STEPS.includes(p.convStep as ConvStep)) return { turn: 'mio', label: 'Te toca seguir la conversación', days: 0 };
@@ -1167,6 +1205,7 @@ export const ACTION_LOG: Partial<Record<string, string>> = {
   lost: 'Lo descartaste',
   do_not_contact: 'Pidió que no lo contacten',
   snooze: 'Lo pasaste para mañana',
+  later: 'Empieza más adelante',
 };
 
 export function logEntryFor(action: ProspectAction, note?: string): { dir: 'in' | 'out' | 'nota'; text: string } | null {
@@ -1178,6 +1217,11 @@ export function logEntryFor(action: ProspectAction, note?: string): { dir: 'in' 
   const base = ACTION_LOG[action];
   if (!base) return null;
   const dir = action === 'they_replied' || action === 'reply' || action === 'conv_agreed' || action === 'audit_completed' ? 'in' : 'out';
+  if (action === 'later') {
+    const [fecha, ...resto] = (note || '').split('|');
+    const m = resto.join('|').trim();
+    return { dir: 'nota', text: `Empieza más adelante: retomar el ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}${m ? ` (${m})` : ''}` };
+  }
   const extra = note && !/^\d{4}-\d{2}-\d{2}/.test(note) ? `: ${note}` : action === 'call' && note ? ` (${note})` : '';
   return { dir, text: `${base}${extra}` };
 }
