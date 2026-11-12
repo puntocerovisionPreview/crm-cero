@@ -1,27 +1,39 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ProspectingSettings } from '../types';
-import { PoolDoc, loadPool, maybeRunWeeklyBatch } from './poolStore';
+import { PoolDoc, contarPool, loadPoolDisponibles, maybeRunWeeklyBatch } from './poolStore';
 
-/** Estado de la reserva (se lee al abrir y después de cada cambio, no en vivo). */
-export function usePool() {
+/**
+ * Estado de la reserva (se lee al abrir y después de cada cambio, no en vivo).
+ * Por defecto solo CUENTA (unas pocas lecturas); con `completo` trae los disponibles (pestaña Reserva).
+ */
+export function usePool(completo = false) {
   const [docs, setDocs] = useState<PoolDoc[] | null>(null);
+  const [conteo, setConteo] = useState<{ disponibles: number; tomados: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (forzar = true) => {
     try {
-      setDocs(await loadPool());
+      if (completo) setDocs(await loadPoolDisponibles());
+      setConteo(await contarPool(forzar));
       setError(null);
     } catch (err) {
       setError((err as Error).message);
     }
-  }, []);
+  }, [completo]);
 
   useEffect(() => {
-    refresh();
+    refresh(false);
   }, [refresh]);
 
   const available = (docs || []).filter((d) => d.status === 'disponible');
-  return { docs, available, availableCount: available.length, takenCount: (docs?.length || 0) - available.length, refresh, error };
+  return {
+    docs: completo ? docs : conteo ? [] : null,
+    available,
+    availableCount: conteo?.disponibles ?? available.length,
+    takenCount: conteo?.tomados ?? 0,
+    refresh: () => refresh(true),
+    error,
+  };
 }
 
 /** Tanda semanal automática: corre una vez por semana al abrir la app, con la configuración ya cargada. */

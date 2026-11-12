@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, getCountFromServer, getDocs, query, setDoc, where, writeBatch } from 'firebase/firestore';
 import { db } from '../firebase';
 import { deepSanitize } from '../utils/firestoreService';
 import { Prospect, ProspectingSettings } from '../types';
@@ -21,9 +21,34 @@ export interface PoolDoc extends PoolLead {
   prospectId?: string;
 }
 
+/** Toda la reserva (disponibles y tomados). Son miles: solo para subir el CSV sin repetir */
 export async function loadPool(): Promise<PoolDoc[]> {
   const snap = await getDocs(collection(db, POOL));
   return snap.docs.map((d) => ({ ...(d.data() as PoolDoc), id: d.id }));
+}
+
+/** Solo los disponibles: para elegir la tanda y para la pestaña Reserva */
+export async function loadPoolDisponibles(): Promise<PoolDoc[]> {
+  const snap = await getDocs(query(collection(db, POOL), where('status', '==', 'disponible')));
+  return snap.docs.map((d) => ({ ...(d.data() as PoolDoc), id: d.id }));
+}
+
+/**
+ * Cuántos quedan y cuántos se tomaron, SIN traer los contactos: contar cuesta 1 lectura cada
+ * 1.000 (leer la reserva entera eran ~2.000 por apertura y se comía el cupo gratis del día).
+ * Se reutiliza 5 minutos: la tarjeta aparece en varios lugares de la pantalla.
+ */
+let conteoCache: { at: number; p: Promise<{ disponibles: number; tomados: number }> } | null = null;
+export function contarPool(forzar = false): Promise<{ disponibles: number; tomados: number }> {
+  if (!forzar && conteoCache && Date.now() - conteoCache.at < 5 * 60 * 1000) return conteoCache.p;
+  const col = collection(db, POOL);
+  const p = Promise.all([getCountFromServer(query(col, where('status', '==', 'disponible'))), getCountFromServer(col)])
+    .then(([disp, total]) => ({ disponibles: disp.data().count, tomados: total.data().count - disp.data().count }))
+    // Si contar no está disponible, se cuentan los disponibles (más lecturas, pero nunca un cero falso)
+    .catch(async () => ({ disponibles: (await loadPoolDisponibles()).length, tomados: 0 }));
+  conteoCache = { at: Date.now(), p };
+  p.catch(() => { conteoCache = null; });
+  return p;
 }
 
 async function commitChunks(ops: Array<(b: ReturnType<typeof writeBatch>) => void>) {
@@ -41,6 +66,7 @@ export async function addToPool(leads: PoolLead[], today: string): Promise<numbe
   await commitChunks(
     fresh.map((l) => (b) => b.set(doc(db, POOL, l.id), deepSanitize({ ...l, status: 'disponible', addedAt: today })))
   );
+  conteoCache = null;
   return fresh.length;
 }
 
@@ -88,8 +114,8 @@ export async function takeFromPool(
   opts: { now?: boolean; boosts?: Record<string, number>; blockedPhones?: Set<string> } = {}
 ): Promise<TakeResult> {
   if (count <= 0) return { added: 0 };
-  const available = (await loadPool()).filter(
-    (d) => d.status === 'disponible' && !(opts.blockedPhones && opts.blockedPhones.has(phoneKey(d.whatsapp)))
+  const available = (await loadPoolDisponibles()).filter(
+    (d) => !(opts.blockedPhones && opts.blockedPhones.has(phoneKey(d.whatsapp)))
   );
   if (available.length === 0) return { added: 0, reason: 'reserva_vacia' };
   let picked = pickBatch(available, count, {
@@ -111,6 +137,7 @@ export async function takeFromPool(
     batch.set(doc(db, POOL, lead.id), { status: 'tomado', takenAt: nowIso, prospectId: p.id }, { merge: true });
   });
   await batch.commit();
+  conteoCache = null;
   return { added: picked.length };
 }
 

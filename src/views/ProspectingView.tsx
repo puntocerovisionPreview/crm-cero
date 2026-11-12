@@ -113,7 +113,8 @@ export const ProspectingView: React.FC<Props> = ({ projects, onAddProject, initi
   const showMore = moreOpen || !!TABS.find((t) => t.id === tab)?.more;
   const [funnelFrom, setFunnelFrom] = useState<string | null>(null);
   const list = prospects || [];
-  const pool = usePool();
+  // La reserva completa (disponibles) solo en su pestaña; en el resto alcanza con contar
+  const pool = usePool(tab === 'reserva');
   const [poolNotice, setPoolNotice] = useState<string | null>(null);
   const [actError, setActError] = useState<string | null>(null);
   const takeOpts = usePoolTakeOptions(list, events);
