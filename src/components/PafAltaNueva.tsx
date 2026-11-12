@@ -31,7 +31,7 @@ export function PafAltaNueva({ project, meetings, onUpdateProject }: { project: 
     setBusy(true); setMsg('');
     const err = await retryArranque(project.id);
     setBusy(false);
-    setMsg(err || 'Listo: carpetas creadas y compartidas.');
+    setMsg(err || (a?.estado === 'listo' ? 'Listo: se sumó lo nuevo de la carpeta modelo (no se pisó ni borró nada).' : 'Listo: carpetas creadas y compartidas.'));
   };
 
   return (
@@ -55,9 +55,11 @@ export function PafAltaNueva({ project, meetings, onUpdateProject }: { project: 
             ))}
           </ol>
           {!project.pafPortal?.publishedAt && <p className="text-[11px] text-amber-300">Publicá su portal y mandale el link: lo primero que va a ver es “Completá tus datos”.</p>}
-          {a?.respuestas && a.estado !== 'listo' && (
-            <button type="button" onClick={reintentar} disabled={busy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-2.5 py-1 text-[11px] font-bold text-zinc-200 disabled:opacity-50">
-              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}Reintentar crear las carpetas
+          {a?.respuestas && (
+            <button type="button" onClick={reintentar} disabled={busy}
+              title={a.estado === 'listo' ? 'Copia a su carpeta lo que agregaste a la carpeta modelo. No pisa ni borra lo que ya tiene.' : undefined}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-2.5 py-1 text-[11px] font-bold text-zinc-200 disabled:opacity-50">
+              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}{a.estado === 'listo' ? 'Traer lo nuevo de la carpeta modelo' : 'Reintentar crear las carpetas'}
             </button>
           )}
           {msg && <p role="status" className="text-[11px] text-zinc-300">{msg}</p>}
