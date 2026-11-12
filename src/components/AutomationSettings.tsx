@@ -167,6 +167,11 @@ export const AutomationSettings: React.FC = () => {
                 Listo{status.credentialMode === 'cloud-run' ? ', con la identidad propia del servidor (sin clave)' : ''}
                 {status.serviceAccountEmail ? ` — ${status.serviceAccountEmail}` : ''}.
               </p>
+            ) : status.credentialMode === 'cloud-run' && /RESOURCE_EXHAUSTED|quota/i.test(status.dbAccessError || '') ? (
+              <>
+                <p>El acceso está bien configurado. Lo que pasa es que <b>la base llegó a su límite gratis de hoy</b> (50.000 lecturas por día) y hasta que se renueve rechaza todo, también esta comprobación.</p>
+                <p>Se renueva sola alrededor de las <b>5 de la mañana</b>. No hace falta tocar nada ni cargar claves nuevas.</p>
+              </>
             ) : status.credentialMode === 'cloud-run' ? (
               <>
                 <p>El servidor está publicado pero Google no le da permiso sobre la base todavía.</p>

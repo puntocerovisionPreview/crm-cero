@@ -63,7 +63,11 @@ export function registerDriveOAuth(app: express.Express, requireOwner: express.R
       const db = getDb();
       const d = db ? (await integrationRef(db).get()).data()?.drive : null;
       res.json({ configured: driveConfigured(), connected: Boolean(d?.refresh), calendar: Boolean(d?.refresh && d?.calendar), email: d?.email || null, error: d?.error || (!db ? 'El servidor no tiene acceso a la base.' : null) });
-    } catch { res.status(503).json({ error: 'No se pudo consultar la conexión con Drive.' }); }
+    } catch (e: any) {
+      // Sin cupo en la base no se puede leer la conexión: decirlo claro, no es un problema de Drive
+      const cupo = /RESOURCE_EXHAUSTED|quota/i.test(String(e?.message || e?.code || ''));
+      res.status(503).json({ error: cupo ? 'La base llegó a su límite gratis de hoy: vuelve sola alrededor de las 5 de la mañana. Drive no tiene nada mal.' : 'No se pudo consultar la conexión con Drive.' });
+    }
   });
   app.post('/api/drive/connect', requireOwner, async (_req, res) => {
     try {
