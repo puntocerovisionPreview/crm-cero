@@ -391,6 +391,8 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
           {tuyas.length ? <>De tu lado hay {tuyas.length === 1 ? 'una sola cosa' : `${tuyas.length} cosas`}</> : <>De tu lado no hay nada por ahora</>}
           {ver.reuniones && p.proximaReunion ? <>, y nos vemos <span className="font-medium">{p.proximaReunion.fecha === taskProps.today ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}{p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}</span>.</> : '.'}
         </p>
+        {/* La semana en una o dos líneas, como se la contaría Juan */}
+        {ver.semana && p.resumenVisible && <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-[var(--text-secondary)] whitespace-pre-line line-clamp-3">{p.resumenVisible}</p>}
         {!readOnly && <button type="button" onClick={() => setShowWelcome(true)} className="mt-3 text-xs text-[var(--text-tertiary)] underline underline-offset-4 hover:text-[var(--text-primary)]">Ver la guía de cómo usar tu portal</button>}
         {mostrarAvance && p.recorrido !== 'web' && <EtapasLine etapas={p.etapas || ['presencia']} actual={etapa} />}
         {mostrarAvance && (
@@ -458,7 +460,15 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                     )}
                   </div>
                   {ahora ? (
-                    <div className="mt-3" key={ahora.id}><PasoCuerpo c={ahora} grande isNew={isNew} {...taskProps} /></div>
+                    <>
+                      <div className="mt-3" key={ahora.id}><PasoCuerpo c={ahora} grande isNew={isNew} {...taskProps} /></div>
+                      {tuyas[idx + 1] && (
+                        <p className="mt-5 text-sm text-[var(--text-secondary)]">
+                          Después de esta te {tuyas.length - idx - 1 === 1 ? 'queda una más' : `quedan ${tuyas.length - idx - 1} más`}:{' '}
+                          <button type="button" onClick={() => setAhoraI(idx + 1)} className="text-[var(--text-primary)] underline underline-offset-4">{tuyas[idx + 1].titulo}</button>
+                        </p>
+                      )}
+                    </>
                   ) : (
                     <>
                       <h2 className="mt-3 text-2xl sm:text-[32px] font-light leading-tight tracking-tight">Nada de tu lado por ahora.</h2>
@@ -508,6 +518,29 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                 <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]">Mientras tanto, nosotros</p>
                 <ul className="mt-2 space-y-1.5">
                   {(p.enMarcha || []).map((x, i) => <li key={i} className="text-sm leading-relaxed text-[var(--text-primary)]">{x.texto}</li>)}
+                </ul>
+              </section>
+            )}
+
+            {/* Lo último que hablamos: para que no tenga que buscarlo en Novedades */}
+            {reuniones[0] && (
+              <section aria-label="Lo que hablamos" className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-tertiary)]">Lo que hablamos el {formatDisplayDate(reuniones[0].fecha, 'medium')}{isNew(`r:${reuniones[0].fecha}`) && <NewBadge className="ml-2" />}</p>
+                <div className="border-l-2 border-[var(--marca)] pl-4"><MeetingSummary s={reuniones[0]} /></div>
+              </section>
+            )}
+
+            {/* Tus números, chicos: el detalle sigue en Novedades */}
+            {(p.numeros || []).length > 0 && (
+              <section aria-label="Tus números">
+                <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-tertiary)]">Tus números</p>
+                <ul className="mt-2 flex flex-wrap gap-x-10 gap-y-3">
+                  {(p.numeros || []).slice(0, 4).map((n, i) => (
+                    <li key={i}>
+                      <p className="text-3xl font-light tracking-tight tabular-nums text-[var(--text-primary)]">{n.valor}</p>
+                      <p className="text-xs text-[var(--text-secondary)]">{n.label}{n.fuente ? ` · ${n.fuente}` : ''}</p>
+                    </li>
+                  ))}
                 </ul>
               </section>
             )}
