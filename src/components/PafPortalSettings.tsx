@@ -30,10 +30,15 @@ export const PortalSectionsToggles: React.FC<{ draft: PafPortalDraft; onChange: 
   );
 };
 
-/** Bienvenida (PDF), Gestión de contenido (app de la CM) y las 4 subcarpetas de Materiales */
+/** Bienvenida (escrita y PDF), Gestión de contenido (app de la CM) y las 4 subcarpetas de Materiales */
 export const PortalLinksEditor: React.FC<{ draft: PafPortalDraft; onChange: (patch: Partial<PafPortalDraft>) => void }> = ({ draft, onChange }) => (
   <div className="space-y-3">
-    <label className="block text-[11px] text-zinc-400">Bienvenida (el PDF 00_BIENVENIDA de su carpeta)
+    <label className="block text-[11px] text-zinc-400">Bienvenida escrita (la lee dentro de su portal, sin abrir nada)
+      <textarea className={`${input} min-h-[8rem]`} value={draft.bienvenidaTexto || ''} maxLength={6000}
+        placeholder={'Qué bueno tenerte acá.\n\nCómo trabajamos\n\nNos vemos cada dos semanas…\n\n(Una línea sola y corta, sin punto, se ve como título.)'}
+        onChange={(e) => onChange({ bienvenidaTexto: e.target.value })} />
+    </label>
+    <label className="block text-[11px] text-zinc-400">Bienvenida en PDF (opcional: el 00_BIENVENIDA de su carpeta)
       <input className={input} value={draft.bienvenida || ''} placeholder="https://drive.google.com/file/d/…" onChange={(e) => onChange({ bienvenida: e.target.value })} />
       {!linkOk(draft.bienvenida) && <span className="text-amber-300">Ese link no se puede abrir.</span>}
     </label>

@@ -53,6 +53,7 @@ describe('portal PAF con login', () => {
       secciones: seccionesVisibles(),
       gestionContenido: null,
       bienvenida: null,
+      bienvenidaTexto: null,
       materiales: {},
       reunionesAcuerdo: null,
       reunionPorConfirmar: null,

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useState } from 'react';
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import {
-  ArrowRight, ArrowUpRight, Building2, CalendarPlus, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, Sparkles, Users, Home, LayoutList, ListChecks, Loader2, MessageCircle, Newspaper, Paperclip, Video,
+  ArrowRight, ArrowUpRight, BookOpen, Building2, CalendarDays, CalendarPlus, Camera, Check, ChevronDown, ChevronLeft, ChevronRight, Folder, Sparkles, Users, Home, LayoutList, ListChecks, Loader2, MessageCircle, Paperclip, TrendingUp, Upload, Video,
 } from 'lucide-react';
 import { BrandLogo } from '../components/BrandLogo';
 import { EmptyState, SegmentedControl } from '../ui';
@@ -14,6 +14,7 @@ import { MATERIALES, type MaterialKey, PAF_DELIVERY_STATE_LABEL, PAF_RESPONSABLE
 import { PAF_PORTAL_LINK_KEYS, PAF_PORTAL_LINK_LABEL, accessHost, accessesFromEnlaces, calendarLink, isOverdue, portalItemKeys, type PafAviso, type PafPortalDoc, type PafPortalLinkKey } from '../portal/model';
 import { Festejo, LoUltimo, saludoDelMomento, useFestejo } from './portal/PortalUltimo';
 import { ArranqueCreando, ArranqueForm } from './portal/PortalArranque';
+import { bloquesBienvenida } from '../portal/bienvenida';
 import { PASO_ESTADO_LABEL, armarPasos, pasosPorHito, type PasoEstado, type PortalPaso } from '../portal/pasos';
 import { sendTaskDone, sendVisita, subscribeAvisos, subscribeMyPafPortals, subscribePafPortal } from '../portal/store';
 
@@ -24,7 +25,7 @@ import { sendTaskDone, sendVisita, subscribeAvisos, subscribeMyPafPortals, subsc
  * En desarrollo, /portal?demo muestra un ejemplo sin login para revisar el diseño.
  */
 
-type Tab = 'inicio' | 'pasos' | 'novedades' | 'archivos';
+type Tab = 'inicio' | 'tareas' | 'subir' | 'reuniones' | 'avances';
 type PortalTask = PafPortalDoc['tareas'][number];
 
 const LINK_HINT: Record<PafPortalLinkKey, string> = {
@@ -56,6 +57,7 @@ const DEMO: PafPortalDoc = {
     { id: 'a2', texto: 'Te grabé 3 minutos contándote cómo quedó la propuesta de foco y qué mirar primero.', link: 'https://www.loom.com/', fecha: '2026-11-09' },
     { id: 'a3', texto: 'Esta semana cerramos el diagnóstico y ya estamos armando las primeras publicaciones con tus fotos.', fecha: '2026-11-07' },
   ],
+  bienvenidaTexto: 'Qué bueno tenerte acá. Durante los próximos meses vamos a trabajar juntos para que a tu estudio lo encuentren, se entienda lo que hace y lo elijan.\n\nCómo trabajamos\n\nNos vemos cada dos semanas. Entre reunión y reunión, acá vas a encontrar lo que te toca y lo que estamos haciendo nosotros.\n\nLo que te voy a pedir\n\nTus obras, fotos del equipo y un poco de tu tiempo. Si algo no lo tenés, lo resolvemos juntos.\n\nCualquier duda, escribime. Te respondo en el día.\nJuan',
   mostrarAvance: true,
   linkReunion: 'https://meet.google.com/',
   hitosCompletados: [1],
@@ -260,6 +262,8 @@ function GoogleMark() {
 
 function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, switcher }: { portal: PafPortalDoc; email: string; demo?: boolean; readOnly?: boolean; embedded?: boolean; onLogout: () => void; switcher?: React.ReactNode }) {
   const [tab, setTab] = useState<Tab>('inicio');
+  // La bienvenida escrita se lee adentro del portal, como una pantalla más
+  const [leyendo, setLeyendo] = useState(false);
   const [avisos, setAvisos] = useState<PafAviso[]>([]);
   const [sending, setSending] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -315,14 +319,7 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   const reportes = p.reportes || [];
   const materiales = MATERIALES.filter((m) => p.materiales?.[m.id]);
   const whatsapp = p.contacto?.whatsapp || '';
-  // Atajos de Inicio: solo lo que este cliente tiene a la vista
   const carpetaUrl = p.enlaces?.carpeta || accesos.find((a) => a.nombre === 'Tu carpeta')?.url;
-  const atajos: { key: string; label: string; hint: string; icon: React.ElementType; url?: string }[] = [
-    ...(ver.materiales ? materiales.map((m) => ({ key: `m-${m.id}`, label: m.label, hint: 'Subí acá', icon: MATERIAL_ICON[m.id], url: p.materiales![m.id] })) : []),
-    ...(ver.contenido && p.gestionContenido ? [{ key: 'contenido', label: 'Contenido', hint: 'Ver y aprobar', icon: LayoutList, url: p.gestionContenido }] : []),
-    ...(ver.accesos && carpetaUrl ? [{ key: 'carpeta', label: 'Tu carpeta', hint: 'Todo en Drive', icon: Folder, url: carpetaUrl }] : []),
-    ...(ver.accesos && accesos.length > 1 ? [{ key: 'todo', label: 'Todos tus enlaces', hint: `${accesos.length} accesos`, icon: Paperclip }] : []),
-  ];
   const isNew = useNewItems(p, !readOnly && !demo);
   // Hito cerrado desde la última vez que entró: se festeja una vez (en el ejemplo, siempre)
   const [festejo, cerrarFestejo] = useFestejo(p.clienteId, etapa, hechos, !readOnly && !embedded, !!demo);
@@ -348,90 +345,98 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
   };
   const verRecorrido = ver.recorrido && mostrarAvance;
   const conReunion = ver.reuniones && !!(p.proximaReunion || p.reunionPorConfirmar);
-  const hayNovedades = ver.novedades || ver.anuncios || ver.semana || ver.cicloCM || ver.tuMes || ver.reportes || ver.acuerdos || (p.numeros || []).length > 0;
 
+  const waHref = whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(`Hola Juan, te escribo de ${p.estudio}.`)}` : '';
   const account = (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2">
       {switcher}
-      <button type="button" onClick={onLogout} title={`Salir (${email})`} className="group inline-flex items-center gap-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-primary)]">
-        <span className="hidden sm:inline">Salir</span>
-        <span className="w-8 h-8 rounded-full border border-[var(--border-subtle)] bg-[var(--bg-surface)] flex items-center justify-center text-xs font-semibold text-[var(--text-secondary)] group-hover:border-[var(--border-strong)]">{initial}</span>
+      {waHref && (
+        <a href={waHref} target="_blank" rel="noopener noreferrer" aria-label="Escribirle a Juan por WhatsApp" title="Escribirle a Juan"
+          className="inline-flex h-11 items-center gap-2 rounded-full border border-[var(--border-subtle)] bg-white px-3 sm:px-4 text-sm text-[var(--text-primary)] hover:border-[var(--border-strong)]">
+          <MessageCircle className="h-5 w-5" /><span className="hidden sm:inline">Escribirle a Juan</span>
+        </a>
+      )}
+      <button type="button" onClick={onLogout} title={`Salir (${email})`} aria-label="Salir" className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-white text-xs font-semibold text-[var(--text-secondary)] hover:border-[var(--border-strong)]">
+        {initial}
       </button>
     </div>
   );
 
+  // La barra de abajo: solo lo que este cliente tiene para ver
+  const subirMateriales = ver.materiales ? materiales : [];
+  const hayReuniones = conReunion || reuniones.length > 0;
+  const hayAvances = verRecorrido || cerradas.length > 0 || reportes.length > 0 || (ver.semana && (!!p.resumenVisible || objetivos.length > 0)) || portalItemKeys(p).length > 0;
   const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: 'inicio', label: 'Inicio' },
-    ...(cartas.length ? [{ id: 'pasos' as Tab, label: 'Paso a paso', count: tuyas.length || undefined }] : []),
-    ...(hayNovedades ? [{ id: 'novedades' as Tab, label: 'Novedades' }] : []),
-    ...(ver.accesos || ver.materiales || ver.contenido ? [{ id: 'archivos' as Tab, label: 'Archivos' }] : []),
+    ...(cartas.length ? [{ id: 'tareas' as Tab, label: 'Tareas', count: tuyas.length || undefined }] : []),
+    ...(subirMateriales.length || (ver.accesos && accesos.length) || (ver.contenido && p.gestionContenido) ? [{ id: 'subir' as Tab, label: 'Subir' }] : []),
+    ...(hayReuniones ? [{ id: 'reuniones' as Tab, label: 'Reuniones' }] : []),
+    ...(hayAvances ? [{ id: 'avances' as Tab, label: 'Avances' }] : []),
   ];
-  const irA = (t: Tab) => { setTab(t); window.scrollTo({ top: 0 }); };
+  const irA = (t: Tab) => { setTab(t); setLeyendo(false); window.scrollTo({ top: 0 }); };
+  const tieneBienvenida = !!(p.bienvenidaTexto || p.bienvenida);
+  const abrirBienvenida = () => {
+    if (p.bienvenidaTexto) { setLeyendo(true); window.scrollTo({ top: 0 }); } else if (p.bienvenida) window.open(p.bienvenida, '_blank', 'noopener,noreferrer');
+  };
+  // Qué carpeta de Materiales le toca llenar ahora (por las tareas que pide archivos)
+  const carpetaPendiente = (id: MaterialKey) => tareas.some((t) => t.estado === 'habilitada' && !avisada(t) && t.pideArchivos && (t.carpeta || 'proyectos') === id);
+  const enRecorrido = mostrarAvance && !!HITOS[hito - 1];
 
   return (
     <Shell right={readOnly ? undefined : account} marca={p.marca} embedded={embedded}>
       {readOnly && !embedded && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista previa: así ve {p.estudio} su portal ahora. Es solo lectura: los botones no hacen nada.</p>}
       {demo && <p className="mb-6 rounded-[var(--radius-control)] border border-dashed border-[var(--border-strong)] px-4 py-2 text-xs text-[var(--text-secondary)]">Vista de ejemplo, solo en tu compu: así lo ve un estudio. Los datos son inventados.</p>}
 
-      {/* Encabezado de marca: logo del estudio, saludo, la semana en una frase y el avance */}
-      <header className="pt-1 sm:pt-4">
-        <div className="flex items-center gap-4 sm:gap-5">
-          {p.logo && (
-            <span className="flex w-16 h-16 sm:w-20 sm:h-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white p-2 shadow-sm">
-              <img src={p.logo} alt={`Logo de ${p.estudio}`} className="max-w-full max-h-full object-contain" />
-            </span>
-          )}
-          <div className="min-w-0">
-            <Eyebrow>Tu espacio con .CERO · {p.recorrido === 'web' ? 'Tu web' : ETAPAS.find((x) => x.id === etapa)!.label}</Eyebrow>
-            <h1 className="mt-1.5 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">{saludoDelMomento()}, {p.estudio}.</h1>
-          </div>
-        </div>
-        <p className="mt-5 max-w-2xl text-lg sm:text-2xl font-light leading-snug tracking-tight text-[var(--text-primary)]">
-          {mostrarAvance && p.recorrido !== 'web' && HITOS[hito - 1] ? <>Ahora estamos en <span className="font-medium">{HITOS[hito - 1].charAt(0).toLowerCase() + HITOS[hito - 1].slice(1)}</span>. </> : null}
-          {tuyas.length ? <>De tu lado hay {tuyas.length === 1 ? 'una sola cosa' : `${tuyas.length} cosas`}</> : <>De tu lado no hay nada por ahora</>}
-          {ver.reuniones && p.proximaReunion ? <>, y nos vemos <span className="font-medium">{p.proximaReunion.fecha === taskProps.today ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}{p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}</span>.</> : '.'}
-        </p>
-        {/* La semana en una o dos líneas, como se la contaría Juan */}
-        {ver.semana && p.resumenVisible && <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-[var(--text-secondary)] whitespace-pre-line line-clamp-3">{p.resumenVisible}</p>}
-        {!readOnly && <button type="button" onClick={() => setShowWelcome(true)} className="mt-3 text-xs text-[var(--text-tertiary)] underline underline-offset-4 hover:text-[var(--text-primary)]">Ver la guía de cómo usar tu portal</button>}
-        {mostrarAvance && p.recorrido !== 'web' && <EtapasLine etapas={p.etapas || ['presencia']} actual={etapa} />}
-        {mostrarAvance && (
-          <button type="button" onClick={() => cartas.length > 0 && irA('pasos')} className="mt-5 w-full text-left group">
-            <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm text-[var(--text-secondary)]">
-              <span className="flex flex-wrap items-baseline gap-x-1.5">
-                <span>Ahora:</span>
-                <span className="font-serif italic text-base text-[var(--text-primary)]">{HITOS[hito - 1]}</span>
-              </span>
-              <span className="inline-flex items-center gap-1 text-xs text-[var(--text-tertiary)] group-hover:text-[var(--text-primary)]">
-                {hechos.length} de {HITOS.length} hitos completados{cartas.length > 0 && <ArrowRight className="w-3.5 h-3.5" />}
-              </span>
-            </span>
-            <HitosBar hito={hito} hechos={hechos} hitos={HITOS} />
-          </button>
-        )}
-      </header>
-
-      {festejo && HITOS[festejo - 1] && <div className="mt-8"><Festejo titulo={HITOS[festejo - 1]} hechos={hechos.length} total={HITOS.length} onClose={cerrarFestejo} /></div>}
-
-      {/* Lo nuevo desde la última visita, en una línea: cada parte lleva a su lugar */}
-      {!showWelcome && ver.novedades && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => irA(tabs.some((x) => x.id === t) ? t : 'inicio')} />}
-
       {showWelcome && <GuiaInicial onClose={closeWelcome} estudio={p.estudio} pendientes={tuyas.length} reunion={ver.reuniones ? p.proximaReunion : undefined} carpeta={carpetaUrl} bienvenida={p.bienvenida} hasWhatsapp={!!whatsapp} />}
 
-      {/* Pestañas */}
-      {tabs.length > 1 && (
-        <>
-          <nav className="hidden sm:block mt-10 -mx-4 px-4 overflow-x-auto no-scrollbar">
-            <SegmentedControl<Tab> value={tab} onChange={setTab} options={tabs} />
-          </nav>
-          <BottomNav tabs={tabs} tab={tab} onChange={irA} />
-        </>
-      )}
+      <main className={`animate-in fade-in duration-200 ${tabs.length > 1 ? 'pb-24 sm:pb-20' : ''}`} key={leyendo ? 'bienvenida' : tab}>
+        {/* La bienvenida que escribió Juan, para leer adentro del portal */}
+        {leyendo && (
+          <article className="space-y-5 pt-1">
+            <button type="button" onClick={() => setLeyendo(false)} className="-ml-1 inline-flex min-h-11 items-center gap-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"><ChevronLeft className="h-5 w-5" />Inicio</button>
+            <p className="text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">Tu bienvenida</p>
+            <div className="max-w-2xl space-y-4">
+              {bloquesBienvenida(p.bienvenidaTexto).map((b, i) => (b.tipo === 'titulo'
+                ? <h2 key={i} className={`${i === 0 ? 'text-3xl sm:text-4xl font-light leading-tight' : 'pt-2 text-xl font-medium'} tracking-tight text-[var(--text-primary)]`}>{b.texto}</h2>
+                : <p key={i} className={`whitespace-pre-line leading-relaxed text-[var(--text-secondary)] ${i === 0 ? 'text-lg sm:text-xl font-light text-[var(--text-primary)]' : 'text-[15px] sm:text-base'}`}>{b.texto}</p>))}
+            </div>
+            {p.bienvenida && <a href={p.bienvenida} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] underline underline-offset-4">También en PDF <ArrowUpRight className="h-4 w-4" /></a>}
+            {tuyas.length > 0 && (
+              <button type="button" onClick={() => irA('tareas')} className="flex min-h-12 w-full max-w-sm items-center justify-center rounded-full px-6 text-[15px] font-medium" style={{ background: 'var(--marca)', color: 'var(--marca-text)' }}>
+                Ver lo primero que te toca
+              </button>
+            )}
+          </article>
+        )}
 
-      <main className="mt-6 sm:mt-8 animate-in fade-in duration-200" key={tab}>
-        {tab === 'inicio' && (
-          <div className="space-y-6 sm:space-y-8">
-            {/* Lo que Juan fijó (la bienvenida, un aviso importante): arriba de todo, apenas entra */}
+        {!leyendo && tab === 'inicio' && (
+          <div className="space-y-5 sm:space-y-6">
+            {/* Saludo: logo del estudio, la semana en una frase y lo que le toca */}
+            <header className="pt-1 sm:pt-2">
+              <div className="flex items-center gap-4 sm:gap-5">
+                {p.logo && (
+                  <span className="flex w-14 h-14 sm:w-20 sm:h-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-white p-2 shadow-sm">
+                    <img src={p.logo} alt={`Logo de ${p.estudio}`} className="max-w-full max-h-full object-contain" />
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <p className="text-xs text-[var(--text-tertiary)] first-letter:uppercase">{new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+                  <h1 className="mt-1 text-3xl sm:text-5xl font-light tracking-tight leading-[1.1] text-[var(--text-primary)] break-words">{saludoDelMomento()}, {p.estudio}.</h1>
+                </div>
+              </div>
+              <p className="mt-4 max-w-2xl text-lg sm:text-2xl font-light leading-snug tracking-tight text-[var(--text-primary)]">
+                {tuyas.length ? <>De tu lado hay <span className="font-medium">{tuyas.length === 1 ? 'una sola cosa' : `${tuyas.length} cosas`}</span></> : <>De tu lado no hay nada por ahora</>}
+                {ver.reuniones && p.proximaReunion ? <> y nos vemos <span className="font-medium">{p.proximaReunion.fecha === taskProps.today ? 'hoy' : new Date(`${p.proximaReunion.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric' })}{p.proximaReunion.hora ? ` a las ${p.proximaReunion.hora}` : ''}</span>.</> : '.'}
+              </p>
+              {ver.semana && p.resumenVisible && <p className="mt-3 max-w-2xl text-[15px] leading-relaxed text-[var(--text-secondary)] whitespace-pre-line line-clamp-4">{p.resumenVisible}</p>}
+            </header>
+
+            {festejo && HITOS[festejo - 1] && <Festejo titulo={HITOS[festejo - 1]} hechos={hechos.length} total={HITOS.length} onClose={cerrarFestejo} />}
+
+            {/* Lo nuevo desde la última visita, en una línea: cada parte lleva a su lugar */}
+            {!showWelcome && ver.novedades && <SinceLastVisit keys={portalItemKeys(p).filter(isNew)} onGo={(t) => irA(tabs.some((x) => x.id === t) ? t : 'inicio')} />}
+
+            {/* Lo que Juan fijó (un aviso importante): arriba de todo, apenas entra */}
             {ver.anuncios && (p.anuncios || []).filter((a) => a.fijado).slice(0, 2).map((a) => (
               <section key={a.id} aria-label={a.titulo || 'Mensaje de .CERO'} className="rounded-[28px] border border-[var(--border-subtle)] bg-white p-5 shadow-sm sm:p-7">
                 <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.2em] text-[var(--marca)]">De .CERO para vos{isNew(`a:${a.id}`) && <NewBadge />}</p>
@@ -444,6 +449,33 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
             {/* Alta sin Tally: lo primero es completar sus datos (con eso se crean sus carpetas) */}
             {p.arranque?.pendiente && <ArranqueForm clienteId={p.clienteId} estudio={p.estudio} email={email} readOnly={readOnly || demo} />}
             {p.arranque?.creando && <ArranqueCreando />}
+
+            {/* La bienvenida de Juan, a un toque */}
+            {tieneBienvenida && (
+              <button type="button" onClick={abrirBienvenida} className="group flex w-full items-center gap-3 rounded-[22px] p-4 text-left transition hover:-translate-y-0.5" style={{ background: 'color-mix(in srgb, var(--marca) 12%, white)' }}>
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[var(--marca)]"><BookOpen className="h-5 w-5" /></span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-medium text-[var(--text-primary)]">Tu bienvenida</span>
+                  <span className="block text-xs text-[var(--text-secondary)]">Cómo vamos a trabajar juntos</span>
+                </span>
+                {p.bienvenidaTexto ? <ArrowRight className="h-4 w-4 text-[var(--text-secondary)]" /> : <ArrowUpRight className="h-4 w-4 text-[var(--text-secondary)]" />}
+              </button>
+            )}
+
+            {/* Cómo viene: un toque y ve todo el recorrido */}
+            {enRecorrido && (
+              <button type="button" onClick={() => hayAvances && irA('avances')} className="block w-full rounded-[24px] bg-[#191B20] p-5 text-left text-[#F4F2EE] transition hover:-translate-y-0.5 sm:p-6">
+                <span className="flex items-baseline justify-between gap-3 text-xs">
+                  <span className="text-[#CFCAC0]">Tu recorrido · {p.recorrido === 'web' ? 'Tu web' : ETAPAS.find((x) => x.id === etapa)!.label}</span>
+                  <span style={{ color: 'color-mix(in srgb, var(--marca) 60%, white)' }}>Paso {hito} de {HITOS.length}</span>
+                </span>
+                <span className="mt-2 block text-xl font-normal tracking-tight sm:text-2xl">{HITOS[hito - 1]}</span>
+                <span className="mt-3 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${HITOS.length}, minmax(0, 1fr))` }} aria-hidden>
+                  {HITOS.map((_, i) => <span key={i} className="h-1.5 rounded-full" style={{ background: hechos.includes(i + 1) ? '#F4F2EE' : i + 1 === hito ? 'var(--marca)' : '#3D4047' }} />)}
+                </span>
+                {hayAvances && <span className="mt-3 inline-flex items-center gap-1 text-xs text-[#CFCAC0]">Ver todo lo que logramos <ArrowRight className="h-3.5 w-3.5" /></span>}
+              </button>
+            )}
 
             {/* AHORA: una sola carta (lo que le toca y, en la misma carta, nuestra devolución) y la reunión */}
             {!p.arranque?.pendiente && <section id="hoy" aria-label="Lo de ahora" className="scroll-mt-6 overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-white text-[var(--text-primary)] shadow-sm">
@@ -484,85 +516,27 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
             </section>}
             {error && <p role="alert" className="text-sm text-rose-500">{error}</p>}
 
-            {/* Atajos: subir materiales, ver el contenido y abrir la carpeta sin buscar */}
-            {atajos.length > 0 && (
-              <section aria-label="Atajos">
-                <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-tertiary)]">Ir directo a</p>
-                <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
-                  {atajos.map((a) => {
-                    const inner = (
-                      <>
-                        <IconTile icon={a.icon} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-medium leading-tight text-[var(--text-primary)]">{a.label}</span>
-                          <span className="mt-0.5 block text-xs leading-tight text-[var(--text-tertiary)]">{a.hint}</span>
-                        </span>
-                      </>
-                    );
-                    const cls = 'group flex h-full w-full items-center gap-3 rounded-2xl border border-[var(--border-subtle)] bg-white p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-sm';
-                    return (
-                      <li key={a.key}>
-                        {a.url
-                          ? <a href={a.url} target="_blank" rel="noopener noreferrer" className={cls}>{inner}</a>
-                          : <button type="button" onClick={() => irA('archivos')} className={cls}>{inner}</button>}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            )}
-
             {/* Lo que estamos haciendo nosotros: chico, para que sepa que avanza */}
             {ver.enMarcha && (p.enMarcha || []).length > 0 && (
-              <section className="rounded-[var(--radius-card)] border border-dashed border-[var(--border-strong)] px-5 py-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-secondary)]">Mientras tanto, nosotros</p>
-                <ul className="mt-2 space-y-1.5">
-                  {(p.enMarcha || []).map((x, i) => <li key={i} className="text-sm leading-relaxed text-[var(--text-primary)]">{x.texto}</li>)}
-                </ul>
+              <section className="flex items-start gap-3 rounded-[22px] border border-dashed border-[var(--border-strong)] px-5 py-4">
+                <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-600" aria-hidden />
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">Mientras tanto, nosotros</p>
+                  <ul className="mt-1 space-y-1">
+                    {(p.enMarcha || []).map((x, i) => <li key={i} className="text-sm leading-relaxed text-[var(--text-secondary)]">{x.texto}</li>)}
+                  </ul>
+                </div>
               </section>
             )}
 
-            {/* Lo último que hablamos: para que no tenga que buscarlo en Novedades */}
-            {reuniones[0] && (
-              <section aria-label="Lo que hablamos" className="space-y-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-tertiary)]">Lo que hablamos el {formatDisplayDate(reuniones[0].fecha, 'medium')}{isNew(`r:${reuniones[0].fecha}`) && <NewBadge className="ml-2" />}</p>
-                <div className="border-l-2 border-[var(--marca)] pl-4"><MeetingSummary s={reuniones[0]} /></div>
-              </section>
-            )}
-
-            {/* Tus números, chicos: el detalle sigue en Novedades */}
-            {(p.numeros || []).length > 0 && (
-              <section aria-label="Tus números">
-                <p className="text-[11px] font-semibold uppercase tracking-[.18em] text-[var(--text-tertiary)]">Tus números</p>
-                <ul className="mt-2 flex flex-wrap gap-x-10 gap-y-3">
-                  {(p.numeros || []).slice(0, 4).map((n, i) => (
-                    <li key={i}>
-                      <p className="text-3xl font-light tracking-tight tabular-nums text-[var(--text-primary)]">{n.valor}</p>
-                      <p className="text-xs text-[var(--text-secondary)]">{n.label}{n.fuente ? ` · ${n.fuente}` : ''}</p>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {/* El resto, ordenado: un solo acceso al paso a paso */}
-            {cartas.length > 0 && (
-              <button type="button" onClick={() => irA('pasos')} className="card-swiss group flex w-full items-center gap-4 p-4 text-left transition hover:-translate-y-0.5">
-                <IconTile icon={ListChecks} />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-[var(--text-primary)]">Todo el paso a paso</span>
-                  <span className="block text-xs text-[var(--text-tertiary)]">{enCurso.length} en curso · {cerradas.length} {cerradas.length === 1 ? 'cerrada' : 'cerradas'}</span>
-                </span>
-                <ArrowRight className="w-4 h-4 text-[var(--text-tertiary)] transition group-hover:translate-x-0.5 group-hover:text-[var(--text-primary)]" />
-              </button>
-            )}
+            {!readOnly && <button type="button" onClick={() => setShowWelcome(true)} className="text-xs text-[var(--text-tertiary)] underline underline-offset-4 hover:text-[var(--text-primary)]">Ver la guía de cómo usar tu portal</button>}
           </div>
         )}
 
-        {tab === 'pasos' && (
+        {!leyendo && tab === 'tareas' && (
           <div className="space-y-10">
+            <PageTitle title="Tus tareas" hint="Cada una dice para qué sirve. Cuando termines, tocá “Terminé”: lo revisamos y te confirmamos." />
             <section>
-              <SectionTitle title="En curso" hint="Cada carta junta lo que te pedimos y lo que te devolvemos. Cuando termines tu parte, tocá “Terminé”: lo revisamos y te confirmamos." />
               {enCurso.length ? (
                 <ul className="space-y-3">
                   {enCurso.map((c, i) => <li key={c.id}><PasoPlegable c={c} abierto={i === 0} isNew={isNew} {...taskProps} /></li>)}
@@ -570,55 +544,74 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
               ) : <EmptyState icon={<Check className="w-5 h-5" />} title="Nada en curso" description="Cuando arranquemos algo nuevo, aparece acá." />}
               {error && <p role="alert" className="mt-3 text-sm text-rose-500">{error}</p>}
             </section>
-
             {cerradas.length > 0 && (
               <section>
-                <SectionTitle title="Ya cerrado" hint={mostrarAvance && p.recorrido !== 'web' ? 'Lo que fuimos terminando juntos, por hito del programa.' : 'Lo que fuimos terminando juntos.'} />
-                <div className="space-y-3">
-                  {(mostrarAvance && p.recorrido !== 'web' ? pasosPorHito(cerradas, etapa) : [{ titulo: 'Todo lo cerrado', pasos: cerradas }]).map((g) => (
-                    <details key={g.titulo} className="group card-swiss">
-                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
-                        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--text-primary)]"><Check className="w-4 h-4 shrink-0 text-emerald-600" />{g.titulo}</span>
-                        <span className="flex shrink-0 items-center gap-2 text-xs text-[var(--text-tertiary)]">{g.pasos.length} {g.pasos.length === 1 ? 'carta' : 'cartas'}<ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" /></span>
-                      </summary>
-                      <ul className="divide-y divide-[var(--border-divider)] border-t border-[var(--border-divider)] px-5">
-                        {g.pasos.map((c) => <li key={c.id} className="py-4"><PasoCuerpo c={c} isNew={isNew} {...taskProps} /></li>)}
-                      </ul>
-                    </details>
-                  ))}
-                </div>
+                <SectionTitle title="Ya hechas" hint="Lo que fuimos terminando juntos." />
+                <details className="group card-swiss">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                    <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--text-primary)]"><Check className="w-4 h-4 shrink-0 text-emerald-600" />{cerradas.length} {cerradas.length === 1 ? 'cerrada' : 'cerradas'}</span>
+                    <ChevronDown className="w-4 h-4 text-[var(--text-tertiary)] transition-transform group-open:rotate-180" />
+                  </summary>
+                  <ul className="divide-y divide-[var(--border-divider)] border-t border-[var(--border-divider)] px-5">
+                    {cerradas.map((c) => <li key={c.id} className="py-4"><PasoCuerpo c={c} isNew={isNew} {...taskProps} /></li>)}
+                  </ul>
+                </details>
               </section>
-            )}
-
-            {verRecorrido && (
-              <details className="group">
-                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
-                  <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />Ver cómo es el programa, hito por hito
-                </summary>
-                <div className="mt-6"><Recorrido hito={hito} hechos={hechos} recorrido={p.recorrido} etapa={etapa} etapas={p.etapas || ['presencia']} /></div>
-              </details>
             )}
           </div>
         )}
 
-        {tab === 'novedades' && (
-          <div className="space-y-6 sm:space-y-8">
-            {/* La historia de lo que fue pasando (anuncios, entregas, reuniones) */}
-            <LoUltimo portal={p} today={taskProps.today} isNew={isNew} />
-
-            {ver.semana && (p.resumenVisible || objetivos.length > 0) && (
-              <Card className="p-5 sm:p-6">
-                <Eyebrow>Esta semana</Eyebrow>
-                {p.resumenVisible && <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{p.resumenVisible}</p>}
-                {objetivos.length > 0 && (
-                  <div className={`grid gap-5 sm:grid-cols-2 ${p.resumenVisible ? 'mt-5 pt-5 border-t border-[var(--border-divider)]' : 'mt-4'}`}>
-                    <GoalColumn title="Hace .CERO" items={objetivos.filter((g) => g.quien === 'cero')} />
-                    <GoalColumn title="Hace tu estudio" items={objetivos.filter((g) => g.quien === 'estudio')} />
-                  </div>
-                )}
-              </Card>
+        {!leyendo && tab === 'subir' && (
+          <div className="space-y-10">
+            <PageTitle title="Subir materiales" hint="Elegí una carpeta y se abre en tu Drive. Adentro hay un tutorial cortito; si dudás, subilo igual y lo vemos juntos." />
+            {subirMateriales.length > 0 && (
+              <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                {subirMateriales.map((m) => {
+                  const toca = carpetaPendiente(m.id);
+                  return (
+                    <li key={m.id}>
+                      <a href={p.materiales![m.id]} target="_blank" rel="noopener noreferrer" className="relative flex h-full min-h-[9.5rem] flex-col gap-3 rounded-[22px] border border-[var(--border-subtle)] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[var(--border-strong)] hover:shadow-sm">
+                        <IconTile icon={MATERIAL_ICON[m.id]} fuerte={toca} />
+                        <span className="min-w-0">
+                          <span className="block text-[15px] font-medium leading-tight text-[var(--text-primary)]">{m.label}</span>
+                          <span className="mt-1 text-xs leading-snug text-[var(--text-secondary)] line-clamp-3">{m.pedido}</span>
+                        </span>
+                        {toca && <span className="absolute right-3 top-3 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ background: 'var(--marca)', color: 'var(--marca-text)' }}>Te toca</span>}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
-
+            {ver.contenido && p.gestionContenido && (
+              <div>
+                <SectionTitle title="Contenido para aprobar" hint="Donde ves y aprobás las publicaciones con la community manager." />
+                <ContentButton url={p.gestionContenido} />
+              </div>
+            )}
+            {ver.accesos && accesos.length > 0 && (
+              <div>
+                <SectionTitle title={subirMateriales.length ? 'Más accesos' : 'Tus carpetas y enlaces'} />
+                <ul className="divide-y divide-[var(--border-divider)] rounded-[22px] border border-[var(--border-subtle)] bg-white px-4">
+                  {accesos.map((a, i) => {
+                    // Los 5 accesos de siempre conservan su descripción; el ícono sale de lo que es el link
+                    const k = PAF_PORTAL_LINK_KEYS.find((key) => PAF_PORTAL_LINK_LABEL[key] === a.nombre);
+                    return (
+                      <li key={`${a.url}-${i}`}>
+                        <a href={a.url} target="_blank" rel="noopener noreferrer" className="group flex min-h-14 items-center gap-3 py-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--bg-surface-muted)] text-[var(--marca)]"><AccessIcon nombre={a.nombre} url={a.url} className="w-[18px] h-[18px]" /></span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">{a.nombre}{isNew(`l:${a.url}`) && <NewBadge />}</span>
+                            <span className="block truncate text-xs text-[var(--text-tertiary)]">{k ? LINK_HINT[k] : PARTE_HINT[a.nombre] || accessHost(a.url)}</span>
+                          </span>
+                          <ArrowUpRight className="w-4 h-4 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)]" />
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
             {ver.cicloCM && (
               <Card className="p-5 sm:p-6">
                 <Eyebrow>El ritmo del contenido</Eyebrow>
@@ -634,40 +627,31 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
                     </li>
                   ))}
                 </ol>
-                {ver.contenido && <ContentButton url={p.gestionContenido} className="mt-4" />}
               </Card>
             )}
+          </div>
+        )}
 
-            {(p.numeros || []).length > 0 && (
-              <section>
-                <Eyebrow>Tus números</Eyebrow>
-                <ul className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  {(p.numeros || []).map((n, i) => (
-                    <li key={i} className="card-swiss p-4">
-                      <p className="text-2xl font-light tracking-tight text-[var(--text-primary)] tabular-nums">{n.valor}</p>
-                      <p className="mt-1 text-xs font-medium text-[var(--text-secondary)]">{n.label}</p>
-                      {n.fuente && <p className="mt-0.5 text-[10px] text-[var(--text-tertiary)]">{n.fuente}</p>}
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
-
-            {ver.tuMes && reportes.length > 0 && <TuMes reportes={reportes} />}
-
-            {reportes.length > 0 && (
-              <section>
-                <SectionTitle title="Reportes" hint="El resumen de cada semana." />
-                <ul className="space-y-3">{reportes.map((r) => <li key={r.id}><ReportCard r={r} /></li>)}</ul>
-              </section>
-            )}
-
+        {!leyendo && tab === 'reuniones' && (
+          <div className="space-y-10">
+            <PageTitle title="Reuniones" />
+            {conReunion
+              ? <section aria-label="Próxima reunión" className="overflow-hidden rounded-[28px] border border-[var(--border-subtle)] bg-white shadow-sm"><ReunionBlock reunion={p.proximaReunion} porConfirmar={p.reunionPorConfirmar} acuerdo={p.reunionesAcuerdo} link={p.linkReunion} estudio={p.estudio} whatsapp={whatsapp} /></section>
+              : <EmptyState icon={<CalendarDays className="w-5 h-5" />} title="Todavía no hay próxima reunión" description="Cuando la acordemos, aparece acá con el link para entrar." />}
             {reuniones.length > 0 && (
               <section>
                 <SectionTitle title="Lo que acordamos" hint="Acuerdos y próximos pasos de cada reunión." />
-                <ul className="space-y-3">
+                <ul className="space-y-2.5">
                   {reuniones.map((s, i) => (
-                    <li key={i}><Card className="p-5"><p className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">{formatDisplayDate(s.fecha, 'medium')}{isNew(`r:${s.fecha}`) && <NewBadge />}</p><MeetingSummary s={s} /></Card></li>
+                    <li key={i}>
+                      <details open={i === 0} className="group rounded-[22px] border border-[var(--border-subtle)] bg-white px-5 py-4">
+                        <summary className="flex cursor-pointer list-none items-center justify-between gap-3">
+                          <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] first-letter:uppercase">{new Date(`${s.fecha}T12:00:00`).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}{isNew(`r:${s.fecha}`) && <NewBadge />}</span>
+                          <ChevronDown className="h-4 w-4 text-[var(--text-tertiary)] transition-transform group-open:rotate-180" />
+                        </summary>
+                        <MeetingSummary s={s} />
+                      </details>
+                    </li>
                   ))}
                 </ul>
               </section>
@@ -675,68 +659,70 @@ function PortalScreen({ portal: p, email, demo, readOnly, embedded, onLogout, sw
           </div>
         )}
 
-        {tab === 'archivos' && (
-          <section className="space-y-10">
-            {ver.contenido && (
-              <div>
-                <SectionTitle title="Gestión de contenido" hint="Donde ves y aprobás las publicaciones con la community manager." />
-                <ContentButton url={p.gestionContenido} />
-              </div>
+        {!leyendo && tab === 'avances' && (
+          <div className="space-y-10">
+            <div>
+              <PageTitle title="Tus avances" />
+              {mostrarAvance && p.recorrido !== 'web' && <EtapasLine etapas={p.etapas || ['presencia']} actual={etapa} />}
+            </div>
+            {verRecorrido && <Card className="p-5 sm:p-6"><Recorrido hito={hito} hechos={hechos} recorrido={p.recorrido} etapa={etapa} etapas={p.etapas || ['presencia']} /></Card>}
+            {ver.semana && (p.resumenVisible || objetivos.length > 0) && (
+              <Card className="p-5 sm:p-6">
+                <Eyebrow>Esta semana</Eyebrow>
+                {p.resumenVisible && <p className="mt-3 text-[15px] leading-relaxed text-[var(--text-primary)] whitespace-pre-line">{p.resumenVisible}</p>}
+                {objetivos.length > 0 && (
+                  <div className={`grid gap-5 sm:grid-cols-2 ${p.resumenVisible ? 'mt-5 pt-5 border-t border-[var(--border-divider)]' : 'mt-4'}`}>
+                    <GoalColumn title="Hace .CERO" items={objetivos.filter((g) => g.quien === 'cero')} />
+                    <GoalColumn title="Hace tu estudio" items={objetivos.filter((g) => g.quien === 'estudio')} />
+                  </div>
+                )}
+              </Card>
             )}
-            {ver.materiales && materiales.length > 0 && (
-              <div>
-                <SectionTitle title="Materiales" hint="Subí cada cosa en su lugar. Así no tenés que buscar en Drive." />
-                <ul className="grid gap-3 sm:grid-cols-2">
-                  {materiales.map((m) => (
-                    <li key={m.id}>
-                      <a href={p.materiales![m.id]} target="_blank" rel="noopener noreferrer" className="card-swiss group flex h-full items-start gap-4 p-4 transition hover:-translate-y-0.5">
-                        <IconTile icon={MATERIAL_ICON[m.id]} />
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)]">{m.label}<ArrowUpRight className="ml-auto w-4 h-4 shrink-0 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" /></span>
-                          <span className="mt-1 block text-xs leading-relaxed text-[var(--text-secondary)]">{m.pedido}</span>
-                          <span className="mt-2 inline-block text-xs font-medium text-[var(--marca)]">Subir acá</span>
-                        </span>
-                      </a>
-                    </li>
+            {cerradas.length > 0 && (
+              <section>
+                <SectionTitle title="Lo que ya logramos juntos" hint={mostrarAvance && p.recorrido !== 'web' ? 'Por hito del programa.' : undefined} />
+                <div className="space-y-3">
+                  {(mostrarAvance && p.recorrido !== 'web' ? pasosPorHito(cerradas, etapa) : [{ titulo: 'Todo lo cerrado', pasos: cerradas }]).map((g) => (
+                    <details key={g.titulo} className="group card-swiss">
+                      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4">
+                        <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--text-primary)]"><Check className="w-4 h-4 shrink-0 text-emerald-600" />{g.titulo}</span>
+                        <span className="flex shrink-0 items-center gap-2 text-xs text-[var(--text-tertiary)]">{g.pasos.length}<ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" /></span>
+                      </summary>
+                      <ul className="divide-y divide-[var(--border-divider)] border-t border-[var(--border-divider)] px-5">
+                        {g.pasos.map((c) => <li key={c.id} className="py-4"><PasoCuerpo c={c} isNew={isNew} {...taskProps} /></li>)}
+                      </ul>
+                    </details>
                   ))}
-                </ul>
-              </div>
+                </div>
+              </section>
             )}
-            {ver.accesos && (
-              <div>
-                <SectionTitle title="Tus carpetas y enlaces" hint="Se abren en Drive y en las herramientas que usamos juntos." />
-                {accesos.length ? (
-                  <ul className="grid gap-3 sm:grid-cols-2">
-                    {accesos.map((a, i) => {
-                      // Los 5 accesos de siempre conservan su descripción; el ícono sale de lo que es el link
-                      const k = PAF_PORTAL_LINK_KEYS.find((key) => PAF_PORTAL_LINK_LABEL[key] === a.nombre);
-                      return (
-                        <li key={`${a.url}-${i}`}>
-                          <a href={a.url} target="_blank" rel="noopener noreferrer" className="card-swiss group flex items-center gap-4 p-4 transition hover:-translate-y-0.5">
-                            <span className="w-10 h-10 shrink-0 rounded-[var(--radius-control)] bg-[var(--bg-surface-muted)] flex items-center justify-center text-[var(--marca)]"><AccessIcon nombre={a.nombre} url={a.url} className="w-[18px] h-[18px]" /></span>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] break-words">{a.nombre}{isNew(`l:${a.url}`) && <NewBadge />}</span>
-                              <span className="block text-xs text-[var(--text-tertiary)] truncate">{k ? LINK_HINT[k] : PARTE_HINT[a.nombre] || accessHost(a.url)}</span>
-                            </span>
-                            <ArrowUpRight className="w-4 h-4 text-[var(--text-tertiary)] transition group-hover:text-[var(--text-primary)] group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                          </a>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                ) : <EmptyState icon={<Folder className="w-5 h-5" />} title="Tus accesos aparecen acá" description="Carpetas de Drive y todo lo que usamos juntos. Te avisamos cuando estén listos." />}
-              </div>
+            <LoUltimo portal={p} today={taskProps.today} isNew={isNew} />
+            {ver.tuMes && reportes.length > 0 && <TuMes reportes={reportes} />}
+            {reportes.length > 0 && (
+              <section>
+                <SectionTitle title="Reportes" hint="El resumen de cada semana." />
+                <ul className="space-y-3">{reportes.map((r) => <li key={r.id}><ReportCard r={r} /></li>)}</ul>
+              </section>
             )}
-          </section>
+          </div>
         )}
       </main>
 
-      <footer className={`mt-16 pt-6 mb-20 ${whatsapp ? 'sm:mb-16' : 'sm:mb-0'} border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-tertiary)]`}>
+      <footer className={`mt-16 pt-6 ${tabs.length > 1 ? 'mb-24 sm:mb-20' : ''} border-t border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-2 text-xs text-[var(--text-tertiary)]`}>
         <BrandLogo size="sm" />
         <span>Actualizado {formatDisplayDate(p.actualizadoEn.slice(0, 10), 'medium')}</span>
       </footer>
-      {whatsapp && <WhatsappButton number={whatsapp} studio={p.estudio} />}
+      {tabs.length > 1 && <BottomNav tabs={tabs} tab={leyendo ? 'inicio' : tab} onChange={irA} />}
     </Shell>
+  );
+}
+
+function PageTitle({ title, hint }: { title: string; hint?: string }) {
+  return (
+    <div className="pt-1">
+      <h1 className="text-3xl sm:text-4xl font-light tracking-tight text-[var(--text-primary)]">{title}</h1>
+      {hint && <p className="mt-2 max-w-2xl text-[15px] leading-relaxed text-[var(--text-secondary)]">{hint}</p>}
+    </div>
   );
 }
 
@@ -892,11 +878,11 @@ function ReportCard({ r }: { r: NonNullable<PafPortalDoc['reportes']>[number] })
 function SinceLastVisit({ keys, onGo }: { keys: string[]; onGo: (tab: Tab) => void }) {
   const n = (prefix: string) => keys.filter((k) => k.startsWith(prefix)).length;
   const parts: { text: string; tab: Tab }[] = [
-    { count: n('a:'), one: '1 anuncio', many: 'anuncios', tab: 'novedades' as Tab },
-    { count: n('t:'), one: '1 tarea nueva', many: 'tareas nuevas', tab: 'pasos' as Tab },
-    { count: n('e:'), one: '1 entrega', many: 'entregas', tab: 'pasos' as Tab },
-    { count: n('l:'), one: '1 acceso', many: 'accesos', tab: 'archivos' as Tab },
-    { count: n('r:'), one: '1 resumen de reunión', many: 'resúmenes de reunión', tab: 'novedades' as Tab },
+    { count: n('a:'), one: '1 anuncio', many: 'anuncios', tab: 'avances' as Tab },
+    { count: n('t:'), one: '1 tarea nueva', many: 'tareas nuevas', tab: 'tareas' as Tab },
+    { count: n('e:'), one: '1 entrega', many: 'entregas', tab: 'tareas' as Tab },
+    { count: n('l:'), one: '1 acceso', many: 'accesos', tab: 'subir' as Tab },
+    { count: n('r:'), one: '1 resumen de reunión', many: 'resúmenes de reunión', tab: 'reuniones' as Tab },
   ].filter((x) => x.count > 0).map((x) => ({ text: x.count === 1 ? x.one : `${x.count} ${x.many}`, tab: x.tab }));
   if (!parts.length) return null;
   return (
@@ -1303,18 +1289,23 @@ function TuMes({ reportes }: { reportes: NonNullable<PafPortalDoc['reportes']> }
 
 /** Navegación de abajo en el celular, como una app */
 function BottomNav({ tabs, tab, onChange }: { tabs: { id: Tab; label: string; count?: number }[]; tab: Tab; onChange: (t: Tab) => void }) {
-  const ICON: Record<Tab, React.ElementType> = { inicio: Home, pasos: ListChecks, novedades: Newspaper, archivos: Folder };
+  const ICON: Record<Tab, React.ElementType> = { inicio: Home, tareas: ListChecks, subir: Upload, reuniones: CalendarDays, avances: TrendingUp };
+  // Celular: barra fija abajo, como cualquier app. Compu: la misma barra, flotando abajo al centro.
   return (
-    <nav className="sm:hidden fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-white/95 backdrop-blur pb-[env(safe-area-inset-bottom)]" aria-label="Secciones">
-      <ul className="flex">
+    <nav aria-label="Secciones" className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-subtle)] bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:inset-x-auto sm:bottom-5 sm:left-1/2 sm:-translate-x-1/2 sm:rounded-full sm:border sm:pb-0 sm:shadow-[0_10px_30px_rgba(25,27,32,0.14)]">
+      <ul className="flex sm:gap-1 sm:p-1.5">
         {tabs.map((x) => {
           const Icon = ICON[x.id];
           const on = tab === x.id;
           return (
-            <li key={x.id} className="flex-1">
-              <button type="button" onClick={() => onChange(x.id)} aria-current={on ? 'page' : undefined} className={`relative flex w-full flex-col items-center gap-0.5 py-2.5 text-[10px] ${on ? 'text-[var(--marca)] font-semibold' : 'text-[var(--text-tertiary)]'}`}>
-                <Icon className="w-5 h-5" />{x.label}
-                {!!x.count && <span className="absolute right-[calc(50%-18px)] top-1.5 min-w-[16px] rounded-full bg-[var(--marca)] px-1 text-[9px] leading-4 text-white">{x.count}</span>}
+            <li key={x.id} className="flex-1 sm:flex-none">
+              <button type="button" onClick={() => onChange(x.id)} aria-current={on ? 'page' : undefined}
+                className={`relative flex w-full flex-col items-center gap-0.5 pb-2.5 pt-2 text-[11px] sm:min-h-11 sm:flex-row sm:gap-2 sm:rounded-full sm:px-4 sm:py-2 sm:text-sm ${on ? 'font-semibold text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}>
+                <span className="flex h-7 w-12 items-center justify-center rounded-full sm:h-auto sm:w-auto" style={on ? { background: 'color-mix(in srgb, var(--marca) 14%, white)', color: 'var(--marca)' } : undefined}>
+                  <Icon className="h-5 w-5" />
+                </span>
+                {x.label}
+                {!!x.count && <span className="absolute right-[calc(50%-24px)] top-1 min-w-[16px] rounded-full px-1 text-[10px] font-semibold leading-4 sm:static" style={{ background: 'var(--marca)', color: 'var(--marca-text)' }}>{x.count}</span>}
               </button>
             </li>
           );

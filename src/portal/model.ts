@@ -57,6 +57,8 @@ export interface PafPortalDraft {
   gestionContenido?: string;
   /** PDF de bienvenida del estudio */
   bienvenida?: string;
+  /** Bienvenida escrita por Juan: se lee dentro del portal (sin PDF) */
+  bienvenidaTexto?: string;
   /** Subcarpetas de 02_Materiales */
   materiales?: Partial<Record<MaterialKey, string>>;
   /** Reuniones que incluye el acuerdo (si lo define) */
@@ -329,6 +331,8 @@ export interface PafPortalDoc {
   secciones?: Record<PortalSeccion, boolean>;
   gestionContenido?: string | null;
   bienvenida?: string | null;
+  /** Bienvenida escrita, para leer dentro del portal */
+  bienvenidaTexto?: string | null;
   materiales?: Partial<Record<MaterialKey, string>>;
   /** Reuniones del acuerdo: cuántas hay y cuántas se hicieron */
   reunionesAcuerdo?: { total: number; hechas: number } | null;
@@ -455,6 +459,7 @@ export function buildPafPortal(
       secciones: ver,
       gestionContenido: ver.contenido && input.draft.gestionContenido ? safeHttpsUrl(normalizeLinkInput(input.draft.gestionContenido)) : null,
       bienvenida: input.draft.bienvenida ? safeHttpsUrl(normalizeLinkInput(input.draft.bienvenida)) : null,
+      bienvenidaTexto: input.draft.bienvenidaTexto?.trim().slice(0, 6000) || null,
       materiales: ver.materiales ? materiales : {},
       reunionesAcuerdo: ver.reunionesAcuerdo && acordadas ? { total: acordadas, hechas: Math.min(acordadas, input.reunionesHechas || 0) } : null,
       reunionPorConfirmar: ver.reuniones ? input.reunionPorConfirmar || null : null,
