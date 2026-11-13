@@ -12,8 +12,17 @@ export const CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
 export const DRIVE_READ_SCOPE = 'https://www.googleapis.com/auth/drive.readonly';
 export const integrationRef = (db: Firestore) => db.collection('settings').doc('integrations_private');
 export class DrivePending extends Error {}
+/** La dirección pública del CRM (la que está registrada en Google para volver después del permiso) */
+export const CRM_PUBLIC_URL_DEFAULT = 'https://crm-cero.ai.studio';
+/**
+ * AI Studio pisa APP_URL con la dirección interna de Cloud Run (…run.app), aunque esté en Secrets.
+ * Esa no es la registrada en Google y el permiso de Drive falla con redirect_uri_mismatch. Por eso:
+ * CRM_PUBLIC_URL si está; si APP_URL es de Cloud Run, la dirección pública; si no (local), APP_URL.
+ */
 export function appOrigin(): string {
-  const url = new URL(process.env.APP_URL || '');
+  const app = process.env.APP_URL || '';
+  const esCloudRun = (() => { try { return /\.run\.app$/i.test(new URL(app).hostname); } catch { return false; } })();
+  const url = new URL(process.env.CRM_PUBLIC_URL || (esCloudRun ? CRM_PUBLIC_URL_DEFAULT : app));
   if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw new Error('APP_URL debe ser la dirección HTTPS del CRM.');
   return url.origin;
 }

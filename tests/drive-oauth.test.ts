@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { memoryFirestore } from './helpers/memoryFirestore';
-import { DRIVE_OWNER, DRIVE_SCOPE, registerDriveOAuth } from '../server/driveOAuth';
+import { DRIVE_OWNER, DRIVE_SCOPE, appOrigin, registerDriveOAuth } from '../server/driveOAuth';
 import { decryptDriveSecret } from '../server/driveCrypto';
 
 const google = vi.hoisted(() => ({ email: 'puntocerovision@gmail.com', scope: 'https://www.googleapis.com/auth/drive.file', verified: true, revoke: vi.fn() }));
@@ -39,6 +39,15 @@ describe('OAuth Drive', () => {
     google.revoke.mockResolvedValue({});
   });
   afterEach(() => vi.unstubAllEnvs());
+  it('usa la dirección pública aunque AI Studio ponga la de Cloud Run en APP_URL', () => {
+    vi.stubEnv('APP_URL', 'https://crm-personal-cero-123456.us-east1.run.app');
+    expect(appOrigin()).toBe('https://crm-cero.ai.studio');
+    vi.stubEnv('CRM_PUBLIC_URL', 'https://otro.ejemplo.com');
+    expect(appOrigin()).toBe('https://otro.ejemplo.com');
+    vi.stubEnv('CRM_PUBLIC_URL', '');
+    vi.stubEnv('APP_URL', 'http://localhost:3000');
+    expect(appOrigin()).toBe('http://localhost:3000');
+  });
   it('exige sesión en estado, inicio y desconexión', async () => {
     const h = harness();
     for (const [method, path] of [['GET','status'],['POST','connect'],['POST','disconnect']]) expect((await h.call(method, `/api/drive/${path}`)).statusCode).toBe(401);
