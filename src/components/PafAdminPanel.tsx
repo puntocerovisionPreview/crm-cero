@@ -550,10 +550,11 @@ function usePortalDraft(project: Project, meetings: AgendaMeeting[], onUpdatePro
     if (!project.pafClienteId && pedido?.clienteId) setClienteId((c) => (CLIENTE_ID_RE.test(c) ? c : pedido.clienteId!));
   }, [project.pafClienteId, pedido?.clienteId]);
 
-  // El correo del alta (con el que se comparte la carpeta) es el que entra al portal
+  // El correo del alta entra al portal solo si todavía no hay ninguno: si lo corregiste a mano
+  // (por ejemplo, lo habías cargado mal), no vuelve a aparecer cada vez que abrís la ficha.
   const altaEmail = pedido?.email;
   useEffect(() => {
-    if (altaEmail) setEmailsText((t) => (normalizeEmails(t).includes(altaEmail.toLowerCase()) ? t : [t.trim(), altaEmail].filter(Boolean).join(', ')));
+    if (altaEmail) setEmailsText((t) => (normalizeEmails(t).length ? t : altaEmail));
   }, [altaEmail]);
 
   // La carpeta del estudio que pegás en el alta pasa a "Tu carpeta" si está vacía
