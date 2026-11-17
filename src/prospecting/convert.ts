@@ -17,8 +17,11 @@ export function prospectToProject(p: Prospect, today: string): Omit<Project, 'id
     archived: false,
     clientPhone: p.whatsapp,
     instagramUrl: p.instagram ? `https://instagram.com/${normalizeInstagram(p.instagram)}` : undefined,
-    projectType: 'paf_pro',
-    serviceType: 'paf',
+    // Lo que se le vendió (Web o PAF); si no se eligió, PAF como hasta ahora
+    projectType: p.interes === 'web' ? 'web' : 'paf_pro',
+    serviceType: p.interes === 'web' ? 'web' : 'paf',
+    wonAt: today,
+    ...(p.carpetaUrl ? { carpetaUrl: p.carpetaUrl } : {}),
     rubro: p.audit?.dedicacion,
     lastContactDate: today,
     ...(p.dealValue ? { estimatedPrice: p.dealValue, estimatedCurrency: p.dealCurrency || 'USD' } : {}),

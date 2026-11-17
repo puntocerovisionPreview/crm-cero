@@ -361,6 +361,9 @@ export interface Project {
   googleMapsUrl?: string; // Ficha de Google Business Profile (Maps)
   websiteUrl?: string; // Sitio web oficial o URL de staging / desarrollo
   isLead?: boolean; // True si es un posible proyecto / prospecto en negociación
+  wonAt?: string; // YYYY-MM-DD: el día que un "posible" pasó a cliente (cuenta como cierre de ese mes)
+  ventaChecks?: Record<string, boolean>; // checklist del paso a paso de venta mientras es "posible"
+  carpetaUrl?: string; // link de Drive de su carpeta de oportunidad
   estimatedPrice?: number; // Valor de precio / presupuesto cotizado
   estimatedCurrency?: 'USD' | 'ARS'; // Moneda del valor estimado (default: ARS para PAF, USD o ARS)
   rubro?: string; // Rubro libre del cliente (ej. Arquitectura, Software, Marketing, Salud, etc.)
@@ -1086,6 +1089,10 @@ export interface Prospect {
   log?: ProspectLogEntry[];
   dealValue?: number; // cuánto vale la oportunidad (tablero de oportunidades)
   dealCurrency?: 'ARS' | 'USD';
+  // Paso a paso de venta (utils/ventaEtapas.ts)
+  interes?: 'web' | 'paf'; // qué se le vende: separa el embudo del mes en Web y PAF
+  ventaChecks?: Record<string, boolean>; // checklist "antes de seguir" de las 9 etapas
+  carpetaUrl?: string; // link de Drive de su carpeta de oportunidad
 }
 
 // Pasos del guion: pregunta → (su respuesta) → empatía → (acuerdo) → speech + link de auditoría
