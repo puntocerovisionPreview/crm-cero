@@ -51,7 +51,7 @@ const UI_KEYS = {
 export function getUiPreferences(): UiPreferences {
   if (typeof window === 'undefined' || !window.localStorage) {
     return {
-      hideCerebro: false,
+      hideCerebro: true,
       hideGrafo: false,
       hideDineroPersonal: false,
       hideCalendarioMes: false,
@@ -84,7 +84,8 @@ export function getUiPreferences(): UiPreferences {
   }
 
   return {
-    hideCerebro: localStorage.getItem(UI_KEYS.hideCerebro) === 'true',
+    // Nace oculto: solo se muestra si lo activaste a mano en Ajustes
+    hideCerebro: localStorage.getItem(UI_KEYS.hideCerebro) !== 'false',
     hideGrafo: localStorage.getItem(UI_KEYS.hideGrafo) === 'true',
     hideDineroPersonal: localStorage.getItem(UI_KEYS.hideDineroPersonal) === 'true',
     hideCalendarioMes: localStorage.getItem(UI_KEYS.hideCalendarioMes) === 'true',

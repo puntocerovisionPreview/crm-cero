@@ -7,6 +7,7 @@ import { HomeMoneyCard } from '../components/HomeMoneyCard';
 import { DayCloseModal } from '../components/DayCloseModal';
 import { JournalEntry, subscribeJournal } from '../utils/journal';
 import { SECTORS, Sector, SectorKey } from '../utils/sectors';
+import { getUiPreferences } from '../utils/uiPreferences';
 import { getCollectedEntries, monthMatcher, sumByCurrency } from '../utils/ledger';
 import { calculateProjectBilling } from '../utils/paymentPlans';
 import { useProspecting } from '../prospecting/useProspecting';
@@ -70,7 +71,8 @@ const SectorIcon: React.FC<{ sector: Sector; size?: number }> = ({ sector, size 
   );
 };
 
-const sectorPath = (key: SectorKey) => SECTORS.find(s => s.key === key)!.items[0].path;
+// Contenido ya no es un sector propio (vive en Vender): sus avisos van directo a su pantalla
+const sectorPath = (key: SectorKey) => SECTORS.find(s => s.key === key)?.items[0].path ?? (key === 'contenido' ? '/contenido' : '/inicio');
 
 const DETALLE_KEY = 'inicio_detalle';
 
@@ -253,7 +255,7 @@ export const HomeView: React.FC<Props> = ({
       <section aria-label="Sectores del estudio">
         <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-[var(--text-tertiary)]">Ir a</h2>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-          {SECTORS.map(sector => {
+          {SECTORS.filter(sector => !(sector.key === 'cerebro' && getUiPreferences().hideCerebro)).map(sector => {
             const items = stats[sector.key].slice(0, 2);
             return (
               <button key={sector.key} type="button" onClick={() => go(sector.items[0].path)}

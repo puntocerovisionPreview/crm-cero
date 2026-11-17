@@ -25,6 +25,9 @@ import {
  * La Home (/inicio) muestra un sector por tarjeta; al entrar a uno, el menú lateral y la barra
  * de abajo muestran solo las pantallas de ese sector (más "← Inicio").
  * Ninguna pantalla se quitó: cada una vive en su sector.
+ * Desde el 17/11/2026 son 4 puertas, ordenadas como la empresa: Mi día, Vender, Clientes y Dinero.
+ * Cerebro sigue existiendo pero nace oculto (el cerebro de .CERO es la carpeta C:\CERO_EMPRESA);
+ * se vuelve a mostrar desde Ajustes.
  */
 
 export type SectorKey = 'dia' | 'prospeccion' | 'contenido' | 'clientes' | 'finanzas' | 'cerebro';
@@ -68,25 +71,18 @@ export const SECTORS: Sector[] = [
     ],
   },
   {
+    // Vender: todo lo que trae clientes (prospección, oportunidades y el contenido propio de .CERO)
     key: 'prospeccion',
-    label: 'Prospección',
-    description: 'Contactos en frío, seguimientos y oportunidades',
+    label: 'Vender',
+    description: 'Prospección, oportunidades y tu contenido para conseguir clientes',
     icon: Send,
     tint: '#34C759',
     featured: true,
     items: [
       { label: 'Prospección', path: '/prospeccion', icon: Send, match: starts('/prospeccion', '/prospectos') },
       { label: 'Oportunidades', path: '/oportunidades', icon: KanbanSquare, match: starts('/oportunidades', '/pipeline') },
+      { label: 'Contenido', path: '/contenido', icon: Clapperboard, match: starts('/contenido', '/calendario-contenido') },
     ],
-  },
-  {
-    key: 'contenido',
-    label: 'Contenido',
-    description: 'Calendario de reels y carruseles, guiones y captions',
-    icon: Clapperboard,
-    tint: '#FF2D55',
-    featured: false,
-    items: [{ label: 'Contenido', path: '/contenido', icon: Clapperboard, match: starts('/contenido', '/calendario-contenido') }],
   },
   {
     key: 'clientes',
@@ -104,7 +100,7 @@ export const SECTORS: Sector[] = [
   },
   {
     key: 'finanzas',
-    label: 'Finanzas',
+    label: 'Dinero',
     description: 'Cobros, gastos del estudio y finanzas personales',
     icon: DollarSign,
     tint: '#5856D6',
