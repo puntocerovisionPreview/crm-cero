@@ -27,7 +27,10 @@ describe('Hoy acordamos', () => {
     const m = mensaje('devolucion', { nombre: 'Ana', portal: 'https://x/portal', entrega: { titulo: 'Kit', version: 'v2', decision: 'si este foco te representa', canal: 'mail', hasta: '2026-11-07' } });
     expect(m).toContain('Kit (v2)');
     expect(m).toContain('si este foco te representa');
-    expect(m).toContain('por mail hasta el 7 de noviembre');
+    // Desde el 17/11/2026 no se aprueba por mail: queda en Resultados y los cambios se piden por WhatsApp
+    expect(m).not.toContain('mail');
+    expect(m).toContain('Resultados');
+    expect(m).toContain('https://x/portal');
     expect(mensaje('pedirMaterial', { nombre: 'Ana', portal: 'p' })).toContain('[subcarpeta de Materiales]');
   });
 });

@@ -60,8 +60,8 @@ export function buildEjemplo(email: string, hoy = new Date()) {
       { ...diag.tareas[0], id: t('dg'), tema: 'diagnostico', estado: 'habilitada', habilitadaEn: iso(-3), fecha: d(4), prioritaria: true },
     ],
     pafEntregas: [
-      { id: t('kit'), tema: 'cliente_ideal', titulo: ideal.entregas[0].titulo, version: 'v1', fecha: d(-2), enlace: DRIVE, publicada: true, estado: 'en_revision', decision: ideal.entregas[0].decision, hasta: d(5), canal: 'mail' },
-      { id: t('inf'), tema: 'diagnostico', titulo: diag.entregas[0].titulo, decision: diag.entregas[0].decision, canal: 'mail', publicada: false },
+      { id: t('kit'), tema: 'cliente_ideal', titulo: ideal.entregas[0].titulo, version: 'v1', fecha: d(-2), enlace: DRIVE, publicada: true, estado: 'entregada', decision: ideal.entregas[0].decision, canal: 'WhatsApp' },
+      { id: t('inf'), tema: 'diagnostico', titulo: diag.entregas[0].titulo, decision: diag.entregas[0].decision, canal: 'WhatsApp', publicada: false },
     ],
     pafResumenes: [{
       id: t('r1'), fecha: d(-12), publicado: true,

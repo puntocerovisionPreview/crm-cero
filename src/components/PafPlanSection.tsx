@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { CalendarPlus, Check, ChevronDown, ListChecks, Package, Play } from 'lucide-react';
+import { BookOpen, CalendarPlus, Check, ChevronDown, ExternalLink, ListChecks, Package, Play } from 'lucide-react';
 import { AgendaMeeting, Project } from '../types';
 import { newItemId } from '../panels/model';
-import { hitosCompletados } from '../portal/model';
+import { BASE_DEL_TEMA, entregaHecha, hitosCompletados } from '../portal/model';
 import { ETAPAS, ETAPA_HITOS, SERVICIOS, TEMA_FASE_LABEL, type Etapa, faseDelTema, kitDelTema, temasDelAlcance, type Servicio, type TemaFase, type TemaId, type TemaPlantilla } from '../portal/presencia';
 import { conHistorial } from '../portal/historial';
 import { republishIfPublished } from '../portal/store';
@@ -280,6 +280,9 @@ function TemaCard({ t, project, meetings, abierto, onToggle, onEmpezar, onCheck,
   const estado = project.pafTemas?.[t.id];
   const tareas = (project.pafTareas || []).filter((x) => x.tema === t.id);
   const entregas = (project.pafEntregas || []).filter((x) => x.tema === t.id);
+  // Página de la Base que alimenta este tema: se da por cargada con la última entrega entregada
+  const base = BASE_DEL_TEMA[t.id];
+  const baseHecha = entregas.filter((e) => entregaHecha(e.estado)).sort((a, b) => (b.fecha || '').localeCompare(a.fecha || ''))[0];
   const fase = faseDelTema(t, estado, project.pafTareas || []);
   const checks = estado?.checks || [];
   const hechos = t.completoCuando.filter((_, i) => checks[i]).length;
@@ -292,7 +295,7 @@ function TemaCard({ t, project, meetings, abierto, onToggle, onEmpezar, onCheck,
       <button type="button" onClick={onToggle} aria-expanded={abierto} className="flex w-full items-center gap-2 p-3 text-left">
         <span className="flex-1 min-w-0">
           <span className="block text-xs font-semibold text-zinc-100">{t.titulo}</span>
-          <span className="block text-[10px] text-zinc-500">{hechos} de {t.completoCuando.length} del checklist{estado?.empezado ? ` · desde el ${ddmm(estado.empezado)}` : ''}</span>
+          <span className="block text-[10px] text-zinc-500">{hechos} de {t.completoCuando.length} del checklist{estado?.empezado ? ` · desde el ${ddmm(estado.empezado)}` : ''}{base ? ` · Base p. ${base.pagina}${baseHecha ? ' ✓' : ''}` : ''}</span>
         </span>
         <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${FASE_STYLE[fase]}`}>{TEMA_FASE_LABEL[fase]}</span>
         <ChevronDown className={`w-4 h-4 shrink-0 text-zinc-500 transition-transform ${abierto ? 'rotate-180' : ''}`} />
@@ -300,6 +303,21 @@ function TemaCard({ t, project, meetings, abierto, onToggle, onEmpezar, onCheck,
       {abierto && (
         <div className="space-y-3 border-t border-zinc-800 p-3">
           <p className="text-[11px] text-zinc-400">{t.objetivo}</p>
+
+          {base && (
+            <div className={`flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border p-2 text-[11px] ${baseHecha ? 'border-emerald-500/25 bg-emerald-500/[0.04]' : 'border-zinc-800 bg-zinc-900/60'}`}>
+              <BookOpen className={`w-3.5 h-3.5 shrink-0 ${baseHecha ? 'text-emerald-300' : 'text-zinc-500'}`} aria-hidden />
+              <span className="flex-1 min-w-0 text-zinc-300">
+                <span className="font-semibold text-zinc-200">Base · página {base.pagina}</span> · {base.titulo}
+                <span className="block text-[10px] text-zinc-500">
+                  {baseHecha ? `Cargada con la entrega del ${baseHecha.fecha ? ddmm(baseHecha.fecha) : '—'}` : `Pendiente: se carga cuando entregás ${t.entregas[0]?.titulo || 'este tema'}`}
+                </span>
+              </span>
+              {project.pafDrive?.carpetaInterna && (
+                <a href={project.pafDrive.carpetaInterna} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-bold text-sky-300 hover:text-sky-200">Carpeta interna <ExternalLink className="w-3 h-3" aria-hidden /></a>
+              )}
+            </div>
+          )}
 
           {!estado?.empezado && fase !== 'completo' && (
             <div className="rounded-lg border border-dashed border-zinc-700 p-2.5 space-y-1.5">
@@ -322,7 +340,7 @@ function TemaCard({ t, project, meetings, abierto, onToggle, onEmpezar, onCheck,
               <ListChecks className="mt-0.5 w-3.5 h-3.5 shrink-0 text-zinc-500" /><span><span className="block font-semibold text-zinc-200">Tareas</span>{tareasTxt}</span>
             </button>
             <button type="button" onClick={() => onVer('entregas')} className="flex items-start gap-1.5 rounded-lg bg-zinc-900 p-2 text-left text-zinc-300 hover:bg-zinc-800">
-              <Package className="mt-0.5 w-3.5 h-3.5 shrink-0 text-zinc-500" /><span><span className="block font-semibold text-zinc-200">Entregas</span>{entregas.length ? entregas.map((e) => `${e.titulo}${e.version ? ` ${e.version}` : ''}: ${e.estado === 'aprobada' ? 'aprobada' : e.publicada ? 'para revisar' : 'por preparar'}`).join(' · ') : t.entregas.length ? 'sin cargar' : 'no tiene'}</span>
+              <Package className="mt-0.5 w-3.5 h-3.5 shrink-0 text-zinc-500" /><span><span className="block font-semibold text-zinc-200">Entregas</span>{entregas.length ? entregas.map((e) => `${e.titulo}${e.version ? ` ${e.version}` : ''}: ${entregaHecha(e.estado) ? `entregado${e.fecha ? ` el ${ddmm(e.fecha)}` : ''}` : e.estado === 'ajustes' ? 'con ajustes' : e.publicada ? 'para revisar' : 'por preparar'}`).join(' · ') : t.entregas.length ? 'sin cargar' : 'no tiene'}</span>
             </button>
             <div className="flex items-start gap-1.5 rounded-lg bg-zinc-900 p-2 text-zinc-300">
               <CalendarPlus className="mt-0.5 w-3.5 h-3.5 shrink-0 text-zinc-500" />

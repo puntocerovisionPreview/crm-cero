@@ -763,12 +763,18 @@ function DeliveryRow({ d, nuevo, sinTitulo }: { d: PafPortalDoc['entregas'][numb
           <span className="mt-0.5 flex flex-wrap gap-x-2 text-xs text-[var(--text-tertiary)]">
             {sinTitulo && d.version && <span>{d.version}</span>}
             {d.fecha && <span>{formatDisplayDate(d.fecha, 'medium')}</span>}
-            {d.estado && <span className={d.estado === 'aprobada' ? 'text-emerald-600' : d.estado === 'ajustes' ? 'text-amber-600' : ''}>{PAF_DELIVERY_STATE_LABEL[d.estado]}</span>}
+            {d.estado && <span className={d.estado === 'aprobada' || d.estado === 'entregada' ? 'text-emerald-600' : d.estado === 'ajustes' ? 'text-amber-600' : ''}>{d.estado === 'entregada' ? 'En tu carpeta › Resultados' : PAF_DELIVERY_STATE_LABEL[d.estado]}</span>}
           </span>
         </span>
         {d.enlace && <a href={d.enlace} target="_blank" rel="noopener noreferrer" className="shrink-0 inline-flex items-center gap-1 rounded-[var(--radius-control)] border border-[var(--border-subtle)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:border-[var(--border-strong)]">Revisar <ArrowUpRight className="w-3.5 h-3.5" /></a>}
       </div>
-      {d.decision && d.estado !== 'aprobada' && (
+      {d.decision && d.estado === 'entregada' && (
+        <p className="mt-3 rounded-[var(--radius-control)] border-l-[3px] border-l-[var(--marca)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]">
+          <span className="text-[var(--text-tertiary)]">Al leerlo, fijate sobre todo </span>{d.decision}
+          <span className="block text-xs text-[var(--text-secondary)]">Si querés cambiar algo, avisanos por WhatsApp.</span>
+        </p>
+      )}
+      {d.decision && d.estado !== 'aprobada' && d.estado !== 'entregada' && (
         <p className="mt-3 rounded-[var(--radius-control)] border-l-[3px] border-l-[var(--marca)] bg-[var(--bg-surface-muted)] px-3 py-2 text-sm text-[var(--text-primary)]">
           <span className="text-[var(--text-tertiary)]">Necesitamos que decidas: </span>{d.decision}
           {(hasta || d.canal) && <span className="block text-xs text-[var(--text-secondary)]">{hasta && `Hasta el ${hasta}`}{hasta && d.canal ? ' · ' : ''}{d.canal && `Confirmalo por ${d.canal}`}</span>}

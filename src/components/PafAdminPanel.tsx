@@ -10,7 +10,8 @@ import {
 } from '../portal/model';
 import { createPedidoAlta, publishPafPortal, publishPortalExtras, republishIfPublished, savePafConfig, subscribePafConfig, subscribePafPortal, subscribePedidoDeProyecto, suggestNextClienteId, suggestNextWebClienteId, unpublishPafPortal } from '../portal/store';
 import { AccessIcon } from './AccessIcon';
-import { MENSAJES, hoyAcordamos, mensaje, recordatorioPendientes, type MensajeId } from '../portal/mensajes';
+import { MENSAJES, avisoEntrega, hoyAcordamos, mensaje, recordatorioPendientes, type MensajeId } from '../portal/mensajes';
+import { getTodayString } from '../utils/storage';
 import { subscribePanelOfProject } from '../panels/store';
 import type { ClientPanel } from '../panels/model';
 import { SegmentedControl } from '../ui';
@@ -738,6 +739,9 @@ function usePafWork(project: Project, meetings: AgendaMeeting[], onUpdateProject
 
   return {
     tasks, deliveries, error, saveDeliveries,
+    /** Para el aviso de WhatsApp de cada entrega */
+    contacto: (project.ownerName || project.clientName || '').split(' ')[0],
+    resultados: project.pafDrive?.resultados,
     channel: suggestedChannel(tasks),
     enable: (id: string) => update(id, (t) => ({ ...t, estado: 'habilitada', habilitadaEn: new Date().toISOString(), motivo: undefined }), (t) => `Tarea habilitada: ${t.titulo}`),
     hide: (id: string) => update(id, (t) => ({ ...t, estado: 'borrador' })),
@@ -912,7 +916,12 @@ function Deliveries({ work, showForm = true, onDone }: { work: Work; showForm?: 
   // Control antes de mostrarla (no bloquea: es para no olvidarse)
   const [controlando, setControlando] = useState<string | null>(null);
   const [checks, setChecks] = useState<boolean[]>([]);
-  const CONTROL = ['Versión y fecha correctas', 'Arriba está el resumen y qué tiene que decidir', 'Nada interno: sin notas, ficha, Tally ni borradores', 'Plazo y canal para confirmar acordados'];
+  const CONTROL = ['Versión y fecha correctas', 'Arriba está el resumen de lo que entregamos', 'Nada interno: sin notas, ficha, Tally ni borradores', 'Subida a su carpeta › Resultados'];
+  const [copiado, setCopiado] = useState<string | null>(null);
+  const copiarWhatsapp = (d: PafDelivery) => {
+    const texto = avisoEntrega({ nombre: work.contacto || '[nombre]', entrega: d, resultados: work.resultados });
+    navigator.clipboard?.writeText(texto).then(() => { setCopiado(d.id); setTimeout(() => setCopiado(null), 1500); }).catch(() => window.prompt('Copiá el mensaje:', texto));
+  };
   const update = (id: string, patch: Partial<PafDelivery>) => work.saveDeliveries(work.deliveries.map((x) => (x.id === id ? { ...x, ...patch } : x)));
   const add = () => {
     if (!f.titulo.trim()) return;
@@ -920,8 +929,8 @@ function Deliveries({ work, showForm = true, onDone }: { work: Work; showForm?: 
     if (f.enlace.trim() && !enlace) { setError('El enlace tiene que empezar con https://'); return; }
     setError('');
     work.saveDeliveries([...work.deliveries, {
-      id: newItemId(), titulo: f.titulo.trim(), publicada: false, estado: 'en_revision',
-      ...(enlace ? { enlace } : {}), ...(f.fecha ? { fecha: f.fecha } : {}), ...(f.version.trim() ? { version: f.version.trim() } : {}),
+      id: newItemId(), titulo: f.titulo.trim(), publicada: false, estado: 'entregada',
+      ...(enlace ? { enlace } : {}), fecha: f.fecha || getTodayString(), ...(f.version.trim() ? { version: f.version.trim() } : {}),
       ...(f.decision.trim() ? { decision: f.decision.trim() } : {}), ...(f.hasta ? { hasta: f.hasta } : {}), ...(f.canal.trim() ? { canal: f.canal.trim() } : {}),
     }]);
     setF(vacio);
@@ -938,11 +947,16 @@ function Deliveries({ work, showForm = true, onDone }: { work: Work; showForm?: 
                 <span className="flex-1 min-w-0">
                   <span className="block truncate">{d.enlace ? <a href={d.enlace} target="_blank" rel="noopener noreferrer" className="underline inline-flex items-center gap-1">{d.titulo}<ExternalLink className="w-3 h-3" /></a> : d.titulo}
                     {d.version && <span className="text-zinc-500"> · {d.version}</span>}{d.fecha && <span className="text-zinc-500"> · {d.fecha}</span>}</span>
-                  {d.decision && <span className="block text-[11px] text-zinc-400">Decide: {d.decision}{d.hasta && ` · hasta el ${d.hasta.split('-').reverse().slice(0, 2).join('/')}`}{d.canal && ` · por ${d.canal}`}</span>}
+                  {d.decision && <span className="block text-[11px] text-zinc-400">{d.estado === 'entregada' ? 'Para mirar' : 'Decide'}: {d.decision}{d.hasta && ` · hasta el ${d.hasta.split('-').reverse().slice(0, 2).join('/')}`}{d.canal && ` · por ${d.canal}`}</span>}
+                  <button type="button" onClick={() => copiarWhatsapp(d)} className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-emerald-300 hover:text-emerald-200">{copiado === d.id ? 'Copiado ✓' : 'Copiar WhatsApp'}</button>
                   <span className="mt-1 block"><CartaSelect item={d} tipo="e" work={work} onChange={(c) => work.saveDeliveries(work.deliveries.map((x) => (x.id === d.id ? conCarta(x, c) : x)))} /></span>
                 </span>
-                <select aria-label="Estado de la entrega" value={d.estado || 'en_revision'} onChange={(e) => update(d.id, { estado: e.target.value as PafDeliveryState })} className="rounded-md bg-zinc-950 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">
-                  {(Object.keys(PAF_DELIVERY_STATE_LABEL) as PafDeliveryState[]).map((k) => <option key={k} value={k}>{PAF_DELIVERY_STATE_LABEL[k]}</option>)}
+                <select aria-label="Estado de la entrega" value={d.estado || ''} onChange={(e) => {
+                  const estado = (e.target.value || undefined) as PafDeliveryState | undefined;
+                  update(d.id, { estado, ...(estado === 'entregada' && !d.fecha ? { fecha: getTodayString() } : {}) });
+                }} className="rounded-md bg-zinc-950 border border-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">
+                  <option value="">Por preparar</option>
+                  {(Object.keys(PAF_DELIVERY_STATE_LABEL) as PafDeliveryState[]).filter((k) => k === 'entregada' || k === 'ajustes' || k === d.estado).map((k) => <option key={k} value={k}>{PAF_DELIVERY_STATE_LABEL[k]}</option>)}
                 </select>
                 <label className="flex items-center gap-1 text-[10px] text-zinc-400"><input type="checkbox" checked={d.publicada} onChange={(e) => {
                   if (!e.target.checked) { update(d.id, { publicada: false }); return; }
@@ -975,11 +989,8 @@ function Deliveries({ work, showForm = true, onDone }: { work: Work; showForm?: 
           <input className={input} value={f.enlace} placeholder="Enlace de Drive (https://)" onChange={(e) => setF({ ...f, enlace: e.target.value })} />
           <input className={`${input} w-36`} type="date" aria-label="Fecha de la entrega" value={f.fecha} onChange={(e) => setF({ ...f, fecha: e.target.value })} />
         </div>
-        <input className={input} value={f.decision} placeholder="Qué tiene que decidir o revisar (ej. si este foco representa al estudio)" onChange={(e) => setF({ ...f, decision: e.target.value })} />
-        <div className="flex gap-1.5">
-          <input className={`${input} w-36`} type="date" aria-label="Hasta cuándo" value={f.hasta} onChange={(e) => setF({ ...f, hasta: e.target.value })} />
-          <input className={input} value={f.canal} placeholder="Dónde lo confirma (mail, Asana, reunión)" onChange={(e) => setF({ ...f, canal: e.target.value })} />
-        </div>
+        <input className={input} value={f.decision} placeholder="(Opcional) Qué conviene que mire (ej. si este foco representa al estudio)" onChange={(e) => setF({ ...f, decision: e.target.value })} />
+        <p className="text-[10px] text-zinc-500">Se carga como Entregado (con la fecha de hoy si no ponés otra). El estudio no aprueba por mail: si quiere cambios, te avisa y subís una versión nueva.</p>
         <button type="button" onClick={add} className="btn-solid-primary px-3 py-1.5 text-xs">Agregar entrega</button>
       </div>}
       {(error || work.error) && <p role="alert" className="text-[11px] text-rose-300">{error || work.error}</p>}

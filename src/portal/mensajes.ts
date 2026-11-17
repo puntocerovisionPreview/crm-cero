@@ -62,8 +62,28 @@ export const MENSAJES: { id: MensajeId; label: string }[] = [
   { id: 'bienvenida', label: 'Bienvenida a su espacio' },
   { id: 'pedirMaterial', label: 'Pedir material' },
   { id: 'confirmarRecepcion', label: 'Confirmar que recibiste algo' },
-  { id: 'devolucion', label: 'Presentar una entrega para revisar' },
+  { id: 'devolucion', label: 'Avisar que le dejaste una entrega' },
 ];
+
+/**
+ * Aviso de entrega por WhatsApp (forma de trabajo del 17/11/2026): el informe ya está en su carpeta
+ * › Resultados; no se pide aprobación por mail. Si quiere cambios, lo dice por acá y sale otra versión.
+ */
+export function avisoEntrega(d: {
+  nombre: string;
+  entrega: { titulo: string; version?: string; enlace?: string; decision?: string };
+  resultados?: string;
+}): string {
+  const e = d.entrega;
+  const donde = e.enlace || d.resultados;
+  return [
+    `Hola ${d.nombre}! Te dejé ${e.titulo}${e.version ? ` (${e.version})` : ''} en tu carpeta, en Resultados${donde ? `: ${donde}` : '.'}`,
+    e.decision ? `Cuando lo leas, fijate sobre todo ${e.decision}.` : '',
+    'Si querés cambiar algo, decime por acá y lo ajusto.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
 
 export function mensaje(id: Exclude<MensajeId, 'recordatorio' | 'novedades' | 'hoyAcordamos'>, d: {
   nombre: string;
@@ -76,7 +96,7 @@ export function mensaje(id: Exclude<MensajeId, 'recordatorio' | 'novedades' | 'h
   if (id === 'bienvenida') return `Hola ${d.nombre}, ya tenés tu espacio de trabajo: ${d.portal} (entrás con tu cuenta de Google). Adentro está la bienvenida y una guía para los materiales. Por ahora te pedimos [acción concreta]. Nos vemos el ${proxima}. Si no podés entrar, avisame desde qué correo lo estás intentando.`;
   if (id === 'pedirMaterial') return `Hola ${d.nombre}, para preparar [trabajo] necesitamos [archivos concretos] de [proyecto]. Podés subirlos en ${d.materiales || '[subcarpeta de Materiales]'}. Sumá dos o tres líneas: qué pidió el cliente, qué dificultad había y cómo lo resolvieron. Avisanos qué se puede mostrar. ¿Lo podrías tener para el [fecha]?`;
   if (id === 'confirmarRecepcion') return `Recibí [archivo], gracias. Con esto puedo avanzar en [trabajo]. Para decidir [punto concreto] me falta confirmar [pregunta]. El resto lo sigo preparando; si preferís, ese punto lo vemos en la reunión.`;
+  // Sin aprobación por mail: el aviso dice dónde quedó y que los cambios se piden por WhatsApp
   const e = d.entrega;
-  const hasta = e?.hasta ? new Date(`${e.hasta}T12:00:00`).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : '[plazo]';
-  return `Hola ${d.nombre}, te comparto ${e ? `${e.titulo}${e.version ? ` (${e.version})` : ''}${e.enlace ? `: ${e.enlace}` : ''}` : '[documento, versión y enlace]'}. La propuesta principal es [una frase] por [razón]. Necesitamos que revises ${e?.decision || '[decisión concreta]'}. Podés confirmarlo o pedir cambios por ${e?.canal || '[mail o Asana]'} hasta el ${hasta}. También lo tenés en tu portal: ${d.portal}`;
+  return `${avisoEntrega({ nombre: d.nombre, entrega: e || { titulo: '[documento]' } })}\nTambién lo tenés en tu portal: ${d.portal}`;
 }

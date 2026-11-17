@@ -246,8 +246,28 @@ export interface PafDelivery {
   /** Carta del portal: vacío = la del tema; "-" = sola; otro texto = carta con ese nombre */
   carta?: string;
 }
-export type PafDeliveryState = 'en_revision' | 'aprobada' | 'ajustes';
-export const PAF_DELIVERY_STATE_LABEL: Record<PafDeliveryState, string> = { en_revision: 'Para revisar', aprobada: 'Aprobada', ajustes: 'Con ajustes' };
+/**
+ * Desde el 17/11/2026 se entrega sin aprobación por mail: Juan sube el informe a Resultados y avisa por
+ * WhatsApp → "entregada". Si el estudio pide un cambio → "ajustes" y sale una versión nueva.
+ * "en_revision" y "aprobada" quedan para las entregas viejas.
+ */
+export type PafDeliveryState = 'entregada' | 'ajustes' | 'en_revision' | 'aprobada';
+export const PAF_DELIVERY_STATE_LABEL: Record<PafDeliveryState, string> = { entregada: 'Entregado', ajustes: 'Con ajustes', en_revision: 'Para revisar', aprobada: 'Aprobada' };
+/** Ya está en manos del estudio (cuenta como entregada en el plan, los reportes y la Base) */
+export const entregaHecha = (estado?: PafDeliveryState) => estado === 'entregada' || estado === 'aprobada';
+
+/**
+ * PÁGINAS DE LA BASE ESTRATÉGICA (01_PAF_METODO/reglas/7_RECORRIDO_Y_BASE.md)
+ * Cada tema que la alimenta: la página se da por cargada cuando su entrega quedó entregada.
+ */
+export const BASE_DEL_TEMA: Partial<Record<import('./presencia').TemaId, { pagina: number; titulo: string }>> = {
+  cliente_ideal: { pagina: 1, titulo: 'A quién le habla, nicho y oferta' },
+  diagnostico: { pagina: 2, titulo: 'El "antes" de cada canal y sus metas' },
+  mensaje: { pagina: 3, titulo: 'Frase, bio, título de la web y texto de Google' },
+  instagram: { pagina: 4, titulo: 'El "después" de Instagram' },
+  google: { pagina: 4, titulo: 'El "después" de Google' },
+  web: { pagina: 4, titulo: 'El "después" de la web' },
+};
 
 /** Tarea tal como la ve el cliente */
 export interface PafPortalTask {
